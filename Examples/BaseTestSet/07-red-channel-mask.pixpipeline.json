@@ -1,0 +1,205 @@
+{
+  "connections": [
+    {
+      "id": "source.image->channel.image",
+      "input": {
+        "nodeID": "channel",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "source",
+        "port": "image"
+      }
+    },
+    {
+      "id": "channel.mask->crop.mask",
+      "input": {
+        "nodeID": "crop",
+        "port": "mask"
+      },
+      "output": {
+        "nodeID": "channel",
+        "port": "mask"
+      }
+    },
+    {
+      "id": "crop.mask->threshold.mask",
+      "input": {
+        "nodeID": "threshold",
+        "port": "mask"
+      },
+      "output": {
+        "nodeID": "crop",
+        "port": "mask"
+      }
+    },
+    {
+      "id": "threshold.mask->invert.mask",
+      "input": {
+        "nodeID": "invert",
+        "port": "mask"
+      },
+      "output": {
+        "nodeID": "threshold",
+        "port": "mask"
+      }
+    },
+    {
+      "id": "invert.mask->image.mask",
+      "input": {
+        "nodeID": "image",
+        "port": "mask"
+      },
+      "output": {
+        "nodeID": "invert",
+        "port": "mask"
+      }
+    },
+    {
+      "id": "image.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "image",
+        "port": "image"
+      }
+    }
+  ],
+  "exposedParameters": [],
+  "id": "org.pixeltje.examples.base-test-set.07-red-channel-mask",
+  "mode": "selection",
+  "name": "Base Test Set 07 · Red Channel Mask",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "source",
+      "kind": "input.image",
+      "parameters": {
+        "sourceName": "test-card.png"
+      },
+      "resources": {},
+      "title": "Test card"
+    },
+    {
+      "executionState": "enabled",
+      "id": "channel",
+      "kind": "mask.fromImage",
+      "parameters": {
+        "channel": "red"
+      },
+      "resources": {},
+      "title": "Red channel"
+    },
+    {
+      "executionState": "enabled",
+      "id": "crop",
+      "kind": "mask.crop",
+      "parameters": {
+        "height": {
+          "$type": "integer",
+          "value": 157
+        },
+        "width": {
+          "$type": "integer",
+          "value": 231
+        },
+        "x": {
+          "$type": "integer",
+          "value": 73
+        },
+        "y": {
+          "$type": "integer",
+          "value": 54
+        }
+      },
+      "resources": {},
+      "title": "Crop mask"
+    },
+    {
+      "executionState": "enabled",
+      "id": "threshold",
+      "kind": "mask.threshold",
+      "parameters": {
+        "value": {
+          "$type": "number",
+          "value": 0.52
+        }
+      },
+      "resources": {},
+      "title": "Binary mask"
+    },
+    {
+      "executionState": "enabled",
+      "id": "invert",
+      "kind": "mask.invert",
+      "parameters": {},
+      "resources": {},
+      "title": "Invert mask"
+    },
+    {
+      "executionState": "enabled",
+      "id": "image",
+      "kind": "mask.toImage",
+      "parameters": {},
+      "resources": {},
+      "title": "Grayscale mask"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.image",
+      "parameters": {},
+      "resources": {},
+      "title": "Image result"
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "channel": {
+        "x": 240,
+        "y": 160
+      },
+      "crop": {
+        "x": 480,
+        "y": 160
+      },
+      "image": {
+        "x": 1200,
+        "y": 160
+      },
+      "invert": {
+        "x": 960,
+        "y": 160
+      },
+      "output": {
+        "x": 1440,
+        "y": 160
+      },
+      "source": {
+        "x": 0,
+        "y": 160
+      },
+      "threshold": {
+        "x": 720,
+        "y": 160
+      }
+    },
+    "nodeSizes": {},
+    "viewportOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "viewportScale": 0.8
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

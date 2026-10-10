@@ -1,0 +1,647 @@
+{
+  "connections" : [
+    {
+      "id" : "source.video->video-preview.video",
+      "input" : {
+        "nodeID" : "video-preview",
+        "port" : "video"
+      },
+      "output" : {
+        "nodeID" : "source",
+        "port" : "video"
+      }
+    },
+    {
+      "id" : "loop.callIndex->video-preview.frameIndex",
+      "input" : {
+        "nodeID" : "video-preview",
+        "port" : "frameIndex"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "callIndex"
+      }
+    },
+    {
+      "id" : "video-preview.image->scale.image",
+      "input" : {
+        "nodeID" : "scale",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "video-preview",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "scale.image->red.image",
+      "input" : {
+        "nodeID" : "red",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "scale",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "scale.image->blue.image",
+      "input" : {
+        "nodeID" : "blue",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "scale",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "scale.image->green.image",
+      "input" : {
+        "nodeID" : "green",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "scale",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "red.mask->red-or-blue.destination",
+      "input" : {
+        "nodeID" : "red-or-blue",
+        "port" : "destination"
+      },
+      "output" : {
+        "nodeID" : "red",
+        "port" : "mask"
+      }
+    },
+    {
+      "id" : "blue.mask->red-or-blue.source",
+      "input" : {
+        "nodeID" : "red-or-blue",
+        "port" : "source"
+      },
+      "output" : {
+        "nodeID" : "blue",
+        "port" : "mask"
+      }
+    },
+    {
+      "id" : "green.mask->green-excess.destination",
+      "input" : {
+        "nodeID" : "green-excess",
+        "port" : "destination"
+      },
+      "output" : {
+        "nodeID" : "green",
+        "port" : "mask"
+      }
+    },
+    {
+      "id" : "red-or-blue.mask->green-excess.source",
+      "input" : {
+        "nodeID" : "green-excess",
+        "port" : "source"
+      },
+      "output" : {
+        "nodeID" : "red-or-blue",
+        "port" : "mask"
+      }
+    },
+    {
+      "id" : "green-excess.mask->key.mask",
+      "input" : {
+        "nodeID" : "key",
+        "port" : "mask"
+      },
+      "output" : {
+        "nodeID" : "green-excess",
+        "port" : "mask"
+      }
+    },
+    {
+      "id" : "key.mask->soft-key.mask",
+      "input" : {
+        "nodeID" : "soft-key",
+        "port" : "mask"
+      },
+      "output" : {
+        "nodeID" : "key",
+        "port" : "mask"
+      }
+    },
+    {
+      "id" : "soft-key.mask->subject.mask",
+      "input" : {
+        "nodeID" : "subject",
+        "port" : "mask"
+      },
+      "output" : {
+        "nodeID" : "soft-key",
+        "port" : "mask"
+      }
+    },
+    {
+      "id" : "seed.seed->background.seed",
+      "input" : {
+        "nodeID" : "background",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "background.image->composite.destination",
+      "input" : {
+        "nodeID" : "composite",
+        "port" : "destination"
+      },
+      "output" : {
+        "nodeID" : "background",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "scale.image->composite.source",
+      "input" : {
+        "nodeID" : "composite",
+        "port" : "source"
+      },
+      "output" : {
+        "nodeID" : "scale",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "subject.mask->composite.mask",
+      "input" : {
+        "nodeID" : "composite",
+        "port" : "mask"
+      },
+      "output" : {
+        "nodeID" : "subject",
+        "port" : "mask"
+      }
+    },
+    {
+      "id" : "composite.image->preview.image",
+      "input" : {
+        "nodeID" : "preview",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "composite",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "preview.image->output.image",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "preview",
+        "port" : "image"
+      }
+    }
+  ],
+  "controlConnections" : [
+    {
+      "id" : "output.completed->loop.completed",
+      "input" : {
+        "nodeID" : "loop",
+        "port" : "completed"
+      },
+      "output" : {
+        "nodeID" : "output",
+        "port" : "completed"
+      }
+    },
+    {
+      "id" : "loop.repeat->start.again",
+      "input" : {
+        "nodeID" : "start",
+        "port" : "again"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "repeat"
+      }
+    }
+  ],
+  "exposedParameters" : [
+    {
+      "defaultValue" : {
+        "$type" : "number",
+        "value" : 0.18
+      },
+      "id" : "key-threshold",
+      "label" : "Green excess threshold",
+      "maximum" : 1,
+      "minimum" : 0,
+      "target" : {
+        "nodeID" : "key",
+        "parameter" : "value"
+      },
+      "valueType" : "number"
+    }
+  ],
+  "id" : "org.pixeltje.examples.greenscreen-chroma-key",
+  "mode" : "generic",
+  "name" : "Green Screen · Video Chroma Key",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "start",
+      "kind" : "control.start",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Start \/ next frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "loop",
+      "kind" : "control.loop",
+      "parameters" : {
+        "autoPause" : false,
+        "delayMilliseconds" : {
+          "$type" : "integer",
+          "value" : 0
+        },
+        "feedback" : "none",
+        "maxCalls" : {
+          "$type" : "integer",
+          "value" : 1070
+        },
+        "seedStrategy" : "fixed"
+      },
+      "resources" : {
+
+      },
+      "title" : "Process all 1,070 frames"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "source",
+      "kind" : "input.video",
+      "parameters" : {
+        "sourceName" : "greenscreen.mp4"
+      },
+      "resources" : {
+
+      },
+      "title" : "Green screen source"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "video-preview",
+      "kind" : "output.videoPreview",
+      "parameters" : {
+        "framesPerSecond" : {
+          "$type" : "number",
+          "value" : 60
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Play source \/ emit frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "scale",
+      "kind" : "image.scaleBy",
+      "parameters" : {
+        "scaleBy" : {
+          "$type" : "number",
+          "value" : 0.5
+        },
+        "upscaleMethod" : "bicubic"
+      },
+      "resources" : {
+
+      },
+      "title" : "Half-size processing"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "red",
+      "kind" : "mask.fromImage",
+      "parameters" : {
+        "channel" : "red"
+      },
+      "resources" : {
+
+      },
+      "title" : "Red channel"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "blue",
+      "kind" : "mask.fromImage",
+      "parameters" : {
+        "channel" : "blue"
+      },
+      "resources" : {
+
+      },
+      "title" : "Blue channel"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "green",
+      "kind" : "mask.fromImage",
+      "parameters" : {
+        "channel" : "green"
+      },
+      "resources" : {
+
+      },
+      "title" : "Green channel"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "red-or-blue",
+      "kind" : "mask.composite",
+      "parameters" : {
+        "operation" : "or"
+      },
+      "resources" : {
+
+      },
+      "title" : "Max of red and blue"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "green-excess",
+      "kind" : "mask.composite",
+      "parameters" : {
+        "operation" : "subtract"
+      },
+      "resources" : {
+
+      },
+      "title" : "Green minus red\/blue"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "key",
+      "kind" : "mask.threshold",
+      "parameters" : {
+        "value" : {
+          "$type" : "number",
+          "value" : 0.18
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Green-screen threshold"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "soft-key",
+      "kind" : "mask.feather",
+      "parameters" : {
+        "bottom" : {
+          "$type" : "integer",
+          "value" : 2
+        },
+        "left" : {
+          "$type" : "integer",
+          "value" : 2
+        },
+        "right" : {
+          "$type" : "integer",
+          "value" : 2
+        },
+        "top" : {
+          "$type" : "integer",
+          "value" : 2
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Soften key edge"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "subject",
+      "kind" : "mask.invert",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Keep subject"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed",
+      "kind" : "input.seed",
+      "parameters" : {
+        "mode" : "fixed",
+        "value" : {
+          "$type" : "integer",
+          "value" : 12026
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Fixed background seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "background",
+      "kind" : "image.proceduralNoise",
+      "parameters" : {
+        "height" : {
+          "$type" : "integer",
+          "value" : 960
+        },
+        "octaves" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "palette" : "aurora",
+        "pattern" : "smooth",
+        "salt" : {
+          "$type" : "integer",
+          "value" : 7
+        },
+        "scale" : {
+          "$type" : "number",
+          "value" : 5
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 540
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Aurora replacement background"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "composite",
+      "kind" : "image.compositeMasked",
+      "parameters" : {
+        "resizeSource" : false,
+        "x" : {
+          "$type" : "integer",
+          "value" : 0
+        },
+        "y" : {
+          "$type" : "integer",
+          "value" : 0
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Subject over new background"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "preview",
+      "kind" : "output.preview",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Processed frame preview"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output",
+      "kind" : "output.image",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Processed frame output"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "background" : {
+        "x" : 1440,
+        "y" : 500
+      },
+      "blue" : {
+        "x" : 1170,
+        "y" : 160
+      },
+      "composite" : {
+        "x" : 2790,
+        "y" : 200
+      },
+      "green" : {
+        "x" : 1170,
+        "y" : 320
+      },
+      "green-excess" : {
+        "x" : 1710,
+        "y" : 200
+      },
+      "key" : {
+        "x" : 1980,
+        "y" : 200
+      },
+      "loop" : {
+        "x" : 42,
+        "y" : 200
+      },
+      "output" : {
+        "x" : 74,
+        "y" : 618
+      },
+      "preview" : {
+        "x" : 538,
+        "y" : 353
+      },
+      "red" : {
+        "x" : 1170,
+        "y" : 0
+      },
+      "red-or-blue" : {
+        "x" : 1440,
+        "y" : 80
+      },
+      "scale" : {
+        "x" : 900,
+        "y" : 0
+      },
+      "seed" : {
+        "x" : 1170,
+        "y" : 500
+      },
+      "soft-key" : {
+        "x" : 2250,
+        "y" : 200
+      },
+      "source" : {
+        "x" : 42,
+        "y" : 8
+      },
+      "start" : {
+        "x" : 180,
+        "y" : 426
+      },
+      "subject" : {
+        "x" : 2520,
+        "y" : 200
+      },
+      "video-preview" : {
+        "x" : 540,
+        "y" : 0
+      }
+    },
+    "nodeSizes" : {
+      "preview" : {
+        "height" : 437,
+        "width" : 498
+      },
+      "video-preview" : {
+        "height" : 300,
+        "width" : 320
+      }
+    },
+    "viewportOrigin" : {
+      "x" : 188.11192902312857,
+      "y" : -62.8886568383353
+    },
+    "viewportScale" : 1.0552018760997406
+  },
+  "primaryOutputNodeIDs" : [
+    "output"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

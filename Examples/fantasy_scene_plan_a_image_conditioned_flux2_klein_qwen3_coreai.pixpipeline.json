@@ -1,0 +1,687 @@
+{
+  "connections" : [
+    {
+      "id" : "prompt.prompt->nextView.originalPrompt",
+      "input" : {
+        "nodeID" : "nextView",
+        "port" : "originalPrompt"
+      },
+      "output" : {
+        "nodeID" : "prompt",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "previousPlan.scenePlan->nextView.previousPlan",
+      "input" : {
+        "nodeID" : "nextView",
+        "port" : "previousPlan"
+      },
+      "output" : {
+        "nodeID" : "previousPlan",
+        "port" : "scenePlan"
+      }
+    },
+    {
+      "id" : "trackpad.x->nextView.x",
+      "input" : {
+        "nodeID" : "nextView",
+        "port" : "x"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "x"
+      }
+    },
+    {
+      "id" : "trackpad.y->nextView.y",
+      "input" : {
+        "nodeID" : "nextView",
+        "port" : "y"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "y"
+      }
+    },
+    {
+      "id" : "nextView.prompt->characterWriter.prompt",
+      "input" : {
+        "nodeID" : "characterWriter",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "nextView",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed.seed->characterWriter.seed",
+      "input" : {
+        "nodeID" : "characterWriter",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "characterWriter.text->parsePlan.text",
+      "input" : {
+        "nodeID" : "parsePlan",
+        "port" : "text"
+      },
+      "output" : {
+        "nodeID" : "characterWriter",
+        "port" : "text"
+      }
+    },
+    {
+      "id" : "parsePlan.prompt->finalPrompt.stringA",
+      "input" : {
+        "nodeID" : "finalPrompt",
+        "port" : "stringA"
+      },
+      "output" : {
+        "nodeID" : "parsePlan",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "persistentImageBrief.value->finalPrompt.stringB",
+      "input" : {
+        "nodeID" : "finalPrompt",
+        "port" : "stringB"
+      },
+      "output" : {
+        "nodeID" : "persistentImageBrief",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "finalPrompt.value->generate.prompt",
+      "input" : {
+        "nodeID" : "generate",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "finalPrompt",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "seed.seed->generate.seed",
+      "input" : {
+        "nodeID" : "generate",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate.image->output.image",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "generate",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "parsePlan.scenePlan->output.scenePlan",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "scenePlan"
+      },
+      "output" : {
+        "nodeID" : "parsePlan",
+        "port" : "scenePlan"
+      }
+    },
+    {
+      "id" : "previousFrame.image->navigationCrop.image",
+      "input" : {
+        "nodeID" : "navigationCrop",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "previousFrame",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "previousPlan.scenePlan->navigationCrop.previousPlan",
+      "input" : {
+        "nodeID" : "navigationCrop",
+        "port" : "previousPlan"
+      },
+      "output" : {
+        "nodeID" : "previousPlan",
+        "port" : "scenePlan"
+      }
+    },
+    {
+      "id" : "trackpad.x->navigationCrop.x",
+      "input" : {
+        "nodeID" : "navigationCrop",
+        "port" : "x"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "x"
+      }
+    },
+    {
+      "id" : "trackpad.y->navigationCrop.y",
+      "input" : {
+        "nodeID" : "navigationCrop",
+        "port" : "y"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "y"
+      }
+    },
+    {
+      "id" : "navigationCrop.image->generate.referenceImage",
+      "input" : {
+        "nodeID" : "generate",
+        "port" : "referenceImage"
+      },
+      "output" : {
+        "nodeID" : "navigationCrop",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "generate.image->output-preview.image",
+      "input" : {
+        "nodeID" : "output-preview",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "generate",
+        "port" : "image"
+      }
+    }
+  ],
+  "controlConnections" : [
+    {
+      "id" : "output.completed->loop.completed",
+      "input" : {
+        "nodeID" : "loop",
+        "port" : "completed"
+      },
+      "output" : {
+        "nodeID" : "output",
+        "port" : "completed"
+      }
+    },
+    {
+      "id" : "loop.repeat->start.again",
+      "input" : {
+        "nodeID" : "start",
+        "port" : "again"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "repeat"
+      }
+    },
+    {
+      "id" : "loop.incrementSeed->seed.increment",
+      "input" : {
+        "nodeID" : "seed",
+        "port" : "increment"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "incrementSeed"
+      }
+    }
+  ],
+  "exposedParameters" : [
+
+  ],
+  "id" : "org.pixeltje.examples.plan-a-image-conditioned-fantasy-world",
+  "mode" : "textToImage",
+  "name" : "Plan-A Image-Conditioned Open Fantasy World — Qwen3 and FLUX.2 Klein",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "start",
+      "kind" : "control.start",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Start \/ Next Pass"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "An explorable, original high-fantasy world seen from a traveler’s eye level. Begin on a weathered stone road outside a vast hilltop castle. The castle fills the central distance and its arched gate is visible slightly to the right, with towers, market banners, ancient trees, mountains, and warm late-afternoon light. Include clear landmarks. Each new view should move into the subject selected from the previous view’s planned layout, revealing plausible nearby details and inviting further exploration. Invent only the next local view as needed; do not predefine a complete world map."
+      },
+      "resources" : {
+
+      },
+      "title" : "Open World Brief"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "previousPlan",
+      "kind" : "input.previousScenePlan",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Previous Planned Layout"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "trackpad",
+      "kind" : "input.trackpad",
+      "parameters" : {
+        "x" : {
+          "$type" : "number",
+          "value" : 0.5
+        },
+        "y" : {
+          "$type" : "number",
+          "value" : 0.5
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Trackpad"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "nextView",
+      "kind" : "scene.navigate",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Next View Brief"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "characterWriter",
+      "kind" : "coreai.textGenerate",
+      "parameters" : {
+        "maxTokens" : {
+          "$type" : "integer",
+          "value" : 2048
+        },
+        "systemPrompt" : "You plan ONE view of an explorable original fantasy world. \/no_think\nReturn ONLY a valid JSON object, no markdown or commentary. Use this shape: {\"imagePrompt\":\"complete visual description\",\"defaultNextView\":\"what moving forward reveals\",\"regions\":{\"castle\":{\"label\":\"castle\",\"box\":[0.45,0.2,0.8,0.8]},\"gate\":{\"label\":\"gate\",\"box\":[0.55,0.5,0.65,0.7]}}}. imagePrompt is a complete standalone prompt for the CURRENT image. It describes only visible content: never put planning phrases such as Next view, Regions, boxes, coordinates, or future instructions inside it. Describe subjects, environment, camera viewpoint, foreground\/background placement, architecture, materials, light, mood, and continuity. Say where visible objects appear in ordinary spatial language, but do not put JSON or coordinates inside imagePrompt. regions is a JSON OBJECT keyed by short unique object names. Give 3 to 7 visible objects, paths, doors, or landmarks. Every region must have a label and a box [left,top,right,bottom] with values from 0 to 1; top is 0. A smaller detail box may sit inside a larger landmark box. A region may also have nextView text describing a closer view, but this field is optional. The layout describes what you INTEND to draw, not pixels you have inspected. On later calls, the camera has moved into the selected subject: place it large and central, abandon the previous wide framing, and reveal a new explorable detail. Make new boxes for the new composition instead of copying old boxes. Keep established visual motifs. Invent only this next local view, not a whole world map.",
+        "temperature" : {
+          "$type" : "number",
+          "value" : 0.35
+        },
+        "topK" : {
+          "$type" : "integer",
+          "value" : 30
+        }
+      },
+      "resources" : {
+        "manifest" : {
+          "reference" : {
+            "componentRole" : "languageModelManifest",
+            "contentHash" : "4ddc5300b4b5062b386e3ce2e4c46705f5dbbb0447d998a35b6b5c648836ad9d",
+            "familyABI" : "coreai-language-model@1",
+            "kind" : "data",
+            "packageID" : "coreai.qwen-qwen3-0-6b",
+            "packageVersion" : "sha256.0a89d27cf3a82f2b0ce63bb1bdc16963b4b3078ba26fe564b0b809ddf2e92041"
+          },
+          "state" : "linked"
+        },
+        "model" : {
+          "reference" : {
+            "componentRole" : "languageModel",
+            "contentHash" : "6495d7dcf2b0027b81602481dc8ba8c8fc3f6a87b8938a088f33a2e04e421604",
+            "familyABI" : "coreai-language-model@1",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.qwen-qwen3-0-6b",
+            "packageVersion" : "sha256.0a89d27cf3a82f2b0ce63bb1bdc16963b4b3078ba26fe564b0b809ddf2e92041"
+          },
+          "state" : "linked"
+        },
+        "tokenizer" : {
+          "reference" : {
+            "componentRole" : "tokenizer",
+            "contentHash" : "0682a040763905c927476457261ce62fcb5e5038f7d0037b37f8f174792cc292",
+            "familyABI" : "coreai-language-model@1",
+            "kind" : "tokenizer",
+            "packageID" : "coreai.qwen-qwen3-0-6b",
+            "packageVersion" : "sha256.0a89d27cf3a82f2b0ce63bb1bdc16963b4b3078ba26fe564b0b809ddf2e92041"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Qwen3 Scene Writer"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "parsePlan",
+      "kind" : "scene.parsePlan",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Parse Qwen3 Scene Plan"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "persistentImageBrief",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "A small, expressive mouse-like adventurer wearing a blue traveling cloak is a recognizable recurring presence in this fantasy world. Keep the character's appearance consistent across views. Use a coherent storybook-meets-cinematic visual style, believable architecture, natural depth, and clear landmarks. Avoid copyrighted characters, logos, captions, interface elements, and text in the image."
+      },
+      "resources" : {
+
+      },
+      "title" : "Persistent Character and Style"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "finalPrompt",
+      "kind" : "text.concatenate",
+      "parameters" : {
+        "delimiter" : "\n\n"
+      },
+      "resources" : {
+
+      },
+      "title" : "Final Image Prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed",
+      "kind" : "input.seed",
+      "parameters" : {
+        "mode" : "fixed",
+        "value" : {
+          "$type" : "integer",
+          "value" : 1008116446
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Shared Seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "referenceGrid" : "half",
+        "steps" : {
+          "$type" : "integer",
+          "value" : 2
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "055691b9e4fe67a93a7b6fc9a8d7b17a9b7d155c265c19201f25d0283ea60b3b",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.b874204e85db6ff4c5bab174613687bf6232664f654810ec0659b6bb94ab292e"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "b76662168960f75fcd0d98dcb0b3468d195e137be277753f083dc1b7a2d66454",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.b874204e85db6ff4c5bab174613687bf6232664f654810ec0659b6bb94ab292e"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ba6c8af5e9857acaaa4fcd37bebe8afec57006286840ddda1a5293adf24836c6",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.b874204e85db6ff4c5bab174613687bf6232664f654810ec0659b6bb94ab292e"
+          },
+          "state" : "linked"
+        },
+        "vaeEncoder" : {
+          "reference" : {
+            "componentRole" : "vaeEncoder",
+            "contentHash" : "4d52dc38091349201d100a1a96b8bc5f8a5966b8b86635d240527380f2a34093",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.b874204e85db6ff4c5bab174613687bf6232664f654810ec0659b6bb94ab292e"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "FLUX.2 Klein Generate"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output",
+      "kind" : "output.image",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Image Output"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "loop",
+      "kind" : "control.loop",
+      "parameters" : {
+        "delayMilliseconds" : {
+          "$type" : "integer",
+          "value" : 100
+        },
+        "feedback" : "scenePlanAndImageToNextView",
+        "maxCalls" : {
+          "$type" : "integer",
+          "value" : 100
+        },
+        "seedStrategy" : "fixed"
+      },
+      "resources" : {
+
+      },
+      "title" : "Loop"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "previousFrame",
+      "kind" : "input.previousFrame",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Previous Rendered Frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "navigationCrop",
+      "kind" : "scene.navigationCrop",
+      "parameters" : {
+        "margin" : {
+          "$type" : "number",
+          "value" : 1.5
+        },
+        "size" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Crop Toward Trackpad"
+    },
+    {
+      "executionState" : "disabled",
+      "id" : "imageEditGuide",
+      "kind" : "edit.markdownNote",
+      "parameters" : {
+        "text" : "## Plan-A image-conditioned navigation\n\nThis copy sends the previous scene plan and rendered frame into the next loop pass. Navigation Crop centers the selected Trackpad X\/Y region; FLUX.2 conditions its next image on that crop and the new Qwen prompt. First frame is text-to-image. The Persistent Character and Style text joins the parsed scene prompt only after Qwen3 finishes, so Qwen3 does not generate the repeated image brief.\n\nThis graph is linked to the complete FLUX.2 Klein 4B macOS export. Select `~\/coreai-models\/exports-image-conditioned\/FLUX.2-klein-4B` in Pipeline Editor. It must include `VAEEncoder.aimodel` and `Transformer.aimodel` with `img2img_half`. If using another export, relink the FLUX.2 node to its package identity. The earlier three-component export is text-only and cannot execute later frames.\n\nThe original text-only Plan-A example remains available."
+      },
+      "resources" : {
+
+      },
+      "title" : "Image-conditioned package setup"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output-preview",
+      "kind" : "output.preview",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Image Preview"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "characterWriter" : {
+        "x" : 600,
+        "y" : 80
+      },
+      "generate" : {
+        "x" : 1410,
+        "y" : 80
+      },
+      "finalPrompt" : {
+        "x" : 1140,
+        "y" : 80
+      },
+      "imageEditGuide" : {
+        "x" : 38,
+        "y" : 780
+      },
+      "loop" : {
+        "x" : 990,
+        "y" : 541
+      },
+      "navigationCrop" : {
+        "x" : 1001,
+        "y" : 335
+      },
+      "nextView" : {
+        "x" : 320,
+        "y" : 220
+      },
+      "output" : {
+        "x" : 1680,
+        "y" : 80
+      },
+      "output-preview" : {
+        "x" : 927,
+        "y" : 697
+      },
+      "parsePlan" : {
+        "x" : 870,
+        "y" : 80
+      },
+      "persistentImageBrief" : {
+        "x" : 360,
+        "y" : 520
+      },
+      "previousFrame" : {
+        "x" : 550,
+        "y" : 792
+      },
+      "previousPlan" : {
+        "x" : 40,
+        "y" : 270
+      },
+      "prompt" : {
+        "x" : 40,
+        "y" : 80
+      },
+      "seed" : {
+        "x" : 600,
+        "y" : 390
+      },
+      "start" : {
+        "x" : 1348,
+        "y" : 829
+      },
+      "trackpad" : {
+        "x" : 40,
+        "y" : 420
+      }
+    },
+    "nodeSizes" : {
+
+    },
+    "viewportOrigin" : {
+      "x" : 372.47427429553414,
+      "y" : 370.4151734262536
+    },
+    "viewportScale" : 1.1520413958700373
+  },
+  "primaryOutputNodeIDs" : [
+    "output"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

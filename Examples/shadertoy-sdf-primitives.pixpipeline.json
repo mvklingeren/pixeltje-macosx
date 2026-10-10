@@ -1,0 +1,387 @@
+{
+  "connections" : [
+    {
+      "id" : "state.state->pointerX.json",
+      "input" : {
+        "nodeID" : "pointerX",
+        "port" : "json"
+      },
+      "output" : {
+        "nodeID" : "state",
+        "port" : "state"
+      }
+    },
+    {
+      "id" : "pointer.x->pointerX.setValue",
+      "input" : {
+        "nodeID" : "pointerX",
+        "port" : "setValue"
+      },
+      "output" : {
+        "nodeID" : "pointer",
+        "port" : "x"
+      }
+    },
+    {
+      "id" : "pointerX.json->pointerY.json",
+      "input" : {
+        "nodeID" : "pointerY",
+        "port" : "json"
+      },
+      "output" : {
+        "nodeID" : "pointerX",
+        "port" : "json"
+      }
+    },
+    {
+      "id" : "pointer.y->pointerY.setValue",
+      "input" : {
+        "nodeID" : "pointerY",
+        "port" : "setValue"
+      },
+      "output" : {
+        "nodeID" : "pointer",
+        "port" : "y"
+      }
+    },
+    {
+      "id" : "pointerY.json->render.state",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "state"
+      },
+      "output" : {
+        "nodeID" : "pointerY",
+        "port" : "json"
+      }
+    },
+    {
+      "id" : "render.image->output.image",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "render",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "primitive-int.value->render.width",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "width"
+      },
+      "output" : {
+        "nodeID" : "primitive-int",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "primitive-int-2.value->render.height",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "height"
+      },
+      "output" : {
+        "nodeID" : "primitive-int-2",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "shader-file.value->render.sourceFile",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "sourceFile"
+      },
+      "output" : {
+        "nodeID" : "shader-file",
+        "port" : "value"
+      }
+    }
+  ],
+  "controlConnections" : [
+    {
+      "id" : "output.completed->loop.completed",
+      "input" : {
+        "nodeID" : "loop",
+        "port" : "completed"
+      },
+      "output" : {
+        "nodeID" : "output",
+        "port" : "completed"
+      }
+    },
+    {
+      "id" : "loop.repeat->start.again",
+      "input" : {
+        "nodeID" : "start",
+        "port" : "again"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "repeat"
+      }
+    }
+  ],
+  "exposedParameters" : [
+
+  ],
+  "id" : "org.pixeltje.examples.sdf-primitives-shader",
+  "mode" : "generic",
+  "name" : "SDF Primitives · Metal Shader",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "start",
+      "kind" : "control.start",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Start \/ Next Frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "state",
+      "kind" : "input.state",
+      "parameters" : {
+        "initialState" : "{\n  \"version\": 1,\n  \"mode\": \"shader\",\n  \"fragmentFunction\": \"sdfPrimitivesFragment\",\n  \"width\": 640,\n  \"height\": 360,\n  \"timeSeconds\": 0,\n  \"secondsPerFrame\": 0.03333333333333333,\n  \"pointer\": {\n    \"x\": 0.5,\n    \"y\": 0.5\n  }\n}"
+      },
+      "resources" : {
+
+      },
+      "title" : "Shader state"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "pointer",
+      "kind" : "input.trackpad",
+      "parameters" : {
+        "x" : {
+          "$type" : "number",
+          "value" : 0.5
+        },
+        "y" : {
+          "$type" : "number",
+          "value" : 0.5
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Point the camera"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "pointerX",
+      "kind" : "text.jsonExtract",
+      "parameters" : {
+        "key" : "\/pointer\/x"
+      },
+      "resources" : {
+
+      },
+      "title" : "Set pointer X"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "pointerY",
+      "kind" : "text.jsonExtract",
+      "parameters" : {
+        "key" : "\/pointer\/y"
+      },
+      "resources" : {
+
+      },
+      "title" : "Set pointer Y"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "shader-file",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "SDFPrimitives.metal"
+      },
+      "resources" : {
+
+      },
+      "title" : "SDFPrimitives.metal"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "render",
+      "kind" : "render.metal",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Metal shader · SDF primitives"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output",
+      "kind" : "output.image",
+      "parameters" : {
+        "filenamePrefix" : "sdf-primitives",
+        "format" : "png"
+      },
+      "resources" : {
+
+      },
+      "title" : "SDF primitives frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "loop",
+      "kind" : "control.loop",
+      "parameters" : {
+        "autoPause" : false,
+        "delayMilliseconds" : {
+          "$type" : "integer",
+          "value" : 0
+        },
+        "feedback" : "none",
+        "maxCalls" : {
+          "$type" : "integer",
+          "value" : -1
+        },
+        "seedStrategy" : "fixed"
+      },
+      "resources" : {
+
+      },
+      "title" : "Animate camera"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "note",
+      "kind" : "edit.markdownNote",
+      "parameters" : {
+        "text" : "# SDF Primitives Shader\nThis workflow renders the user-supplied MIT-licensed Inigo Quilez Shadertoy shader with the existing Metal Render node. JSON State owns the fragment entry point, default 640 × 360 resolution, base time, seconds per frame and pointer position. Connect the existing Width and Height inputs on Metal Render to override either state dimension. The Trackpad and two JSON Value nodes fill the pointer fields; the Metal node receives just one state connection. Drag the Trackpad to steer the camera, including while the Loop is running. The Loop call index advances time. Metal Render draws the card preview at its own size; full-screen preview uses the connected Width and Height. This Loop has no post-frame delay, so rendering and preview work determine its frame rate. No mesh or texture channels are used. Source and MIT license: Examples\/SDFPrimitives.metal."
+      },
+      "resources" : {
+
+      },
+      "title" : "How it works"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 2880
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Integer"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int-2",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 1864
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Integer"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "loop" : {
+        "x" : 478,
+        "y" : 537
+      },
+      "note" : {
+        "x" : 0,
+        "y" : 860
+      },
+      "output" : {
+        "x" : 1138,
+        "y" : 0
+      },
+      "pointer" : {
+        "x" : 0,
+        "y" : 430
+      },
+      "pointerX" : {
+        "x" : 290,
+        "y" : 130
+      },
+      "pointerY" : {
+        "x" : 550,
+        "y" : 130
+      },
+      "primitive-int" : {
+        "x" : 580.887784090909,
+        "y" : 822.897727272727
+      },
+      "primitive-int-2" : {
+        "x" : 579,
+        "y" : 946
+      },
+      "shader-file" : {
+        "x" : 550,
+        "y" : 360
+      },
+      "render" : {
+        "x" : 864,
+        "y" : 290
+      },
+      "start" : {
+        "x" : 0,
+        "y" : 0
+      },
+      "state" : {
+        "x" : 0,
+        "y" : 130
+      }
+    },
+    "nodeSizes" : {
+      "note" : {
+        "height" : 320,
+        "width" : 500
+      },
+      "pointer" : {
+        "height" : 240,
+        "width" : 220
+      },
+      "render" : {
+        "height" : 656,
+        "width" : 783
+      }
+    },
+    "viewportOrigin" : {
+      "x" : -52.62073863636362,
+      "y" : -139.77272727272742
+    },
+    "viewportScale" : 0.55
+  },
+  "primaryOutputNodeIDs" : [
+    "output"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

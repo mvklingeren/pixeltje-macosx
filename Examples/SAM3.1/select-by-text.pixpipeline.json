@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 2,
+  "id": "org.pixeltje.examples.sam31.text-selection",
+  "name": "SAM 3.1 · Select by Text",
+  "mode": "selection",
+  "requirements": {
+    "minimumEngineVersion": 1,
+    "familyABIs": []
+  },
+  "nodes": [
+    {
+      "id": "source",
+      "kind": "input.image",
+      "title": "Choose an image",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    },
+    {
+      "id": "prompt",
+      "kind": "input.prompt",
+      "title": "What to select",
+      "executionState": "enabled",
+      "parameters": {
+        "value": "person"
+      },
+      "resources": {}
+    },
+    {
+      "id": "sam31",
+      "kind": "coreai.sam31Select",
+      "title": "SAM 3.1 selection",
+      "executionState": "enabled",
+      "parameters": {
+        "scoreThreshold": {
+          "$type": "number",
+          "value": 0.5
+        },
+        "maskThreshold": {
+          "$type": "number",
+          "value": 0.5
+        },
+        "maxSegments": {
+          "$type": "integer",
+          "value": 32
+        }
+      },
+      "resources": {
+        "model": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.meta.sam3.1-image-selection",
+            "packageVersion": "facebook-sam3.1-daa63191845a-coreai-fp16",
+          "contentHash": "e41c0a848dcd286d180386edb5a6a998650255f2d65eadd7327413c57da2962d",
+            "componentRole": "detector"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.meta.sam3.1-image-selection",
+            "packageVersion": "facebook-sam3.1-daa63191845a-coreai-fp16",
+            "contentHash": "6d9109cc838977f3ca94a379eec36aecc7c807e1785cd729660ca2fc0171fb35",
+            "componentRole": "tokenizer"
+          }
+        }
+      }
+    },
+    {
+      "id": "image",
+      "kind": "mask.toImage",
+      "title": "Preview selection",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    },
+    {
+      "id": "output",
+      "kind": "output.image",
+      "title": "Selection image",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    }
+  ],
+  "connections": [
+    {
+      "id": "source.image->sam31.image",
+      "output": {
+        "nodeID": "source",
+        "port": "image"
+      },
+      "input": {
+        "nodeID": "sam31",
+        "port": "image"
+      }
+    },
+    {
+      "id": "prompt.prompt->sam31.prompt",
+      "output": {
+        "nodeID": "prompt",
+        "port": "prompt"
+      },
+      "input": {
+        "nodeID": "sam31",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "sam31.mask->image.mask",
+      "output": {
+        "nodeID": "sam31",
+        "port": "mask"
+      },
+      "input": {
+        "nodeID": "image",
+        "port": "mask"
+      }
+    },
+    {
+      "id": "image.image->output.image",
+      "output": {
+        "nodeID": "image",
+        "port": "image"
+      },
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      }
+    }
+  ],
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "exposedParameters": [],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "source": {
+        "x": 0,
+        "y": 0
+      },
+      "prompt": {
+        "x": 0,
+        "y": 190
+      },
+      "sam31": {
+        "x": 300,
+        "y": 80
+      },
+      "image": {
+        "x": 610,
+        "y": 80
+      },
+      "output": {
+        "x": 880,
+        "y": 80
+      }
+    },
+    "nodeSizes": {},
+    "viewportOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "viewportScale": 0.8
+  }
+}

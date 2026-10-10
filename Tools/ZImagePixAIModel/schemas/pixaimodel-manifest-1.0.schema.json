@@ -1,0 +1,288 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pixeltje.app/schemas/pixaimodel/manifest/1.0",
+  "title": "Pixeltje AI model package manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "package", "publisher", "compatibility", "pipelines",
+    "components", "generation", "color", "memory", "records", "licenses", "inventory"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "1.0.0"},
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identifier", "displayName", "modelFamily", "variant", "formatVersion"],
+      "properties": {
+        "identifier": {"type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)+$"},
+        "displayName": {"type": "string", "minLength": 1},
+        "modelFamily": {"type": "string", "minLength": 1},
+        "variant": {"type": "string", "minLength": 1},
+        "formatVersion": {"const": "1.0.0"}
+      }
+    },
+    "publisher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "modelRepository", "revision"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "modelRepository": {"type": "string", "format": "uri"},
+        "revision": {"$ref": "#/$defs/sha1"}
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimumMacOS", "minimumPipelineRuntime", "artifactTypes"],
+      "properties": {
+        "minimumMacOS": {"const": "27.0"},
+        "minimumPipelineRuntime": {"$ref": "#/$defs/semver"},
+        "artifactTypes": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": {"enum": ["aimodel", "aimodelc"]}
+        }
+      }
+    },
+    "pipelines": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "version", "descriptor", "descriptorSHA256", "modes", "minimumRuntime"],
+        "properties": {
+          "id": {"$ref": "#/$defs/id"},
+          "version": {"$ref": "#/$defs/semver"},
+          "descriptor": {"$ref": "#/$defs/relativePath"},
+          "descriptorSHA256": {"$ref": "#/$defs/sha256"},
+          "modes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/mode"}},
+          "minimumRuntime": {"$ref": "#/$defs/semver"}
+        }
+      }
+    },
+    "components": {
+      "type": "array", "minItems": 1,
+      "items": {"$ref": "#/$defs/component"}
+    },
+    "generation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["modes", "schedulers", "resolution", "prompt", "latent", "defaults"],
+      "properties": {
+        "modes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/mode"}},
+        "schedulers": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["id", "implementation", "configurationSHA256"],
+            "properties": {
+              "id": {"$ref": "#/$defs/id"},
+              "implementation": {"enum": ["host"]},
+              "configurationSHA256": {"$ref": "#/$defs/sha256"}
+            }
+          }
+        },
+        "resolution": {
+          "type": "object", "additionalProperties": false,
+          "required": ["minimumWidth", "maximumWidth", "minimumHeight", "maximumHeight", "requiredMultiple", "independentAxes", "maximumImageTokens", "resamplingFallback"],
+          "properties": {
+            "minimumWidth": {"type": "integer", "minimum": 1},
+            "maximumWidth": {"type": "integer", "minimum": 1},
+            "minimumHeight": {"type": "integer", "minimum": 1},
+            "maximumHeight": {"type": "integer", "minimum": 1},
+            "requiredMultiple": {"type": "integer", "minimum": 1},
+            "independentAxes": {"type": "boolean"},
+            "maximumImageTokens": {"type": "integer", "minimum": 1},
+            "resamplingFallback": {"const": false},
+            "decoderStrategy": {"enum": ["dynamic", "overlapped-tiles", "fixed-variants"]}
+          }
+        },
+        "prompt": {
+          "type": "object", "additionalProperties": false,
+          "required": ["maximumTokens", "tokenizerIdentity", "chatTemplateSHA256", "embeddingHiddenSize"],
+          "properties": {
+            "maximumTokens": {"type": "integer", "minimum": 1},
+            "tokenizerIdentity": {"type": "string", "minLength": 1},
+            "chatTemplateSHA256": {"$ref": "#/$defs/sha256"},
+            "embeddingHiddenSize": {"type": "integer", "minimum": 1}
+          }
+        },
+        "latent": {
+          "type": "object", "additionalProperties": false,
+          "required": ["channels", "spatialDownsample", "patchWidth", "patchHeight", "scalingFactor", "shiftFactor", "timestepScale", "ropeTheta", "ropeAxesDimensions", "ropeAxesLengths"],
+          "properties": {
+            "channels": {"type": "integer", "minimum": 1},
+            "spatialDownsample": {"type": "integer", "minimum": 1},
+            "patchWidth": {"type": "integer", "minimum": 1},
+            "patchHeight": {"type": "integer", "minimum": 1},
+            "scalingFactor": {"type": "number"},
+            "shiftFactor": {"type": "number"},
+            "timestepScale": {"type": "number"},
+            "ropeTheta": {"type": "number"},
+            "ropeAxesDimensions": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "integer", "minimum": 1}},
+            "ropeAxesLengths": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "integer", "minimum": 1}}
+          }
+        },
+        "defaults": {
+          "type": "object", "additionalProperties": false,
+          "required": ["width", "height", "transformerEvaluations", "guidanceScale", "seedMode", "scheduler"],
+          "properties": {
+            "width": {"type": "integer"}, "height": {"type": "integer"},
+            "transformerEvaluations": {"type": "integer", "minimum": 1},
+            "guidanceScale": {"type": "number"},
+            "seedMode": {"enum": ["fixed", "random"]},
+            "scheduler": {"$ref": "#/$defs/id"}
+          }
+        }
+      }
+    },
+    "color": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sourceTensor", "outputTensor", "packageOutput"],
+      "properties": {
+        "sourceTensor": {"type": "string", "minLength": 1},
+        "outputTensor": {"type": "string", "minLength": 1},
+        "packageOutput": {"type": "string", "minLength": 1}
+      }
+    },
+    "memory": {
+      "type": "object", "additionalProperties": false,
+      "required": ["estimatedPeakBytes", "residencyGroups"],
+      "properties": {
+        "estimatedPeakBytes": {"type": "integer", "minimum": 0},
+        "residencyGroups": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["id", "componentIDs", "simultaneouslyResident"],
+            "properties": {
+              "id": {"$ref": "#/$defs/id"},
+              "componentIDs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+              "simultaneouslyResident": {"type": "boolean"}
+            }
+          }
+        }
+      }
+    },
+    "records": {
+      "type": "object", "additionalProperties": false,
+      "required": ["provenance", "validation"],
+      "properties": {
+        "provenance": {"$ref": "#/$defs/recordReference"},
+        "validation": {"$ref": "#/$defs/recordReference"}
+      }
+    },
+    "licenses": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/license"}},
+    "inventory": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/inventoryItem"}}
+  },
+  "$defs": {
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "sha1": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "tensorName": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "relativePath": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\u0000]+$"},
+    "mode": {"enum": ["text-to-image", "image-to-image", "inpaint", "outpaint"]},
+    "dimension": {
+      "oneOf": [
+        {"type": "integer", "minimum": 1},
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["symbol", "minimum", "maximum"],
+          "properties": {
+            "symbol": {"$ref": "#/$defs/id"},
+            "minimum": {"type": "integer", "minimum": 1},
+            "maximum": {"type": "integer", "minimum": 1},
+            "multipleOf": {"type": "integer", "minimum": 1}
+          }
+        }
+      ]
+    },
+    "tensor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "scalarType", "rank", "dimensions", "layout", "semantic"],
+      "properties": {
+        "name": {"$ref": "#/$defs/tensorName"},
+        "scalarType": {"enum": ["float16", "bfloat16", "float32", "int32", "bool"]},
+        "rank": {"type": "integer", "minimum": 0},
+        "dimensions": {"type": "array", "items": {"$ref": "#/$defs/dimension"}},
+        "layout": {"type": "string", "minLength": 1},
+        "valueRange": {
+          "type": "object", "additionalProperties": false,
+          "required": ["minimum", "maximum"],
+          "properties": {"minimum": {"type": "number"}, "maximum": {"type": "number"}}
+        },
+        "semantic": {"type": "string", "minLength": 1}
+      }
+    },
+    "variant": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "artifact", "functionName", "digest", "digestAlgorithm", "storageType", "specialization", "inputs", "outputs", "capabilities"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "artifact": {"$ref": "#/$defs/relativePath"},
+        "functionName": {"type": "string", "minLength": 1},
+        "digest": {"$ref": "#/$defs/sha256"},
+        "digestAlgorithm": {"enum": ["sha256-tree-v1"]},
+        "storageType": {"enum": ["float32", "bfloat16", "float16", "int8", "int4", "mixed"]},
+        "specialization": {"enum": ["required-on-first-load", "ahead-of-time"]},
+        "inputs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/tensor"}},
+        "outputs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/tensor"}},
+        "capabilities": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "minimumWidth": {"type": "integer"}, "maximumWidth": {"type": "integer"},
+            "minimumHeight": {"type": "integer"}, "maximumHeight": {"type": "integer"},
+            "requiredMultiple": {"type": "integer", "minimum": 1},
+            "maximumImageTokens": {"type": "integer", "minimum": 1},
+            "maximumPromptTokens": {"type": "integer", "minimum": 1},
+            "executionStrategy": {"enum": ["direct", "overlapped-tiles"]},
+            "decoderStrategy": {"enum": ["dynamic", "overlapped-tiles", "fixed-variants"]},
+            "tilePixels": {"type": "integer", "minimum": 16},
+            "tileOverlapFactor": {"type": "number", "exclusiveMinimum": 0, "maximum": 0.5},
+            "directMaximumImageTokens": {"type": "integer", "minimum": 1}
+          }
+        },
+        "estimatedResidentBytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "component": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "role", "revision", "variants"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "role": {"enum": ["prompt-encoder", "denoiser", "vae-encoder", "vae-decoder", "glue"]},
+        "revision": {"type": "string", "minLength": 1},
+        "compatibilityGroup": {"$ref": "#/$defs/id"},
+        "variants": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/variant"}}
+      }
+    },
+    "recordReference": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {"path": {"$ref": "#/$defs/relativePath"}, "sha256": {"$ref": "#/$defs/sha256"}}
+    },
+    "license": {
+      "type": "object", "additionalProperties": false,
+      "required": ["spdx", "appliesTo", "path", "sha256"],
+      "properties": {
+        "spdx": {"type": "string", "minLength": 1},
+        "appliesTo": {"type": "string", "minLength": 1},
+        "path": {"$ref": "#/$defs/relativePath"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "noticePath": {"$ref": "#/$defs/relativePath"},
+        "noticeSHA256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "inventoryItem": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "kind", "digest", "digestAlgorithm"],
+      "properties": {
+        "path": {"$ref": "#/$defs/relativePath"},
+        "kind": {"enum": ["file", "directory"]},
+        "digest": {"$ref": "#/$defs/sha256"},
+        "digestAlgorithm": {"enum": ["sha256", "sha256-tree-v1"]},
+        "mediaType": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

@@ -1,0 +1,264 @@
+{
+  "connections": [
+    {
+      "id": "state.state->render.state",
+      "input": {
+        "nodeID": "render",
+        "port": "state"
+      },
+      "output": {
+        "nodeID": "state",
+        "port": "state"
+      }
+    },
+    {
+      "id": "render.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "render",
+        "port": "image"
+      }
+    },
+    {
+      "id": "primitive-int.value->render.width",
+      "input": {
+        "nodeID": "render",
+        "port": "width"
+      },
+      "output": {
+        "nodeID": "primitive-int",
+        "port": "value"
+      }
+    },
+    {
+      "id": "primitive-int-2.value->render.height",
+      "input": {
+        "nodeID": "render",
+        "port": "height"
+      },
+      "output": {
+        "nodeID": "primitive-int-2",
+        "port": "value"
+      }
+    },
+    {
+      "id": "shader-text.value->render.source",
+      "input": {
+        "nodeID": "render",
+        "port": "source"
+      },
+      "output": {
+        "nodeID": "shader-text",
+        "port": "value"
+      }
+    }
+  ],
+  "controlConnections": [
+    {
+      "id": "output.completed->loop.completed",
+      "input": {
+        "nodeID": "loop",
+        "port": "completed"
+      },
+      "output": {
+        "nodeID": "output",
+        "port": "completed"
+      }
+    },
+    {
+      "id": "loop.repeat->start.again",
+      "input": {
+        "nodeID": "start",
+        "port": "again"
+      },
+      "output": {
+        "nodeID": "loop",
+        "port": "repeat"
+      }
+    }
+  ],
+  "exposedParameters": [],
+  "id": "org.pixeltje.examples.furry-hearts-shader-inline",
+  "mode": "generic",
+  "name": "Furry Hearts · Inline Metal Shader",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "start",
+      "kind": "control.start",
+      "parameters": {},
+      "resources": {},
+      "title": "Start / Next Frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "state",
+      "kind": "input.state",
+      "parameters": {
+        "initialState": "{\n  \"version\": 1,\n  \"mode\": \"shader\",\n  \"fragmentFunction\": \"furryHeartsFragment\",\n  \"width\": 640,\n  \"height\": 360,\n  \"timeSeconds\": 0,\n  \"secondsPerFrame\": 0.016666666666666666\n}"
+      },
+      "resources": {},
+      "title": "Furry hearts shader state"
+    },
+    {
+      "executionState": "enabled",
+      "id": "shader-text",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": "#include <metal_stdlib>\nusing namespace metal;\n\n// Self-contained plush-heart scene for the Pipeline Editor's shader mode.\nstruct ShaderUniforms {\n    float4 resolutionTime; // width, height, seconds, unused\n    float4 mouse;          // reserved by the shared shader-state contract\n};\n\nfloat hash21(float2 p) {\n    return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);\n}\n\nfloat noise2(float2 p) {\n    float2 cell = floor(p);\n    float2 f = fract(p);\n    f = f * f * (3.0 - 2.0 * f);\n    return mix(mix(hash21(cell), hash21(cell + float2(1.0, 0.0)), f.x),\n               mix(hash21(cell + float2(0.0, 1.0)),\n                   hash21(cell + float2(1.0, 1.0)), f.x), f.y);\n}\n\n// The classic implicit heart gives two rounded lobes, a notch, and a pointed tip.\nfloat heartDistance(float2 p) {\n    float xx = p.x * p.x;\n    float yy = p.y * p.y;\n    float a = xx + yy - 1.0;\n    float field = a * a * a - xx * p.y * yy;\n    float2 gradient = float2(6.0 * p.x * a * a - 2.0 * p.x * p.y * yy,\n                             6.0 * p.y * a * a - 3.0 * xx * yy);\n    return field / max(length(gradient), 0.65);\n}\n\nfloat2 projectPoint(float3 point, float3 camera, float3 forward,\n                    float3 right, float3 up, float focalLength) {\n    float3 relative = point - camera;\n    float depth = max(dot(relative, forward), 0.01);\n    return float2(dot(relative, right), dot(relative, up))\n           * (focalLength / depth);\n}\n\nfloat3 floorColor(float3 point) {\n    float grain = noise2(point.xz * 8.0) - 0.5;\n    float broad = exp(-0.016 * dot(point.xz, point.xz));\n    return float3(0.75, 0.675, 0.565) + broad * float3(0.085, 0.075, 0.065)\n           + grain * 0.013;\n}\n\nfloat3 renderHearts(float2 screen, float2 resolution, float time) {\n    const float focalLength = 2.18;\n    const float cycle = 8.4;\n    float t = time - cycle * floor(time / cycle);\n\n    float3 camera = float3(0.0, 3.9, -9.5);\n    float3 forward = normalize(float3(0.0, 0.95, 0.0) - camera);\n    float3 right = normalize(cross(float3(0.0, 1.0, 0.0), forward));\n    float3 up = normalize(cross(forward, right));\n    float3 ray = normalize(forward + (right * screen.x + up * screen.y)\n                           / focalLength);\n\n    // The floor continues to the horizon; a warm background fills the sky.\n    float3 color = float3(0.91, 0.865, 0.78) - 0.035 * max(screen.y, 0.0);\n    bool seesFloor = ray.y < -0.0001;\n    float3 floorPoint = float3(0.0);\n    if (seesFloor) {\n        floorPoint = camera + ray * (-camera.y / ray.y);\n        color = floorColor(floorPoint);\n    }\n\n    // Draw the five distant rows first so the nearer hearts sit in front.\n    for (int i = 24; i >= 0; --i) {\n        int row = i / 5;\n        int column = i % 5;\n        float index = float(i);\n        float z = -3.8 + float(row) * 2.75;\n        float size = 0.87 + float(row) * 0.065\n                     + 0.06 * hash21(float2(index, 3.7));\n        float screenColumn = (float(column) - 2.0) * 0.55\n                             + (row % 2 == 1 ? 0.16 : 0.0);\n        float nominalDepth = dot(float3(0.0, size, z) - camera, forward);\n        float x = screenColumn * nominalDepth / focalLength\n                  + 0.09 * sin(t * 1.34 + index * 1.8);\n\n        // Each heart follows a parabolic bounce. At dropAt it keeps its\n        // current height and velocity, then falls under gravity without\n        // another bounce and settles on the floor.\n        float bounceHeight = 1.28 + 0.30 * hash21(float2(index, 5.3));\n        float bouncePeriod = 0.82 + 0.13 * hash21(float2(index, 7.1));\n        float phaseOffset = hash21(float2(index, 9.4));\n        float phase = fract(t / bouncePeriod + phaseOffset);\n        float lift = 4.0 * bounceHeight * phase * (1.0 - phase);\n        const float dropAt = 3.65;\n        if (t >= dropAt) {\n            float dropPhase = fract(dropAt / bouncePeriod + phaseOffset);\n            float startHeight = 4.0 * bounceHeight * dropPhase\n                                * (1.0 - dropPhase);\n            float startVelocity = 4.0 * bounceHeight\n                                  * (1.0 - 2.0 * dropPhase) / bouncePeriod;\n            float fallTime = t - dropAt;\n            lift = max(0.0, startHeight + startVelocity * fallTime\n                             - 0.5 * 13.5 * fallTime * fallTime);\n        }\n\n        float vanishStart = 5.22 + float(row) * 0.10\n                            + 0.24 * hash21(float2(index, 12.6));\n        float vanish = smoothstep(vanishStart, vanishStart + 1.15, t);\n        if (vanish >= 1.0) continue;\n        float groundness = 1.0 - smoothstep(0.02, 0.20, lift);\n        float stretchX = 1.0 + 0.10 * groundness;\n        float stretchY = 1.0 - 0.12 * groundness;\n\n        if (seesFloor) {\n            float2 fromHeart = floorPoint.xz - float2(x, z);\n            if (abs(fromHeart.x) < size * 2.5\n                && abs(fromHeart.y) < size * 1.5) {\n                float2 shadowPoint = fromHeart\n                                     / float2(size * 0.9, size * 0.47);\n                float shadow = exp(-dot(shadowPoint, shadowPoint) * 2.1);\n                shadow *= (0.27 / (1.0 + lift * 0.9)) * (1.0 - vanish);\n                color *= 1.0 - shadow;\n            }\n        }\n\n        float3 center = float3(x, size * 1.02 * stretchY + lift, z);\n        float3 relative = center - camera;\n        float depth = max(dot(relative, forward), 0.01);\n        float pixelsPerUnit = focalLength / depth;\n        float2 centerScreen = projectPoint(center, camera, forward, right,\n                                           up, focalLength);\n        float2 p = (screen - centerScreen) / (pixelsPerUnit * size);\n        p.x /= stretchX;\n        p.y /= stretchY;\n        float baseTilt = (hash21(float2(index, 11.7)) - 0.5) * 0.30;\n        float wobble = 0.10 * sin(t * 5.2 + index * 1.2)\n                       * smoothstep(0.0, 0.45, lift);\n        float angle = baseTilt + wobble;\n        float cosine = cos(angle);\n        float sine = sin(angle);\n        p = float2(cosine * p.x + sine * p.y,\n                   -sine * p.x + cosine * p.y);\n\n        if (abs(p.x) > 1.55 || abs(p.y) > 1.65) continue;\n\n        float distance = heartDistance(p);\n        float2 seed = float2(index * 17.0, index * 29.0);\n        float fur = (noise2(p * 64.0 + seed) - 0.5) * 0.047\n                  + (noise2(p * 154.0 + seed) - 0.5) * 0.015;\n        float pixelWidth = 2.0 / (resolution.y * pixelsPerUnit * size);\n        float alpha = 1.0 - smoothstep(-pixelWidth, pixelWidth,\n                                        distance + fur);\n\n        // Small strands catch the light while the outer silhouette stays soft.\n        float fiber = noise2(p * float2(96.0, 138.0) + seed);\n        float strands = 0.5 + 0.5 * sin(p.x * 190.0 + p.y * 52.0\n                                        + noise2(p * 15.0 + seed) * 8.0);\n        float bulge = smoothstep(0.0, 0.39, -distance);\n        float sideLight = clamp(0.5 - 0.22 * p.x + 0.28 * p.y, 0.0, 1.0);\n        float light = 0.62 + 0.19 * bulge + 0.22 * sideLight;\n        float3 red = float3(0.72, 0.055, 0.073)\n                     * (0.88 + 0.20 * hash21(float2(index, 53.9)));\n        float3 heartColor = red * light * (0.82 + 0.27 * fiber\n                                          + 0.075 * strands);\n        float rim = exp(-pow(max(-distance, 0.0) / 0.075, 2.0));\n        heartColor += float3(0.16, 0.045, 0.04) * rim\n                      * (0.4 + 0.6 * sideLight);\n        float glint = exp(-dot((p - float2(-0.42, 0.58))\n                               / float2(0.31, 0.25),\n                               (p - float2(-0.42, 0.58))\n                               / float2(0.31, 0.25)) * 1.9);\n        heartColor += float3(0.11, 0.035, 0.036) * glint;\n\n        // Individual tufts fade at different times, then a few loose fibers\n        // drift outward before the floor is left empty for the next cycle.\n        if (vanish > 0.0) {\n            float tuft = hash21(floor(p * 77.0) + seed);\n            alpha *= smoothstep(vanish - 0.035, vanish + 0.035, tuft);\n            alpha *= 1.0 - vanish * 0.25;\n            float2 fleckPoint = (p - float2(0.12, 0.28) * vanish)\n                                * 34.0;\n            float2 fleckCell = floor(fleckPoint);\n            float fleckChance = hash21(fleckCell + seed * 2.0);\n            float fleck = 1.0 - smoothstep(0.12, 0.36,\n                                           length(fract(fleckPoint) - 0.5));\n            fleck *= step(0.978, fleckChance)\n                     * sin(vanish * 3.14159265)\n                     * (1.0 - smoothstep(1.0, 1.75, length(p)));\n            heartColor = mix(heartColor, float3(0.87, 0.24, 0.22), fleck);\n            alpha = max(alpha, fleck * 0.55);\n        }\n        color = mix(color, heartColor, clamp(alpha, 0.0, 1.0));\n    }\n\n    // The shader contract expects opaque display-referred sRGB output.\n    return clamp(color, float3(0.0), float3(1.0));\n}\n\nvertex float4 fullscreenVertex(uint vertexID [[vertex_id]]) {\n    float2 p = float2((vertexID << 1) & 2, vertexID & 2);\n    return float4(p * 2.0 - 1.0, 0.0, 1.0);\n}\n\nfragment float4 furryHeartsFragment(\n    float4 position [[position]], constant ShaderUniforms &uniforms [[buffer(0)]]) {\n    float2 resolution = uniforms.resolutionTime.xy;\n    float2 frag = float2(position.x, resolution.y - position.y);\n    float2 screen = (frag - 0.5 * resolution) * (2.0 / resolution.y);\n    return float4(renderHearts(screen, resolution, uniforms.resolutionTime.z),\n                  1.0);\n}\n"
+      },
+      "resources": {},
+      "title": "Inline furry hearts shader"
+    },
+    {
+      "executionState": "enabled",
+      "id": "render",
+      "kind": "render.metal",
+      "parameters": {},
+      "resources": {},
+      "title": "Metal shader · Furry hearts"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.image",
+      "parameters": {
+        "filenamePrefix": "furry-hearts",
+        "format": "png"
+      },
+      "resources": {},
+      "title": "Furry hearts frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "loop",
+      "kind": "control.loop",
+      "parameters": {
+        "autoPause": false,
+        "delayMilliseconds": {
+          "$type": "integer",
+          "value": 0
+        },
+        "feedback": "none",
+        "limitHz": {
+          "$type": "integer",
+          "value": 60
+        },
+        "maxCalls": {
+          "$type": "integer",
+          "value": -1
+        },
+        "seedStrategy": "fixed"
+      },
+      "resources": {},
+      "title": "Bounce, fall, and dissolve hearts"
+    },
+    {
+      "executionState": "enabled",
+      "id": "note",
+      "kind": "edit.markdownNote",
+      "parameters": {
+        "text": "# Furry Hearts · Inline Metal Shader\nTwenty-five plush red hearts fill five staggered rows across a broad beige floor. Each has a slight left or right lean and its own high parabolic bounce. At 3.65 seconds, each keeps its current height and velocity, then drops under gravity and rests on the floor. The hearts break into tufts and disappear between about 5.2 and 7 seconds; the floor remains empty until the 8.4-second scene repeats. Soft floor shadows and procedural fur are built into the inline Metal shader. JSON State advances time by 1/60 second per Loop call, and Loop is capped at 60 Hz. Width and Height control full-screen and saved output; reduce them if rendering is slow. No pointer, texture channels, or external file are needed."
+      },
+      "resources": {},
+      "title": "How it works"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 2880
+        }
+      },
+      "resources": {},
+      "title": "Output width"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int-2",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 1800
+        }
+      },
+      "resources": {},
+      "title": "Output height"
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "loop": {
+        "x": 1385,
+        "y": 502
+      },
+      "note": {
+        "x": 0,
+        "y": 892
+      },
+      "output": {
+        "x": 1282,
+        "y": 4
+      },
+      "primitive-int": {
+        "x": 268,
+        "y": 105
+      },
+      "primitive-int-2": {
+        "x": 265,
+        "y": 261
+      },
+      "render": {
+        "x": 570,
+        "y": 150
+      },
+      "shader-text": {
+        "x": 137,
+        "y": 417
+      },
+      "start": {
+        "x": 1382,
+        "y": 328
+      },
+      "state": {
+        "x": 0,
+        "y": 150
+      }
+    },
+    "nodeSizes": {
+      "note": {
+        "height": 260,
+        "width": 520
+      },
+      "render": {
+        "height": 574,
+        "width": 658
+      },
+      "shader-text": {
+        "height": 422,
+        "width": 355
+      }
+    },
+    "viewportOrigin": {
+      "x": -131.17647058823545,
+      "y": -55.294117647058926
+    },
+    "viewportScale": 0.68
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

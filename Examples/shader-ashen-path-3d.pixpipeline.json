@@ -1,0 +1,400 @@
+{
+  "connections" : [
+    {
+      "id" : "render.image->output.image",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "render",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "primitive-int.value->render.width",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "width"
+      },
+      "output" : {
+        "nodeID" : "primitive-int",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "primitive-int-2.value->render.height",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "height"
+      },
+      "output" : {
+        "nodeID" : "primitive-int-2",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "program-text.value->render.program",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "program"
+      },
+      "output" : {
+        "nodeID" : "program-text",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "shader-text.value->render.sourceFile",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "sourceFile"
+      },
+      "output" : {
+        "nodeID" : "shader-text",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "trackpad.x->render.pointerX",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "pointerX"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "x"
+      }
+    },
+    {
+      "id" : "trackpad.y->render.pointerY",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "pointerY"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "y"
+      }
+    },
+    {
+      "id" : "trackpad.actionCount->render.actionCount",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "actionCount"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "actionCount"
+      }
+    },
+    {
+      "id" : "camera-angles.value->render.parameters",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "parameters"
+      },
+      "output" : {
+        "nodeID" : "camera-angles",
+        "port" : "value"
+      }
+    }
+  ],
+  "controlConnections" : [
+    {
+      "id" : "output.completed->loop.completed",
+      "input" : {
+        "nodeID" : "loop",
+        "port" : "completed"
+      },
+      "output" : {
+        "nodeID" : "output",
+        "port" : "completed"
+      }
+    },
+    {
+      "id" : "loop.repeat->start.again",
+      "input" : {
+        "nodeID" : "start",
+        "port" : "again"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "repeat"
+      }
+    }
+  ],
+  "exposedParameters" : [
+
+  ],
+  "id" : "org.pixeltje.examples.ashen-path-perspective-3d-game",
+  "mode" : "generic",
+  "name" : "Ashen Path · 3D Camera",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "start",
+      "kind" : "control.start",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Start \/ Next Frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "shader-text",
+      "kind" : "primitive.filePath",
+      "parameters" : {
+        "mode" : "relative",
+        "path" : "AshenPath3DProgram.metal"
+      },
+      "resources" : {
+
+      },
+      "title" : "3D game shader beside workflow"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "render",
+      "kind" : "gpu.program",
+      "parameters" : {
+        "framesPerSecond" : {
+          "$type" : "number",
+          "value" : 30
+        },
+        "seed" : {
+          "$type" : "integer",
+          "value" : 1
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "GPU Program · Ashen Path 3D"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output",
+      "kind" : "output.image",
+      "parameters" : {
+        "filenamePrefix" : "ashen-path-3d",
+        "format" : "png"
+      },
+      "resources" : {
+
+      },
+      "title" : "Game frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "loop",
+      "kind" : "control.loop",
+      "parameters" : {
+        "autoPause" : false,
+        "delayMilliseconds" : {
+          "$type" : "integer",
+          "value" : 0
+        },
+        "feedback" : "none",
+        "limitHz" : {
+          "$type" : "integer",
+          "value" : 30
+        },
+        "maxCalls" : {
+          "$type" : "integer",
+          "value" : -1
+        },
+        "seedStrategy" : "fixed"
+      },
+      "resources" : {
+
+      },
+      "title" : "Advance game world"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "note",
+      "kind" : "edit.markdownNote",
+      "parameters" : {
+        "text" : "# Ashen Path · 3D camera\nRun the workflow, then click a revealed stone tile in the Trackpad to walk there. The perspective camera follows the adventurer. Edit the Camera yaw \/ pitch JSON node to change the angle: yawDegrees orbits around the player (0–360), and pitchDegrees raises the camera (20–80). Stop and start Run after editing an angle; GPU Program parameters restart the game state. Collect seven coins across the four raised planes. Approach the horned creature and click Action on the Trackpad, or press Space, to swing your sword. Three hits defeat it. Collect every coin and defeat the creature to light the central portal. This copy keeps its 3D scene and game logic in AshenPath3DProgram.metal; the original isometric example remains separate."
+      },
+      "resources" : {
+
+      },
+      "title" : "How to play"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 2880
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Output width"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int-2",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 1800
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Output height"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "program-text",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "{\"version\":1,\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":16384},{\"name\":\"display\",\"kind\":\"texture\"}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeGame\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceGame\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"present\":[{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"gameFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"}}],\"swaps\":[],\"output\":\"display\",\"parameters\":[\"yawDegrees\",\"pitchDegrees\"]}"
+      },
+      "resources" : {
+
+      },
+      "title" : "Game state and render passes"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "trackpad",
+      "kind" : "input.trackpad",
+      "parameters" : {
+        "engaged" : true,
+        "engagedAtCall" : {
+          "$type" : "integer",
+          "value" : 98
+        },
+        "x" : {
+          "$type" : "number",
+          "value" : 0.6767097848360656
+        },
+        "y" : {
+          "$type" : "number",
+          "value" : 0.5019371157786885
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Move \/ Action (Space)"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "camera-angles",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "{\"yawDegrees\":45,\"pitchDegrees\":55}"
+      },
+      "resources" : {
+
+      },
+      "title" : "Camera yaw \/ pitch (degrees)"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "camera-angles" : {
+        "x" : 80,
+        "y" : 500
+      },
+      "loop" : {
+        "x" : 1820,
+        "y" : 540
+      },
+      "note" : {
+        "x" : 80,
+        "y" : 740
+      },
+      "output" : {
+        "x" : 1820,
+        "y" : 210
+      },
+      "primitive-int" : {
+        "x" : 730,
+        "y" : 130
+      },
+      "primitive-int-2" : {
+        "x" : 730,
+        "y" : 280
+      },
+      "program-text" : {
+        "x" : 80,
+        "y" : 30
+      },
+      "render" : {
+        "x" : 1114,
+        "y" : 108
+      },
+      "shader-text" : {
+        "x" : 82,
+        "y" : 325
+      },
+      "start" : {
+        "x" : 1820,
+        "y" : 410
+      },
+      "trackpad" : {
+        "x" : 740,
+        "y" : 470
+      }
+    },
+    "nodeSizes" : {
+      "camera-angles" : {
+        "height" : 145,
+        "width" : 480
+      },
+      "note" : {
+        "height" : 434,
+        "width" : 331
+      },
+      "program-text" : {
+        "height" : 225,
+        "width" : 610
+      },
+      "render" : {
+        "height" : 700,
+        "width" : 652
+      },
+      "shader-text" : {
+        "height" : 160,
+        "width" : 400
+      },
+      "trackpad" : {
+        "height" : 360,
+        "width" : 300
+      }
+    },
+    "viewportOrigin" : {
+      "x" : 331.92955971481877,
+      "y" : -76.30117252036224
+    },
+    "viewportScale" : 0.6852996826171875
+  },
+  "primaryOutputNodeIDs" : [
+    "output"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

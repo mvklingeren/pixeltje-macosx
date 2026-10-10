@@ -1,0 +1,336 @@
+{
+  "connections": [
+    {
+      "id": "render.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "render",
+        "port": "image"
+      }
+    },
+    {
+      "id": "primitive-int.value->render.width",
+      "input": {
+        "nodeID": "render",
+        "port": "width"
+      },
+      "output": {
+        "nodeID": "primitive-int",
+        "port": "value"
+      }
+    },
+    {
+      "id": "primitive-int-2.value->render.height",
+      "input": {
+        "nodeID": "render",
+        "port": "height"
+      },
+      "output": {
+        "nodeID": "primitive-int-2",
+        "port": "value"
+      }
+    },
+    {
+      "id": "program-text.value->render.program",
+      "input": {
+        "nodeID": "render",
+        "port": "program"
+      },
+      "output": {
+        "nodeID": "program-text",
+        "port": "value"
+      }
+    },
+    {
+      "id": "parameters-text.value->render.parameters",
+      "input": {
+        "nodeID": "render",
+        "port": "parameters"
+      },
+      "output": {
+        "nodeID": "parameters-text",
+        "port": "value"
+      }
+    },
+    {
+      "id": "primitive-string.value->render.source",
+      "input": {
+        "nodeID": "render",
+        "port": "source"
+      },
+      "output": {
+        "nodeID": "primitive-string",
+        "port": "value"
+      }
+    },
+    {
+      "id": "shader-text.contents->primitive-string.value",
+      "input": {
+        "nodeID": "primitive-string",
+        "port": "value"
+      },
+      "output": {
+        "nodeID": "shader-text",
+        "port": "contents"
+      }
+    }
+  ],
+  "controlConnections": [
+    {
+      "id": "output.completed->loop.completed",
+      "input": {
+        "nodeID": "loop",
+        "port": "completed"
+      },
+      "output": {
+        "nodeID": "output",
+        "port": "completed"
+      }
+    },
+    {
+      "id": "loop.repeat->start.again",
+      "input": {
+        "nodeID": "start",
+        "port": "again"
+      },
+      "output": {
+        "nodeID": "loop",
+        "port": "repeat"
+      }
+    }
+  ],
+  "exposedParameters": [],
+  "id": "org.pixeltje.examples.orbital-bloom-gpu-program",
+  "mode": "generic",
+  "name": "Orbital Bloom · GPU Program",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "start",
+      "kind": "control.start",
+      "parameters": {},
+      "resources": {},
+      "title": "Start / Next Frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "shader-text",
+      "kind": "primitive.filePath",
+      "parameters": {
+        "mode": "relative",
+        "path": "OrbitalBloom.metal"
+      },
+      "resources": {},
+      "title": "Orbital Bloom Metal source"
+    },
+    {
+      "executionState": "enabled",
+      "id": "render",
+      "kind": "gpu.program",
+      "parameters": {
+        "framesPerSecond": {
+          "$type": "number",
+          "value": 30
+        },
+        "seed": {
+          "$type": "integer",
+          "value": 1
+        }
+      },
+      "resources": {},
+      "title": "GPU Program · Orbital Bloom"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.image",
+      "parameters": {
+        "filenamePrefix": "orbital-bloom",
+        "format": "png"
+      },
+      "resources": {},
+      "title": "Orbital Bloom frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "loop",
+      "kind": "control.loop",
+      "parameters": {
+        "autoPause": false,
+        "delayMilliseconds": {
+          "$type": "integer",
+          "value": 0
+        },
+        "feedback": "none",
+        "limitHz": {
+          "$type": "integer",
+          "value": 30
+        },
+        "maxCalls": {
+          "$type": "integer",
+          "value": -1
+        },
+        "seedStrategy": "fixed"
+      },
+      "resources": {},
+      "title": "Animate the orbiting lights"
+    },
+    {
+      "executionState": "enabled",
+      "id": "note",
+      "kind": "edit.markdownNote",
+      "parameters": {
+        "text": "# Orbital Bloom · Flight through a growing light tunnel\nThe opening petal sculpture holds briefly, then the camera accelerates into its dark center. Each crown and its orbiting comets lives at a fixed depth: it grows past the camera while another colored crown emerges at the vanishing point. Six repeating depth slices keep the tunnel supplied with new forms. A half-float feedback texture carries older light forward and twists it into trails. The final pass adds stars, a violet nebula, faint speed rays, and the core corona. Everything is procedural and seeded; no external assets are needed. Trail, Sparkle, Orbit speed, Nebula, and Travel speed tune the effect; changing them restarts the GPU simulation. OrbitalBloom.metal sits beside this workflow through the Source File port. Image Output saves each completed 1440 × 900 frame as PNG; Stop Loop to finish."
+      },
+      "resources": {},
+      "title": "How Orbital Bloom works"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 1440
+        }
+      },
+      "resources": {},
+      "title": "Output width"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int-2",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 900
+        }
+      },
+      "resources": {},
+      "title": "Output height"
+    },
+    {
+      "executionState": "enabled",
+      "id": "program-text",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": "{\"version\":1,\"parameters\":[\"trail\",\"sparkle\",\"orbitSpeed\",\"nebula\",\"travelSpeed\"],\"resources\":[{\"name\":\"history\",\"kind\":\"texture\"},{\"name\":\"historyNext\",\"kind\":\"texture\"},{\"name\":\"display\",\"kind\":\"texture\"}],\"initialize\":[],\"tick\":[{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"fadeFragment\",\"target\":\"historyNext\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentTextures\":{\"1\":\"history\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"bloomFragment\",\"target\":\"historyNext\",\"load\":\"load\",\"blend\":\"additive\",\"vertexCount\":3},{\"kind\":\"render\",\"vertex\":\"orbitVertex\",\"fragment\":\"orbitFragment\",\"target\":\"historyNext\",\"load\":\"load\",\"blend\":\"additive\",\"vertexCount\":6,\"instanceCount\":3072}],\"swaps\":[[\"history\",\"historyNext\"]],\"present\":[{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"presentFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentTextures\":{\"1\":\"history\"}}],\"output\":\"display\"}"
+      },
+      "resources": {},
+      "title": "Petal, comet, and feedback passes"
+    },
+    {
+      "executionState": "enabled",
+      "id": "parameters-text",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": "{\"trail\":0.94,\"sparkle\":1.35,\"orbitSpeed\":1.0,\"nebula\":1.0,\"travelSpeed\":1.0}"
+      },
+      "resources": {},
+      "title": "Trail, sparkle, orbit, nebula, travel"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-string",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": ""
+      },
+      "resources": {},
+      "title": "Text"
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "loop": {
+        "x": 1819,
+        "y": 550
+      },
+      "note": {
+        "x": 81,
+        "y": 732
+      },
+      "output": {
+        "x": 1819,
+        "y": 217
+      },
+      "parameters-text": {
+        "x": 82,
+        "y": 265
+      },
+      "primitive-int": {
+        "x": 766,
+        "y": 159
+      },
+      "primitive-int-2": {
+        "x": 764,
+        "y": 309
+      },
+      "primitive-string": {
+        "x": 519,
+        "y": 487
+      },
+      "program-text": {
+        "x": 76,
+        "y": 20
+      },
+      "render": {
+        "x": 1063,
+        "y": 98
+      },
+      "shader-text": {
+        "x": 88,
+        "y": 480
+      },
+      "start": {
+        "x": 1818,
+        "y": 421
+      }
+    },
+    "nodeSizes": {
+      "note": {
+        "height": 275,
+        "width": 408
+      },
+      "parameters-text": {
+        "height": 165,
+        "width": 400
+      },
+      "primitive-string": {
+        "height": 507,
+        "width": 508
+      },
+      "program-text": {
+        "height": 229,
+        "width": 674
+      },
+      "render": {
+        "height": 575,
+        "width": 660
+      },
+      "shader-text": {
+        "height": 160,
+        "width": 400
+      }
+    },
+    "viewportOrigin": {
+      "x": 141.1661868491213,
+      "y": 70.5959842012302
+    },
+    "viewportScale": 1.100372314453125
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

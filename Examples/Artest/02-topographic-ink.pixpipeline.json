@@ -1,0 +1,616 @@
+{
+  "connections" : [
+    {
+      "id" : "seed.seed->paper.seed",
+      "input" : {
+        "nodeID" : "paper",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "seed.seed->blue.seed",
+      "input" : {
+        "nodeID" : "blue",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "seed.seed->coral.seed",
+      "input" : {
+        "nodeID" : "coral",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "trackpad.x->blueMask.value",
+      "input" : {
+        "nodeID" : "blueMask",
+        "port" : "value"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "x"
+      }
+    },
+    {
+      "id" : "blue.height->blueMask.mask",
+      "input" : {
+        "nodeID" : "blueMask",
+        "port" : "mask"
+      },
+      "output" : {
+        "nodeID" : "blue",
+        "port" : "height"
+      }
+    },
+    {
+      "id" : "coral.height->coralMask.mask",
+      "input" : {
+        "nodeID" : "coralMask",
+        "port" : "mask"
+      },
+      "output" : {
+        "nodeID" : "coral",
+        "port" : "height"
+      }
+    },
+    {
+      "id" : "coral.image->shift.image",
+      "input" : {
+        "nodeID" : "shift",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "coral",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "trackpad.y->shift.normalizedY",
+      "input" : {
+        "nodeID" : "shift",
+        "port" : "normalizedY"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "y"
+      }
+    },
+    {
+      "id" : "paper.image->first.destination",
+      "input" : {
+        "nodeID" : "first",
+        "port" : "destination"
+      },
+      "output" : {
+        "nodeID" : "paper",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "blue.image->first.source",
+      "input" : {
+        "nodeID" : "first",
+        "port" : "source"
+      },
+      "output" : {
+        "nodeID" : "blue",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "blueMask.mask->first.mask",
+      "input" : {
+        "nodeID" : "first",
+        "port" : "mask"
+      },
+      "output" : {
+        "nodeID" : "blueMask",
+        "port" : "mask"
+      }
+    },
+    {
+      "id" : "first.image->multiply.imageA",
+      "input" : {
+        "nodeID" : "multiply",
+        "port" : "imageA"
+      },
+      "output" : {
+        "nodeID" : "first",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "shift.image->multiply.imageB",
+      "input" : {
+        "nodeID" : "multiply",
+        "port" : "imageB"
+      },
+      "output" : {
+        "nodeID" : "shift",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "first.image->second.destination",
+      "input" : {
+        "nodeID" : "second",
+        "port" : "destination"
+      },
+      "output" : {
+        "nodeID" : "first",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "multiply.image->second.source",
+      "input" : {
+        "nodeID" : "second",
+        "port" : "source"
+      },
+      "output" : {
+        "nodeID" : "multiply",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "coralMask.mask->second.mask",
+      "input" : {
+        "nodeID" : "second",
+        "port" : "mask"
+      },
+      "output" : {
+        "nodeID" : "coralMask",
+        "port" : "mask"
+      }
+    },
+    {
+      "id" : "second.image->preview.image",
+      "input" : {
+        "nodeID" : "preview",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "second",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "preview.image->output.image",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "preview",
+        "port" : "image"
+      }
+    }
+  ],
+  "controlConnections" : [
+    {
+      "id" : "output.completed->loop.completed",
+      "input" : {
+        "nodeID" : "loop",
+        "port" : "completed"
+      },
+      "output" : {
+        "nodeID" : "output",
+        "port" : "completed"
+      }
+    },
+    {
+      "id" : "loop.repeat->start.again",
+      "input" : {
+        "nodeID" : "start",
+        "port" : "again"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "repeat"
+      }
+    },
+    {
+      "id" : "loop.incrementSeed->seed.increment",
+      "input" : {
+        "nodeID" : "seed",
+        "port" : "increment"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "incrementSeed"
+      }
+    }
+  ],
+  "exposedParameters" : [
+
+  ],
+  "id" : "org.pixeltje.examples.artest.02-topographic-ink",
+  "mode" : "textToImage",
+  "name" : "Artest 02 · Topographic Ink",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "seed",
+      "kind" : "input.seed",
+      "parameters" : {
+        "mode" : "fixed",
+        "value" : {
+          "$type" : "integer",
+          "value" : 24092602
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Fixed art seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "trackpad",
+      "kind" : "input.trackpad",
+      "parameters" : {
+        "x" : {
+          "$type" : "number",
+          "value" : 0.5362890625000003
+        },
+        "y" : {
+          "$type" : "number",
+          "value" : 0.41617918719211977
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Waterline and drift"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "paper",
+      "kind" : "image.proceduralNoise",
+      "parameters" : {
+        "height" : {
+          "$type" : "integer",
+          "value" : 640
+        },
+        "octaves" : {
+          "$type" : "integer",
+          "value" : 2
+        },
+        "palette" : "paper",
+        "salt" : {
+          "$type" : "integer",
+          "value" : 3
+        },
+        "scale" : {
+          "$type" : "number",
+          "value" : 23
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 640
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Paper grain"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "blue",
+      "kind" : "image.proceduralNoise",
+      "parameters" : {
+        "height" : {
+          "$type" : "integer",
+          "value" : 640
+        },
+        "octaves" : {
+          "$type" : "integer",
+          "value" : 5
+        },
+        "palette" : "inkBlue",
+        "salt" : {
+          "$type" : "integer",
+          "value" : 17
+        },
+        "scale" : {
+          "$type" : "number",
+          "value" : 5
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 640
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Blue contour field"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "coral",
+      "kind" : "image.proceduralNoise",
+      "parameters" : {
+        "height" : {
+          "$type" : "integer",
+          "value" : 640
+        },
+        "octaves" : {
+          "$type" : "integer",
+          "value" : 5
+        },
+        "palette" : "inkCoral",
+        "salt" : {
+          "$type" : "integer",
+          "value" : 43
+        },
+        "scale" : {
+          "$type" : "number",
+          "value" : 7
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 640
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Coral contour field"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "blueMask",
+      "kind" : "mask.threshold",
+      "parameters" : {
+        "value" : {
+          "$type" : "number",
+          "value" : 0.5
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "X sets waterline"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "coralMask",
+      "kind" : "mask.threshold",
+      "parameters" : {
+        "value" : {
+          "$type" : "number",
+          "value" : 0.59
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Coral islands"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "first",
+      "kind" : "image.compositeMasked",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Print blue ink"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "shift",
+      "kind" : "image.translate",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Y drifts coral field"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "multiply",
+      "kind" : "image.blend",
+      "parameters" : {
+        "blendFactor" : {
+          "$type" : "number",
+          "value" : 0.42
+        },
+        "blendMode" : "multiply"
+      },
+      "resources" : {
+
+      },
+      "title" : "Multiply ink colors"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "second",
+      "kind" : "image.compositeMasked",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Print coral through islands"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "preview",
+      "kind" : "output.preview",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Art preview"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output",
+      "kind" : "output.image",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Image result"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "note",
+      "kind" : "edit.markdownNote",
+      "parameters" : {
+        "text" : "# Topographic ink\nTrackpad X raises or lowers the blue contour waterline. Y drifts the coral field vertically. With one image, release the crosshair to render; for a series, press Run. Change the fixed seed to print a new map.\nThe Loop makes one image by default. Increase Max calls to make a series with successive seeds. Move the Trackpad while the series runs; the next image uses its latest position."
+      },
+      "resources" : {
+
+      },
+      "title" : "How to play"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "start",
+      "kind" : "control.start",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Start \/ Next Pass"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "loop",
+      "kind" : "control.loop",
+      "parameters" : {
+        "delayMilliseconds" : {
+          "$type" : "integer",
+          "value" : 1000
+        },
+        "feedback" : "none",
+        "maxCalls" : {
+          "$type" : "integer",
+          "value" : -1
+        },
+        "seedStrategy" : "increment"
+      },
+      "resources" : {
+
+      },
+      "title" : "Loop · 1 image"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "blue" : {
+        "x" : 265,
+        "y" : 162
+      },
+      "blueMask" : {
+        "x" : 561,
+        "y" : 192
+      },
+      "coral" : {
+        "x" : 270,
+        "y" : 370
+      },
+      "coralMask" : {
+        "x" : 560,
+        "y" : 390
+      },
+      "first" : {
+        "x" : 850,
+        "y" : 0
+      },
+      "loop" : {
+        "x" : 1680,
+        "y" : 493
+      },
+      "multiply" : {
+        "x" : 1130,
+        "y" : 140
+      },
+      "note" : {
+        "x" : 0,
+        "y" : 740
+      },
+      "output" : {
+        "x" : 1675,
+        "y" : 280
+      },
+      "paper" : {
+        "x" : 270,
+        "y" : 0
+      },
+      "preview" : {
+        "x" : 1670,
+        "y" : -40
+      },
+      "second" : {
+        "x" : 1400,
+        "y" : 130
+      },
+      "seed" : {
+        "x" : 0,
+        "y" : 221
+      },
+      "shift" : {
+        "x" : 850,
+        "y" : 310
+      },
+      "start" : {
+        "x" : 1955,
+        "y" : 390
+      },
+      "trackpad" : {
+        "x" : 292,
+        "y" : 634
+      }
+    },
+    "nodeSizes" : {
+
+    },
+    "viewportOrigin" : {
+      "x" : -70.00000000000009,
+      "y" : -109.99999999999963
+    },
+    "viewportScale" : 0.7
+  },
+  "primaryOutputNodeIDs" : [
+    "output"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

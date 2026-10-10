@@ -1,0 +1,323 @@
+{
+  "connections": [
+    {
+      "id": "prompt.prompt->characterWriter.prompt",
+      "input": {
+        "nodeID": "characterWriter",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed.seed->characterWriter.seed",
+      "input": {
+        "nodeID": "characterWriter",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "characterWriter.text->generate.prompt",
+      "input": {
+        "nodeID": "generate",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "characterWriter",
+        "port": "text"
+      }
+    },
+    {
+      "id": "seed.seed->generate.seed",
+      "input": {
+        "nodeID": "generate",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "generate",
+        "port": "image"
+      }
+    }
+  ],
+  "exposedParameters": [],
+  "id": "org.pixeltje.pipeline.qwen3-flux2-klein-4b-game-character",
+  "mode": "textToImage",
+  "name": "Qwen3 Game Character to FLUX.2 Klein 4B Distilled",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "start",
+      "kind": "control.start",
+      "parameters": {},
+      "resources": {},
+      "title": "Start / Next Pass"
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt",
+      "kind": "input.prompt",
+      "parameters": {
+        "value": "Describe one original fantasy game character as a full-body image prompt. Include appearance, clothing, equipment, pose, and lighting. Write one sentence only."
+      },
+      "resources": {},
+      "title": "Character Brief"
+    },
+    {
+      "executionState": "enabled",
+      "id": "characterWriter",
+      "kind": "coreai.textGenerate",
+      "parameters": {
+        "maxTokens": {
+          "$type": "integer",
+          "value": 192
+        },
+        "systemPrompt": "Write one concise visual sentence about a game character and nothing else.\n/no_think",
+        "temperature": {
+          "$type": "number",
+          "value": 0.7
+        },
+        "topK": {
+          "$type": "integer",
+          "value": 40
+        }
+      },
+      "resources": {
+        "manifest": {
+          "state": "linked",
+          "reference": {
+            "kind": "data",
+            "packageID": "coreai.qwen-qwen3-0-6b",
+            "packageVersion": "sha256.0a89d27cf3a82f2b0ce63bb1bdc16963b4b3078ba26fe564b0b809ddf2e92041",
+            "contentHash": "4ddc5300b4b5062b386e3ce2e4c46705f5dbbb0447d998a35b6b5c648836ad9d",
+            "componentRole": "languageModelManifest",
+            "familyABI": "coreai-language-model@1"
+          }
+        },
+        "model": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.qwen-qwen3-0-6b",
+            "packageVersion": "sha256.0a89d27cf3a82f2b0ce63bb1bdc16963b4b3078ba26fe564b0b809ddf2e92041",
+            "contentHash": "6495d7dcf2b0027b81602481dc8ba8c8fc3f6a87b8938a088f33a2e04e421604",
+            "componentRole": "languageModel",
+            "familyABI": "coreai-language-model@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.qwen-qwen3-0-6b",
+            "packageVersion": "sha256.0a89d27cf3a82f2b0ce63bb1bdc16963b4b3078ba26fe564b0b809ddf2e92041",
+            "contentHash": "0682a040763905c927476457261ce62fcb5e5038f7d0037b37f8f174792cc292",
+            "componentRole": "tokenizer",
+            "familyABI": "coreai-language-model@1"
+          }
+        }
+      },
+      "title": "Qwen3 Character Prompt"
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed",
+      "kind": "input.seed",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 0
+        },
+        "mode": "fixed"
+      },
+      "resources": {},
+      "title": "Shared Seed"
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate",
+      "kind": "coreai.flux2KleinGenerate",
+      "parameters": {
+        "width": {
+          "$type": "integer",
+          "value": 1024
+        },
+        "height": {
+          "$type": "integer",
+          "value": 1024
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 4
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "denoiser": {
+          "reference": {
+            "componentRole": "denoiser",
+            "contentHash": "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI": "flux2-klein-4b-coreai@2",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion": "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state": "linked"
+        },
+        "textEncoder": {
+          "reference": {
+            "componentRole": "textEncoder",
+            "contentHash": "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI": "flux2-klein-4b-coreai@2",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion": "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state": "linked"
+        },
+        "vaeDecoder": {
+          "reference": {
+            "componentRole": "vae",
+            "contentHash": "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI": "flux2-klein-4b-coreai@2",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion": "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state": "linked"
+        }
+      },
+      "title": "FLUX.2 Klein Generate"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.image",
+      "parameters": {},
+      "resources": {},
+      "title": "Image Output"
+    },
+    {
+      "executionState": "enabled",
+      "id": "loop",
+      "kind": "control.loop",
+      "parameters": {
+        "maxCalls": {
+          "$type": "integer",
+          "value": 3
+        },
+        "delayMilliseconds": {
+          "$type": "integer",
+          "value": 1000
+        },
+        "seedStrategy": "increment",
+        "feedback": "none"
+      },
+      "resources": {},
+      "title": "Loop"
+    }
+  ],
+  "presentation": {
+    "nodePositions": {
+      "start": {
+        "x": 40,
+        "y": 700
+      },
+      "prompt": {
+        "x": 40,
+        "y": 120
+      },
+      "seed": {
+        "x": 40,
+        "y": 420
+      },
+      "characterWriter": {
+        "x": 360,
+        "y": 120
+      },
+      "generate": {
+        "x": 760,
+        "y": 120
+      },
+      "output": {
+        "x": 1120,
+        "y": 120
+      },
+      "loop": {
+        "x": 1120,
+        "y": 470
+      }
+    },
+    "nodeSizes": {},
+    "viewportOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "viewportScale": 1
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2,
+  "controlConnections": [
+    {
+      "id": "output.completed->loop.completed",
+      "input": {
+        "nodeID": "loop",
+        "port": "completed"
+      },
+      "output": {
+        "nodeID": "output",
+        "port": "completed"
+      }
+    },
+    {
+      "id": "loop.repeat->start.again",
+      "input": {
+        "nodeID": "start",
+        "port": "again"
+      },
+      "output": {
+        "nodeID": "loop",
+        "port": "repeat"
+      }
+    },
+    {
+      "id": "loop.incrementSeed->seed.increment",
+      "input": {
+        "nodeID": "seed",
+        "port": "increment"
+      },
+      "output": {
+        "nodeID": "loop",
+        "port": "incrementSeed"
+      }
+    }
+  ]
+}

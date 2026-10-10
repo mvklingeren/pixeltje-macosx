@@ -1,0 +1,264 @@
+{
+  "connections": [
+    {
+      "id": "state.state->render.state",
+      "input": {
+        "nodeID": "render",
+        "port": "state"
+      },
+      "output": {
+        "nodeID": "state",
+        "port": "state"
+      }
+    },
+    {
+      "id": "render.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "render",
+        "port": "image"
+      }
+    },
+    {
+      "id": "primitive-int.value->render.width",
+      "input": {
+        "nodeID": "render",
+        "port": "width"
+      },
+      "output": {
+        "nodeID": "primitive-int",
+        "port": "value"
+      }
+    },
+    {
+      "id": "primitive-int-2.value->render.height",
+      "input": {
+        "nodeID": "render",
+        "port": "height"
+      },
+      "output": {
+        "nodeID": "primitive-int-2",
+        "port": "value"
+      }
+    },
+    {
+      "id": "shader-text.value->render.source",
+      "input": {
+        "nodeID": "render",
+        "port": "source"
+      },
+      "output": {
+        "nodeID": "shader-text",
+        "port": "value"
+      }
+    }
+  ],
+  "controlConnections": [
+    {
+      "id": "output.completed->loop.completed",
+      "input": {
+        "nodeID": "loop",
+        "port": "completed"
+      },
+      "output": {
+        "nodeID": "output",
+        "port": "completed"
+      }
+    },
+    {
+      "id": "loop.repeat->start.again",
+      "input": {
+        "nodeID": "start",
+        "port": "again"
+      },
+      "output": {
+        "nodeID": "loop",
+        "port": "repeat"
+      }
+    }
+  ],
+  "exposedParameters": [],
+  "id": "org.pixeltje.examples.strawberry-rain-shader-inline",
+  "mode": "generic",
+  "name": "Strawberry Rain · Inline Metal Shader",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "start",
+      "kind": "control.start",
+      "parameters": {},
+      "resources": {},
+      "title": "Start / Next Frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "state",
+      "kind": "input.state",
+      "parameters": {
+        "initialState": "{\n  \"version\": 1,\n  \"mode\": \"shader\",\n  \"fragmentFunction\": \"strawberryRainFragment\",\n  \"width\": 640,\n  \"height\": 360,\n  \"timeSeconds\": 0,\n  \"secondsPerFrame\": 0.016666666666666666\n}"
+      },
+      "resources": {},
+      "title": "Strawberry rain shader state"
+    },
+    {
+      "executionState": "enabled",
+      "id": "shader-text",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": "#include <metal_stdlib>\nusing namespace metal;\n\n// A continuous shower of red strawberries with green calyxes and tiny seeds.\nstruct ShaderUniforms {\n    float4 resolutionTime; // width, height, seconds, unused\n    float4 mouse;          // reserved by the shader-state contract\n};\n\nfloat hash21(float2 p) {\n    return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);\n}\n\nfloat noise2(float2 p) {\n    float2 cell = floor(p);\n    float2 f = fract(p);\n    f = f * f * (3.0 - 2.0 * f);\n    return mix(mix(hash21(cell), hash21(cell + float2(1.0, 0.0)), f.x),\n               mix(hash21(cell + float2(0.0, 1.0)),\n                   hash21(cell + float2(1.0, 1.0)), f.x), f.y);\n}\n\nfloat3 berryColor(float2 p, float width, float seed, float yaw) {\n    // Treat the front of the pear-shaped body as a rounded 3D surface.\n    float u = clamp(p.x / max(width, 0.05), -0.999, 0.999);\n    float v = clamp((p.y + 0.12) / 1.05, -0.98, 0.98);\n    float depth = sqrt(max(0.0, 1.0 - u * u))\n                  * sqrt(max(0.0, 1.0 - v * v));\n    float3 surfaceNormal = normalize(float3(0.95 * u, 0.73 * v,\n                                             1.30 * depth + 0.025));\n    float cs = cos(yaw), sn = sin(yaw);\n    float3 normal = float3(cs * surfaceNormal.x + sn * surfaceNormal.z,\n                            surfaceNormal.y,\n                            -sn * surfaceNormal.x + cs * surfaceNormal.z);\n    float3 lightDirection = normalize(float3(-0.58, 0.73, 0.63));\n    float diffuse = max(dot(normal, lightDirection), 0.0);\n    float wrappedLight = clamp((dot(normal, lightDirection) + 0.35) / 1.35,\n                               0.0, 1.0);\n    float grain = noise2(p * 21.0 + seed * 37.0);\n    float3 red = mix(float3(0.68, 0.055, 0.065),\n                     float3(0.82, 0.105, 0.085), seed);\n    float3 color = red * (0.27 + 0.79 * wrappedLight)\n                   * (0.91 + 0.15 * grain);\n    color *= 1.0 - 0.19 * smoothstep(0.38, 0.72, p.y);\n    color += float3(0.13, 0.019, 0.010)\n             * pow(1.0 - depth, 2.0) * (0.5 + 0.5 * diffuse);\n\n    // Project the staggered seed rows around the curved surface. As the\n    // berry turns, seeds move across its face instead of staying painted on.\n    float longitude = atan2(u, max(depth, 0.02)) + yaw;\n    float row = floor((p.y + 0.92) * 8.0);\n    float2 seedUV = float2(longitude * 3.7 + fract(row * 0.5),\n                           (p.y + 0.92) * 8.0);\n    float2 cell = floor(seedUV);\n    float2 jitter = (float2(hash21(cell + float2(13.0, seed)),\n                            hash21(cell + float2(seed, 47.0))) - 0.5) * 0.16;\n    float2 mark = (fract(seedUV) - 0.5 - jitter) / float2(0.18, 0.26);\n    float seedShape = length(mark);\n    float dimple = 1.0 - smoothstep(1.0, 1.42, seedShape);\n    float achene = 1.0 - smoothstep(0.63, 0.94, seedShape);\n    color *= 1.0 - 0.28 * dimple;\n    color = mix(color, float3(0.88, 0.66, 0.33)\n                       * (0.68 + 0.34 * diffuse), achene * 0.92);\n\n    float3 halfVector = normalize(lightDirection + float3(0.0, 0.0, 1.0));\n    float gloss = pow(max(dot(normal, halfVector), 0.0), 38.0);\n    color += float3(0.43, 0.27, 0.20) * gloss;\n    return color;\n}\n\n// The calyx is a ring of leaves in 3D. Yaw changes which leaves are in front.\nfloat3 drawCalyx(float3 color, float2 p, float yaw, float aa,\n                  bool drawFront) {\n    float cs = cos(yaw), sn = sin(yaw);\n    float2 base = float2(sn * 0.18, 0.68);\n    for (int leaf = 0; leaf < 5; ++leaf) {\n        float angle = 6.2831853 * float(leaf) / 5.0;\n        float3 tip3 = float3(0.65 * sin(angle), 0.0,\n                             0.65 * cos(angle));\n        float depth = -sn * tip3.x + cs * tip3.z;\n        if ((depth >= 0.0) != drawFront) continue;\n        float2 tip = float2(cs * tip3.x + sn * tip3.z,\n                            0.80 - 0.62 * max(tip3.z, 0.0)\n                            + 0.04 * max(-tip3.z, 0.0));\n        float2 axis = tip - base;\n        float t = clamp(dot(p - base, axis) / max(dot(axis, axis), 0.01),\n                        0.0, 1.0);\n        float2 fromVein = p - (base + t * axis);\n        float leafWidth = 0.018 + 0.14 * sin(3.14159265 * t);\n        float leafEdge = length(fromVein) - leafWidth;\n        float coverage = 1.0 - smoothstep(-aa, aa, leafEdge);\n        float signedSide = (axis.x * fromVein.y - axis.y * fromVein.x)\n                           / max(length(axis), 0.01);\n        float arch = clamp(abs(signedSide) / leafWidth, 0.0, 1.0);\n        float leafLight = clamp(0.55 + 0.35 * sqrt(1.0 - arch * arch)\n                                + 0.18 * depth / 0.65\n                                - 0.12 * signedSide / leafWidth,\n                                0.33, 1.18);\n        float vein = 1.0 - smoothstep(0.012, 0.037, length(fromVein));\n        float3 green = float3(0.13, 0.46, 0.11) * leafLight\n                       * (0.95 + 0.12 * t);\n        green += float3(0.12, 0.21, 0.045) * vein * 0.48;\n        color = mix(color, green, coverage);\n    }\n    return color;\n}\n\nfloat3 renderStrawberryRain(float2 screen, float2 resolution, float time) {\n    float aspect = resolution.x / resolution.y;\n    float sky = smoothstep(-1.2, 1.2, screen.y);\n    float3 color = mix(float3(0.91, 0.86, 0.75),\n                       float3(0.66, 0.81, 0.76), sky);\n    color += (noise2(screen * 85.0) - 0.5) * 0.012;\n\n    // Staggered phases give a steady stream while each fruit tumbles and sways.\n    for (int i = 0; i < 32; ++i) {\n        float index = float(i);\n        float seed = hash21(float2(index, 19.7));\n        float size = 0.090 + 0.080 * index / 31.0\n                     + 0.019 * hash21(float2(index, 8.3));\n        float speed = 0.16 + 0.095 * hash21(float2(index, 5.1));\n        float phase = fract((index + 0.5) / 32.0 + time * speed);\n        float2 center = float2(\n            (2.0 * hash21(float2(index, 13.4)) - 1.0) * (aspect - 0.03)\n                + 0.10 * sin(time * (0.8 + seed) + index * 2.3),\n            1.32 - 2.66 * phase);\n        float2 delta = screen - center;\n        if (abs(delta.x) > size * 1.25 || abs(delta.y) > size * 1.25)\n            continue;\n\n        float rotation = time * (0.75 + seed * 0.80) + index * 2.4;\n        float c = cos(rotation), s = sin(rotation);\n        float2 p = float2(c * delta.x + s * delta.y,\n                          -s * delta.x + c * delta.y) / size;\n        float yaw = 0.75 * sin(time * (0.8 + seed * 0.6) + index * 1.1);\n        float horizontalScale = 0.70 + 0.30 * cos(yaw);\n        float aa = max(2.0 / (resolution.y * size), 0.008);\n\n        // Wide shoulders taper smoothly into the pointed strawberry tip.\n        float rise = clamp((p.y + 1.02) / 1.15, 0.0, 1.0);\n        float width = 0.82 * pow(rise, 0.72)\n                      * (1.0 - 0.18 * smoothstep(0.40, 0.75, p.y))\n                      * horizontalScale;\n        float bodyEdge = max(abs(p.x) - width,\n                             max(p.y - 0.72, -1.02 - p.y));\n        float body = 1.0 - smoothstep(-aa, aa, bodyEdge);\n        color = drawCalyx(color, p, yaw, aa, false);\n        if (body > 0.0)\n            color = mix(color, berryColor(p, width, seed, yaw), body);\n\n        // Rear leaves are covered by the fruit; front leaves overlap it.\n        color = drawCalyx(color, p, yaw, aa, true);\n        float2 crownCenter = float2(sin(yaw) * 0.18, 0.68);\n        float crown = 1.0 - smoothstep(0.10 - aa, 0.10 + aa,\n                                       length(p - crownCenter));\n        color = mix(color, float3(0.18, 0.43, 0.12), crown);\n\n        // The stem shares the crown's 3D turn instead of staying in place.\n        float cs = cos(yaw), sn = sin(yaw);\n        float2 stemStart = float2(sn * 0.16, 0.70);\n        float2 stemEnd = float2(cs * 0.13 + sn * 0.03, 1.14);\n        float2 stemAxis = stemEnd - stemStart;\n        float stemT = clamp(dot(p - stemStart, stemAxis)\n                            / dot(stemAxis, stemAxis), 0.0, 1.0);\n        float stemDistance = length(p - (stemStart + stemT * stemAxis));\n        float stem = 1.0 - smoothstep(0.035 - aa, 0.035 + aa,\n                                     stemDistance);\n        float stemLight = clamp(0.78 + 0.25 * cs\n                                - 1.8 * (p.x - stemStart.x), 0.55, 1.18);\n        color = mix(color, float3(0.18, 0.36, 0.10) * stemLight, stem);\n    }\n    return clamp(color, float3(0.0), float3(1.0));\n}\n\nvertex float4 fullscreenVertex(uint vertexID [[vertex_id]]) {\n    float2 p = float2((vertexID << 1) & 2, vertexID & 2);\n    return float4(p * 2.0 - 1.0, 0.0, 1.0);\n}\n\nfragment float4 strawberryRainFragment(\n    float4 position [[position]], constant ShaderUniforms &uniforms [[buffer(0)]]) {\n    float2 resolution = uniforms.resolutionTime.xy;\n    float2 frag = float2(position.x, resolution.y - position.y);\n    float2 screen = (frag - 0.5 * resolution) * (2.0 / resolution.y);\n    return float4(renderStrawberryRain(screen, resolution,\n                                       uniforms.resolutionTime.z), 1.0);\n}\n"
+      },
+      "resources": {},
+      "title": "Inline strawberry rain shader"
+    },
+    {
+      "executionState": "enabled",
+      "id": "render",
+      "kind": "render.metal",
+      "parameters": {},
+      "resources": {},
+      "title": "Metal shader · Strawberry rain"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.image",
+      "parameters": {
+        "filenamePrefix": "strawberry-rain",
+        "format": "png"
+      },
+      "resources": {},
+      "title": "Strawberry rain frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "loop",
+      "kind": "control.loop",
+      "parameters": {
+        "autoPause": false,
+        "delayMilliseconds": {
+          "$type": "integer",
+          "value": 0
+        },
+        "feedback": "none",
+        "limitHz": {
+          "$type": "integer",
+          "value": 60
+        },
+        "maxCalls": {
+          "$type": "integer",
+          "value": -1
+        },
+        "seedStrategy": "fixed"
+      },
+      "resources": {},
+      "title": "Continuous strawberry rain"
+    },
+    {
+      "executionState": "enabled",
+      "id": "note",
+      "kind": "edit.markdownNote",
+      "parameters": {
+        "text": "# Strawberry Rain · Inline Metal Shader\nThirty-two red strawberries fall continuously through a pale autumn sky. Each fruit has rounded 3D surface lighting, a glossy highlight, and golden seeds that move across its curved face as it turns. Its leafy crown and stem turn with it: rear leaves pass behind the berry and front leaves overlap it. The berries also tumble and drift side to side. The shader is embedded in the Text node and needs no external texture or shader file. JSON State advances time by 1/60 second per Loop call; Loop is capped at 60 Hz. Width and Height control full-screen preview and saved output."
+      },
+      "resources": {},
+      "title": "How it works"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 2880
+        }
+      },
+      "resources": {},
+      "title": "Output width"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int-2",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 1800
+        }
+      },
+      "resources": {},
+      "title": "Output height"
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "loop": {
+        "x": 1385,
+        "y": 502
+      },
+      "note": {
+        "x": 0,
+        "y": 892
+      },
+      "output": {
+        "x": 1375,
+        "y": 5
+      },
+      "primitive-int": {
+        "x": 268,
+        "y": 105
+      },
+      "primitive-int-2": {
+        "x": 265,
+        "y": 261
+      },
+      "render": {
+        "x": 570,
+        "y": 150
+      },
+      "shader-text": {
+        "x": 137,
+        "y": 417
+      },
+      "start": {
+        "x": 1382,
+        "y": 328
+      },
+      "state": {
+        "x": 0,
+        "y": 150
+      }
+    },
+    "nodeSizes": {
+      "note": {
+        "height": 260,
+        "width": 520
+      },
+      "render": {
+        "height": 700,
+        "width": 723
+      },
+      "shader-text": {
+        "height": 422,
+        "width": 355
+      }
+    },
+    "viewportOrigin": {
+      "x": -131.17647058823545,
+      "y": -55.294117647058926
+    },
+    "viewportScale": 0.68
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

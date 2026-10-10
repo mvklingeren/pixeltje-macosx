@@ -1,0 +1,306 @@
+{
+  "connections": [
+    {
+      "id": "render.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "render",
+        "port": "image"
+      }
+    },
+    {
+      "id": "primitive-int.value->render.width",
+      "input": {
+        "nodeID": "render",
+        "port": "width"
+      },
+      "output": {
+        "nodeID": "primitive-int",
+        "port": "value"
+      }
+    },
+    {
+      "id": "primitive-int-2.value->render.height",
+      "input": {
+        "nodeID": "render",
+        "port": "height"
+      },
+      "output": {
+        "nodeID": "primitive-int-2",
+        "port": "value"
+      }
+    },
+    {
+      "id": "shader-text.value->render.sourceFile",
+      "input": {
+        "nodeID": "render",
+        "port": "sourceFile"
+      },
+      "output": {
+        "nodeID": "shader-text",
+        "port": "value"
+      }
+    },
+    {
+      "id": "program-text.value->render.program",
+      "input": {
+        "nodeID": "render",
+        "port": "program"
+      },
+      "output": {
+        "nodeID": "program-text",
+        "port": "value"
+      }
+    },
+    {
+      "id": "parameters-text.value->render.parameters",
+      "input": {
+        "nodeID": "render",
+        "port": "parameters"
+      },
+      "output": {
+        "nodeID": "parameters-text",
+        "port": "value"
+      }
+    }
+  ],
+  "controlConnections": [
+    {
+      "id": "output.completed->loop.completed",
+      "input": {
+        "nodeID": "loop",
+        "port": "completed"
+      },
+      "output": {
+        "nodeID": "output",
+        "port": "completed"
+      }
+    },
+    {
+      "id": "loop.repeat->start.again",
+      "input": {
+        "nodeID": "start",
+        "port": "again"
+      },
+      "output": {
+        "nodeID": "loop",
+        "port": "repeat"
+      }
+    }
+  ],
+  "exposedParameters": [],
+  "id": "org.pixeltje.examples.flurry-gpu-program",
+  "mode": "generic",
+  "name": "Flurry · GPU Particle Program",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "start",
+      "kind": "control.start",
+      "parameters": {},
+      "resources": {},
+      "title": "Start / Next Frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "shader-text",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": "FlurryProgram.metal"
+      },
+      "resources": {},
+      "title": "Metal source beside workflow"
+    },
+    {
+      "executionState": "enabled",
+      "id": "render",
+      "kind": "gpu.program",
+      "parameters": {
+        "framesPerSecond": {
+          "$type": "number",
+          "value": 60.0
+        },
+        "seed": {
+          "$type": "integer",
+          "value": 1
+        }
+      },
+      "resources": {},
+      "title": "GPU Program · Flurry"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.image",
+      "parameters": {
+        "filenamePrefix": "flurry",
+        "format": "png"
+      },
+      "resources": {},
+      "title": "Flurry frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "loop",
+      "kind": "control.loop",
+      "parameters": {
+        "autoPause": false,
+        "delayMilliseconds": {
+          "$type": "integer",
+          "value": 0
+        },
+        "feedback": "none",
+        "limitHz": {
+          "$type": "integer",
+          "value": 60
+        },
+        "maxCalls": {
+          "$type": "integer",
+          "value": -1
+        },
+        "seedStrategy": "fixed"
+      },
+      "resources": {},
+      "title": "Advance five smoke streams"
+    },
+    {
+      "executionState": "enabled",
+      "id": "note",
+      "kind": "edit.markdownNote",
+      "parameters": {
+        "text": "# Flurry · Five coupled smoke streams\nThe generic GPU Program holds 3,600 smoke particles and a half-float frame history. A slow moving star emits two particles into each of five streams per 60 Hz frame. The star and five sparks are invisible guides: every particle is attracted to all sparks, with stronger attraction to its assigned spark. Its color comes from that spark at birth. Only soft motion-blurred smoke quads are drawn, then their light is added to the faded previous frame. A final pass maps the accumulated light to sRGB for Image Output. Width and Height control both rendering and saved images; changing either restarts the simulation. FlurryProgram.metal sits beside this workflow through the Source File port. This is an independently authored reconstruction informed by Calum Robinson’s public Flurry source."
+      },
+      "resources": {},
+      "title": "How the effect is built"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 1280
+        }
+      },
+      "resources": {},
+      "title": "Output width"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int-2",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 800
+        }
+      },
+      "resources": {},
+      "title": "Output height"
+    },
+    {
+      "executionState": "enabled",
+      "id": "program-text",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": "{\"version\":1,\"parameters\":[\"persistence\",\"brightness\",\"incohesion\",\"spread\"],\"resources\":[{\"name\":\"smoke\",\"kind\":\"buffer\",\"bytes\":230400},{\"name\":\"history\",\"kind\":\"texture\"},{\"name\":\"historyNext\",\"kind\":\"texture\"},{\"name\":\"display\",\"kind\":\"texture\"}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeSmoke\",\"threads\":[3600],\"buffers\":{\"1\":\"smoke\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceSmoke\",\"threads\":[3600],\"buffers\":{\"1\":\"smoke\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"fadeFragment\",\"target\":\"historyNext\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentTextures\":{\"1\":\"history\"}},{\"kind\":\"render\",\"vertex\":\"smokeVertex\",\"fragment\":\"smokeFragment\",\"target\":\"historyNext\",\"load\":\"load\",\"blend\":\"additive\",\"vertexCount\":6,\"instanceCount\":3600,\"vertexBuffers\":{\"1\":\"smoke\"}}],\"swaps\":[[\"history\",\"historyNext\"]],\"present\":[{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"presentFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentTextures\":{\"1\":\"history\"}}],\"output\":\"display\"}"
+      },
+      "resources": {},
+      "title": "Bounded GPU passes and resources"
+    },
+    {
+      "executionState": "enabled",
+      "id": "parameters-text",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": "{\"persistence\":0.94,\"brightness\":1.6,\"incohesion\":0.07,\"spread\":1.0}"
+      },
+      "resources": {},
+      "title": "Trail, brightness, incohesion, spread"
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "loop": {
+        "x": 1385,
+        "y": 502
+      },
+      "note": {
+        "x": 10,
+        "y": 850
+      },
+      "output": {
+        "x": 1320,
+        "y": 40
+      },
+      "primitive-int": {
+        "x": 260,
+        "y": 85
+      },
+      "primitive-int-2": {
+        "x": 260,
+        "y": 235
+      },
+      "render": {
+        "x": 600,
+        "y": 130
+      },
+      "shader-text": {
+        "x": -170,
+        "y": 530
+      },
+      "start": {
+        "x": 1382,
+        "y": 328
+      },
+      "program-text": {
+        "x": -170,
+        "y": 80
+      },
+      "parameters-text": {
+        "x": -170,
+        "y": 300
+      }
+    },
+    "nodeSizes": {
+      "note": {
+        "width": 590,
+        "height": 300
+      },
+      "render": {
+        "width": 660,
+        "height": 575
+      },
+      "shader-text": {
+        "width": 400,
+        "height": 160
+      },
+      "program-text": {
+        "width": 400,
+        "height": 200
+      },
+      "parameters-text": {
+        "width": 400,
+        "height": 165
+      }
+    },
+    "viewportOrigin": {
+      "x": -131.17647058823545,
+      "y": -55.294117647058926
+    },
+    "viewportScale": 0.68
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

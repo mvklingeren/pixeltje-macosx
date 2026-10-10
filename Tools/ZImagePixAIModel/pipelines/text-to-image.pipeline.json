@@ -1,0 +1,153 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "z-image-turbo-text-to-image",
+  "version": "1.0.0",
+  "minimumRuntime": "1.0.0",
+  "modes": ["text-to-image"],
+  "parameters": [
+    {"id": "prompt", "type": "string", "required": true},
+    {"id": "seed", "type": "integer", "required": true, "default": 42, "minimum": 0, "maximum": 9223372036854775807},
+    {"id": "width", "type": "integer", "required": true, "default": 1024, "minimum": 512, "maximum": 2048, "multipleOf": 16},
+    {"id": "height", "type": "integer", "required": true, "default": 1024, "minimum": 512, "maximum": 2048, "multipleOf": 16},
+    {"id": "inference-steps", "type": "integer", "required": true, "default": 9, "minimum": 2, "maximum": 50},
+    {"id": "guidance-scale", "type": "number", "required": true, "default": 0.0, "minimum": 0.0, "maximum": 20.0}
+  ],
+  "nodes": [
+    {
+      "id": "format-prompt",
+      "operation": "chat-template",
+      "inputs": ["prompt"],
+      "outputs": ["formatted-prompt"],
+      "configuration": {
+        "resource": "Resources/tokenizer/tokenizer_config.json",
+        "addGenerationPrompt": true,
+        "enableThinking": true
+      }
+    },
+    {
+      "id": "tokenize-prompt",
+      "operation": "tokenize",
+      "inputs": ["formatted-prompt"],
+      "outputs": ["input-ids", "attention-mask"],
+      "configuration": {
+        "resourceDirectory": "Resources/tokenizer",
+        "padding": "max-length",
+        "maximumLength": 512,
+        "truncation": true
+      }
+    },
+    {
+      "id": "encode-prompt",
+      "operation": "core-ai",
+      "inputs": ["input-ids", "attention-mask"],
+      "outputs": ["prompt-embeddings"],
+      "configuration": {
+        "componentID": "prompt-encoder",
+        "selection": {"maximumPromptTokens": 512},
+        "outputHiddenState": -2,
+        "removePadding": true,
+        "padForDenoiserToMultiple": 32
+      }
+    },
+    {
+      "id": "initial-noise",
+      "operation": "seeded-noise",
+      "inputs": ["seed", "width", "height"],
+      "outputs": ["latents"],
+      "configuration": {
+        "algorithm": "pytorch-cpu-mt19937-normal-v1",
+        "scalarType": "float32",
+        "channels": 16,
+        "spatialDownsample": 8
+      }
+    },
+    {
+      "id": "denoise",
+      "operation": "flow-match-euler-loop",
+      "inputs": ["latents", "prompt-embeddings", "width", "height", "inference-steps", "guidance-scale"],
+      "outputs": ["denoised-latents"],
+      "configuration": {
+        "componentID": "denoiser",
+        "scheduler": "flow-match-euler-discrete",
+        "schedulerConfiguration": "Resources/scheduler/scheduler_config.json",
+        "numberOfTrainingTimesteps": 1000,
+        "useDynamicShifting": false,
+        "shift": 3.0,
+        "sigmaMinimum": 0.0,
+        "skipZeroDeltaStep": true,
+        "timestepConvention": "one-minus-scheduler-timestep-over-1000",
+        "negateDenoiserOutput": true,
+        "maximumIterations": 49
+      }
+    },
+    {
+      "id": "prepare-decoder-latents",
+      "operation": "vae-affine",
+      "inputs": ["denoised-latents"],
+      "outputs": ["decoder-latents"],
+      "configuration": {
+        "direction": "decode",
+        "scalingFactor": 0.3611,
+        "shiftFactor": 0.1159,
+        "formula": "divide-scale-add-shift"
+      }
+    },
+    {
+      "id": "decode-image",
+      "operation": "tiled-execution",
+      "inputs": ["decoder-latents"],
+      "outputs": ["decoded-image"],
+      "configuration": {
+        "componentID": "vae-decoder",
+        "selection": {"nativeDimensions": true, "maximumImageTokens": 16384},
+        "directMaximumImageTokens": 9216,
+        "tilePixels": 1024,
+        "tileOverlapFactor": 0.25,
+        "resampling": false
+      }
+    },
+    {
+      "id": "normalize-image",
+      "operation": "normalize",
+      "inputs": ["decoded-image"],
+      "outputs": ["normalized-image"],
+      "configuration": {
+        "formula": "clamp-half-plus-half",
+        "minimum": 0.0,
+        "maximum": 1.0
+      }
+    },
+    {
+      "id": "image-output",
+      "operation": "final-output",
+      "inputs": ["normalized-image"],
+      "outputs": ["image"],
+      "configuration": {
+        "colorContract": "linear-display-p3",
+        "alpha": "opaque"
+      }
+    }
+  ],
+  "edges": [
+    {"from": "parameter:prompt", "to": "node:format-prompt.prompt"},
+    {"from": "node:format-prompt.formatted-prompt", "to": "node:tokenize-prompt.formatted-prompt"},
+    {"from": "node:tokenize-prompt.input-ids", "to": "node:encode-prompt.input-ids"},
+    {"from": "node:tokenize-prompt.attention-mask", "to": "node:encode-prompt.attention-mask"},
+    {"from": "parameter:seed", "to": "node:initial-noise.seed"},
+    {"from": "parameter:width", "to": "node:initial-noise.width"},
+    {"from": "parameter:height", "to": "node:initial-noise.height"},
+    {"from": "node:initial-noise.latents", "to": "node:denoise.latents"},
+    {"from": "node:encode-prompt.prompt-embeddings", "to": "node:denoise.prompt-embeddings"},
+    {"from": "parameter:width", "to": "node:denoise.width"},
+    {"from": "parameter:height", "to": "node:denoise.height"},
+    {"from": "parameter:inference-steps", "to": "node:denoise.inference-steps"},
+    {"from": "parameter:guidance-scale", "to": "node:denoise.guidance-scale"},
+    {"from": "node:denoise.denoised-latents", "to": "node:prepare-decoder-latents.denoised-latents"},
+    {"from": "node:prepare-decoder-latents.decoder-latents", "to": "node:decode-image.decoder-latents"},
+    {"from": "node:decode-image.decoded-image", "to": "node:normalize-image.decoded-image"},
+    {"from": "node:normalize-image.normalized-image", "to": "node:image-output.normalized-image"}
+  ],
+  "outputs": [
+    {"id": "image", "source": "node:image-output.image", "semantic": "native-resolution linear Display P3 RGB image"}
+  ]
+}

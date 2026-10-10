@@ -1,0 +1,231 @@
+{
+  "connections": [
+    {
+      "id": "prompt.prompt->completion.prompt",
+      "input": {
+        "nodeID": "completion",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed.seed->completion.seed",
+      "input": { "nodeID": "completion", "port": "seed" },
+      "output": { "nodeID": "seed", "port": "seed" }
+    }
+  ],
+  "controlConnections": [
+    {
+      "id": "completion.completed->loop.completed",
+      "input": { "nodeID": "loop", "port": "completed" },
+      "output": { "nodeID": "completion", "port": "completed" }
+    },
+    {
+      "id": "loop.repeat->start.again",
+      "input": { "nodeID": "start", "port": "again" },
+      "output": { "nodeID": "loop", "port": "repeat" }
+    },
+    {
+      "id": "loop.incrementSeed->seed.increment",
+      "input": { "nodeID": "seed", "port": "increment" },
+      "output": { "nodeID": "loop", "port": "incrementSeed" }
+    }
+  ],
+  "exposedParameters": [
+    {
+      "defaultValue": {
+        "$type": "integer",
+        "value": 128
+      },
+      "id": "maximum-response-tokens",
+      "label": "Maximum response tokens",
+      "maximum": 4096,
+      "minimum": 1,
+      "target": {
+        "nodeID": "completion",
+        "parameter": "maxTokens"
+      },
+      "valueType": "integer"
+    },
+    {
+      "defaultValue": {
+        "$type": "number",
+        "value": 0.9
+      },
+      "id": "temperature",
+      "label": "Temperature",
+      "maximum": 2,
+      "minimum": 0,
+      "target": {
+        "nodeID": "completion",
+        "parameter": "temperature"
+      },
+      "valueType": "number"
+    },
+    {
+      "defaultValue": {
+        "$type": "integer",
+        "value": 40
+      },
+      "id": "top-k",
+      "label": "Top K",
+      "maximum": 1000,
+      "minimum": 1,
+      "target": {
+        "nodeID": "completion",
+        "parameter": "topK"
+      },
+      "valueType": "integer"
+    },
+    {
+      "defaultValue": {
+        "$type": "integer",
+        "value": 417
+      },
+      "id": "seed",
+      "label": "Seed",
+      "maximum": 4294967295,
+      "minimum": 0,
+      "target": {
+        "nodeID": "seed",
+        "parameter": "value"
+      },
+      "valueType": "integer"
+    }
+  ],
+  "id": "org.pixeltje.pipeline.qwen3-text-loop",
+  "mode": "generic",
+  "name": "Qwen3 Short Random Text Loop",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "start",
+      "kind": "control.start",
+      "parameters": {},
+      "resources": {},
+      "title": "Start / Next Pass"
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt",
+      "kind": "input.prompt",
+      "parameters": {
+        "value": "Write one short, surprising sentence about an imaginary animal. Output only the sentence."
+      },
+      "resources": {},
+      "title": "Prompt"
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed",
+      "kind": "input.seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": { "$type": "integer", "value": 417 }
+      },
+      "resources": {},
+      "title": "Seed"
+    },
+    {
+      "executionState": "enabled",
+      "id": "completion",
+      "kind": "coreai.textGenerate",
+      "parameters": {
+        "maxTokens": {
+          "$type": "integer",
+          "value": 128
+        },
+        "systemPrompt": "Write one concise creative sentence and nothing else.\n/no_think",
+        "temperature": {
+          "$type": "number",
+          "value": 0.9
+        },
+        "topK": {
+          "$type": "integer",
+          "value": 40
+        }
+      },
+      "resources": {
+        "manifest": {
+          "state": "linked",
+          "reference": {
+            "kind": "data",
+            "packageID": "coreai.qwen-qwen3-0-6b",
+            "packageVersion": "sha256.0a89d27cf3a82f2b0ce63bb1bdc16963b4b3078ba26fe564b0b809ddf2e92041",
+            "contentHash": "4ddc5300b4b5062b386e3ce2e4c46705f5dbbb0447d998a35b6b5c648836ad9d",
+            "componentRole": "languageModelManifest",
+            "familyABI": "coreai-language-model@1"
+          }
+        },
+        "model": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.qwen-qwen3-0-6b",
+            "packageVersion": "sha256.0a89d27cf3a82f2b0ce63bb1bdc16963b4b3078ba26fe564b0b809ddf2e92041",
+            "contentHash": "6495d7dcf2b0027b81602481dc8ba8c8fc3f6a87b8938a088f33a2e04e421604",
+            "componentRole": "languageModel",
+            "familyABI": "coreai-language-model@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.qwen-qwen3-0-6b",
+            "packageVersion": "sha256.0a89d27cf3a82f2b0ce63bb1bdc16963b4b3078ba26fe564b0b809ddf2e92041",
+            "contentHash": "0682a040763905c927476457261ce62fcb5e5038f7d0037b37f8f174792cc292",
+            "componentRole": "tokenizer",
+            "familyABI": "coreai-language-model@1"
+          }
+        }
+      },
+      "title": "Generate Text"
+    },
+    {
+      "executionState": "enabled",
+      "id": "loop",
+      "kind": "control.loop",
+      "parameters": {
+        "maxCalls": { "$type": "integer", "value": 3 },
+        "delayMilliseconds": { "$type": "integer", "value": 1000 },
+        "seedStrategy": "increment",
+        "feedback": "none"
+      },
+      "resources": {},
+      "title": "Loop"
+    }
+  ],
+  "presentation": {
+    "nodePositions": {
+      "start": { "x": 40, "y": 360 },
+      "prompt": {
+        "x": 40,
+        "y": 120
+      },
+      "completion": {
+        "x": 320,
+        "y": 120
+      },
+      "loop": { "x": 680, "y": 360 },
+      "seed": { "x": 320, "y": 480 }
+    },
+    "nodeSizes": {},
+    "viewportOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "viewportScale": 1
+  },
+  "primaryOutputNodeIDs": [
+    "completion"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

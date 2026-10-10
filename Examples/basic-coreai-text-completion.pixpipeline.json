@@ -1,0 +1,173 @@
+{
+  "connections": [
+    {
+      "id": "prompt.prompt->completion.prompt",
+      "input": {
+        "nodeID": "completion",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt",
+        "port": "prompt"
+      }
+    }
+  ],
+  "exposedParameters": [
+    {
+      "defaultValue": {
+        "$type": "integer",
+        "value": 256
+      },
+      "id": "maximum-response-tokens",
+      "label": "Maximum response tokens",
+      "maximum": 4096,
+      "minimum": 1,
+      "target": {
+        "nodeID": "completion",
+        "parameter": "maxTokens"
+      },
+      "valueType": "integer"
+    },
+    {
+      "defaultValue": {
+        "$type": "number",
+        "value": 0.7
+      },
+      "id": "temperature",
+      "label": "Temperature",
+      "maximum": 2,
+      "minimum": 0,
+      "target": {
+        "nodeID": "completion",
+        "parameter": "temperature"
+      },
+      "valueType": "number"
+    },
+    {
+      "defaultValue": {
+        "$type": "integer",
+        "value": 40
+      },
+      "id": "top-k",
+      "label": "Top K",
+      "maximum": 1000,
+      "minimum": 1,
+      "target": {
+        "nodeID": "completion",
+        "parameter": "topK"
+      },
+      "valueType": "integer"
+    },
+    {
+      "defaultValue": {
+        "$type": "integer",
+        "value": 0
+      },
+      "id": "seed",
+      "label": "Seed",
+      "maximum": 4294967295,
+      "minimum": 0,
+      "target": {
+        "nodeID": "completion",
+        "parameter": "seed"
+      },
+      "valueType": "integer"
+    }
+  ],
+  "id": "org.pixeltje.pipeline.coreai-text-completion",
+  "mode": "generic",
+  "name": "Core AI Text Completion",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "prompt",
+      "kind": "input.prompt",
+      "parameters": {},
+      "resources": {},
+      "title": "Prompt"
+    },
+    {
+      "executionState": "enabled",
+      "id": "completion",
+      "kind": "coreai.textGenerate",
+      "parameters": {
+        "maxTokens": {
+          "$type": "integer",
+          "value": 256
+        },
+        "seed": {
+          "$type": "integer",
+          "value": 0
+        },
+        "systemPrompt": "You are a concise, helpful writing assistant. Return only the requested text.",
+        "temperature": {
+          "$type": "number",
+          "value": 0.7
+        },
+        "topK": {
+          "$type": "integer",
+          "value": 40
+        }
+      },
+      "resources": {
+        "manifest": {
+          "requirement": {
+            "componentRole": "languageModelManifest",
+            "familyABI": "coreai-language-model@1",
+            "kind": "data",
+            "sourceFormat": "json",
+            "sourceName": "metadata.json"
+          },
+          "state": "unresolved"
+        },
+        "model": {
+          "requirement": {
+            "componentRole": "languageModel",
+            "familyABI": "coreai-language-model@1",
+            "kind": "coreAIModel",
+            "sourceFormat": ".aimodel or .aimodelc",
+            "sourceName": "Core AI language-model bundle"
+          },
+          "state": "unresolved"
+        },
+        "tokenizer": {
+          "requirement": {
+            "componentRole": "tokenizer",
+            "familyABI": "coreai-language-model@1",
+            "kind": "tokenizer",
+            "sourceFormat": "Hugging Face tokenizer directory",
+            "sourceName": "embedded tokenizer"
+          },
+          "state": "unresolved"
+        }
+      },
+      "title": "Generate Text"
+    }
+  ],
+  "presentation": {
+    "nodePositions": {
+      "prompt": {
+        "x": 40,
+        "y": 120
+      },
+      "completion": {
+        "x": 320,
+        "y": 120
+      }
+    },
+    "nodeSizes": {},
+    "viewportOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "viewportScale": 1
+  },
+  "primaryOutputNodeIDs": [
+    "completion"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

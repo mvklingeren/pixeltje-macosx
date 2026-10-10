@@ -1,0 +1,479 @@
+{
+  "connections" : [
+    {
+      "id" : "loop.callIndex->phaseStep.a",
+      "input" : {
+        "nodeID" : "phaseStep",
+        "port" : "a"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "callIndex"
+      }
+    },
+    {
+      "id" : "phaseStep.number->red.phaseShiftDegrees",
+      "input" : {
+        "nodeID" : "red",
+        "port" : "phaseShiftDegrees"
+      },
+      "output" : {
+        "nodeID" : "phaseStep",
+        "port" : "number"
+      }
+    },
+    {
+      "id" : "phaseStep.number->green.phaseShiftDegrees",
+      "input" : {
+        "nodeID" : "green",
+        "port" : "phaseShiftDegrees"
+      },
+      "output" : {
+        "nodeID" : "phaseStep",
+        "port" : "number"
+      }
+    },
+    {
+      "id" : "phaseStep.number->blue.phaseShiftDegrees",
+      "input" : {
+        "nodeID" : "blue",
+        "port" : "phaseShiftDegrees"
+      },
+      "output" : {
+        "nodeID" : "phaseStep",
+        "port" : "number"
+      }
+    },
+    {
+      "id" : "preview.image->output.image",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "preview",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "red.curve->drawRed.curve",
+      "input" : {
+        "nodeID" : "drawRed",
+        "port" : "curve"
+      },
+      "output" : {
+        "nodeID" : "red",
+        "port" : "curve"
+      }
+    },
+    {
+      "id" : "green.curve->drawGreen.curve",
+      "input" : {
+        "nodeID" : "drawGreen",
+        "port" : "curve"
+      },
+      "output" : {
+        "nodeID" : "green",
+        "port" : "curve"
+      }
+    },
+    {
+      "id" : "drawRed.image->drawGreen.background",
+      "input" : {
+        "nodeID" : "drawGreen",
+        "port" : "background"
+      },
+      "output" : {
+        "nodeID" : "drawRed",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "blue.curve->drawBlue.curve",
+      "input" : {
+        "nodeID" : "drawBlue",
+        "port" : "curve"
+      },
+      "output" : {
+        "nodeID" : "blue",
+        "port" : "curve"
+      }
+    },
+    {
+      "id" : "drawGreen.image->drawBlue.background",
+      "input" : {
+        "nodeID" : "drawBlue",
+        "port" : "background"
+      },
+      "output" : {
+        "nodeID" : "drawGreen",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "drawBlue.image->preview.image",
+      "input" : {
+        "nodeID" : "preview",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "drawBlue",
+        "port" : "image"
+      }
+    }
+  ],
+  "controlConnections" : [
+    {
+      "id" : "output.completed->loop.completed",
+      "input" : {
+        "nodeID" : "loop",
+        "port" : "completed"
+      },
+      "output" : {
+        "nodeID" : "output",
+        "port" : "completed"
+      }
+    },
+    {
+      "id" : "loop.repeat->start.again",
+      "input" : {
+        "nodeID" : "start",
+        "port" : "again"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "repeat"
+      }
+    }
+  ],
+  "exposedParameters" : [
+
+  ],
+  "id" : "org.pixeltje.examples.artest.04-three-phase-sinus",
+  "mode" : "textToImage",
+  "name" : "Artest 04 · Three-Phase Sinus",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "start",
+      "kind" : "control.start",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Start \/ Next Pass"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "phaseStep",
+      "kind" : "math.expression",
+      "parameters" : {
+        "expression" : "a*12"
+      },
+      "resources" : {
+
+      },
+      "title" : "Phase advance · 12° per call"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "red",
+      "kind" : "signal.sinusoid",
+      "parameters" : {
+        "amplitude" : {
+          "$type" : "number",
+          "value" : 0.25
+        },
+        "centerY" : {
+          "$type" : "number",
+          "value" : 0.5
+        },
+        "cycles" : {
+          "$type" : "number",
+          "value" : 4
+        },
+        "phaseDegrees" : {
+          "$type" : "number",
+          "value" : 0
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Red sinusoid · 0°"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "green",
+      "kind" : "signal.sinusoid",
+      "parameters" : {
+        "amplitude" : {
+          "$type" : "number",
+          "value" : 0.25
+        },
+        "centerY" : {
+          "$type" : "number",
+          "value" : 0.5
+        },
+        "cycles" : {
+          "$type" : "number",
+          "value" : 4
+        },
+        "phaseDegrees" : {
+          "$type" : "number",
+          "value" : 120
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Green sinusoid · 120°"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "blue",
+      "kind" : "signal.sinusoid",
+      "parameters" : {
+        "amplitude" : {
+          "$type" : "number",
+          "value" : 0.25
+        },
+        "centerY" : {
+          "$type" : "number",
+          "value" : 0.5
+        },
+        "cycles" : {
+          "$type" : "number",
+          "value" : 4
+        },
+        "phaseDegrees" : {
+          "$type" : "number",
+          "value" : 240
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Blue sinusoid · 240°"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "preview",
+      "kind" : "output.preview",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Three-phase preview"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output",
+      "kind" : "output.image",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Image result"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "loop",
+      "kind" : "control.loop",
+      "parameters" : {
+        "delayMilliseconds" : {
+          "$type" : "integer",
+          "value" : 0
+        },
+        "feedback" : "none",
+        "maxCalls" : {
+          "$type" : "integer",
+          "value" : -1
+        },
+        "seedStrategy" : "fixed"
+      },
+      "resources" : {
+
+      },
+      "title" : "Loop · 30 phase frames"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "note",
+      "kind" : "edit.markdownNote",
+      "parameters" : {
+        "text" : "# Three-phase sinus\nThree numeric Sinusoid nodes keep fixed amplitudes and phases of 0°, 120°, and 240°. Loop supplies a zero-based call index; Math Expression multiplies it by 12° and feeds the same phase shift to all three curves. Thirty calls produce one full cycle while preserving their 120° separation. Draw Curve layers the red, green, and blue signals over a fixed seeded background. Run to save 30 successive image frames. The 33 ms Loop delay begins after each frame is rendered and saved, so playback speed depends on render time."
+      },
+      "resources" : {
+
+      },
+      "title" : "How to play"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "drawRed",
+      "kind" : "image.drawCurve",
+      "parameters" : {
+        "color" : "red",
+        "height" : {
+          "$type" : "integer",
+          "value" : 600
+        },
+        "opacity" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "strokeWidth" : {
+          "$type" : "number",
+          "value" : 3.8
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 960
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Draw red curve"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "drawGreen",
+      "kind" : "image.drawCurve",
+      "parameters" : {
+        "color" : "green",
+        "height" : {
+          "$type" : "integer",
+          "value" : 600
+        },
+        "opacity" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "strokeWidth" : {
+          "$type" : "number",
+          "value" : 3.8
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 960
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Draw green curve"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "drawBlue",
+      "kind" : "image.drawCurve",
+      "parameters" : {
+        "color" : "blue",
+        "height" : {
+          "$type" : "integer",
+          "value" : 600
+        },
+        "opacity" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "strokeWidth" : {
+          "$type" : "number",
+          "value" : 3.8
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 960
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Draw blue curve"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "blue" : {
+        "x" : 290,
+        "y" : 660
+      },
+      "drawBlue" : {
+        "x" : 939,
+        "y" : 554
+      },
+      "drawGreen" : {
+        "x" : 939,
+        "y" : 317
+      },
+      "drawRed" : {
+        "x" : 948,
+        "y" : 47
+      },
+      "green" : {
+        "x" : 290,
+        "y" : 330
+      },
+      "loop" : {
+        "x" : 1401,
+        "y" : 910
+      },
+      "note" : {
+        "x" : 0,
+        "y" : 1000
+      },
+      "output" : {
+        "x" : 1408,
+        "y" : 704
+      },
+      "phaseStep" : {
+        "x" : 0,
+        "y" : 260
+      },
+      "preview" : {
+        "x" : 1291,
+        "y" : 3
+      },
+      "red" : {
+        "x" : 290,
+        "y" : 0
+      },
+      "start" : {
+        "x" : 1713,
+        "y" : 1146
+      }
+    },
+    "nodeSizes" : {
+      "preview" : {
+        "height" : 572,
+        "width" : 789
+      }
+    },
+    "viewportOrigin" : {
+      "x" : 428.20729279933704,
+      "y" : -103.03509345473395
+    },
+    "viewportScale" : 0.65581787109375
+  },
+  "primaryOutputNodeIDs" : [
+    "output"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

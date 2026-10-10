@@ -1,0 +1,19 @@
+[mcp_servers.swift_pixeltje_macosx]
+command = "/bin/zsh"
+args = ["-c", "exec \"$(git rev-parse --show-toplevel)/.codex/sourcekit-mcp/run.sh\""]
+enabled = true
+required = false
+startup_timeout_sec = 30
+tool_timeout_sec = 120
+default_tools_approval_mode = "auto"
+enabled_tools = [
+  "find_symbols",
+  "search_workspace_symbols",
+  "find_references",
+  "get_definition",
+  "get_implementations",
+  "get_hover_info",
+  "get_diagnostics",
+  "call_hierarchy",
+  "type_hierarchy",
+]

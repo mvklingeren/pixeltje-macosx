@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pixeltje.app/schemas/pixaimodel/validation/1.0",
+  "title": "Pixeltje AI model validation record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "packageIdentifier", "complete", "system", "gates", "exports", "components", "resolutionMatrix", "performance"],
+  "properties": {
+    "schemaVersion": {"const": "1.0.0"},
+    "packageIdentifier": {"type": "string", "minLength": 1},
+    "complete": {"type": "boolean"},
+    "decoderStrategy": {"enum": ["dynamic", "overlapped-tiles", "fixed-variants"]},
+    "system": {
+      "type": "object", "additionalProperties": false,
+      "required": ["macOS", "build", "machine", "coreAIRuntime", "python", "torch", "coreAITorch"],
+      "properties": {
+        "macOS": {"type": "string", "minLength": 1}, "build": {"type": "string", "minLength": 1},
+        "machine": {"type": "string", "minLength": 1}, "coreAIRuntime": {"type": "string", "minLength": 1},
+        "python": {"type": "string", "minLength": 1}, "torch": {"type": "string", "minLength": 1},
+        "coreAITorch": {"type": "string", "minLength": 1}
+      }
+    },
+    "gates": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "status", "evidence"],
+        "properties": {
+          "id": {"$ref": "#/$defs/id"},
+          "status": {"enum": ["passed", "failed", "blocked", "not-applicable"]},
+          "evidence": {"type": "array", "items": {"type": "string", "minLength": 1}},
+          "detail": {"type": "string"}
+        }
+      }
+    },
+    "exports": {
+      "type": "array", "minItems": 4, "maxItems": 4,
+      "items": {"$ref": "#/$defs/export"}
+    },
+    "components": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "variant", "assetDigestAlgorithm", "assetDigest", "descriptorMatch", "finiteOutputs", "parity"],
+        "properties": {
+          "id": {"$ref": "#/$defs/id"}, "variant": {"$ref": "#/$defs/id"},
+          "assetDigestAlgorithm": {"enum": ["sha256-tree-v1"]},
+          "assetDigest": {"$ref": "#/$defs/sha256"},
+          "descriptorMatch": {"type": "boolean"}, "finiteOutputs": {"type": "boolean"},
+          "estimatedResidentBytes": {"type": "integer", "minimum": 0},
+          "parity": {
+            "type": "object", "additionalProperties": false,
+            "required": ["status", "metric", "threshold", "worstObserved"],
+            "properties": {
+              "status": {"enum": ["passed", "failed", "blocked"]},
+              "metric": {"type": "string", "minLength": 1},
+              "threshold": {"type": "number"}, "worstObserved": {"type": "number"}
+            }
+          }
+        }
+      }
+    },
+    "resolutionMatrix": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["width", "height", "status", "native", "resampled", "imageTokens"],
+        "properties": {
+          "width": {"type": "integer", "minimum": 1}, "height": {"type": "integer", "minimum": 1},
+          "status": {"enum": ["passed", "failed", "blocked"]},
+          "native": {"type": "boolean"}, "resampled": {"type": "boolean"},
+          "imageTokens": {"type": "integer", "minimum": 1},
+          "outputSHA256": {"$ref": "#/$defs/sha256"},
+          "durationSeconds": {"type": "number", "minimum": 0}
+        }
+      }
+    },
+    "performance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["peakResidentBytes", "componentLoadSeconds", "firstSpecializationSeconds", "repeatInvocationSeconds", "denoiserStepSeconds"],
+      "properties": {
+        "peakResidentBytes": {"type": "integer", "minimum": 0},
+        "componentLoadSeconds": {"type": "object"},
+        "firstSpecializationSeconds": {"type": "object"},
+        "repeatInvocationSeconds": {"type": "object"},
+        "denoiserStepSeconds": {"type": "object"}
+      }
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "sha1": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "export": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "variant", "reportFile", "reportSHA256", "assetDigestAlgorithm", "assetDigest", "converterMode", "probe", "precision", "computationPrecision", "sourceRevision", "sourceLockSHA256", "toolSHA256", "system"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "variant": {"$ref": "#/$defs/id"},
+        "reportFile": {"type": "string", "minLength": 1},
+        "reportSHA256": {"$ref": "#/$defs/sha256"},
+        "assetDigestAlgorithm": {"const": "sha256-tree-v1"},
+        "assetDigest": {"$ref": "#/$defs/sha256"},
+        "converterMode": {"const": "release"},
+        "probe": {"const": false},
+        "precision": {"enum": ["float16", "bfloat16", "float32"]},
+        "computationPrecision": {"type": "string", "minLength": 1},
+        "sourceRevision": {"$ref": "#/$defs/sha1"},
+        "sourceLockSHA256": {"$ref": "#/$defs/sha256"},
+        "toolSHA256": {"$ref": "#/$defs/sha256"},
+        "system": {"type": "object"}
+      }
+    }
+  }
+}

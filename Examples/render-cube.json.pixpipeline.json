@@ -1,0 +1,519 @@
+{
+  "connections" : [
+    {
+      "id" : "geometry.value->mesh.data",
+      "input" : {
+        "nodeID" : "mesh",
+        "port" : "data"
+      },
+      "output" : {
+        "nodeID" : "geometry",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "mesh-to-metal-render",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "mesh"
+      },
+      "output" : {
+        "nodeID" : "mesh",
+        "port" : "mesh"
+      }
+    },
+    {
+      "id" : "tilt.value->world.rotationX",
+      "input" : {
+        "nodeID" : "world",
+        "port" : "rotationX"
+      },
+      "output" : {
+        "nodeID" : "tilt",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "loop.callIndex->spin.a",
+      "input" : {
+        "nodeID" : "spin",
+        "port" : "a"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "callIndex"
+      }
+    },
+    {
+      "id" : "spin.number->offset.a",
+      "input" : {
+        "nodeID" : "offset",
+        "port" : "a"
+      },
+      "output" : {
+        "nodeID" : "spin",
+        "port" : "number"
+      }
+    },
+    {
+      "id" : "offset.number->world.rotationY",
+      "input" : {
+        "nodeID" : "world",
+        "port" : "rotationY"
+      },
+      "output" : {
+        "nodeID" : "offset",
+        "port" : "number"
+      }
+    },
+    {
+      "id" : "world.matrix->render.worldMatrix",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "worldMatrix"
+      },
+      "output" : {
+        "nodeID" : "world",
+        "port" : "matrix"
+      }
+    },
+    {
+      "id" : "camera.viewMatrix->render.viewMatrix",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "viewMatrix"
+      },
+      "output" : {
+        "nodeID" : "camera",
+        "port" : "viewMatrix"
+      }
+    },
+    {
+      "id" : "camera.projectionMatrix->render.projectionMatrix",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "projectionMatrix"
+      },
+      "output" : {
+        "nodeID" : "camera",
+        "port" : "projectionMatrix"
+      }
+    },
+    {
+      "id" : "render.image->preview.image",
+      "input" : {
+        "nodeID" : "preview",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "render",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "preview.image->output.image",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "preview",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "width.value->camera.width",
+      "input" : {
+        "nodeID" : "camera",
+        "port" : "width"
+      },
+      "output" : {
+        "nodeID" : "width",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "width.value->render.width",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "width"
+      },
+      "output" : {
+        "nodeID" : "width",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "height.value->camera.height",
+      "input" : {
+        "nodeID" : "camera",
+        "port" : "height"
+      },
+      "output" : {
+        "nodeID" : "height",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "height.value->render.height",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "height"
+      },
+      "output" : {
+        "nodeID" : "height",
+        "port" : "value"
+      }
+    }
+  ],
+  "controlConnections" : [
+    {
+      "id" : "output.completed->loop.completed",
+      "input" : {
+        "nodeID" : "loop",
+        "port" : "completed"
+      },
+      "output" : {
+        "nodeID" : "output",
+        "port" : "completed"
+      }
+    },
+    {
+      "id" : "loop.repeat->start.again",
+      "input" : {
+        "nodeID" : "start",
+        "port" : "again"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "repeat"
+      }
+    }
+  ],
+  "exposedParameters" : [
+
+  ],
+  "id" : "org.pixeltje.examples.render-cube",
+  "mode" : "generic",
+  "name" : "Render Cube · Spinning 3D Mesh",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "start",
+      "kind" : "control.start",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Start \/ Next Frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "geometry",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "{\n  \"vertices\": [\n    [\n      -0.5,\n      -0.5,\n      -0.5\n    ],\n    [\n      0.5,\n      -0.5,\n      -0.5\n    ],\n    [\n      0.5,\n      0.5,\n      -0.5\n    ],\n    [\n      -0.5,\n      0.5,\n      -0.5\n    ],\n    [\n      -0.5,\n      -0.5,\n      0.5\n    ],\n    [\n      0.5,\n      -0.5,\n      0.5\n    ],\n    [\n      0.5,\n      0.5,\n      0.5\n    ],\n    [\n      -0.5,\n      0.5,\n      0.5\n    ]\n  ],\n  \"triangles\": [\n    [\n      4,\n      5,\n      6\n    ],\n    [\n      4,\n      6,\n      7\n    ],\n    [\n      1,\n      0,\n      3\n    ],\n    [\n      1,\n      3,\n      2\n    ],\n    [\n      0,\n      4,\n      7\n    ],\n    [\n      0,\n      7,\n      3\n    ],\n    [\n      5,\n      1,\n      2\n    ],\n    [\n      5,\n      2,\n      6\n    ],\n    [\n      3,\n      7,\n      6\n    ],\n    [\n      3,\n      6,\n      2\n    ],\n    [\n      0,\n      1,\n      5\n    ],\n    [\n      0,\n      5,\n      4\n    ]\n  ]\n}"
+      },
+      "resources" : {
+
+      },
+      "title" : "Cube vertices and triangles"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "mesh",
+      "kind" : "geometry.meshFromVertices",
+      "parameters" : {
+        "normalMode" : "flat"
+      },
+      "resources" : {
+
+      },
+      "title" : "Cube mesh"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "tilt",
+      "kind" : "primitive.float",
+      "parameters" : {
+        "value" : {
+          "$type" : "number",
+          "value" : 25
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "X tilt: 25 degrees"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "spin",
+      "kind" : "math.expression",
+      "parameters" : {
+        "expression" : "a*5"
+      },
+      "resources" : {
+
+      },
+      "title" : "Spin: 5 degrees per frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "offset",
+      "kind" : "math.expression",
+      "parameters" : {
+        "expression" : "a+35"
+      },
+      "resources" : {
+
+      },
+      "title" : "Starting Y angle: 35 degrees"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "world",
+      "kind" : "math.transformMatrix",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "World matrix"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "width",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 512
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Width: 512"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "height",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 512
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Height: 512"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "camera",
+      "kind" : "camera.matrices",
+      "parameters" : {
+        "farClip" : {
+          "$type" : "number",
+          "value" : 100
+        },
+        "fieldOfView" : {
+          "$type" : "number",
+          "value" : 45
+        },
+        "nearClip" : {
+          "$type" : "number",
+          "value" : 0.1
+        },
+        "positionZ" : {
+          "$type" : "number",
+          "value" : 4
+        },
+        "projection" : "perspective"
+      },
+      "resources" : {
+
+      },
+      "title" : "View and projection"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "render",
+      "kind" : "render.metal",
+      "parameters" : {
+        "ambient" : {
+          "$type" : "number",
+          "value" : 0.2
+        },
+        "backgroundColor" : "#00000000",
+        "color" : "#F28C28",
+        "lightIntensity" : {
+          "$type" : "number",
+          "value" : 0.8
+        },
+        "mode" : "filled"
+      },
+      "resources" : {
+
+      },
+      "title" : "Render spinning cube"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "preview",
+      "kind" : "output.preview",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Live cube preview"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output",
+      "kind" : "output.image",
+      "parameters" : {
+        "filenamePrefix" : "render-cube",
+        "format" : "png"
+      },
+      "resources" : {
+
+      },
+      "title" : "Cube frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "loop",
+      "kind" : "control.loop",
+      "parameters" : {
+        "autoPause" : false,
+        "delayMilliseconds" : {
+          "$type" : "integer",
+          "value" : 33
+        },
+        "feedback" : "none",
+        "maxCalls" : {
+          "$type" : "integer",
+          "value" : -1
+        },
+        "seedStrategy" : "fixed"
+      },
+      "resources" : {
+
+      },
+      "title" : "Spin until Cancel"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "note",
+      "kind" : "edit.markdownNote",
+      "parameters" : {
+        "text" : "# Spinning cube\nRun Pipeline (Command-Return) to spin; Cancel stops the loop. Eight XYZ vertices and twelve counterclockwise triangles define a unit cube. Mesh from Vertices computes flat face normals. Each frame uses rotation Y = 35 + callIndex * 5 degrees with a fixed 25-degree X tilt. Camera Matrices looks from (0,0,4) toward the origin. Metal Render uses projection × view × world and outputs a transparent, antialiased sRGB image plus a separate coverage mask. Image Preview updates each frame; Image Output saves PNG frames. The 33 ms delay starts after rendering and saving, so this is workflow animation, not guaranteed 30 fps playback. Loop is Infinite by default; set Max calls to 72 for one revolution."
+      },
+      "resources" : {
+
+      },
+      "title" : "How it works"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "camera" : {
+        "x" : 650,
+        "y" : 600
+      },
+      "geometry" : {
+        "x" : 0,
+        "y" : 130
+      },
+      "height" : {
+        "x" : 0,
+        "y" : 810
+      },
+      "loop" : {
+        "x" : 320,
+        "y" : 800
+      },
+      "mesh" : {
+        "x" : 320,
+        "y" : 130
+      },
+      "note" : {
+        "x" : 0,
+        "y" : 1230
+      },
+      "offset" : {
+        "x" : 320,
+        "y" : 600
+      },
+      "output" : {
+        "x" : 1280,
+        "y" : 690
+      },
+      "preview" : {
+        "x" : 1280,
+        "y" : 130
+      },
+      "render" : {
+        "x" : 970,
+        "y" : 220
+      },
+      "spin" : {
+        "x" : 320,
+        "y" : 440
+      },
+      "start" : {
+        "x" : 0,
+        "y" : 0
+      },
+      "tilt" : {
+        "x" : 0,
+        "y" : 440
+      },
+      "width" : {
+        "x" : 0,
+        "y" : 620
+      },
+      "world" : {
+        "x" : 650,
+        "y" : 130
+      }
+    },
+    "nodeSizes" : {
+      "note" : {
+        "height" : 340,
+        "width" : 540
+      },
+      "preview" : {
+        "height" : 520,
+        "width" : 540
+      }
+    },
+    "viewportOrigin" : {
+      "x" : -236.42787090578403,
+      "y" : -59.28993198295832
+    },
+    "viewportScale" : 0.6736862182617188
+  },
+  "primaryOutputNodeIDs" : [
+    "output"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

@@ -1,0 +1,244 @@
+{
+  "connections": [
+    {
+      "id": "source.image->dimensions.image",
+      "input": {
+        "nodeID": "dimensions",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "source",
+        "port": "image"
+      }
+    },
+    {
+      "id": "dimensions.width->half-width.a",
+      "input": {
+        "nodeID": "half-width",
+        "port": "a"
+      },
+      "output": {
+        "nodeID": "dimensions",
+        "port": "width"
+      }
+    },
+    {
+      "id": "dimensions.height->half-height.a",
+      "input": {
+        "nodeID": "half-height",
+        "port": "a"
+      },
+      "output": {
+        "nodeID": "dimensions",
+        "port": "height"
+      }
+    },
+    {
+      "id": "source.image->scale.image",
+      "input": {
+        "nodeID": "scale",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "source",
+        "port": "image"
+      }
+    },
+    {
+      "id": "half-width.integer->scale.width",
+      "input": {
+        "nodeID": "scale",
+        "port": "width"
+      },
+      "output": {
+        "nodeID": "half-width",
+        "port": "integer"
+      }
+    },
+    {
+      "id": "half-height.integer->scale.height",
+      "input": {
+        "nodeID": "scale",
+        "port": "height"
+      },
+      "output": {
+        "nodeID": "half-height",
+        "port": "integer"
+      }
+    },
+    {
+      "id": "scale.image->crop.image",
+      "input": {
+        "nodeID": "crop",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "scale",
+        "port": "image"
+      }
+    },
+    {
+      "id": "crop.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "crop",
+        "port": "image"
+      }
+    }
+  ],
+  "exposedParameters": [
+    {
+      "defaultValue": {
+        "$type": "integer",
+        "value": 224
+      },
+      "id": "crop-width",
+      "label": "Crop width",
+      "maximum": 256,
+      "minimum": 1,
+      "target": {
+        "nodeID": "crop",
+        "parameter": "width"
+      },
+      "valueType": "integer"
+    }
+  ],
+  "id": "org.pixeltje.examples.base-test-set.02-computed-image-resize",
+  "mode": "imageToImage",
+  "name": "Base Test Set 02 · Computed Image Resize",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "source",
+      "kind": "input.image",
+      "parameters": {
+        "sourceName": "test-card.png"
+      },
+      "resources": {},
+      "title": "Test card"
+    },
+    {
+      "executionState": "enabled",
+      "id": "dimensions",
+      "kind": "image.dimensions",
+      "parameters": {},
+      "resources": {},
+      "title": "Read dimensions"
+    },
+    {
+      "executionState": "enabled",
+      "id": "half-width",
+      "kind": "math.expression",
+      "parameters": {
+        "expression": "a / 2"
+      },
+      "resources": {},
+      "title": "Half width"
+    },
+    {
+      "executionState": "enabled",
+      "id": "half-height",
+      "kind": "math.expression",
+      "parameters": {
+        "expression": "a / 2"
+      },
+      "resources": {},
+      "title": "Half height"
+    },
+    {
+      "executionState": "enabled",
+      "id": "scale",
+      "kind": "image.scale",
+      "parameters": {
+        "upscaleMethod": "nearest-exact"
+      },
+      "resources": {},
+      "title": "Scale to half size"
+    },
+    {
+      "executionState": "enabled",
+      "id": "crop",
+      "kind": "image.crop",
+      "parameters": {
+        "height": {
+          "$type": "integer",
+          "value": 160
+        },
+        "width": {
+          "$type": "integer",
+          "value": 224
+        },
+        "x": {
+          "$type": "integer",
+          "value": 16
+        },
+        "y": {
+          "$type": "integer",
+          "value": 16
+        }
+      },
+      "resources": {},
+      "title": "Inset crop"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.image",
+      "parameters": {
+        "filenamePrefix": "computed-resize"
+      },
+      "resources": {},
+      "title": "Image result"
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "crop": {
+        "x": 960,
+        "y": 180
+      },
+      "dimensions": {
+        "x": 240,
+        "y": 40
+      },
+      "half-height": {
+        "x": 480,
+        "y": 200
+      },
+      "half-width": {
+        "x": 480,
+        "y": 0
+      },
+      "output": {
+        "x": 1200,
+        "y": 180
+      },
+      "scale": {
+        "x": 720,
+        "y": 180
+      },
+      "source": {
+        "x": 0,
+        "y": 180
+      }
+    },
+    "nodeSizes": {},
+    "viewportOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "viewportScale": 0.8
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

@@ -1,0 +1,243 @@
+{
+  "connections": [
+    {
+      "id": "prompt.prompt->generate.prompt",
+      "input": {
+        "nodeID": "generate",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed.seed->generate.seed",
+      "input": {
+        "nodeID": "generate",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "generate",
+        "port": "image"
+      }
+    },
+    {
+      "id": "negative.prompt->generate.negativePrompt",
+      "input": {
+        "nodeID": "generate",
+        "port": "negativePrompt"
+      },
+      "output": {
+        "nodeID": "negative",
+        "port": "prompt"
+      }
+    }
+  ],
+  "exposedParameters": [],
+  "id": "comfyui.77bd57fd-cff9-4795-8a5a-9f37c31ef3b5",
+  "mode": "textToImage",
+  "name": "z-image example workflow",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "prompt",
+      "kind": "input.prompt",
+      "parameters": {
+        "value": "anime RPG game style, cute anime girl with gigantic fennec ears and a big fluffy fox tail with long wavy blonde hair and large blue eyes blonde colored eyelashes wearing a pink sweater a large oversized gold trimmed black winter coat and a long blue maxi skirt and a red scarf, she is sitting beside a campfire in the wilderness at night playing guitar with a milky way galaxy sky"
+      },
+      "resources": {},
+      "title": "Prompt"
+    },
+    {
+      "executionState": "enabled",
+      "id": "negative",
+      "kind": "input.negativePrompt",
+      "parameters": {
+        "value": "low quality, bad anatomy, extra digits, missing digits, extra limbs, missing limbs"
+      },
+      "resources": {},
+      "title": "Negative Prompt"
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed",
+      "kind": "input.seed",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 42
+        }
+      },
+      "resources": {},
+      "title": "Seed"
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate",
+      "kind": "coreai.zImageGenerate",
+      "parameters": {
+        "width": {
+          "$type": "integer",
+          "value": 1024
+        },
+        "height": {
+          "$type": "integer",
+          "value": 1024
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "tokenizer": {
+          "state": "unresolved",
+          "requirement": {
+            "kind": "tokenizer",
+            "componentRole": "tokenizer",
+            "sourceName": "tokenizer/tokenizer.json",
+            "familyABI": "z-image-coreai-graph@2"
+          }
+        },
+        "promptEncoder": {
+          "requirement": {
+            "componentRole": "textEncoder",
+            "kind": "coreAIModel",
+            "sourceFormat": "safetensors",
+            "sourceName": "text_encoders/qwen_3_4b.safetensors",
+            "sourceURL": "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors"
+          },
+          "state": "unresolved"
+        },
+        "denoiser": {
+          "requirement": {
+            "componentRole": "denoiser",
+            "kind": "coreAIModel",
+            "sourceFormat": "safetensors",
+            "sourceName": "diffusion_models/z_image_turbo_bf16.safetensors",
+            "sourceURL": "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/diffusion_models/z_image_turbo_bf16.safetensors"
+          },
+          "state": "unresolved"
+        },
+        "timestepEmbedder": {
+          "state": "unresolved",
+          "requirement": {
+            "kind": "coreAIModel",
+            "componentRole": "timestepEmbedder",
+            "sourceName": "zimage_timestep_embedder.aimodel",
+            "familyABI": "z-image-coreai-graph@2"
+          }
+        },
+        "ropeMetadata": {
+          "state": "unresolved",
+          "requirement": {
+            "kind": "data",
+            "componentRole": "ropeMetadata",
+            "sourceName": "glue/rope_metadata.json",
+            "familyABI": "z-image-coreai-graph@2"
+          }
+        },
+        "ropeAxis0": {
+          "state": "unresolved",
+          "requirement": {
+            "kind": "data",
+            "componentRole": "ropeAxis0",
+            "sourceName": "glue/rope_axis0.f32",
+            "familyABI": "z-image-coreai-graph@2"
+          }
+        },
+        "ropeAxis1": {
+          "state": "unresolved",
+          "requirement": {
+            "kind": "data",
+            "componentRole": "ropeAxis1",
+            "sourceName": "glue/rope_axis1.f32",
+            "familyABI": "z-image-coreai-graph@2"
+          }
+        },
+        "ropeAxis2": {
+          "state": "unresolved",
+          "requirement": {
+            "kind": "data",
+            "componentRole": "ropeAxis2",
+            "sourceName": "glue/rope_axis2.f32",
+            "familyABI": "z-image-coreai-graph@2"
+          }
+        },
+        "vaeDecoder": {
+          "requirement": {
+            "componentRole": "vae",
+            "kind": "coreAIModel",
+            "sourceFormat": "safetensors",
+            "sourceName": "vae/ae.safetensors",
+            "sourceURL": "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors"
+          },
+          "state": "unresolved"
+        }
+      },
+      "title": "Z-Image Generate"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.image",
+      "parameters": {},
+      "resources": {},
+      "title": "Image Output"
+    }
+  ],
+  "presentation": {
+    "nodePositions": {
+      "prompt": {
+        "x": 40,
+        "y": 120
+      },
+      "negative": {
+        "x": 320,
+        "y": 120
+      },
+      "seed": {
+        "x": 600,
+        "y": 120
+      },
+      "generate": {
+        "x": 880,
+        "y": 120
+      },
+      "output": {
+        "x": 1160,
+        "y": 120
+      }
+    },
+    "nodeSizes": {},
+    "viewportOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "viewportScale": 1
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

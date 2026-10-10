@@ -1,0 +1,235 @@
+{
+  "connections": [
+    {
+      "id": "prompt.prompt->generate.prompt",
+      "input": {
+        "nodeID": "generate",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed.seed->generate.seed",
+      "input": {
+        "nodeID": "generate",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "generate",
+        "port": "image"
+      }
+    }
+  ],
+  "exposedParameters": [],
+  "id": "org.pixeltje.examples.z-image-turbo-acp",
+  "mode": "textToImage",
+  "name": "Z-Image Turbo (ACP)",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "prompt",
+      "kind": "input.prompt",
+      "parameters": {},
+      "resources": {},
+      "title": "Prompt"
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed",
+      "kind": "input.seed",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 0
+        }
+      },
+      "resources": {},
+      "title": "Seed"
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate",
+      "kind": "coreai.zImageGenerate",
+      "parameters": {
+        "width": {
+          "$type": "integer",
+          "value": 1024
+        },
+        "height": {
+          "$type": "integer",
+          "value": 1024
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "tokenizer": {
+          "reference": {
+            "componentRole": "tokenizer",
+            "contentHash": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+            "familyABI": "z-image-coreai-seq64@1",
+            "kind": "tokenizer",
+            "packageID": "coreai.z-image.z-image-turbo",
+            "packageVersion": "sha256.4f210fdd90f70035476ee34b9e7b524679fbf180fd77e13165755e1a095b9e65"
+          },
+          "state": "linked"
+        },
+        "promptEncoder": {
+          "reference": {
+            "componentRole": "promptEncoder",
+            "contentHash": "0ac88fa5d25b77875d005015e955df4b5cd259c9bf6c0554aac8aad32dae8b34",
+            "familyABI": "z-image-coreai-seq64@1",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.z-image.z-image-turbo",
+            "packageVersion": "sha256.4f210fdd90f70035476ee34b9e7b524679fbf180fd77e13165755e1a095b9e65"
+          },
+          "state": "linked"
+        },
+        "denoiser": {
+          "reference": {
+            "componentRole": "denoiser",
+            "contentHash": "cfbb51aee0c244541dcc4e7b6cb3cc5a0701a664a178807dd97af5b8acfaedf9",
+            "familyABI": "z-image-coreai-seq64@1",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.z-image.z-image-turbo",
+            "packageVersion": "sha256.4f210fdd90f70035476ee34b9e7b524679fbf180fd77e13165755e1a095b9e65"
+          },
+          "state": "linked"
+        },
+        "timestepEmbedder": {
+          "reference": {
+            "componentRole": "timestepEmbedder",
+            "contentHash": "cedac6488d1a7b2279242d47619068bd98a758a629c4d51b506976b988089c46",
+            "familyABI": "z-image-coreai-seq64@1",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.z-image.z-image-turbo",
+            "packageVersion": "sha256.4f210fdd90f70035476ee34b9e7b524679fbf180fd77e13165755e1a095b9e65"
+          },
+          "state": "linked"
+        },
+        "ropeMetadata": {
+          "reference": {
+            "componentRole": "ropeMetadata",
+            "contentHash": "b622a59d3f75350b4f770ef8e995b0e7028091302d7afb46a45434549b62ae57",
+            "familyABI": "z-image-coreai-seq64@1",
+            "kind": "data",
+            "packageID": "coreai.z-image.z-image-turbo",
+            "packageVersion": "sha256.4f210fdd90f70035476ee34b9e7b524679fbf180fd77e13165755e1a095b9e65"
+          },
+          "state": "linked"
+        },
+        "ropeAxis0": {
+          "reference": {
+            "componentRole": "ropeAxis0",
+            "contentHash": "feb4fd655388475535e64815df25227b6d62cfe7580f246cc9b41f763fa59779",
+            "familyABI": "z-image-coreai-seq64@1",
+            "kind": "data",
+            "packageID": "coreai.z-image.z-image-turbo",
+            "packageVersion": "sha256.4f210fdd90f70035476ee34b9e7b524679fbf180fd77e13165755e1a095b9e65"
+          },
+          "state": "linked"
+        },
+        "ropeAxis1": {
+          "reference": {
+            "componentRole": "ropeAxis1",
+            "contentHash": "718fc0a99da0c1d3ffaf3da2dd4daf0781b54ccd6428a1b44cbd4fd8308780a3",
+            "familyABI": "z-image-coreai-seq64@1",
+            "kind": "data",
+            "packageID": "coreai.z-image.z-image-turbo",
+            "packageVersion": "sha256.4f210fdd90f70035476ee34b9e7b524679fbf180fd77e13165755e1a095b9e65"
+          },
+          "state": "linked"
+        },
+        "ropeAxis2": {
+          "reference": {
+            "componentRole": "ropeAxis2",
+            "contentHash": "718fc0a99da0c1d3ffaf3da2dd4daf0781b54ccd6428a1b44cbd4fd8308780a3",
+            "familyABI": "z-image-coreai-seq64@1",
+            "kind": "data",
+            "packageID": "coreai.z-image.z-image-turbo",
+            "packageVersion": "sha256.4f210fdd90f70035476ee34b9e7b524679fbf180fd77e13165755e1a095b9e65"
+          },
+          "state": "linked"
+        },
+        "vaeDecoder": {
+          "reference": {
+            "componentRole": "vaeDecoder",
+            "contentHash": "7e46df0aa524108720a7c5bdae4561f3a5b12fc1956e16fc46c41d363f6c5e92",
+            "familyABI": "z-image-coreai-seq64@1",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.z-image.z-image-turbo",
+            "packageVersion": "sha256.4f210fdd90f70035476ee34b9e7b524679fbf180fd77e13165755e1a095b9e65"
+          },
+          "state": "linked"
+        }
+      },
+      "title": "Z-Image Generate"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.image",
+      "parameters": {},
+      "resources": {},
+      "title": "Image Output"
+    }
+  ],
+  "presentation": {
+    "nodePositions": {
+      "prompt": {
+        "x": 40,
+        "y": 120
+      },
+      "seed": {
+        "x": 320,
+        "y": 120
+      },
+      "generate": {
+        "x": 600,
+        "y": 120
+      },
+      "output": {
+        "x": 880,
+        "y": 120
+      }
+    },
+    "nodeSizes": {},
+    "viewportOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "viewportScale": 1
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

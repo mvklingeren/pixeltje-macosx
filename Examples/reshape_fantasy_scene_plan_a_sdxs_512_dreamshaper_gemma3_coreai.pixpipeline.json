@@ -1,0 +1,1310 @@
+{
+  "connections" : [
+    {
+      "id" : "prompt.prompt->subjectSuffix.string",
+      "input" : {
+        "nodeID" : "subjectSuffix",
+        "port" : "string"
+      },
+      "output" : {
+        "nodeID" : "prompt",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "subjectSuffix.value->subjectSplit.text",
+      "input" : {
+        "nodeID" : "subjectSplit",
+        "port" : "text"
+      },
+      "output" : {
+        "nodeID" : "subjectSuffix",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "subjectSplit.items->sam31.subjects",
+      "input" : {
+        "nodeID" : "sam31",
+        "port" : "subjects"
+      },
+      "output" : {
+        "nodeID" : "subjectSplit",
+        "port" : "items"
+      }
+    },
+    {
+      "id" : "previousFrame.image->sam31.image",
+      "input" : {
+        "nodeID" : "sam31",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "previousFrame",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "sam31.masks->hitTest.masks",
+      "input" : {
+        "nodeID" : "hitTest",
+        "port" : "masks"
+      },
+      "output" : {
+        "nodeID" : "sam31",
+        "port" : "masks"
+      }
+    },
+    {
+      "id" : "trackpad.x->hitTest.x",
+      "input" : {
+        "nodeID" : "hitTest",
+        "port" : "x"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "x"
+      }
+    },
+    {
+      "id" : "trackpad.y->hitTest.y",
+      "input" : {
+        "nodeID" : "hitTest",
+        "port" : "y"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "y"
+      }
+    },
+    {
+      "id" : "hitTest.found->selectedOrAdvance.condition",
+      "input" : {
+        "nodeID" : "selectedOrAdvance",
+        "port" : "condition"
+      },
+      "output" : {
+        "nodeID" : "hitTest",
+        "port" : "found"
+      }
+    },
+    {
+      "id" : "hitTest.label->selectedOrAdvance.trueValue",
+      "input" : {
+        "nodeID" : "selectedOrAdvance",
+        "port" : "trueValue"
+      },
+      "output" : {
+        "nodeID" : "hitTest",
+        "port" : "label"
+      }
+    },
+    {
+      "id" : "selectedOrAdvance.value->nextBrief.stringB",
+      "input" : {
+        "nodeID" : "nextBrief",
+        "port" : "stringB"
+      },
+      "output" : {
+        "nodeID" : "selectedOrAdvance",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "loop.callIndex->isLaterCall.a",
+      "input" : {
+        "nodeID" : "isLaterCall",
+        "port" : "a"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "callIndex"
+      }
+    },
+    {
+      "id" : "isLaterCall.boolean->openingOrNextBrief.condition",
+      "input" : {
+        "nodeID" : "openingOrNextBrief",
+        "port" : "condition"
+      },
+      "output" : {
+        "nodeID" : "isLaterCall",
+        "port" : "boolean"
+      }
+    },
+    {
+      "id" : "prompt.prompt->openingOrNextBrief.falseValue",
+      "input" : {
+        "nodeID" : "openingOrNextBrief",
+        "port" : "falseValue"
+      },
+      "output" : {
+        "nodeID" : "prompt",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "openingOrNextBrief.value->characterWriter.prompt",
+      "input" : {
+        "nodeID" : "characterWriter",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "openingOrNextBrief",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "seed.seed->characterWriter.seed",
+      "input" : {
+        "nodeID" : "characterWriter",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "characterWriter.text->stripSubjects.string",
+      "input" : {
+        "nodeID" : "stripSubjects",
+        "port" : "string"
+      },
+      "output" : {
+        "nodeID" : "characterWriter",
+        "port" : "text"
+      }
+    },
+    {
+      "id" : "stripSubjects.value->finalPrompt.stringB",
+      "input" : {
+        "nodeID" : "finalPrompt",
+        "port" : "stringB"
+      },
+      "output" : {
+        "nodeID" : "stripSubjects",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "persistentMouse.value->finalPrompt.stringA",
+      "input" : {
+        "nodeID" : "finalPrompt",
+        "port" : "stringA"
+      },
+      "output" : {
+        "nodeID" : "persistentMouse",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "finalPrompt.value->generate.prompt",
+      "input" : {
+        "nodeID" : "generate",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "finalPrompt",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "seed.seed->generate.seed",
+      "input" : {
+        "nodeID" : "generate",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate.image->output-preview.image",
+      "input" : {
+        "nodeID" : "output-preview",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "generate",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "output-preview.image->output.image",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "output-preview",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "nextBrief.value->completeMoveBrief.stringA",
+      "input" : {
+        "nodeID" : "completeMoveBrief",
+        "port" : "stringA"
+      },
+      "output" : {
+        "nodeID" : "nextBrief",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "completeMoveBrief.value->openingOrNextBrief.trueValue",
+      "input" : {
+        "nodeID" : "openingOrNextBrief",
+        "port" : "trueValue"
+      },
+      "output" : {
+        "nodeID" : "completeMoveBrief",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "prompt.prompt->previousDescription.string",
+      "input" : {
+        "nodeID" : "previousDescription",
+        "port" : "string"
+      },
+      "output" : {
+        "nodeID" : "prompt",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "previousDescription.value->previousTurn.trueValue",
+      "input" : {
+        "nodeID" : "previousTurn",
+        "port" : "trueValue"
+      },
+      "output" : {
+        "nodeID" : "previousDescription",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "emptyHistory.value->previousTurn.falseValue",
+      "input" : {
+        "nodeID" : "previousTurn",
+        "port" : "falseValue"
+      },
+      "output" : {
+        "nodeID" : "emptyHistory",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "isLaterCall.boolean->previousTurn.condition",
+      "input" : {
+        "nodeID" : "previousTurn",
+        "port" : "condition"
+      },
+      "output" : {
+        "nodeID" : "isLaterCall",
+        "port" : "boolean"
+      }
+    },
+    {
+      "id" : "previousTurn.value->characterWriter.previousResponse",
+      "input" : {
+        "nodeID" : "characterWriter",
+        "port" : "previousResponse"
+      },
+      "output" : {
+        "nodeID" : "previousTurn",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "storyRequest.value->characterWriter.previousPrompt",
+      "input" : {
+        "nodeID" : "characterWriter",
+        "port" : "previousPrompt"
+      },
+      "output" : {
+        "nodeID" : "storyRequest",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "subjectSuffix.value->autoRoute.string",
+      "input" : {
+        "nodeID" : "autoRoute",
+        "port" : "string"
+      },
+      "output" : {
+        "nodeID" : "subjectSuffix",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "autoRoute.value->routeLength.string",
+      "input" : {
+        "nodeID" : "routeLength",
+        "port" : "string"
+      },
+      "output" : {
+        "nodeID" : "autoRoute",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "routeLength.length->routePresent.a",
+      "input" : {
+        "nodeID" : "routePresent",
+        "port" : "a"
+      },
+      "output" : {
+        "nodeID" : "routeLength",
+        "port" : "length"
+      }
+    },
+    {
+      "id" : "routePresent.boolean->autoRouteOrFallback.condition",
+      "input" : {
+        "nodeID" : "autoRouteOrFallback",
+        "port" : "condition"
+      },
+      "output" : {
+        "nodeID" : "routePresent",
+        "port" : "boolean"
+      }
+    },
+    {
+      "id" : "autoRoute.value->autoRouteOrFallback.trueValue",
+      "input" : {
+        "nodeID" : "autoRouteOrFallback",
+        "port" : "trueValue"
+      },
+      "output" : {
+        "nodeID" : "autoRoute",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "naturalAdvance.value->autoRouteOrFallback.falseValue",
+      "input" : {
+        "nodeID" : "autoRouteOrFallback",
+        "port" : "falseValue"
+      },
+      "output" : {
+        "nodeID" : "naturalAdvance",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "autoRouteOrFallback.value->selectedOrAdvance.falseValue",
+      "input" : {
+        "nodeID" : "selectedOrAdvance",
+        "port" : "falseValue"
+      },
+      "output" : {
+        "nodeID" : "autoRouteOrFallback",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "stripSubjects.value->landmarkWriter.prompt",
+      "input" : {
+        "nodeID" : "landmarkWriter",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "stripSubjects",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "seed.seed->landmarkWriter.seed",
+      "input" : {
+        "nodeID" : "landmarkWriter",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "landmarkWriter.text->cleanLandmarks.string",
+      "input" : {
+        "nodeID" : "cleanLandmarks",
+        "port" : "string"
+      },
+      "output" : {
+        "nodeID" : "landmarkWriter",
+        "port" : "text"
+      }
+    },
+    {
+      "id" : "stripSubjects.value->feedbackText.stringA",
+      "input" : {
+        "nodeID" : "feedbackText",
+        "port" : "stringA"
+      },
+      "output" : {
+        "nodeID" : "stripSubjects",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "cleanLandmarks.value->feedbackText.stringB",
+      "input" : {
+        "nodeID" : "feedbackText",
+        "port" : "stringB"
+      },
+      "output" : {
+        "nodeID" : "cleanLandmarks",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "feedbackText.value->output.feedbackText",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "feedbackText"
+      },
+      "output" : {
+        "nodeID" : "feedbackText",
+        "port" : "value"
+      }
+    }
+  ],
+  "controlConnections" : [
+    {
+      "id" : "output.completed->loop.completed",
+      "input" : {
+        "nodeID" : "loop",
+        "port" : "completed"
+      },
+      "output" : {
+        "nodeID" : "output",
+        "port" : "completed"
+      }
+    },
+    {
+      "id" : "loop.repeat->start.again",
+      "input" : {
+        "nodeID" : "start",
+        "port" : "again"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "repeat"
+      }
+    },
+    {
+      "id" : "loop.incrementSeed->seed.increment",
+      "input" : {
+        "nodeID" : "seed",
+        "port" : "increment"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "incrementSeed"
+      }
+    }
+  ],
+  "exposedParameters" : [
+
+  ],
+  "id" : "org.pixeltje.pipeline.reshape-fantasy-scene-plan-a-gemma3-sdxs-512-dreamshaper",
+  "mode" : "textToImage",
+  "name" : "Open Fantasy World — Gemma 3, SAM 3.1 and SDXS 512",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "start",
+      "kind" : "control.start",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Start \/ Next Pass"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "First view: a weathered stone road leading to a hilltop castle at sunset. Show the gate on the right and a tower on the left. On later views, move into the selected landmark and reveal two new visible paths, doors, or landmarks. Keep architecture and light locally coherent."
+      },
+      "resources" : {
+
+      },
+      "title" : "Opening Brief \/ Previous View"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "trackpad",
+      "kind" : "input.trackpad",
+      "parameters" : {
+        "x" : {
+          "$type" : "number",
+          "value" : 0.6197098214285733
+        },
+        "y" : {
+          "$type" : "number",
+          "value" : 0.3492630080049272
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Trackpad"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "characterWriter",
+      "kind" : "coreai.textGenerate",
+      "parameters" : {
+        "maxTokens" : {
+          "$type" : "integer",
+          "value" : 128
+        },
+        "systemPrompt" : "Write the current view in a medieval fantasy journey as one compact image description. When the traveler moves, describe the place they reach and two new visible landmarks with their positions. Return only the image description; the mouse is supplied separately.",
+        "temperature" : {
+          "$type" : "number",
+          "value" : 0.7
+        },
+        "topK" : {
+          "$type" : "integer",
+          "value" : 40
+        }
+      },
+      "resources" : {
+        "manifest" : {
+          "reference" : {
+            "componentRole" : "languageModelManifest",
+            "contentHash" : "284b0f6cd377432a502134d293745429e7a2a90aff7ae8c53f2b2b61560b005b",
+            "familyABI" : "coreai-language-model@1",
+            "kind" : "data",
+            "packageID" : "coreai.google-gemma-3-12b-it",
+            "packageVersion" : "sha256.d470babaaf10086496e586c16a99796c7a9151e083674d4dbabebd612888919b"
+          },
+          "state" : "linked"
+        },
+        "model" : {
+          "reference" : {
+            "componentRole" : "languageModel",
+            "contentHash" : "ffe53d54d909be6218e5094a1611c60cfc915ec5cfc6f616618c01b470220fe3",
+            "familyABI" : "coreai-language-model@1",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.google-gemma-3-12b-it",
+            "packageVersion" : "sha256.d470babaaf10086496e586c16a99796c7a9151e083674d4dbabebd612888919b"
+          },
+          "state" : "linked"
+        },
+        "tokenizer" : {
+          "reference" : {
+            "componentRole" : "tokenizer",
+            "contentHash" : "9ebf4c1a647372c4d5534d7bda877f200799dee2a447c705811e2cb2930db2a2",
+            "familyABI" : "coreai-language-model@1",
+            "kind" : "tokenizer",
+            "packageID" : "coreai.google-gemma-3-12b-it",
+            "packageVersion" : "sha256.d470babaaf10086496e586c16a99796c7a9151e083674d4dbabebd612888919b"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Gemma 3 Scene Writer"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "persistentMouse",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "Small anthropomorphic mouse in blue cloak at left foreground, rear three-quarter view facing into scene, round ears, pointed snout, whiskers, thin tail;"
+      },
+      "resources" : {
+
+      },
+      "title" : "Recurring Mouse"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "finalPrompt",
+      "kind" : "text.concatenate",
+      "parameters" : {
+        "delimiter" : " "
+      },
+      "resources" : {
+
+      },
+      "title" : "Short SDXS Prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed",
+      "kind" : "input.seed",
+      "parameters" : {
+        "mode" : "fixed",
+        "value" : {
+          "$type" : "integer",
+          "value" : 1008116446
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Shared Seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate",
+      "kind" : "coreai.sdxsGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 0
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 512
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 1
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 512
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "bfeacb45c5d75f84fea181297319ac3ecb4174a575ea7e86b7253da25980c120",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "acc841490e1cad1df183b42144879c5c8dfe3062d34a3057b9558f301f05bf1e",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "6ea8c60c7d82cd85c1966124b2f472509ef617dd22f95d7d571a04903158ffd9",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "SDXS 512 Generate"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output",
+      "kind" : "output.image",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Image + View Text Output"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "loop",
+      "kind" : "control.loop",
+      "parameters" : {
+        "autoPause" : false,
+        "delayMilliseconds" : {
+          "$type" : "integer",
+          "value" : 100
+        },
+        "feedback" : "imageAndTextToNextView",
+        "maxCalls" : {
+          "$type" : "integer",
+          "value" : 100
+        },
+        "seedStrategy" : "increment"
+      },
+      "resources" : {
+
+      },
+      "title" : "Loop"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output-preview",
+      "kind" : "output.preview",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Image Preview"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "previousFrame",
+      "kind" : "input.previousFrame",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Previous Rendered Frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "subjectSuffix",
+      "kind" : "text.regexExtract",
+      "parameters" : {
+        "groupIndex" : {
+          "$type" : "integer",
+          "value" : 1
+        },
+        "mode" : "First Group",
+        "pattern" : "(?m)^@@[ \t]*([^\r\n]*)"
+      },
+      "resources" : {
+
+      },
+      "title" : "Previous View Subject Line"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "subjectSplit",
+      "kind" : "text.split",
+      "parameters" : {
+        "maxItems" : {
+          "$type" : "integer",
+          "value" : 8
+        },
+        "omitEmpty" : true,
+        "separator" : "|",
+        "trimItems" : true
+      },
+      "resources" : {
+
+      },
+      "title" : "Split Subject Names"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "sam31",
+      "kind" : "coreai.sam31Select",
+      "parameters" : {
+        "maskThreshold" : {
+          "$type" : "number",
+          "value" : 0.5
+        },
+        "maxSegments" : {
+          "$type" : "integer",
+          "value" : 8
+        },
+        "scoreThreshold" : {
+          "$type" : "number",
+          "value" : 0.4
+        }
+      },
+      "resources" : {
+        "model" : {
+          "reference" : {
+            "componentRole" : "detector",
+            "contentHash" : "e41c0a848dcd286d180386edb5a6a998650255f2d65eadd7327413c57da2962d",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.meta.sam3.1-image-selection",
+            "packageVersion" : "facebook-sam3.1-daa63191845a-coreai-fp16"
+          },
+          "state" : "linked"
+        },
+        "tokenizer" : {
+          "reference" : {
+            "componentRole" : "tokenizer",
+            "contentHash" : "6d9109cc838977f3ca94a379eec36aecc7c807e1785cd729660ca2fc0171fb35",
+            "kind" : "tokenizer",
+            "packageID" : "coreai.meta.sam3.1-image-selection",
+            "packageVersion" : "facebook-sam3.1-daa63191845a-coreai-fp16"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "SAM 3.1 Subject Masks"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "hitTest",
+      "kind" : "mask.hitTest",
+      "parameters" : {
+        "coverageThreshold" : {
+          "$type" : "number",
+          "value" : 0.5
+        },
+        "radiusPixels" : {
+          "$type" : "integer",
+          "value" : 3
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Clicked Mask"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "naturalAdvance",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "nearby path"
+      },
+      "resources" : {
+
+      },
+      "title" : "No Landmark Fallback"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "selectedOrAdvance",
+      "kind" : "logic.ifElse",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Clicked Subject or Natural Advance"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "nextBrief",
+      "kind" : "text.concatenate",
+      "parameters" : {
+        "delimiter" : "",
+        "stringA" : "Continue the journey through the "
+      },
+      "resources" : {
+
+      },
+      "title" : "Travel Through Destination"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "isLaterCall",
+      "kind" : "math.expression",
+      "parameters" : {
+        "expression" : "a+0"
+      },
+      "resources" : {
+
+      },
+      "title" : "Later Call?"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "openingOrNextBrief",
+      "kind" : "logic.ifElse",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Opening Brief or Next View"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "stripSubjects",
+      "kind" : "text.regexReplace",
+      "parameters" : {
+        "caseInsensitive" : false,
+        "pattern" : "(?s)\\s*(?:@@|CLICKED SUBJECT:).*$",
+        "replacement" : ""
+      },
+      "resources" : {
+
+      },
+      "title" : "Image Prompt Without Subject List"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "completeMoveBrief",
+      "kind" : "text.concatenate",
+      "parameters" : {
+        "delimiter" : "",
+        "stringB" : ". Describe the view after arriving there, with two new visible routes or entrances."
+      },
+      "resources" : {
+
+      },
+      "title" : "Describe the Arrived View"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "previousDescription",
+      "kind" : "text.regexReplace",
+      "parameters" : {
+        "pattern" : "(?s)\\s*@@.*$",
+        "replacement" : ""
+      },
+      "resources" : {
+
+      },
+      "title" : "Previous Assistant Scene"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "emptyHistory",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : ""
+      },
+      "resources" : {
+
+      },
+      "title" : "No Prior Turn on First Call"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "previousTurn",
+      "kind" : "logic.ifElse",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Prior Scene on Later Calls"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "storyRequest",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "Describe the current view on the mouse's medieval fantasy journey at sunset."
+      },
+      "resources" : {
+
+      },
+      "title" : "Previous Scene Request"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "autoRoute",
+      "kind" : "text.regexExtract",
+      "parameters" : {
+        "groupIndex" : {
+          "$type" : "integer",
+          "value" : 1
+        },
+        "mode" : "First Group",
+        "pattern" : "^[\\s|]*([^|\\r\\n]+)"
+      },
+      "resources" : {
+
+      },
+      "title" : "First Available Route"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "routeLength",
+      "kind" : "text.length",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Route Name Length"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "routePresent",
+      "kind" : "math.expression",
+      "parameters" : {
+        "expression" : "a+0"
+      },
+      "resources" : {
+
+      },
+      "title" : "Has a Named Route?"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "autoRouteOrFallback",
+      "kind" : "logic.ifElse",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Named Route or Nearby Path"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "landmarkWriter",
+      "kind" : "coreai.textGenerate",
+      "parameters" : {
+        "maxTokens" : {
+          "$type" : "integer",
+          "value" : 64
+        },
+        "systemPrompt" : "Extract concrete visible paths, entrances, or navigable landmarks from the scene. Return only 2 to 4 short object names separated by |, with the most obvious forward route first. Ignore the route used to arrive when it is only mentioned as behind the traveler or in an introductory Beyond phrase. No sentences or descriptions.",
+        "temperature" : {
+          "$type" : "number",
+          "value" : 0.2
+        },
+        "topK" : {
+          "$type" : "integer",
+          "value" : 40
+        }
+      },
+      "resources" : {
+        "manifest" : {
+          "reference" : {
+            "componentRole" : "languageModelManifest",
+            "contentHash" : "284b0f6cd377432a502134d293745429e7a2a90aff7ae8c53f2b2b61560b005b",
+            "familyABI" : "coreai-language-model@1",
+            "kind" : "data",
+            "packageID" : "coreai.google-gemma-3-12b-it",
+            "packageVersion" : "sha256.d470babaaf10086496e586c16a99796c7a9151e083674d4dbabebd612888919b"
+          },
+          "state" : "linked"
+        },
+        "model" : {
+          "reference" : {
+            "componentRole" : "languageModel",
+            "contentHash" : "ffe53d54d909be6218e5094a1611c60cfc915ec5cfc6f616618c01b470220fe3",
+            "familyABI" : "coreai-language-model@1",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.google-gemma-3-12b-it",
+            "packageVersion" : "sha256.d470babaaf10086496e586c16a99796c7a9151e083674d4dbabebd612888919b"
+          },
+          "state" : "linked"
+        },
+        "tokenizer" : {
+          "reference" : {
+            "componentRole" : "tokenizer",
+            "contentHash" : "9ebf4c1a647372c4d5534d7bda877f200799dee2a447c705811e2cb2930db2a2",
+            "familyABI" : "coreai-language-model@1",
+            "kind" : "tokenizer",
+            "packageID" : "coreai.google-gemma-3-12b-it",
+            "packageVersion" : "sha256.d470babaaf10086496e586c16a99796c7a9151e083674d4dbabebd612888919b"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Extract Visible Routes"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "cleanLandmarks",
+      "kind" : "text.regexReplace",
+      "parameters" : {
+        "pattern" : "\\s*\\|\\s*|[\\r\\n]+",
+        "replacement" : "|"
+      },
+      "resources" : {
+
+      },
+      "title" : "Normalize Route Separators"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "feedbackText",
+      "kind" : "text.concatenate",
+      "parameters" : {
+        "delimiter" : "\n@@"
+      },
+      "resources" : {
+
+      },
+      "title" : "Scene + Landmark Feedback"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "autoRoute" : {
+        "x" : 550,
+        "y" : 1050
+      },
+      "autoRouteOrFallback" : {
+        "x" : 1350,
+        "y" : 650
+      },
+      "characterWriter" : {
+        "x" : 2110,
+        "y" : 80
+      },
+      "cleanLandmarks" : {
+        "x" : 2630,
+        "y" : 1450
+      },
+      "completeMoveBrief" : {
+        "x" : 1800,
+        "y" : -170
+      },
+      "emptyHistory" : {
+        "x" : 1350,
+        "y" : 1400
+      },
+      "feedbackText" : {
+        "x" : 2900,
+        "y" : 1450
+      },
+      "finalPrompt" : {
+        "x" : 2630,
+        "y" : 80
+      },
+      "generate" : {
+        "x" : 2900,
+        "y" : 80
+      },
+      "hitTest" : {
+        "x" : 1080,
+        "y" : 320
+      },
+      "isLaterCall" : {
+        "x" : 1350,
+        "y" : 830
+      },
+      "landmarkWriter" : {
+        "x" : 2370,
+        "y" : 1450
+      },
+      "loop" : {
+        "x" : 2110,
+        "y" : 650
+      },
+      "naturalAdvance" : {
+        "x" : 1080,
+        "y" : 650
+      },
+      "nextBrief" : {
+        "x" : 1600,
+        "y" : 250
+      },
+      "openingOrNextBrief" : {
+        "x" : 1850,
+        "y" : 340
+      },
+      "output" : {
+        "x" : 3420,
+        "y" : 80
+      },
+      "output-preview" : {
+        "x" : 2681,
+        "y" : 383
+      },
+      "persistentMouse" : {
+        "x" : 2370,
+        "y" : 320
+      },
+      "previousDescription" : {
+        "x" : 1080,
+        "y" : 1120
+      },
+      "previousFrame" : {
+        "x" : 40,
+        "y" : 320
+      },
+      "previousTurn" : {
+        "x" : 1600,
+        "y" : 1120
+      },
+      "prompt" : {
+        "x" : 40,
+        "y" : 80
+      },
+      "routeLength" : {
+        "x" : 800,
+        "y" : 1100
+      },
+      "routePresent" : {
+        "x" : 1050,
+        "y" : 1400
+      },
+      "sam31" : {
+        "x" : 800,
+        "y" : 320
+      },
+      "seed" : {
+        "x" : 2110,
+        "y" : 460
+      },
+      "selectedOrAdvance" : {
+        "x" : 1350,
+        "y" : 450
+      },
+      "start" : {
+        "x" : 2110,
+        "y" : 880
+      },
+      "storyRequest" : {
+        "x" : 1850,
+        "y" : 1120
+      },
+      "stripSubjects" : {
+        "x" : 2370,
+        "y" : 80
+      },
+      "subjectSplit" : {
+        "x" : 550,
+        "y" : 320
+      },
+      "subjectSuffix" : {
+        "x" : 300,
+        "y" : 320
+      },
+      "trackpad" : {
+        "x" : 2898,
+        "y" : 1079
+      }
+    },
+    "nodeSizes" : {
+      "output-preview" : {
+        "height" : 668,
+        "width" : 666
+      }
+    },
+    "viewportOrigin" : {
+      "x" : 1957.1428571428569,
+      "y" : 268.5714285714286
+    },
+    "viewportScale" : 0.7
+  },
+  "primaryOutputNodeIDs" : [
+    "output"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

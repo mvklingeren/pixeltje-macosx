@@ -1,0 +1,115 @@
+{
+  "79": {
+    "inputs": {
+      "image": "Gemini_Generated_Image_y7ctmzy7ctmzy7ct.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "95": {
+    "inputs": {
+      "mask": [
+        "99:75",
+        0
+      ]
+    },
+    "class_type": "MaskPreview",
+    "_meta": {
+      "title": "Preview Mask"
+    }
+  },
+  "106": {
+    "inputs": {
+      "images": [
+        "111",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "111": {
+    "inputs": {
+      "image": [
+        "79",
+        0
+      ],
+      "alpha": [
+        "99:75",
+        0
+      ]
+    },
+    "class_type": "JoinImageWithAlpha",
+    "_meta": {
+      "title": "Join Image with Alpha"
+    }
+  },
+  "99:78": {
+    "inputs": {
+      "text": "coins:4",
+      "clip": [
+        "99:77",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "99:75": {
+    "inputs": {
+      "threshold": 0.5,
+      "refine_iterations": 2,
+      "individual_masks": false,
+      "model": [
+        "99:77",
+        0
+      ],
+      "image": [
+        "79",
+        0
+      ],
+      "conditioning": [
+        "99:78",
+        0
+      ]
+    },
+    "class_type": "SAM3_Detect",
+    "_meta": {
+      "title": "SAM3 Detect"
+    }
+  },
+  "99:77": {
+    "inputs": {
+      "ckpt_name": "sam3.1_multiplex_fp16.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Load Checkpoint"
+    }
+  },
+  "112": {
+    "inputs": {
+      "mask": ["99:75", 0]
+    },
+    "class_type": "MaskToImage",
+    "_meta": {
+      "title": "Selection Mask as Image"
+    }
+  },
+  "113": {
+    "inputs": {
+      "filename_prefix": "Pixeltje-Selection",
+      "images": ["112", 0]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Selection Mask"
+    }
+  }
+}

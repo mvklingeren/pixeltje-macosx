@@ -1,0 +1,68 @@
+{
+  "connections": [
+    {
+      "id": "source.audio->output.audio",
+      "input": {
+        "nodeID": "output",
+        "port": "audio"
+      },
+      "output": {
+        "nodeID": "source",
+        "port": "audio"
+      }
+    }
+  ],
+  "exposedParameters": [],
+  "id": "org.pixeltje.examples.base-test-set.10-audio-passthrough",
+  "mode": "generic",
+  "name": "Base Test Set 10 · Audio Passthrough",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "source",
+      "kind": "input.audio",
+      "parameters": {
+        "sourceName": "two-tone.wav"
+      },
+      "resources": {},
+      "title": "Two-tone WAV"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.audio",
+      "parameters": {
+        "filenamePrefix": "two-tone"
+      },
+      "resources": {},
+      "title": "Audio result"
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "output": {
+        "x": 240,
+        "y": 120
+      },
+      "source": {
+        "x": 0,
+        "y": 120
+      }
+    },
+    "nodeSizes": {},
+    "viewportOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "viewportScale": 0.8
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

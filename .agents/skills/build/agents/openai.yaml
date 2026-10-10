@@ -1,0 +1,4 @@
+interface:
+  display_name: "Build"
+  short_description: "Build and package a shareable release ZIP"
+  default_prompt: "Use $build to create a verified Pixeltje Mac release ZIP."

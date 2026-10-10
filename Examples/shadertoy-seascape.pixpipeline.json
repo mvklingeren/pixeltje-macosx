@@ -1,0 +1,472 @@
+{
+  "connections" : [
+    {
+      "id" : "render.image->output.image",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "render",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "primitive-int.value->render.width",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "width"
+      },
+      "output" : {
+        "nodeID" : "primitive-int",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "primitive-int-2.value->render.height",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "height"
+      },
+      "output" : {
+        "nodeID" : "primitive-int-2",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "shader-file.value->render.sourceFile",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "sourceFile"
+      },
+      "output" : {
+        "nodeID" : "shader-file",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "state.state->pointerX.json",
+      "input" : {
+        "nodeID" : "pointerX",
+        "port" : "json"
+      },
+      "output" : {
+        "nodeID" : "state",
+        "port" : "state"
+      }
+    },
+    {
+      "id" : "pointer.x->pointerX.setValue",
+      "input" : {
+        "nodeID" : "pointerX",
+        "port" : "setValue"
+      },
+      "output" : {
+        "nodeID" : "pointer",
+        "port" : "x"
+      }
+    },
+    {
+      "id" : "pointerX.json->pointerY.json",
+      "input" : {
+        "nodeID" : "pointerY",
+        "port" : "json"
+      },
+      "output" : {
+        "nodeID" : "pointerX",
+        "port" : "json"
+      }
+    },
+    {
+      "id" : "pointer.y->pointerY.setValue",
+      "input" : {
+        "nodeID" : "pointerY",
+        "port" : "setValue"
+      },
+      "output" : {
+        "nodeID" : "pointer",
+        "port" : "y"
+      }
+    },
+    {
+      "id" : "pointerY.json->pointerEngaged.json",
+      "input" : {
+        "nodeID" : "pointerEngaged",
+        "port" : "json"
+      },
+      "output" : {
+        "nodeID" : "pointerY",
+        "port" : "json"
+      }
+    },
+    {
+      "id" : "pointer.engaged->pointerEngaged.setValue",
+      "input" : {
+        "nodeID" : "pointerEngaged",
+        "port" : "setValue"
+      },
+      "output" : {
+        "nodeID" : "pointer",
+        "port" : "engaged"
+      }
+    },
+    {
+      "id" : "pointerEngaged.json->pointerEngagedAtCall.json",
+      "input" : {
+        "nodeID" : "pointerEngagedAtCall",
+        "port" : "json"
+      },
+      "output" : {
+        "nodeID" : "pointerEngaged",
+        "port" : "json"
+      }
+    },
+    {
+      "id" : "pointer.engagedAtCall->pointerEngagedAtCall.setValue",
+      "input" : {
+        "nodeID" : "pointerEngagedAtCall",
+        "port" : "setValue"
+      },
+      "output" : {
+        "nodeID" : "pointer",
+        "port" : "engagedAtCall"
+      }
+    },
+    {
+      "id" : "pointerEngagedAtCall.json->render.state",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "state"
+      },
+      "output" : {
+        "nodeID" : "pointerEngagedAtCall",
+        "port" : "json"
+      }
+    }
+  ],
+  "controlConnections" : [
+    {
+      "id" : "output.completed->loop.completed",
+      "input" : {
+        "nodeID" : "loop",
+        "port" : "completed"
+      },
+      "output" : {
+        "nodeID" : "output",
+        "port" : "completed"
+      }
+    },
+    {
+      "id" : "loop.repeat->start.again",
+      "input" : {
+        "nodeID" : "start",
+        "port" : "again"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "repeat"
+      }
+    }
+  ],
+  "exposedParameters" : [
+
+  ],
+  "id" : "org.pixeltje.examples.seascape-shader",
+  "mode" : "generic",
+  "name" : "Seascape · Metal Shader",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "start",
+      "kind" : "control.start",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Start \/ Next Frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "state",
+      "kind" : "input.state",
+      "parameters" : {
+        "initialState" : "{\n  \"version\": 1,\n  \"mode\": \"shader\",\n  \"fragmentFunction\": \"seascapeFragment\",\n  \"width\": 640,\n  \"height\": 360,\n  \"timeSeconds\": 0,\n  \"secondsPerFrame\": 0.03333333333333333,\n  \"pointer\": {\n    \"x\": 0.5,\n    \"y\": 0.5,\n    \"engaged\": false,\n    \"engagedAtCall\": 0\n  }\n}"
+      },
+      "resources" : {
+
+      },
+      "title" : "Seascape shader state"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "shader-file",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "Seascape.metal"
+      },
+      "resources" : {
+
+      },
+      "title" : "Seascape.metal"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "render",
+      "kind" : "render.metal",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Metal shader · Seascape"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output",
+      "kind" : "output.image",
+      "parameters" : {
+        "filenamePrefix" : "seascape",
+        "format" : "png"
+      },
+      "resources" : {
+
+      },
+      "title" : "Seascape frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "loop",
+      "kind" : "control.loop",
+      "parameters" : {
+        "autoPause" : false,
+        "delayMilliseconds" : {
+          "$type" : "integer",
+          "value" : 0
+        },
+        "feedback" : "none",
+        "limitHz" : {
+          "$type" : "integer",
+          "value" : 30
+        },
+        "maxCalls" : {
+          "$type" : "integer",
+          "value" : -1
+        },
+        "seedStrategy" : "fixed"
+      },
+      "resources" : {
+
+      },
+      "title" : "Animate sea"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "note",
+      "kind" : "edit.markdownNote",
+      "parameters" : {
+        "text" : "# Seascape Shader\nThis workflow renders the user-supplied Seascape shader. The Seascape.metal Text node supplies the filename to Metal Render; keep the .metal file beside this workflow. Drag the Trackpad left or right to move the camera along the sea, and up or down to tilt its view. The first touch holds the camera at its current animation phase. The camera then stays fixed at the chosen position while the sea keeps moving. Reset the Trackpad to return to automatic camera motion. Four JSON Value nodes write the Trackpad coordinates, engaged flag, and first-touch Loop call into the JSON State pointer. This keeps the camera framing consistent between the card and full-size output. Loop advances shader time on each call. Change Width and Height to adjust output size. The source is attributed to Alexander Alekseev (TDM) and carries a Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported notice in the .metal file."
+      },
+      "resources" : {
+
+      },
+      "title" : "How it works"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 2880
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Output width"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int-2",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 1800
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Output height"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "pointer",
+      "kind" : "input.trackpad",
+      "parameters" : {
+        "engaged" : false,
+        "engagedAtCall" : {
+          "$type" : "integer",
+          "value" : 0
+        },
+        "x" : {
+          "$type" : "number",
+          "value" : 0.5
+        },
+        "y" : {
+          "$type" : "number",
+          "value" : 0.5
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Move the camera"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "pointerX",
+      "kind" : "text.jsonExtract",
+      "parameters" : {
+        "key" : "\/pointer\/x"
+      },
+      "resources" : {
+
+      },
+      "title" : "Set pointer X"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "pointerY",
+      "kind" : "text.jsonExtract",
+      "parameters" : {
+        "key" : "\/pointer\/y"
+      },
+      "resources" : {
+
+      },
+      "title" : "Set pointer Y"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "pointerEngaged",
+      "kind" : "text.jsonExtract",
+      "parameters" : {
+        "key" : "\/pointer\/engaged"
+      },
+      "resources" : {
+
+      },
+      "title" : "Set camera hold"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "pointerEngagedAtCall",
+      "kind" : "text.jsonExtract",
+      "parameters" : {
+        "key" : "\/pointer\/engagedAtCall"
+      },
+      "resources" : {
+
+      },
+      "title" : "Set hold frame"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "loop" : {
+        "x" : 1140,
+        "y" : 1020
+      },
+      "note" : {
+        "x" : 0,
+        "y" : 860
+      },
+      "output" : {
+        "x" : 1970,
+        "y" : 0
+      },
+      "pointer" : {
+        "x" : 0,
+        "y" : 430
+      },
+      "pointerEngaged" : {
+        "x" : 810,
+        "y" : 130
+      },
+      "pointerEngagedAtCall" : {
+        "x" : 810,
+        "y" : 570
+      },
+      "pointerX" : {
+        "x" : 290,
+        "y" : 130
+      },
+      "pointerY" : {
+        "x" : 550,
+        "y" : 130
+      },
+      "primitive-int" : {
+        "x" : 810,
+        "y" : 900
+      },
+      "primitive-int-2" : {
+        "x" : 810,
+        "y" : 1020
+      },
+      "render" : {
+        "x" : 1140,
+        "y" : 290
+      },
+      "shader-file" : {
+        "x" : 810,
+        "y" : 360
+      },
+      "start" : {
+        "x" : 65,
+        "y" : 47
+      },
+      "state" : {
+        "x" : 0,
+        "y" : 130
+      }
+    },
+    "nodeSizes" : {
+      "note" : {
+        "height" : 320,
+        "width" : 500
+      },
+      "pointer" : {
+        "height" : 240,
+        "width" : 220
+      },
+      "render" : {
+        "height" : 656,
+        "width" : 783
+      }
+    },
+    "viewportOrigin" : {
+      "x" : 591.2262877368114,
+      "y" : 59.85736276783852
+    },
+    "viewportScale" : 0.6562051391601562
+  },
+  "primaryOutputNodeIDs" : [
+    "output"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

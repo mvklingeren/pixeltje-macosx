@@ -1,0 +1,405 @@
+{
+  "connections": [
+    {
+      "id": "state.state->pointerX.json",
+      "input": {
+        "nodeID": "pointerX",
+        "port": "json"
+      },
+      "output": {
+        "nodeID": "state",
+        "port": "state"
+      }
+    },
+    {
+      "id": "pointer.x->pointerX.setValue",
+      "input": {
+        "nodeID": "pointerX",
+        "port": "setValue"
+      },
+      "output": {
+        "nodeID": "pointer",
+        "port": "x"
+      }
+    },
+    {
+      "id": "pointerX.json->pointerY.json",
+      "input": {
+        "nodeID": "pointerY",
+        "port": "json"
+      },
+      "output": {
+        "nodeID": "pointerX",
+        "port": "json"
+      }
+    },
+    {
+      "id": "pointer.y->pointerY.setValue",
+      "input": {
+        "nodeID": "pointerY",
+        "port": "setValue"
+      },
+      "output": {
+        "nodeID": "pointer",
+        "port": "y"
+      }
+    },
+    {
+      "id": "pointerY.json->timeline.value",
+      "input": {
+        "nodeID": "timeline",
+        "port": "value"
+      },
+      "output": {
+        "nodeID": "pointerY",
+        "port": "json"
+      }
+    },
+    {
+      "id": "render.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "render",
+        "port": "image"
+      }
+    },
+    {
+      "id": "primitive-int.value->render.width",
+      "input": {
+        "nodeID": "render",
+        "port": "width"
+      },
+      "output": {
+        "nodeID": "primitive-int",
+        "port": "value"
+      }
+    },
+    {
+      "id": "primitive-int-2.value->render.height",
+      "input": {
+        "nodeID": "render",
+        "port": "height"
+      },
+      "output": {
+        "nodeID": "primitive-int-2",
+        "port": "value"
+      }
+    },
+    {
+      "id": "shader-file.value->render.sourceFile",
+      "input": {
+        "nodeID": "render",
+        "port": "sourceFile"
+      },
+      "output": {
+        "nodeID": "shader-file",
+        "port": "value"
+      }
+    },
+    {
+      "id": "timeline.value->render.state",
+      "input": {
+        "nodeID": "render",
+        "port": "state"
+      },
+      "output": {
+        "nodeID": "timeline",
+        "port": "value"
+      }
+    },
+    {
+      "id": "timeline.framesPerSecond->output.framesPerSecond",
+      "input": {
+        "nodeID": "output",
+        "port": "framesPerSecond"
+      },
+      "output": {
+        "nodeID": "timeline",
+        "port": "framesPerSecond"
+      }
+    }
+  ],
+  "controlConnections": [
+    {
+      "id": "output.completed->timeline.completed",
+      "input": {
+        "nodeID": "timeline",
+        "port": "completed"
+      },
+      "output": {
+        "nodeID": "output",
+        "port": "completed"
+      }
+    },
+    {
+      "id": "timeline.repeat->start.again",
+      "input": {
+        "nodeID": "start",
+        "port": "again"
+      },
+      "output": {
+        "nodeID": "timeline",
+        "port": "repeat"
+      }
+    }
+  ],
+  "exposedParameters": [],
+  "id": "org.pixeltje.examples.sdf-primitives-timeline",
+  "mode": "generic",
+  "name": "SDF Primitives · Timeline",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "start",
+      "kind": "control.start",
+      "parameters": {},
+      "resources": {},
+      "title": "Start / Next Frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "state",
+      "kind": "input.state",
+      "parameters": {
+        "initialState": "{\n  \"version\": 1,\n  \"mode\": \"shader\",\n  \"fragmentFunction\": \"sdfPrimitivesFragment\",\n  \"width\": 640,\n  \"height\": 360,\n  \"timeSeconds\": 0,\n  \"secondsPerFrame\": 0,\n  \"pointer\": {\n    \"x\": 0.5,\n    \"y\": 0.5\n  }\n}"
+      },
+      "resources": {},
+      "title": "Base shader state"
+    },
+    {
+      "executionState": "enabled",
+      "id": "pointer",
+      "kind": "input.trackpad",
+      "parameters": {
+        "x": {
+          "$type": "number",
+          "value": 0.5
+        },
+        "y": {
+          "$type": "number",
+          "value": 0.5
+        }
+      },
+      "resources": {},
+      "title": "Point the camera"
+    },
+    {
+      "executionState": "enabled",
+      "id": "pointerX",
+      "kind": "text.jsonExtract",
+      "parameters": {
+        "key": "/pointer/x"
+      },
+      "resources": {},
+      "title": "Set pointer X"
+    },
+    {
+      "executionState": "enabled",
+      "id": "pointerY",
+      "kind": "text.jsonExtract",
+      "parameters": {
+        "key": "/pointer/y"
+      },
+      "resources": {},
+      "title": "Set pointer Y"
+    },
+    {
+      "executionState": "enabled",
+      "id": "shader-file",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": "SDFPrimitives.metal"
+      },
+      "resources": {},
+      "title": "SDFPrimitives.metal"
+    },
+    {
+      "executionState": "enabled",
+      "id": "render",
+      "kind": "render.metal",
+      "parameters": {},
+      "resources": {},
+      "title": "Metal shader · SDF primitives"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.video",
+      "parameters": {
+        "filenamePrefix": "sdf-primitives-timeline",
+        "format": "mp4",
+        "codec": "h264",
+        "framesPerSecond": {
+          "$type": "number",
+          "value": 30
+        }
+      },
+      "resources": {},
+      "title": "SDF timeline video"
+    },
+    {
+      "executionState": "enabled",
+      "id": "note",
+      "kind": "edit.markdownNote",
+      "parameters": {
+        "text": "# SDF Primitives with Timeline\nThis is a copy of the SDF shader workflow. The Timeline sits between the Trackpad-updated JSON state and Metal Render. Its /timeSeconds track uses Ease In/Out to complete one camera orbit and return to the starting view, so the 120-frame clip can loop smoothly. Trackpad X remains a live camera offset. The Timeline controls the 30-fps run through Output → Timeline → Start, and its frame rate feeds Video Output. Select Timeline to edit the track in the bottom panel or preview any frame. Source and MIT license: Examples/SDFPrimitives.metal."
+      },
+      "resources": {},
+      "title": "How the timeline works"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 640
+        }
+      },
+      "resources": {},
+      "title": "Width · 640"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int-2",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 360
+        }
+      },
+      "resources": {},
+      "title": "Height · 360"
+    },
+    {
+      "id": "timeline",
+      "kind": "control.timeline",
+      "title": "Animate shader state",
+      "executionState": "enabled",
+      "resources": {},
+      "parameters": {
+        "frameCount": {
+          "$type": "integer",
+          "value": 120
+        },
+        "framesPerSecond": {
+          "$type": "number",
+          "value": 30
+        },
+        "tracks": [
+          {
+            "path": "/timeSeconds",
+            "interpolation": "easeInOut",
+            "keyframes": [
+              {
+                "frame": {
+                  "$type": "integer",
+                  "value": 0
+                },
+                "value": {
+                  "$type": "number",
+                  "value": 0
+                }
+              },
+              {
+                "frame": {
+                  "$type": "integer",
+                  "value": 119
+                },
+                "value": {
+                  "$type": "number",
+                  "value": 41.88790204786391
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "note": {
+        "x": 0,
+        "y": 860
+      },
+      "output": {
+        "x": 1138,
+        "y": 0
+      },
+      "pointer": {
+        "x": 0,
+        "y": 430
+      },
+      "pointerX": {
+        "x": 290,
+        "y": 130
+      },
+      "pointerY": {
+        "x": 550,
+        "y": 130
+      },
+      "primitive-int": {
+        "x": 580.887784090909,
+        "y": 822.897727272727
+      },
+      "primitive-int-2": {
+        "x": 579,
+        "y": 946
+      },
+      "shader-file": {
+        "x": 550,
+        "y": 360
+      },
+      "render": {
+        "x": 864,
+        "y": 290
+      },
+      "start": {
+        "x": 0,
+        "y": 0
+      },
+      "state": {
+        "x": 0,
+        "y": 130
+      },
+      "timeline": {
+        "x": 610,
+        "y": 145
+      }
+    },
+    "nodeSizes": {
+      "note": {
+        "height": 320,
+        "width": 500
+      },
+      "pointer": {
+        "height": 240,
+        "width": 220
+      },
+      "render": {
+        "height": 656,
+        "width": 783
+      }
+    },
+    "viewportOrigin": {
+      "x": -52.62073863636362,
+      "y": -139.77272727272742
+    },
+    "viewportScale": 0.55
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

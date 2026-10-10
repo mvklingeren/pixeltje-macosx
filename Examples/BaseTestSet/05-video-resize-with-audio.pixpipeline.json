@@ -1,0 +1,203 @@
+{
+  "connections": [
+    {
+      "id": "source.video->components.video",
+      "input": {
+        "nodeID": "components",
+        "port": "video"
+      },
+      "output": {
+        "nodeID": "source",
+        "port": "video"
+      }
+    },
+    {
+      "id": "components.images->scale.image",
+      "input": {
+        "nodeID": "scale",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "components",
+        "port": "images"
+      }
+    },
+    {
+      "id": "components.audio->audio-route.value",
+      "input": {
+        "nodeID": "audio-route",
+        "port": "value"
+      },
+      "output": {
+        "nodeID": "components",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "audio-route.value->create.audio",
+      "input": {
+        "nodeID": "create",
+        "port": "audio"
+      },
+      "output": {
+        "nodeID": "audio-route",
+        "port": "value"
+      }
+    },
+    {
+      "id": "scale.image->create.images",
+      "input": {
+        "nodeID": "create",
+        "port": "images"
+      },
+      "output": {
+        "nodeID": "scale",
+        "port": "image"
+      }
+    },
+    {
+      "id": "create.video->output.video",
+      "input": {
+        "nodeID": "output",
+        "port": "video"
+      },
+      "output": {
+        "nodeID": "create",
+        "port": "video"
+      }
+    }
+  ],
+  "exposedParameters": [
+    {
+      "defaultValue": {
+        "$type": "number",
+        "value": 0.5
+      },
+      "id": "frame-scale",
+      "label": "Frame scale",
+      "maximum": 1.0,
+      "minimum": 0.25,
+      "target": {
+        "nodeID": "scale",
+        "parameter": "scaleBy"
+      },
+      "valueType": "number"
+    }
+  ],
+  "id": "org.pixeltje.examples.base-test-set.05-video-resize-with-audio",
+  "mode": "generic",
+  "name": "Base Test Set 05 · Video Resize with Audio",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "source",
+      "kind": "input.video",
+      "parameters": {
+        "sourceName": "moving-test-card.mp4"
+      },
+      "resources": {},
+      "title": "Moving test card"
+    },
+    {
+      "executionState": "enabled",
+      "id": "components",
+      "kind": "media.videoComponents",
+      "parameters": {},
+      "resources": {},
+      "title": "Split video"
+    },
+    {
+      "executionState": "enabled",
+      "id": "scale",
+      "kind": "image.scaleBy",
+      "parameters": {
+        "scaleBy": {
+          "$type": "number",
+          "value": 0.5
+        },
+        "upscaleMethod": "nearest-exact"
+      },
+      "resources": {},
+      "title": "Half-size frames"
+    },
+    {
+      "executionState": "enabled",
+      "id": "audio-route",
+      "kind": "utility.reroute",
+      "parameters": {},
+      "resources": {},
+      "title": "Preserve audio"
+    },
+    {
+      "executionState": "enabled",
+      "id": "create",
+      "kind": "media.createVideo",
+      "parameters": {
+        "bitDepth": "auto",
+        "codec": "h264",
+        "colorSpace": "sRGB",
+        "framesPerSecond": {
+          "$type": "number",
+          "value": 12
+        }
+      },
+      "resources": {},
+      "title": "Reassemble"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.video",
+      "parameters": {
+        "codec": "h264",
+        "filenamePrefix": "resized-test-card",
+        "format": "mp4"
+      },
+      "resources": {},
+      "title": "Video result"
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "audio-route": {
+        "x": 480,
+        "y": 340
+      },
+      "components": {
+        "x": 240,
+        "y": 180
+      },
+      "create": {
+        "x": 720,
+        "y": 180
+      },
+      "output": {
+        "x": 960,
+        "y": 180
+      },
+      "scale": {
+        "x": 480,
+        "y": 40
+      },
+      "source": {
+        "x": 0,
+        "y": 180
+      }
+    },
+    "nodeSizes": {},
+    "viewportOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "viewportScale": 0.8
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

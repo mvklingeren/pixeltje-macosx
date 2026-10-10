@@ -1,0 +1,264 @@
+{
+  "connections": [
+    {
+      "id": "state.state->render.state",
+      "input": {
+        "nodeID": "render",
+        "port": "state"
+      },
+      "output": {
+        "nodeID": "state",
+        "port": "state"
+      }
+    },
+    {
+      "id": "render.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "render",
+        "port": "image"
+      }
+    },
+    {
+      "id": "primitive-int.value->render.width",
+      "input": {
+        "nodeID": "render",
+        "port": "width"
+      },
+      "output": {
+        "nodeID": "primitive-int",
+        "port": "value"
+      }
+    },
+    {
+      "id": "primitive-int-2.value->render.height",
+      "input": {
+        "nodeID": "render",
+        "port": "height"
+      },
+      "output": {
+        "nodeID": "primitive-int-2",
+        "port": "value"
+      }
+    },
+    {
+      "id": "shader-text.value->render.source",
+      "input": {
+        "nodeID": "render",
+        "port": "source"
+      },
+      "output": {
+        "nodeID": "shader-text",
+        "port": "value"
+      }
+    }
+  ],
+  "controlConnections": [
+    {
+      "id": "output.completed->loop.completed",
+      "input": {
+        "nodeID": "loop",
+        "port": "completed"
+      },
+      "output": {
+        "nodeID": "output",
+        "port": "completed"
+      }
+    },
+    {
+      "id": "loop.repeat->start.again",
+      "input": {
+        "nodeID": "start",
+        "port": "again"
+      },
+      "output": {
+        "nodeID": "loop",
+        "port": "repeat"
+      }
+    }
+  ],
+  "exposedParameters": [],
+  "id": "org.pixeltje.examples.chestnut-rain-shader-inline",
+  "mode": "generic",
+  "name": "Chestnut Rain · Inline Metal Shader",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "start",
+      "kind": "control.start",
+      "parameters": {},
+      "resources": {},
+      "title": "Start / Next Frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "state",
+      "kind": "input.state",
+      "parameters": {
+        "initialState": "{\n  \"version\": 1,\n  \"mode\": \"shader\",\n  \"fragmentFunction\": \"chestnutRainFragment\",\n  \"width\": 640,\n  \"height\": 360,\n  \"timeSeconds\": 0,\n  \"secondsPerFrame\": 0.016666666666666666\n}"
+      },
+      "resources": {},
+      "title": "Chestnut rain shader state"
+    },
+    {
+      "executionState": "enabled",
+      "id": "shader-text",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": "#include <metal_stdlib>\nusing namespace metal;\n\n// A continuous autumn shower of chestnut burrs and a few bare nuts.\nstruct ShaderUniforms {\n    float4 resolutionTime; // width, height, seconds, unused\n    float4 mouse;          // reserved by the shader-state contract\n};\n\nfloat hash21(float2 p) {\n    return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);\n}\n\nfloat noise2(float2 p) {\n    float2 cell = floor(p);\n    float2 f = fract(p);\n    f = f * f * (3.0 - 2.0 * f);\n    return mix(mix(hash21(cell), hash21(cell + float2(1.0, 0.0)), f.x),\n               mix(hash21(cell + float2(0.0, 1.0)),\n                   hash21(cell + float2(1.0, 1.0)), f.x), f.y);\n}\n\nfloat3 burrColor(float2 p, float radius, float angle, float seed) {\n    float grain = noise2(p * 18.0 + seed * 31.0);\n    float light = clamp(0.70 + 0.21 * (p.y - p.x) + 0.15 * (1.0 - radius),\n                        0.35, 1.16);\n    float3 green = mix(float3(0.31, 0.39, 0.15),\n                       float3(0.51, 0.42, 0.20), seed);\n    float3 color = green * light * (0.85 + 0.27 * grain);\n\n    // Pale spines radiate from the husk; their roots remain darker green.\n    float spine = pow(0.5 + 0.5 * cos(angle * 36.0 + 0.7 * sin(angle * 7.0)),\n                      10.0);\n    float tips = smoothstep(0.61, 0.90, radius);\n    color = mix(color, float3(0.77, 0.67, 0.35) * light,\n                spine * tips * 0.83);\n\n    // A narrow split in some burrs reveals the deep brown inner shell.\n    if (seed > 0.48) {\n        float2 opening = float2(0.90 * p.x + 0.43 * p.y,\n                                -0.43 * p.x + 0.90 * p.y);\n        float cut = length(opening / float2(0.19, 0.56));\n        float aperture = 1.0 - smoothstep(0.85, 1.08, cut);\n        color = mix(color, float3(0.19, 0.105, 0.055), aperture * 0.87);\n        float inner = length((opening - float2(0.045, -0.05))\n                             / float2(0.11, 0.39));\n        color = mix(color, float3(0.43, 0.20, 0.085),\n                    (1.0 - smoothstep(0.78, 1.0, inner)) * aperture);\n    }\n    return color;\n}\n\nfloat3 nutColor(float2 p, float radius, float seed) {\n    float grain = noise2(p * 12.0 + seed * 41.0);\n    float light = clamp(0.49 + 0.32 * (p.y - p.x) + 0.24 * (1.0 - radius),\n                        0.30, 1.12);\n    float3 color = float3(0.43, 0.16, 0.075) * light\n                   * (0.90 + 0.18 * grain);\n    float highlight = exp(-dot((p - float2(-0.29, 0.27))\n                                / float2(0.19, 0.32),\n                                (p - float2(-0.29, 0.27))\n                                / float2(0.19, 0.32)) * 1.5);\n    color += float3(0.33, 0.17, 0.095) * highlight;\n\n    // The broad cream scar is characteristic of a shelled chestnut.\n    float scar = (1.0 - smoothstep(-0.50, -0.35, p.y))\n                 * (1.0 - smoothstep(0.42, 0.73, abs(p.x)));\n    color = mix(color, float3(0.78, 0.59, 0.35)\n                       * (0.87 + 0.16 * grain), scar);\n    return color;\n}\n\nfloat3 renderChestnutRain(float2 screen, float2 resolution, float time) {\n    float aspect = resolution.x / resolution.y;\n    float sky = smoothstep(-1.2, 1.2, screen.y);\n    float3 color = mix(float3(0.87, 0.82, 0.69),\n                       float3(0.62, 0.72, 0.70), sky);\n    color += (noise2(screen * 85.0) - 0.5) * 0.012;\n\n    // Draw small distant pieces first, then the larger foreground pieces.\n    // Four of the 32 pieces are bare chestnuts; the rest wear spiky husks.\n    for (int i = 0; i < 32; ++i) {\n        float index = float(i);\n        float seed = hash21(float2(index, 19.7));\n        float size = 0.092 + 0.080 * index / 31.0\n                     + 0.019 * hash21(float2(index, 8.3));\n        float speed = 0.16 + 0.095 * hash21(float2(index, 5.1));\n        float phase = fract((index + 0.5) / 32.0 + time * speed);\n        float2 center = float2(\n            (2.0 * hash21(float2(index, 13.4)) - 1.0) * (aspect - 0.03)\n                + 0.10 * sin(time * (0.8 + seed) + index * 2.3),\n            1.30 - 2.60 * phase);\n        float2 delta = screen - center;\n        if (abs(delta.x) > size * 1.20 || abs(delta.y) > size * 1.20)\n            continue;\n\n        float rotation = time * (1.0 + seed * 1.1) + index * 2.4;\n        float c = cos(rotation), s = sin(rotation);\n        float2 p = float2(c * delta.x + s * delta.y,\n                          -s * delta.x + c * delta.y) / size;\n        float radius = length(p);\n        if (radius > 1.20) continue;\n\n        bool bare = (i % 8 == 1);\n        float edge;\n        float3 piece;\n        if (bare) {\n            // A rounded, pointed nut with a pale base and a lacquered sheen.\n            float width = 0.79 - 0.25 * max(p.y, 0.0);\n            edge = length(float2(p.x / width, p.y / 0.87)) - 1.0;\n            piece = nutColor(p, radius, seed);\n        } else {\n            // Irregular radial spines turn each husk into a chestnut burr.\n            float angle = atan2(p.y, p.x);\n            float spine = pow(0.5 + 0.5\n                              * cos(angle * 36.0 + 0.7 * sin(angle * 7.0)),\n                              10.0);\n            float outline = 0.72 + 0.29 * spine\n                            + 0.035 * sin(angle * 11.0 + seed * 9.0);\n            edge = radius - outline;\n            piece = burrColor(p, radius, angle, seed);\n        }\n        float aa = max(2.0 / (resolution.y * size), 0.008);\n        float coverage = 1.0 - smoothstep(-aa, aa, edge);\n        color = mix(color, piece, coverage);\n    }\n    return clamp(color, float3(0.0), float3(1.0));\n}\n\nvertex float4 fullscreenVertex(uint vertexID [[vertex_id]]) {\n    float2 p = float2((vertexID << 1) & 2, vertexID & 2);\n    return float4(p * 2.0 - 1.0, 0.0, 1.0);\n}\n\nfragment float4 chestnutRainFragment(\n    float4 position [[position]], constant ShaderUniforms &uniforms [[buffer(0)]]) {\n    float2 resolution = uniforms.resolutionTime.xy;\n    float2 frag = float2(position.x, resolution.y - position.y);\n    float2 screen = (frag - 0.5 * resolution) * (2.0 / resolution.y);\n    return float4(renderChestnutRain(screen, resolution,\n                                     uniforms.resolutionTime.z), 1.0);\n}\n"
+      },
+      "resources": {},
+      "title": "Inline chestnut rain shader"
+    },
+    {
+      "executionState": "enabled",
+      "id": "render",
+      "kind": "render.metal",
+      "parameters": {},
+      "resources": {},
+      "title": "Metal shader · Chestnut rain"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.image",
+      "parameters": {
+        "filenamePrefix": "chestnut-rain",
+        "format": "png"
+      },
+      "resources": {},
+      "title": "Chestnut rain frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "loop",
+      "kind": "control.loop",
+      "parameters": {
+        "autoPause": false,
+        "delayMilliseconds": {
+          "$type": "integer",
+          "value": 0
+        },
+        "feedback": "none",
+        "limitHz": {
+          "$type": "integer",
+          "value": 60
+        },
+        "maxCalls": {
+          "$type": "integer",
+          "value": -1
+        },
+        "seedStrategy": "fixed"
+      },
+      "resources": {},
+      "title": "Continuous chestnut rain"
+    },
+    {
+      "executionState": "enabled",
+      "id": "note",
+      "kind": "edit.markdownNote",
+      "parameters": {
+        "text": "# Chestnut Rain · Inline Metal Shader\nThirty-two chestnut pieces fall continuously through a soft autumn sky. Most are green or golden spiky husks, some split to reveal their brown interior; four are glossy bare chestnuts with a pale base. Each piece has its own fall speed, gentle wind drift, and tumble. The source lives in the Text node and needs no external texture or shader file. JSON State advances time by 1/60 second per Loop call; Loop is capped at 60 Hz. Width and Height control full-screen preview and saved output; reduce them if rendering is slow."
+      },
+      "resources": {},
+      "title": "How it works"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 2880
+        }
+      },
+      "resources": {},
+      "title": "Output width"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int-2",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 1800
+        }
+      },
+      "resources": {},
+      "title": "Output height"
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "loop": {
+        "x": 1385,
+        "y": 502
+      },
+      "note": {
+        "x": 0,
+        "y": 892
+      },
+      "output": {
+        "x": 1282,
+        "y": 4
+      },
+      "primitive-int": {
+        "x": 268,
+        "y": 105
+      },
+      "primitive-int-2": {
+        "x": 265,
+        "y": 261
+      },
+      "render": {
+        "x": 570,
+        "y": 150
+      },
+      "shader-text": {
+        "x": 137,
+        "y": 417
+      },
+      "start": {
+        "x": 1382,
+        "y": 328
+      },
+      "state": {
+        "x": 0,
+        "y": 150
+      }
+    },
+    "nodeSizes": {
+      "note": {
+        "height": 260,
+        "width": 520
+      },
+      "render": {
+        "height": 700,
+        "width": 723
+      },
+      "shader-text": {
+        "height": 422,
+        "width": 355
+      }
+    },
+    "viewportOrigin": {
+      "x": -131.17647058823545,
+      "y": -55.294117647058926
+    },
+    "viewportScale": 0.68
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

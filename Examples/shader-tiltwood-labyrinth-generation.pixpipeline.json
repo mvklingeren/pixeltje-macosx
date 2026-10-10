@@ -1,0 +1,1109 @@
+{
+  "connections" : [
+    {
+      "id" : "render.image->output.image",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "render",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "primitive-int.value->render.width",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "width"
+      },
+      "output" : {
+        "nodeID" : "primitive-int",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "primitive-int-2.value->render.height",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "height"
+      },
+      "output" : {
+        "nodeID" : "primitive-int-2",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "program-text.value->render.program",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "program"
+      },
+      "output" : {
+        "nodeID" : "program-text",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "shader-text.value->render.sourceFile",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "sourceFile"
+      },
+      "output" : {
+        "nodeID" : "shader-text",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "trackpad.x->render.pointerX",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "pointerX"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "x"
+      }
+    },
+    {
+      "id" : "trackpad.y->render.pointerY",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "pointerY"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "y"
+      }
+    },
+    {
+      "id" : "trackpad.actionCount->render.actionCount",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "actionCount"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "actionCount"
+      }
+    },
+    {
+      "id" : "game-settings.value->render.parameters",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "parameters"
+      },
+      "output" : {
+        "nodeID" : "game-settings",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "prompt-maple.prompt->generate-maple.prompt",
+      "input" : {
+        "nodeID" : "generate-maple",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-maple",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-maple.seed->generate-maple.seed",
+      "input" : {
+        "nodeID" : "generate-maple",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-maple",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate-maple.image->texture-cache.asset0",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset0"
+      },
+      "output" : {
+        "nodeID" : "generate-maple",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-walnut.prompt->generate-walnut.prompt",
+      "input" : {
+        "nodeID" : "generate-walnut",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-walnut",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-walnut.seed->generate-walnut.seed",
+      "input" : {
+        "nodeID" : "generate-walnut",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-walnut",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate-walnut.image->texture-cache.asset1",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset1"
+      },
+      "output" : {
+        "nodeID" : "generate-walnut",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-felt.prompt->generate-felt.prompt",
+      "input" : {
+        "nodeID" : "generate-felt",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-felt",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-felt.seed->generate-felt.seed",
+      "input" : {
+        "nodeID" : "generate-felt",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-felt",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate-felt.image->texture-cache.asset2",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset2"
+      },
+      "output" : {
+        "nodeID" : "generate-felt",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-marble.prompt->generate-marble.prompt",
+      "input" : {
+        "nodeID" : "generate-marble",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-marble",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-marble.seed->generate-marble.seed",
+      "input" : {
+        "nodeID" : "generate-marble",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-marble",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate-marble.image->texture-cache.asset3",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset3"
+      },
+      "output" : {
+        "nodeID" : "generate-marble",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-room.prompt->generate-room.prompt",
+      "input" : {
+        "nodeID" : "generate-room",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-room",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-room.seed->generate-room.seed",
+      "input" : {
+        "nodeID" : "generate-room",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-room",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate-room.image->texture-cache.asset4",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset4"
+      },
+      "output" : {
+        "nodeID" : "generate-room",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "texture-cache.assets->render.assets",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "assets"
+      },
+      "output" : {
+        "nodeID" : "texture-cache",
+        "port" : "assets"
+      }
+    }
+  ],
+  "controlConnections" : [
+    {
+      "id" : "output.completed->loop.completed",
+      "input" : {
+        "nodeID" : "loop",
+        "port" : "completed"
+      },
+      "output" : {
+        "nodeID" : "output",
+        "port" : "completed"
+      }
+    },
+    {
+      "id" : "loop.repeat->start.again",
+      "input" : {
+        "nodeID" : "start",
+        "port" : "again"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "repeat"
+      }
+    }
+  ],
+  "exposedParameters" : [
+
+  ],
+  "id" : "org.pixeltje.examples.tiltwood-labyrinth-generation",
+  "mode" : "generic",
+  "name" : "Tiltwood Labyrinth · Tilt Maze · Generated Textures",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "start",
+      "kind" : "control.start",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Start \/ Next Frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "shader-text",
+      "kind" : "primitive.filePath",
+      "parameters" : {
+        "mode" : "relative",
+        "path" : "TiltwoodLabyrinthGenerationProgram.metal"
+      },
+      "resources" : {
+
+      },
+      "title" : "Tiltwood Labyrinth shader beside workflow"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "render",
+      "kind" : "gpu.program",
+      "parameters" : {
+        "framesPerSecond" : {
+          "$type" : "number",
+          "value" : 60
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 600
+        },
+        "seed" : {
+          "$type" : "integer",
+          "value" : 1
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 960
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "GPU Program · Tiltwood Labyrinth"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output",
+      "kind" : "output.image",
+      "parameters" : {
+        "filenamePrefix" : "tiltwood-labyrinth",
+        "format" : "png"
+      },
+      "resources" : {
+
+      },
+      "title" : "Game frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "loop",
+      "kind" : "control.loop",
+      "parameters" : {
+        "autoPause" : false,
+        "delayMilliseconds" : {
+          "$type" : "integer",
+          "value" : 0
+        },
+        "feedback" : "none",
+        "limitHz" : {
+          "$type" : "integer",
+          "value" : 60
+        },
+        "maxCalls" : {
+          "$type" : "integer",
+          "value" : -1
+        },
+        "seedStrategy" : "fixed"
+      },
+      "resources" : {
+
+      },
+      "title" : "Advance the labyrinth"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "note",
+      "kind" : "edit.markdownNote",
+      "parameters" : {
+        "text" : "# Tiltwood Labyrinth · Generated textures\nA tilting wooden labyrinth: roll a glass marble past the holes and into the brass goal ring. On each Run, five fixed-seed FLUX.2 Klein 4B Distilled jobs generate the maple board, the walnut walls, the felt tray, the swirled glass of the marble, and a study-room panorama that the marble and pearls reflect, each at 1024 × 1024. Asset Cache stores the five images as named slots for this run and previews each one as it becomes ready. The game starts after all five are ready; later frames reuse the bundle without invoking Klein again. Cancel and Run starts a fresh cache and regenerates all five. The model package remains link-only.\n\n**Controls.** Drag the Trackpad crosshair, or drag on the full-screen preview, to tilt the board: the marble rolls toward the crosshair. The centre of the pad holds the board level, and full tilt is reached about a third of the way to each edge. A ring on screen marks the crosshair, and the spirit level at the bottom right shows the current tilt. Action or Space releases the marble at the start of each board and after a lost marble. While the marble rolls, Space hops it over a hole (two hops per board).\n\n**Goal.** Clear five boards: First Roll, Hole Garden, The Maze, The Narrows, and The Gauntlet. A marble that rolls over the middle of a hole drops through, and the rim pulls on a marble that brushes past. Roll over a checkpoint ring to respawn there. Pearls score 100 each. Clearing a board scores 500, ten points for each second under par, 150 for each unused hop, and 300 for a flawless board, and gives back one marble. You start with five marbles; when they run out, press Space to start again.\n\n**Settings.** The game settings JSON sets `tiltSensitivity` (1 normal, 0.25–2.5), `startingMarbles` (1–9), `hopsPerBoard` (0–5), and `firstBoard` (1–5, for practice). Changing a setting restarts the game."
+      },
+      "resources" : {
+
+      },
+      "title" : "How to play"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 960
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Output width"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int-2",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 600
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Output height"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "program-text",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "{\"version\":1,\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":4096},{\"name\":\"display\",\"kind\":\"texture\"},{\"name\":\"boardTopTexture\",\"kind\":\"inputTexture\",\"input\":\"asset0\"},{\"name\":\"wallWoodTexture\",\"kind\":\"inputTexture\",\"input\":\"asset1\"},{\"name\":\"trayFeltTexture\",\"kind\":\"inputTexture\",\"input\":\"asset2\"},{\"name\":\"marbleTexture\",\"kind\":\"inputTexture\",\"input\":\"asset3\"},{\"name\":\"roomTexture\",\"kind\":\"inputTexture\",\"input\":\"asset4\"}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeLabyrinth\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceLabyrinth\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"present\":[{\"kind\":\"render\",\"vertex\":\"labyrinthVertex\",\"fragment\":\"labyrinthFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"boardTopTexture\",\"2\":\"wallWoodTexture\",\"3\":\"trayFeltTexture\",\"4\":\"marbleTexture\",\"5\":\"roomTexture\"}}],\"swaps\":[],\"output\":\"display\",\"parameters\":[\"tiltSensitivity\",\"startingMarbles\",\"hopsPerBoard\",\"firstBoard\"]}"
+      },
+      "resources" : {
+
+      },
+      "title" : "Game state and render passes"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "trackpad",
+      "kind" : "input.trackpad",
+      "parameters" : {
+        "engaged" : true,
+        "engagedAtCall" : {
+          "$type" : "integer",
+          "value" : 2504
+        },
+        "x" : {
+          "$type" : "number",
+          "value" : 0.44797501474056606
+        },
+        "y" : {
+          "$type" : "number",
+          "value" : 0.4109453038290788
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Tilt the board · Release \/ Hop (Action \/ Space)"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "game-settings",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "{\"tiltSensitivity\":1,\"startingMarbles\":5,\"hopsPerBoard\":2,\"firstBoard\":1}"
+      },
+      "resources" : {
+
+      },
+      "title" : "Game settings (tilt, marbles, hops, first board)"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-maple",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless albedo material texture of pale maple wood, smooth sanded light honey colored board with fine straight grain, evenly lit, no knots, no borders, no objects, no shadows, no writing"
+      },
+      "resources" : {
+
+      },
+      "title" : "Maple Board prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-maple",
+      "kind" : "input.seed",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 51
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Maple Board fixed seed value"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-maple",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Maple Board · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-walnut",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless albedo material texture of dark walnut wood, rich chocolate brown flowing grain, satin oiled finish, evenly lit, no borders, no objects, no shadows, no writing"
+      },
+      "resources" : {
+
+      },
+      "title" : "Walnut Walls prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-walnut",
+      "kind" : "input.seed",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 8086
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Walnut Walls fixed seed value"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-walnut",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Walnut Walls · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-felt",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless albedo material texture of deep green wool felt cloth, soft dense fibers, uniform color, evenly lit, no folds, no borders, no objects, no shadows, no writing"
+      },
+      "resources" : {
+
+      },
+      "title" : "Felt Tray prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-felt",
+      "kind" : "input.seed",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 1234567
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Felt Tray fixed seed value"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-felt",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Felt Tray · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-marble",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless tileable albedo texture of abstract swirled glass, twisting ribbons and wisps of cobalt blue, milky white and amber suspended in clear glass, continuous pattern filling the entire frame, evenly lit, no sphere, no marble silhouette, no perspective, no highlights, no shadows, no background, no text"
+      },
+      "resources" : {
+
+      },
+      "title" : "Glass Marble prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-marble",
+      "kind" : "input.seed",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 777
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Glass Marble fixed seed value"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-marble",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Glass Marble · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-room",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "equirectangular panorama of a cozy wooden study room interior, warm table lamps, tall bright windows, bookshelves, soft golden evening light, no people, no text"
+      },
+      "resources" : {
+
+      },
+      "title" : "Study Room prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-room",
+      "kind" : "input.seed",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 2024
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Study Room fixed seed value"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-room",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Study Room · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "texture-cache",
+      "kind" : "cache.assets",
+      "parameters" : {
+        "keepBetweenRuns" : true,
+        "slotCount" : {
+          "$type" : "integer",
+          "value" : 5
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Generated textures · run cache"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "game-settings" : {
+        "x" : 107,
+        "y" : 518
+      },
+      "generate-felt" : {
+        "x" : 1285,
+        "y" : 1290
+      },
+      "generate-maple" : {
+        "x" : 325,
+        "y" : 1290
+      },
+      "generate-marble" : {
+        "x" : 1765,
+        "y" : 1290
+      },
+      "generate-room" : {
+        "x" : 2245,
+        "y" : 1290
+      },
+      "generate-walnut" : {
+        "x" : 805,
+        "y" : 1290
+      },
+      "loop" : {
+        "x" : 1840,
+        "y" : 480
+      },
+      "note" : {
+        "x" : 80,
+        "y" : 710
+      },
+      "output" : {
+        "x" : 1787,
+        "y" : 79
+      },
+      "primitive-int" : {
+        "x" : 756,
+        "y" : 33
+      },
+      "primitive-int-2" : {
+        "x" : 740,
+        "y" : 220
+      },
+      "program-text" : {
+        "x" : 153,
+        "y" : 26
+      },
+      "prompt-felt" : {
+        "x" : 1040,
+        "y" : 1240
+      },
+      "prompt-maple" : {
+        "x" : 80,
+        "y" : 1240
+      },
+      "prompt-marble" : {
+        "x" : 1520,
+        "y" : 1240
+      },
+      "prompt-room" : {
+        "x" : 2000,
+        "y" : 1240
+      },
+      "prompt-walnut" : {
+        "x" : 560,
+        "y" : 1240
+      },
+      "render" : {
+        "x" : 1093,
+        "y" : 77
+      },
+      "seed-felt" : {
+        "x" : 1040,
+        "y" : 1350
+      },
+      "seed-maple" : {
+        "x" : 80,
+        "y" : 1350
+      },
+      "seed-marble" : {
+        "x" : 1520,
+        "y" : 1350
+      },
+      "seed-room" : {
+        "x" : 2000,
+        "y" : 1350
+      },
+      "seed-walnut" : {
+        "x" : 560,
+        "y" : 1350
+      },
+      "shader-text" : {
+        "x" : 125,
+        "y" : 281
+      },
+      "start" : {
+        "x" : 1840,
+        "y" : 340
+      },
+      "texture-cache" : {
+        "x" : 1040,
+        "y" : 1560
+      },
+      "trackpad" : {
+        "x" : 740,
+        "y" : 400
+      }
+    },
+    "nodeSizes" : {
+      "game-settings" : {
+        "height" : 160,
+        "width" : 480
+      },
+      "note" : {
+        "height" : 480,
+        "width" : 640
+      },
+      "program-text" : {
+        "height" : 221,
+        "width" : 432
+      },
+      "render" : {
+        "height" : 700,
+        "width" : 652
+      },
+      "shader-text" : {
+        "height" : 160,
+        "width" : 400
+      },
+      "trackpad" : {
+        "height" : 360,
+        "width" : 300
+      }
+    },
+    "viewportOrigin" : {
+      "x" : 133.54838709677438,
+      "y" : -162.25806451612877
+    },
+    "viewportScale" : 0.62
+  },
+  "primaryOutputNodeIDs" : [
+    "output"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

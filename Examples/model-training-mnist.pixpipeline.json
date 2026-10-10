@@ -1,0 +1,284 @@
+{
+  "connections" : [
+    {
+      "id" : "c87be6ed-10fc-450d-aa14-b0cbe8b8f9f1.tensor->ea9f23e7-aa0d-4d31-8ddc-ff9d79759bef.input",
+      "input" : {
+        "nodeID" : "ea9f23e7-aa0d-4d31-8ddc-ff9d79759bef",
+        "port" : "input"
+      },
+      "output" : {
+        "nodeID" : "c87be6ed-10fc-450d-aa14-b0cbe8b8f9f1",
+        "port" : "tensor"
+      }
+    },
+    {
+      "id" : "ea9f23e7-aa0d-4d31-8ddc-ff9d79759bef.tensor->148c62dc-b2fd-4388-bc10-38667ababa85.input",
+      "input" : {
+        "nodeID" : "148c62dc-b2fd-4388-bc10-38667ababa85",
+        "port" : "input"
+      },
+      "output" : {
+        "nodeID" : "ea9f23e7-aa0d-4d31-8ddc-ff9d79759bef",
+        "port" : "tensor"
+      }
+    },
+    {
+      "id" : "148c62dc-b2fd-4388-bc10-38667ababa85.tensor->a64f653b-99f9-40b6-b251-dfa3a97260e5.input",
+      "input" : {
+        "nodeID" : "a64f653b-99f9-40b6-b251-dfa3a97260e5",
+        "port" : "input"
+      },
+      "output" : {
+        "nodeID" : "148c62dc-b2fd-4388-bc10-38667ababa85",
+        "port" : "tensor"
+      }
+    },
+    {
+      "id" : "a64f653b-99f9-40b6-b251-dfa3a97260e5.tensor->cc9c99f9-568a-4da6-89ad-ca7d3fb15c19.input",
+      "input" : {
+        "nodeID" : "cc9c99f9-568a-4da6-89ad-ca7d3fb15c19",
+        "port" : "input"
+      },
+      "output" : {
+        "nodeID" : "a64f653b-99f9-40b6-b251-dfa3a97260e5",
+        "port" : "tensor"
+      }
+    },
+    {
+      "id" : "cc9c99f9-568a-4da6-89ad-ca7d3fb15c19.tensor->5d30e307-60c9-48e9-b4d1-e52c8b81e3fb.input",
+      "input" : {
+        "nodeID" : "5d30e307-60c9-48e9-b4d1-e52c8b81e3fb",
+        "port" : "input"
+      },
+      "output" : {
+        "nodeID" : "cc9c99f9-568a-4da6-89ad-ca7d3fb15c19",
+        "port" : "tensor"
+      }
+    },
+    {
+      "id" : "5d30e307-60c9-48e9-b4d1-e52c8b81e3fb.model->model-train.model",
+      "input" : {
+        "nodeID" : "model-train",
+        "port" : "model"
+      },
+      "output" : {
+        "nodeID" : "5d30e307-60c9-48e9-b4d1-e52c8b81e3fb",
+        "port" : "model"
+      }
+    }
+  ],
+  "controlConnections" : [
+
+  ],
+  "exposedParameters" : [
+
+  ],
+  "id" : "b33249a6-7cc1-4ee7-bc66-ded2eed14cfa",
+  "mode" : "generic",
+  "name" : "MNIST Digit Classifier",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "c87be6ed-10fc-450d-aa14-b0cbe8b8f9f1",
+      "kind" : "model.input",
+      "parameters" : {
+        "channels" : {
+          "$type" : "integer",
+          "value" : 1
+        },
+        "dtype" : "float32",
+        "height" : {
+          "$type" : "integer",
+          "value" : 28
+        },
+        "name" : "Digit image",
+        "width" : {
+          "$type" : "integer",
+          "value" : 28
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Digit image"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "ea9f23e7-aa0d-4d31-8ddc-ff9d79759bef",
+      "kind" : "model.layer",
+      "parameters" : {
+        "kernelSize" : {
+          "$type" : "integer",
+          "value" : 3
+        },
+        "name" : "Conv2D · 8 filters",
+        "operation" : "conv2d",
+        "units" : {
+          "$type" : "integer",
+          "value" : 8
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Conv2D · 8 filters"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "148c62dc-b2fd-4388-bc10-38667ababa85",
+      "kind" : "model.layer",
+      "parameters" : {
+        "kernelSize" : {
+          "$type" : "integer",
+          "value" : 3
+        },
+        "name" : "ReLU",
+        "operation" : "relu",
+        "units" : {
+          "$type" : "integer",
+          "value" : 16
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "ReLU"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "a64f653b-99f9-40b6-b251-dfa3a97260e5",
+      "kind" : "model.layer",
+      "parameters" : {
+        "kernelSize" : {
+          "$type" : "integer",
+          "value" : 3
+        },
+        "name" : "Flatten",
+        "operation" : "flatten",
+        "units" : {
+          "$type" : "integer",
+          "value" : 16
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Flatten"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "cc9c99f9-568a-4da6-89ad-ca7d3fb15c19",
+      "kind" : "model.layer",
+      "parameters" : {
+        "kernelSize" : {
+          "$type" : "integer",
+          "value" : 3
+        },
+        "name" : "Ten digit scores",
+        "operation" : "dense",
+        "units" : {
+          "$type" : "integer",
+          "value" : 10
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Ten digit scores"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "5d30e307-60c9-48e9-b4d1-e52c8b81e3fb",
+      "kind" : "model.output",
+      "parameters" : {
+        "name" : "output"
+      },
+      "resources" : {
+
+      },
+      "title" : "output"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "model-train",
+      "kind" : "model.train",
+      "parameters" : {
+        "batchSize" : {
+          "$type" : "integer",
+          "value" : 128
+        },
+        "datasetPreset" : "mnist",
+        "epochs" : {
+          "$type" : "integer",
+          "value" : 3
+        },
+        "learningRate" : {
+          "$type" : "number",
+          "value" : 0.001
+        },
+        "seed" : {
+          "$type" : "integer",
+          "value" : 42
+        },
+        "task" : "classification"
+      },
+      "resources" : {
+
+      },
+      "title" : "Train Model"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "148c62dc-b2fd-4388-bc10-38667ababa85" : {
+        "x" : 594,
+        "y" : 324
+      },
+      "5d30e307-60c9-48e9-b4d1-e52c8b81e3fb" : {
+        "x" : 1442,
+        "y" : 578
+      },
+      "a64f653b-99f9-40b6-b251-dfa3a97260e5" : {
+        "x" : 884,
+        "y" : 422
+      },
+      "c87be6ed-10fc-450d-aa14-b0cbe8b8f9f1" : {
+        "x" : 58,
+        "y" : 98
+      },
+      "cc9c99f9-568a-4da6-89ad-ca7d3fb15c19" : {
+        "x" : 1162,
+        "y" : 507
+      },
+      "ea9f23e7-aa0d-4d31-8ddc-ff9d79759bef" : {
+        "x" : 306,
+        "y" : 210
+      },
+      "model-train" : {
+        "x" : 1011,
+        "y" : 827
+      }
+    },
+    "nodeSizes" : {
+
+    },
+    "viewportOrigin" : {
+      "x" : -81.33129719838152,
+      "y" : -72.62176860228345
+    },
+    "viewportScale" : 0.5920257568359375
+  },
+  "primaryOutputNodeIDs" : [
+    "model-train"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

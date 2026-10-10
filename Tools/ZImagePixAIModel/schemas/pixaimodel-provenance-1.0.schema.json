@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pixeltje.app/schemas/pixaimodel/provenance/1.0",
+  "title": "Pixeltje AI model deterministic provenance record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "packageIdentifier", "source", "references", "toolchain", "sourceFiles", "conversionExports", "outputArtifacts"],
+  "properties": {
+    "schemaVersion": {"const": "1.0.0"},
+    "packageIdentifier": {"type": "string", "minLength": 1},
+    "source": {"$ref": "#/$defs/repository"},
+    "references": {"type": "array", "items": {"$ref": "#/$defs/repository"}},
+    "toolchain": {
+      "type": "object", "additionalProperties": false,
+      "required": ["coreAIModelsRevision", "coreAIModelsUVLockSHA256", "conversionToolRevision"],
+      "properties": {
+        "coreAIModelsRevision": {"$ref": "#/$defs/sha1"},
+        "coreAIModelsUVLockSHA256": {"$ref": "#/$defs/sha256"},
+        "conversionToolRevision": {"type": "string", "minLength": 1}
+      }
+    },
+    "sourceFiles": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/file"}},
+    "conversionExports": {
+      "type": "array", "minItems": 4, "maxItems": 4,
+      "items": {"$ref": "#/$defs/export"}
+    },
+    "outputArtifacts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/artifact"}}
+  },
+  "$defs": {
+    "sha1": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "relativePath": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\u0000]+$"},
+    "repository": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository", "revision", "license"],
+      "properties": {
+        "repository": {"type": "string", "format": "uri"},
+        "revision": {"$ref": "#/$defs/sha1"},
+        "license": {"type": "string", "minLength": 1}
+      }
+    },
+    "file": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/relativePath"}, "sha256": {"$ref": "#/$defs/sha256"},
+        "size": {"type": "integer", "minimum": 0}
+      }
+    },
+    "export": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "variant", "reportFile", "reportSHA256", "assetDigestAlgorithm", "assetDigest", "converterMode", "probe", "precision", "computationPrecision", "sourceRevision", "sourceLockSHA256", "toolSHA256", "system"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+        "variant": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+        "reportFile": {"type": "string", "minLength": 1},
+        "reportSHA256": {"$ref": "#/$defs/sha256"},
+        "assetDigestAlgorithm": {"const": "sha256-tree-v1"},
+        "assetDigest": {"$ref": "#/$defs/sha256"},
+        "converterMode": {"const": "release"},
+        "probe": {"const": false},
+        "precision": {"enum": ["float16", "bfloat16", "float32"]},
+        "computationPrecision": {"type": "string", "minLength": 1},
+        "sourceRevision": {"$ref": "#/$defs/sha1"},
+        "sourceLockSHA256": {"$ref": "#/$defs/sha256"},
+        "toolSHA256": {"$ref": "#/$defs/sha256"},
+        "system": {"type": "object"}
+      }
+    },
+    "artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "digest", "digestAlgorithm"],
+      "properties": {
+        "path": {"$ref": "#/$defs/relativePath"}, "digest": {"$ref": "#/$defs/sha256"},
+        "digestAlgorithm": {"enum": ["sha256", "sha256-tree-v1"]}
+      }
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 2,
+  "id": "org.pixeltje.examples.default",
+  "name": "default",
+  "mode": "generic",
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "nodes": [
+    {
+      "id": "text",
+      "kind": "primitive.string",
+      "title": "Text",
+      "executionState": "enabled",
+      "parameters": { "value": "Hello, Pixeltje!" },
+      "resources": {}
+    },
+    {
+      "id": "output",
+      "kind": "output.text",
+      "title": "Text Output",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    }
+  ],
+  "connections": [
+    {
+      "id": "text.value->output.text",
+      "output": { "nodeID": "text", "port": "value" },
+      "input": { "nodeID": "output", "port": "text" }
+    }
+  ],
+  "exposedParameters": [],
+  "primaryOutputNodeIDs": ["output"],
+  "presentation": {
+    "nodePositions": {
+      "text": { "x": 80, "y": 120 },
+      "output": { "x": 360, "y": 120 }
+    },
+    "nodeSizes": {},
+    "viewportOrigin": { "x": 0, "y": 0 },
+    "viewportScale": 1
+  }
+}

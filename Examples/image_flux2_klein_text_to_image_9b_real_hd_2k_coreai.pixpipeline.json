@@ -1,0 +1,197 @@
+{
+  "connections": [
+    {
+      "id": "prompt.prompt->generate.prompt",
+      "input": {
+        "nodeID": "generate",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed.seed->generate.seed",
+      "input": {
+        "nodeID": "generate",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "generate",
+        "port": "image"
+      }
+    }
+  ],
+  "exposedParameters": [],
+  "id": "pixeltje.flux2-klein-9b-fp8-real-hd-2k-1024",
+  "mode": "textToImage",
+  "name": "FLUX.2 Klein 9B FP8 + Real HD 2K (experimental split)",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "prompt",
+      "kind": "input.prompt",
+      "parameters": {
+        "value": "A red fox in a snowy forest, detailed photograph"
+      },
+      "resources": {},
+      "title": "Prompt"
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed",
+      "kind": "input.seed",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 47
+        }
+      },
+      "resources": {},
+      "title": "Seed"
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate",
+      "kind": "coreai.flux2Klein9BSplitGenerate",
+      "parameters": {
+        "width": {
+          "$type": "integer",
+          "value": 1024
+        },
+        "height": {
+          "$type": "integer",
+          "value": 1024
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 4
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "denoiser": {
+          "state": "unresolved",
+          "requirement": {
+            "kind": "coreAIModel",
+            "componentRole": "denoiser",
+            "sourceName": "FLUX.2-klein-9B-fp8-1024-real-hd-2k",
+            "sourceFormat": "split-aimodel",
+            "familyABI": "flux2-klein-9b-split-coreai@1"
+          }
+        },
+        "textEncoder": {
+          "state": "unresolved",
+          "requirement": {
+            "kind": "coreAIModel",
+            "componentRole": "textEncoder",
+            "sourceName": "Qwen3-8B-FP8-flux2-encoder-experimental",
+            "sourceFormat": "split-aimodel",
+            "familyABI": "flux2-klein-9b-split-coreai@1"
+          }
+        },
+        "vaeDecoder": {
+          "state": "unresolved",
+          "requirement": {
+            "kind": "coreAIModel",
+            "componentRole": "vae",
+            "sourceName": "FLUX.2-klein-4B/VAEDecoder.aimodel",
+            "sourceFormat": "aimodel-with-batch-norm-sidecars",
+            "familyABI": "flux2-klein-9b-split-coreai@1"
+          }
+        }
+      },
+      "title": "FLUX.2 Klein 9B + Real HD 2K Generate",
+      "origin": {
+        "system": "pixeltje.experimental-coreai-export",
+        "sourceNodeID": "generate",
+        "sourceType": "FLUX2Klein9BSplitGenerate",
+        "metadata": {
+          "sourceModel": "black-forest-labs/FLUX.2-klein-9b-fp8",
+          "resolution": "1024x1024",
+          "computePreference": "gpu",
+          "adapterFusion": "offline DoRA at strength 1.0",
+          "adapterName": "HighDetail.safetensors",
+          "adapterSHA256": "108c649190f0953852feb15dad3d8ef8821753814a386ae46006d6949f722616",
+          "adapterPage": "https://civitai.com/models/2636697/real-hd-2k-sfwnsfw"
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.image",
+      "parameters": {},
+      "resources": {},
+      "title": "Image Output"
+    },
+    {
+      "executionState": "disabled",
+      "id": "guide",
+      "kind": "edit.markdownNote",
+      "title": "Experimental 9B workflow",
+      "parameters": {
+        "text": "## FLUX.2 Klein 9B FP8 — Real HD 2K\n\nIn Pipeline Editor, choose the Model Package directory below. The editor links the denoiser, Qwen3-8B FP8 encoder, and FLUX.2 VAE as one package, then Run generates a 1024 × 1024 image.\n\n`~/coreai-models/exports/FLUX.2-klein-9B-fp8-1024-real-hd-2k`\n\nThis fixed 1024-pixel package uses GPU-preferred Core AI FP8 functions. The Real HD 2K adapter is already fused in its separate denoiser export; its name does not change the 1024 × 1024 output size."
+      },
+      "resources": {}
+    }
+  ],
+  "presentation": {
+    "nodePositions": {
+      "prompt": {
+        "x": 40,
+        "y": 120
+      },
+      "seed": {
+        "x": 320,
+        "y": 120
+      },
+      "generate": {
+        "x": 600,
+        "y": 120
+      },
+      "output": {
+        "x": 880,
+        "y": 120
+      },
+      "guide": {
+        "x": 600,
+        "y": 340
+      }
+    },
+    "nodeSizes": {
+      "guide": {
+        "width": 520,
+        "height": 350
+      }
+    },
+    "viewportOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "viewportScale": 1
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

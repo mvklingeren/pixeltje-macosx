@@ -1,0 +1,192 @@
+{
+  "connections": [
+    {
+      "id": "source.image->invert.image",
+      "input": {
+        "nodeID": "invert",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "source",
+        "port": "image"
+      }
+    },
+    {
+      "id": "source.image->preview-blend.imageA",
+      "input": {
+        "nodeID": "preview-blend",
+        "port": "imageA"
+      },
+      "output": {
+        "nodeID": "source",
+        "port": "image"
+      }
+    },
+    {
+      "id": "invert.image->preview-blend.imageB",
+      "input": {
+        "nodeID": "preview-blend",
+        "port": "imageB"
+      },
+      "output": {
+        "nodeID": "invert",
+        "port": "image"
+      }
+    },
+    {
+      "id": "preview-blend.image->preview.image",
+      "input": {
+        "nodeID": "preview",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "preview-blend",
+        "port": "image"
+      }
+    },
+    {
+      "id": "preview-blend.image->final-blend.imageA",
+      "input": {
+        "nodeID": "final-blend",
+        "port": "imageA"
+      },
+      "output": {
+        "nodeID": "preview-blend",
+        "port": "image"
+      }
+    },
+    {
+      "id": "invert.image->final-blend.imageB",
+      "input": {
+        "nodeID": "final-blend",
+        "port": "imageB"
+      },
+      "output": {
+        "nodeID": "invert",
+        "port": "image"
+      }
+    },
+    {
+      "id": "final-blend.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "final-blend",
+        "port": "image"
+      }
+    }
+  ],
+  "exposedParameters": [],
+  "id": "org.pixeltje.examples.base-test-set.08-two-factor-blend",
+  "mode": "imageToImage",
+  "name": "Base Test Set 08 · Two Factor Blend",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "source",
+      "kind": "input.image",
+      "parameters": {
+        "sourceName": "test-card.png"
+      },
+      "resources": {},
+      "title": "Test card"
+    },
+    {
+      "executionState": "enabled",
+      "id": "invert",
+      "kind": "image.invert",
+      "parameters": {},
+      "resources": {},
+      "title": "Inverse"
+    },
+    {
+      "executionState": "enabled",
+      "id": "preview-blend",
+      "kind": "image.blend",
+      "parameters": {
+        "blendFactor": {
+          "$type": "number",
+          "value": 0.25
+        },
+        "blendMode": "normal"
+      },
+      "resources": {},
+      "title": "Quarter normal blend"
+    },
+    {
+      "executionState": "enabled",
+      "id": "preview",
+      "kind": "output.preview",
+      "parameters": {},
+      "resources": {},
+      "title": "Blend preview"
+    },
+    {
+      "executionState": "enabled",
+      "id": "final-blend",
+      "kind": "image.blend",
+      "parameters": {
+        "blendFactor": {
+          "$type": "number",
+          "value": 0.75
+        },
+        "blendMode": "multiply"
+      },
+      "resources": {},
+      "title": "Three-quarter multiply blend"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.image",
+      "parameters": {},
+      "resources": {},
+      "title": "Image result"
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "final-blend": {
+        "x": 480,
+        "y": 280
+      },
+      "invert": {
+        "x": 240,
+        "y": 40
+      },
+      "output": {
+        "x": 720,
+        "y": 280
+      },
+      "preview": {
+        "x": 720,
+        "y": 0
+      },
+      "preview-blend": {
+        "x": 480,
+        "y": 0
+      },
+      "source": {
+        "x": 0,
+        "y": 160
+      }
+    },
+    "nodeSizes": {},
+    "viewportOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "viewportScale": 0.8
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

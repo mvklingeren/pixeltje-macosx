@@ -1,0 +1,1373 @@
+{
+  "connections" : [
+    {
+      "id" : "render.image->output.image",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "render",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "primitive-int.value->render.width",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "width"
+      },
+      "output" : {
+        "nodeID" : "primitive-int",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "primitive-int-2.value->render.height",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "height"
+      },
+      "output" : {
+        "nodeID" : "primitive-int-2",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "program-text.value->render.program",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "program"
+      },
+      "output" : {
+        "nodeID" : "program-text",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "shader-text.value->render.sourceFile",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "sourceFile"
+      },
+      "output" : {
+        "nodeID" : "shader-text",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "trackpad.x->render.pointerX",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "pointerX"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "x"
+      }
+    },
+    {
+      "id" : "trackpad.y->render.pointerY",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "pointerY"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "y"
+      }
+    },
+    {
+      "id" : "trackpad.actionCount->render.actionCount",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "actionCount"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "actionCount"
+      }
+    },
+    {
+      "id" : "game-settings.value->render.parameters",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "parameters"
+      },
+      "output" : {
+        "nodeID" : "game-settings",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "prompt-panorama.prompt->generate-panorama.prompt",
+      "input" : {
+        "nodeID" : "generate-panorama",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-panorama",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-panorama.seed->generate-panorama.seed",
+      "input" : {
+        "nodeID" : "generate-panorama",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-panorama",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate-panorama.image->texture-cache.asset0",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset0"
+      },
+      "output" : {
+        "nodeID" : "generate-panorama",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-wood.prompt->generate-wood.prompt",
+      "input" : {
+        "nodeID" : "generate-wood",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-wood",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-wood.seed->generate-wood.seed",
+      "input" : {
+        "nodeID" : "generate-wood",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-wood",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate-wood.image->texture-cache.asset1",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset1"
+      },
+      "output" : {
+        "nodeID" : "generate-wood",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-perch.prompt->generate-perch.prompt",
+      "input" : {
+        "nodeID" : "generate-perch",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-perch",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-perch.seed->generate-perch.seed",
+      "input" : {
+        "nodeID" : "generate-perch",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-perch",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate-perch.image->texture-cache.asset2",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset2"
+      },
+      "output" : {
+        "nodeID" : "generate-perch",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-trout.prompt->generate-trout.prompt",
+      "input" : {
+        "nodeID" : "generate-trout",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-trout",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-trout.seed->generate-trout.seed",
+      "input" : {
+        "nodeID" : "generate-trout",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-trout",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate-trout.image->texture-cache.asset3",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset3"
+      },
+      "output" : {
+        "nodeID" : "generate-trout",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-carp.prompt->generate-carp.prompt",
+      "input" : {
+        "nodeID" : "generate-carp",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-carp",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-carp.seed->generate-carp.seed",
+      "input" : {
+        "nodeID" : "generate-carp",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-carp",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate-carp.image->texture-cache.asset4",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset4"
+      },
+      "output" : {
+        "nodeID" : "generate-carp",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-pike.prompt->generate-pike.prompt",
+      "input" : {
+        "nodeID" : "generate-pike",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-pike",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-pike.seed->generate-pike.seed",
+      "input" : {
+        "nodeID" : "generate-pike",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-pike",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate-pike.image->texture-cache.asset5",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset5"
+      },
+      "output" : {
+        "nodeID" : "generate-pike",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-poster.prompt->generate-poster.prompt",
+      "input" : {
+        "nodeID" : "generate-poster",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-poster",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-poster.seed->generate-poster.seed",
+      "input" : {
+        "nodeID" : "generate-poster",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-poster",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate-poster.image->texture-cache.asset6",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset6"
+      },
+      "output" : {
+        "nodeID" : "generate-poster",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "texture-cache.assets->render.assets",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "assets"
+      },
+      "output" : {
+        "nodeID" : "texture-cache",
+        "port" : "assets"
+      }
+    }
+  ],
+  "controlConnections" : [
+    {
+      "id" : "output.completed->loop.completed",
+      "input" : {
+        "nodeID" : "loop",
+        "port" : "completed"
+      },
+      "output" : {
+        "nodeID" : "output",
+        "port" : "completed"
+      }
+    },
+    {
+      "id" : "loop.repeat->start.again",
+      "input" : {
+        "nodeID" : "start",
+        "port" : "again"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "repeat"
+      }
+    }
+  ],
+  "exposedParameters" : [
+
+  ],
+  "id" : "org.pixeltje.examples.mistmere-angler-generation",
+  "mode" : "generic",
+  "name" : "Mistmere Angler · Lake Fishing · Generated Textures",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "start",
+      "kind" : "control.start",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Start \/ Next Frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "shader-text",
+      "kind" : "primitive.filePath",
+      "parameters" : {
+        "mode" : "relative",
+        "path" : "MistmereAnglerGenerationProgram.metal"
+      },
+      "resources" : {
+
+      },
+      "title" : "Mistmere Angler shader beside workflow"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "render",
+      "kind" : "gpu.program",
+      "parameters" : {
+        "framesPerSecond" : {
+          "$type" : "number",
+          "value" : 60
+        },
+        "seed" : {
+          "$type" : "integer",
+          "value" : 1
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "GPU Program · Mistmere Angler"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output",
+      "kind" : "output.image",
+      "parameters" : {
+        "filenamePrefix" : "mistmere-angler",
+        "format" : "png"
+      },
+      "resources" : {
+
+      },
+      "title" : "Game frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "loop",
+      "kind" : "control.loop",
+      "parameters" : {
+        "autoPause" : false,
+        "delayMilliseconds" : {
+          "$type" : "integer",
+          "value" : 0
+        },
+        "feedback" : "none",
+        "limitHz" : {
+          "$type" : "integer",
+          "value" : 120
+        },
+        "maxCalls" : {
+          "$type" : "integer",
+          "value" : -1
+        },
+        "seedStrategy" : "fixed"
+      },
+      "resources" : {
+
+      },
+      "title" : "Advance the fishing day"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "note",
+      "kind" : "edit.markdownNote",
+      "parameters" : {
+        "text" : "# Mistmere Angler · Generated textures\nA first-person fishing game. You stand at the end of a wooden jetty on a misty mountain lake and fish through three days: a misty morning, a calm afternoon and the evening rise, each with its own light, mist and fish. Perch, brown trout, common carp and northern pike swim under the surface as dark shapes, and give themselves away with rise rings. Every fish has its own weight, strength, stamina and habits: perch nibble near the jetty, trout jump, carp tease the float for a long time and fight heavily, and pike strike far out, shake their heads and need quick reactions. The scene is ray-cast per pixel: the generated panorama wraps around the lake and is reflected in rippling water, and the jetty uses the generated planks. On each Run, seven fixed-seed FLUX.2 Klein 4B Distilled jobs paint 1024 × 1024 images: the lake panorama, the jetty planks, a field-guide illustration of each species (shown on the catch card when you land one) and the title poster. Asset Cache stores the seven images as named slots and previews each one as it becomes ready; the game starts after all seven are ready, and later frames reuse the bundle without running the model again. The cache keeps its images between Runs of the same workflow revision, so only the first Run (or a Run after editing the workflow or pressing Clear) generates them. The model package remains link-only; link the Klein nodes to the same 4B Distilled package as the bundled Klein example.\n\n**Controls.** Drag the Trackpad crosshair, or drag on the full-screen preview. *Aim:* drag onto the water where you want to cast (the ring and the distance show the target) and press Action or Space to cast. *Wait:* watch the float (the small marker above it bobs with every nibble). When a fish pulls the float under, a red **!** appears: press Space quickly to strike. Striking during a nibble spooks the fish; pressing Space while nothing bites reels the float in to cast again (also after the bait has been stolen). *Fight:* the crosshair height is the reel: drag it up to reel in (faster near the top) and down into the HOLD zone to stop reeling; the gauge on the right shows where it sits. While you hold, the reel's drag lets line out safely; reeling while the fish runs hard pushes the tension into the red and snaps the line. Reel when the fish rests or swims towards you, or the slack line lets the hook fall out. Move the crosshair to the side opposite the fish's run to put side strain on it (SIDE STRAIN!) and tire it faster. When a tired fish is beside the jetty, NET IT! appears: press Space to land it. A fish that is still too lively bolts away. Space also starts the game, starts each day and dismisses the catch card and the result screens.\n\n**Goal.** Land the day's target weight before the light goes (the clock shows the time of day): 2.5 kg on the misty morning, 7 kg on the calm afternoon and 13 kg on the evening rise. A fish still on the line at the end of the day can be played out. Points reward weight and species, with a bonus for trophy fish; the trip summary shows your biggest fish and your rank. If you miss a target, press Space to fish that day again.\n\n**Settings.** The Game settings JSON sets `daySeconds` (45–900, default 180 real seconds per day), `firstDay` (1–3), `fishPower` (0.5–1.5; lower makes fish weaker), `horizonLine` (0.25–0.8, default 0.5: where the far shoreline sits in the generated panorama, from the top) and `biteRate` (0.3–3). Changing a setting restarts the run."
+      },
+      "resources" : {
+
+      },
+      "title" : "How to play"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 1440
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Output width"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int-2",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 900
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Output height"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "program-text",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "{\"version\":1,\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":4096},{\"name\":\"display\",\"kind\":\"texture\"},{\"name\":\"panoramaTexture\",\"kind\":\"inputTexture\",\"input\":\"asset0\"},{\"name\":\"woodTexture\",\"kind\":\"inputTexture\",\"input\":\"asset1\"},{\"name\":\"perchTexture\",\"kind\":\"inputTexture\",\"input\":\"asset2\"},{\"name\":\"troutTexture\",\"kind\":\"inputTexture\",\"input\":\"asset3\"},{\"name\":\"carpTexture\",\"kind\":\"inputTexture\",\"input\":\"asset4\"},{\"name\":\"pikeTexture\",\"kind\":\"inputTexture\",\"input\":\"asset5\"},{\"name\":\"posterTexture\",\"kind\":\"inputTexture\",\"input\":\"asset6\"}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeLake\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceLake\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"present\":[{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"lakeFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"panoramaTexture\",\"2\":\"woodTexture\",\"3\":\"perchTexture\",\"4\":\"troutTexture\",\"5\":\"carpTexture\",\"6\":\"pikeTexture\",\"7\":\"posterTexture\"}}],\"swaps\":[],\"output\":\"display\",\"parameters\":[\"daySeconds\",\"firstDay\",\"fishPower\",\"horizonLine\",\"biteRate\"]}"
+      },
+      "resources" : {
+
+      },
+      "title" : "Game state and render passes"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "trackpad",
+      "kind" : "input.trackpad",
+      "parameters" : {
+        "engaged" : true,
+        "engagedAtCall" : {
+          "$type" : "integer",
+          "value" : 466
+        },
+        "x" : {
+          "$type" : "number",
+          "value" : 0.24971711119589346
+        },
+        "y" : {
+          "$type" : "number",
+          "value" : 0.5197436875693674
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Aim the cast, work the rod and reel · Cast \/ strike \/ net (Action \/ Space)"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "game-settings",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "{\"daySeconds\":180,\"firstDay\":1,\"fishPower\":1,\"horizonLine\":0.5,\"biteRate\":1}"
+      },
+      "resources" : {
+
+      },
+      "title" : "Game settings (day seconds, first day, fish power, panorama horizon, bite rate)"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-panorama",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "wide landscape photograph looking straight across a calm misty mountain lake in the early morning, the far shoreline runs level across the exact middle of the image, a dense dark pine forest along the far shore, forested hills and blue mountains rising behind it under a soft pale sky, thin mist lying on the water, the lower half of the image is calm lake water with soft reflections, soft diffuse light, no boats, no people, no buildings, no jetty, no text"
+      },
+      "resources" : {
+
+      },
+      "title" : "Lake Panorama prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-panorama",
+      "kind" : "input.seed",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 731905
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Lake Panorama fixed seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-panorama",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Lake Panorama · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-wood",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless top-down photograph of weathered grey and brown wooden jetty planks running horizontally across the image, worn timber grain and small knots, a little moss in the narrow gaps, soft even daylight, uniform texture across the whole image, no objects, no shadows, no text"
+      },
+      "resources" : {
+
+      },
+      "title" : "Jetty Planks prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-wood",
+      "kind" : "input.seed",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 40213
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Jetty Planks fixed seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-wood",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Jetty Planks · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-perch",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "vintage natural history book illustration of a single european perch fish in side view, the whole fish centered horizontally in the middle of the image with empty space around it, olive green back with bold dark vertical bands, a spiny dorsal fin and orange red lower fins, delicate watercolor and ink, plain warm cream parchment paper background, no text, no labels, no border, no other animals"
+      },
+      "resources" : {
+
+      },
+      "title" : "Perch Illustration prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-perch",
+      "kind" : "input.seed",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 1858
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Perch Illustration fixed seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-perch",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Perch Illustration · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-trout",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "vintage natural history book illustration of a single brown trout fish in side view, the whole fish centered horizontally in the middle of the image with empty space around it, golden brown body with black and red spots and a pale belly, delicate watercolor and ink, plain warm cream parchment paper background, no text, no labels, no border, no other animals"
+      },
+      "resources" : {
+
+      },
+      "title" : "Brown Trout Illustration prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-trout",
+      "kind" : "input.seed",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 1766
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Brown Trout Illustration fixed seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-trout",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Brown Trout Illustration · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-carp",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "vintage natural history book illustration of a single common carp fish in side view, the whole fish centered horizontally in the middle of the image with empty space around it, deep bronze golden body with large scales and small barbels at the mouth, delicate watercolor and ink, plain warm cream parchment paper background, no text, no labels, no border, no other animals"
+      },
+      "resources" : {
+
+      },
+      "title" : "Common Carp Illustration prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-carp",
+      "kind" : "input.seed",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 1758
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Common Carp Illustration fixed seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-carp",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Common Carp Illustration · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-pike",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "vintage natural history book illustration of a single northern pike fish in side view, the whole fish centered horizontally in the middle of the image with empty space around it, long slender olive green body with rows of pale yellow spots and a flat duck-bill snout, delicate watercolor and ink, plain warm cream parchment paper background, no text, no labels, no border, no other animals"
+      },
+      "resources" : {
+
+      },
+      "title" : "Northern Pike Illustration prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-pike",
+      "kind" : "input.seed",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 1977
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Northern Pike Illustration fixed seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-pike",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Northern Pike Illustration · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-poster",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "vintage 1950s mountain lake fishing lodge travel poster illustration of an angler standing at the end of a wooden jetty casting a fishing rod over a misty mountain lake at sunrise, a trout leaping from the water, pine forests and blue mountains, warm orange morning sky, bold flat colors, screen print style, no text, no letters, no words, no logos"
+      },
+      "resources" : {
+
+      },
+      "title" : "Title Poster prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-poster",
+      "kind" : "input.seed",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 19530714
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Title Poster fixed seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-poster",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Title Poster · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "texture-cache",
+      "kind" : "cache.assets",
+      "parameters" : {
+        "keepBetweenRuns" : true,
+        "slotCount" : {
+          "$type" : "integer",
+          "value" : 7
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Generated textures · run cache"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "game-settings" : {
+        "x" : 80,
+        "y" : 500
+      },
+      "generate-carp" : {
+        "x" : 2245,
+        "y" : 1350
+      },
+      "generate-panorama" : {
+        "x" : 325,
+        "y" : 1350
+      },
+      "generate-perch" : {
+        "x" : 1285,
+        "y" : 1350
+      },
+      "generate-pike" : {
+        "x" : 2725,
+        "y" : 1350
+      },
+      "generate-poster" : {
+        "x" : 3205,
+        "y" : 1350
+      },
+      "generate-trout" : {
+        "x" : 1765,
+        "y" : 1350
+      },
+      "generate-wood" : {
+        "x" : 805,
+        "y" : 1350
+      },
+      "loop" : {
+        "x" : 1840,
+        "y" : 480
+      },
+      "note" : {
+        "x" : 80,
+        "y" : 700
+      },
+      "output" : {
+        "x" : 1840,
+        "y" : 100
+      },
+      "primitive-int" : {
+        "x" : 740,
+        "y" : 60
+      },
+      "primitive-int-2" : {
+        "x" : 740,
+        "y" : 220
+      },
+      "program-text" : {
+        "x" : 80,
+        "y" : 40
+      },
+      "prompt-carp" : {
+        "x" : 2000,
+        "y" : 1300
+      },
+      "prompt-panorama" : {
+        "x" : 80,
+        "y" : 1300
+      },
+      "prompt-perch" : {
+        "x" : 1040,
+        "y" : 1300
+      },
+      "prompt-pike" : {
+        "x" : 2480,
+        "y" : 1300
+      },
+      "prompt-poster" : {
+        "x" : 2960,
+        "y" : 1300
+      },
+      "prompt-trout" : {
+        "x" : 1520,
+        "y" : 1300
+      },
+      "prompt-wood" : {
+        "x" : 560,
+        "y" : 1300
+      },
+      "render" : {
+        "x" : 1120,
+        "y" : 60
+      },
+      "seed-carp" : {
+        "x" : 2000,
+        "y" : 1410
+      },
+      "seed-panorama" : {
+        "x" : 80,
+        "y" : 1410
+      },
+      "seed-perch" : {
+        "x" : 1040,
+        "y" : 1410
+      },
+      "seed-pike" : {
+        "x" : 2480,
+        "y" : 1410
+      },
+      "seed-poster" : {
+        "x" : 2960,
+        "y" : 1410
+      },
+      "seed-trout" : {
+        "x" : 1520,
+        "y" : 1410
+      },
+      "seed-wood" : {
+        "x" : 560,
+        "y" : 1410
+      },
+      "shader-text" : {
+        "x" : 80,
+        "y" : 300
+      },
+      "start" : {
+        "x" : 1840,
+        "y" : 340
+      },
+      "texture-cache" : {
+        "x" : 1520,
+        "y" : 1640
+      },
+      "trackpad" : {
+        "x" : 740,
+        "y" : 400
+      }
+    },
+    "nodeSizes" : {
+      "game-settings" : {
+        "height" : 160,
+        "width" : 480
+      },
+      "note" : {
+        "height" : 464,
+        "width" : 415
+      },
+      "program-text" : {
+        "height" : 225,
+        "width" : 610
+      },
+      "render" : {
+        "height" : 700,
+        "width" : 663
+      },
+      "shader-text" : {
+        "height" : 160,
+        "width" : 400
+      },
+      "texture-cache" : {
+        "height" : 470,
+        "width" : 360
+      },
+      "trackpad" : {
+        "height" : 360,
+        "width" : 300
+      }
+    },
+    "viewportOrigin" : {
+      "x" : 25.454545454545926,
+      "y" : -27.272727272727273
+    },
+    "viewportScale" : 0.55
+  },
+  "primaryOutputNodeIDs" : [
+    "output"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

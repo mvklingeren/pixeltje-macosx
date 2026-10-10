@@ -1,0 +1,264 @@
+{
+  "connections": [
+    {
+      "id": "state.state->render.state",
+      "input": {
+        "nodeID": "render",
+        "port": "state"
+      },
+      "output": {
+        "nodeID": "state",
+        "port": "state"
+      }
+    },
+    {
+      "id": "render.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "render",
+        "port": "image"
+      }
+    },
+    {
+      "id": "primitive-int.value->render.width",
+      "input": {
+        "nodeID": "render",
+        "port": "width"
+      },
+      "output": {
+        "nodeID": "primitive-int",
+        "port": "value"
+      }
+    },
+    {
+      "id": "primitive-int-2.value->render.height",
+      "input": {
+        "nodeID": "render",
+        "port": "height"
+      },
+      "output": {
+        "nodeID": "primitive-int-2",
+        "port": "value"
+      }
+    },
+    {
+      "id": "shader-text.value->render.source",
+      "input": {
+        "nodeID": "render",
+        "port": "source"
+      },
+      "output": {
+        "nodeID": "shader-text",
+        "port": "value"
+      }
+    }
+  ],
+  "controlConnections": [
+    {
+      "id": "output.completed->loop.completed",
+      "input": {
+        "nodeID": "loop",
+        "port": "completed"
+      },
+      "output": {
+        "nodeID": "output",
+        "port": "completed"
+      }
+    },
+    {
+      "id": "loop.repeat->start.again",
+      "input": {
+        "nodeID": "start",
+        "port": "again"
+      },
+      "output": {
+        "nodeID": "loop",
+        "port": "repeat"
+      }
+    }
+  ],
+  "exposedParameters": [],
+  "id": "org.pixeltje.examples.cloudy-sky-shader-inline",
+  "mode": "generic",
+  "name": "Cloudy Sky · Inline Metal Shader",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "start",
+      "kind": "control.start",
+      "parameters": {},
+      "resources": {},
+      "title": "Start / Next Frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "state",
+      "kind": "input.state",
+      "parameters": {
+        "initialState": "{\n  \"version\": 1,\n  \"mode\": \"shader\",\n  \"fragmentFunction\": \"cloudyFragment\",\n  \"width\": 960,\n  \"height\": 540,\n  \"timeSeconds\": 0,\n  \"secondsPerFrame\": 0.03333333333333333\n}"
+      },
+      "resources": {},
+      "title": "Cloudy sky shader state"
+    },
+    {
+      "executionState": "enabled",
+      "id": "shader-text",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": "#include <metal_stdlib>\nusing namespace metal;\n\nstruct ShaderUniforms {\n    float4 resolutionTime;\n    float4 mouse;\n};\n\nfloat hash21(float2 p) {\n    p = fract(p * float2(0.1031, 0.1030));\n    p += dot(p, p.yx + 33.33);\n    return fract((p.x + p.y) * p.x);\n}\n\nfloat hash31(float3 p) {\n    p = fract(p * 0.1031);\n    p += dot(p, p.yzx + 33.33);\n    return fract((p.x + p.y) * p.z);\n}\n\nfloat noise3(float3 p) {\n    float3 cell = floor(p);\n    float3 f = fract(p);\n    float3 u = f * f * (3.0 - 2.0 * f);\n    float a = mix(hash31(cell), hash31(cell + float3(1.0, 0.0, 0.0)), u.x);\n    float b = mix(hash31(cell + float3(0.0, 1.0, 0.0)),\n                  hash31(cell + float3(1.0, 1.0, 0.0)), u.x);\n    float c = mix(hash31(cell + float3(0.0, 0.0, 1.0)),\n                  hash31(cell + float3(1.0, 0.0, 1.0)), u.x);\n    float d = mix(hash31(cell + float3(0.0, 1.0, 1.0)),\n                  hash31(cell + float3(1.0, 1.0, 1.0)), u.x);\n    return mix(mix(a, b, u.y), mix(c, d, u.y), u.z);\n}\n\nfloat cloudDensity(float3 p, float time, bool fineDetail) {\n    float3 q = p * float3(0.42, 0.74, 0.42)\n               + float3(0.23 * time, 0.04 * sin(0.35 * time), 0.38 * time);\n    float shape = 0.62 * noise3(q * 0.62)\n                  + 0.28 * noise3(q * 1.51)\n                  + 0.10 * (fineDetail ? noise3(q * 3.07) : 0.5);\n    float floorFade = smoothstep(-1.9, -0.9, p.y);\n    float ceilingFade = 1.0 - smoothstep(0.35, 1.5, p.y);\n    return smoothstep(0.50, 0.66, shape) * floorFade * ceilingFade;\n}\n\nfloat3 skyColor(float3 rd, float3 sunDir) {\n    float height = smoothstep(-0.15, 0.8, rd.y);\n    float3 sky = mix(float3(0.37, 0.60, 0.81),\n                     float3(0.09, 0.30, 0.68), height);\n    float horizon = exp(-7.0 * abs(rd.y));\n    sky = mix(sky, float3(0.89, 0.60, 0.38), 0.20 * horizon);\n    float sun = max(dot(rd, sunDir), 0.0);\n    sky += float3(1.0, 0.72, 0.46) * (0.16 * pow(sun, 16.0)\n                                      + 0.55 * pow(sun, 512.0));\n    return sky;\n}\n\nfloat3 renderClouds(float3 ro, float3 rd, float2 pixel, float time) {\n    const float3 sunDir = normalize(float3(-0.52, 0.58, 0.62));\n    float3 sky = skyColor(rd, sunDir);\n    float nearDistance = 0.0;\n    float farDistance = 55.0;\n\n    if (abs(rd.y) < 0.0001) {\n        if (ro.y < -1.9 || ro.y > 1.5) return sky;\n    } else {\n        float lower = (-1.9 - ro.y) / rd.y;\n        float upper = (1.5 - ro.y) / rd.y;\n        nearDistance = max(0.0, min(lower, upper));\n        farDistance = min(farDistance, max(lower, upper));\n    }\n\n    if (farDistance <= nearDistance) return sky;\n\n    float4 accumulated = float4(0.0);\n    float t = nearDistance\n              + hash21(floor(pixel)) * (0.16 + 0.025 * nearDistance);\n\n    for (int step = 0; step < 80; ++step) {\n        if (t >= farDistance || accumulated.a > 0.995) break;\n        float dt = min(0.16 + 0.025 * t, farDistance - t);\n        float3 position = ro + (t + 0.5 * dt) * rd;\n        float density = cloudDensity(position, time, t < 18.0);\n        if (density > 0.005) {\n            float litDensity = cloudDensity(position + 0.65 * sunDir,\n                                            time, false);\n            float light = clamp(0.54 + 2.2 * (density - litDensity),\n                                0.16, 1.0);\n            float3 cloud = mix(float3(0.13, 0.21, 0.32),\n                               float3(0.87, 0.88, 0.86), light);\n            cloud = mix(cloud, sky, 1.0 - exp(-0.0007 * t * t));\n            float alpha = 1.0 - exp(-0.78 * density * dt);\n            float visible = (1.0 - accumulated.a) * alpha;\n            accumulated.rgb += cloud * visible;\n            accumulated.a += visible;\n        }\n        t += dt;\n    }\n\n    return sky * (1.0 - accumulated.a) + accumulated.rgb;\n}\n\nvertex float4 fullscreenVertex(uint vertexID [[vertex_id]]) {\n    float2 p = float2((vertexID << 1) & 2, vertexID & 2);\n    return float4(p * 2.0 - 1.0, 0.0, 1.0);\n}\n\nfragment float4 cloudyFragment(\n    float4 position [[position]],\n    constant ShaderUniforms &uniforms [[buffer(0)]]) {\n    float2 resolution = uniforms.resolutionTime.xy;\n    float2 frag = float2(position.x, resolution.y - position.y);\n    float2 uv = (2.0 * frag - resolution) / resolution.y;\n    float time = uniforms.resolutionTime.z;\n    float2 pointer = uniforms.mouse.xy / resolution;\n    float azimuth = 0.55 * (pointer.x - 0.5) + 0.035 * sin(0.11 * time);\n    float elevation = 0.4 * (pointer.y - 0.5);\n    float3 ro = float3(5.0 * sin(azimuth), 2.2 + elevation,\n                        -6.0 * cos(azimuth));\n    float3 target = float3(0.0, -0.15, 6.0);\n    float3 forward = normalize(target - ro);\n    float3 right = normalize(cross(float3(0.0, 1.0, 0.0), forward));\n    float3 up = cross(forward, right);\n    float3 rd = normalize(uv.x * right + uv.y * up + 1.45 * forward);\n    float3 linear = renderClouds(ro, rd, frag, time);\n    return float4(clamp(linear, float3(0.0), float3(1.0)), 1.0);\n}\n"
+      },
+      "resources": {},
+      "title": "Inline cloudy sky shader"
+    },
+    {
+      "executionState": "enabled",
+      "id": "render",
+      "kind": "render.metal",
+      "parameters": {},
+      "resources": {},
+      "title": "Metal shader · Cloudy sky"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.image",
+      "parameters": {
+        "filenamePrefix": "cloudy-sky",
+        "format": "png"
+      },
+      "resources": {},
+      "title": "Cloudy sky frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "loop",
+      "kind": "control.loop",
+      "parameters": {
+        "autoPause": false,
+        "delayMilliseconds": {
+          "$type": "integer",
+          "value": 0
+        },
+        "feedback": "none",
+        "limitHz": {
+          "$type": "integer",
+          "value": 30
+        },
+        "maxCalls": {
+          "$type": "integer",
+          "value": -1
+        },
+        "seedStrategy": "fixed"
+      },
+      "resources": {},
+      "title": "Continuous cloud drift"
+    },
+    {
+      "executionState": "enabled",
+      "id": "note",
+      "kind": "edit.markdownNote",
+      "parameters": {
+        "text": "# Cloudy Sky · Inline Metal Shader\nA blue sky and a drifting cloud bank under a warm sun. The shader generates its own smooth 3D noise because Metal Render has no texture channels. It marches only through the cloud layer, reduces fine detail in the distance, and composites shaded cloud samples with atmospheric haze. The shader is embedded in the Text node. JSON State advances time by 1/30 second per Loop call; Loop is capped at 30 Hz. Width and Height control full-screen preview and saved output."
+      },
+      "resources": {},
+      "title": "How it works"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 960
+        }
+      },
+      "resources": {},
+      "title": "Output width"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int-2",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 540
+        }
+      },
+      "resources": {},
+      "title": "Output height"
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "loop": {
+        "x": 1385,
+        "y": 502
+      },
+      "note": {
+        "x": 0,
+        "y": 892
+      },
+      "output": {
+        "x": 1375,
+        "y": 5
+      },
+      "primitive-int": {
+        "x": 268,
+        "y": 105
+      },
+      "primitive-int-2": {
+        "x": 265,
+        "y": 261
+      },
+      "render": {
+        "x": 570,
+        "y": 150
+      },
+      "shader-text": {
+        "x": 137,
+        "y": 417
+      },
+      "start": {
+        "x": 1382,
+        "y": 328
+      },
+      "state": {
+        "x": 0,
+        "y": 150
+      }
+    },
+    "nodeSizes": {
+      "note": {
+        "height": 260,
+        "width": 520
+      },
+      "render": {
+        "height": 700,
+        "width": 723
+      },
+      "shader-text": {
+        "height": 422,
+        "width": 355
+      }
+    },
+    "viewportOrigin": {
+      "x": -131.17647058823545,
+      "y": -55.294117647058926
+    },
+    "viewportScale": 0.68
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

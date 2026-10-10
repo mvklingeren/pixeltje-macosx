@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pixeltje Pipeline · FLUX.2 Klein 9B model setup</title>
+  <style>
+    :root { color-scheme: light dark; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    body { max-width: 780px; margin: 3rem auto; padding: 0 1.25rem; line-height: 1.55; }
+    h1 { line-height: 1.2; }
+    h2 { margin-top: 2rem; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    pre { overflow-x: auto; padding: 1rem; border-radius: .6rem; background: color-mix(in srgb, CanvasText 8%, Canvas); }
+    .note { padding: .8rem 1rem; border-left: 3px solid #5b8def; background: color-mix(in srgb, #5b8def 10%, Canvas); }
+  </style>
+</head>
+<body>
+  <h1>Set up FLUX.2 Klein 9B FP8</h1>
+  <p>Pixeltje Pipeline loads Core AI model packages from your Mac. The app download contains the
+    example workflows and conversion recipe, but no model weights. This guide builds the regular
+    1024 × 1024 package and, if you supply the adapter, the Real HD 2K variant.</p>
+
+  <h2>1. Prepare your Mac</h2>
+  <p>Use an Apple Silicon Mac with the macOS and Xcode versions required by this Pixeltje Pipeline
+    release. Install <a href="https://docs.astral.sh/uv/getting-started/installation/">uv</a>,
+    <a href="https://huggingface.co/docs/huggingface_hub/en/guides/cli">the Hugging Face CLI (<code>hf</code>)</a>,
+    and Git. Allow ample free disk space for the source checkpoints, intermediate exports, and final
+    packages. Keep the build workspace until both packages are complete.</p>
+  <p>Open the <a href="https://huggingface.co/black-forest-labs/FLUX.2-klein-9b-fp8">publisher's
+    9B FP8 page</a>, sign in, and accept its access conditions in your own account. Then authenticate
+    the CLI in Terminal:</p>
+  <pre><code>hf auth login</code></pre>
+  <p class="note">The 9B weights use the FLUX Non-Commercial License. Qwen3-8B-FP8 and the 4B VAE
+    are separate publisher downloads. The setup command obtains them directly from
+    <a href="https://huggingface.co/Qwen/Qwen3-8B-FP8">Qwen</a> and
+    <a href="https://huggingface.co/black-forest-labs/FLUX.2-klein-4B/tree/main/vae">Black Forest Labs</a>.
+    Pixeltje does not collect your Hugging Face token.</p>
+
+  <h2>2. Build the regular 9B package</h2>
+  <p>In Terminal, run the command bundled beside this guide. The example assumes the app is in
+    <code>/Applications</code>; use the app's actual path if you installed it elsewhere.</p>
+  <pre><code>"/Applications/Pixeltje Pipeline.app/Contents/Resources/ModelSetup/setup-flux2-klein-9b.command"</code></pre>
+  <p>The command clones the pinned Apple Core AI conversion tools, downloads only the required
+    publisher files, verifies the reviewed weight hashes, exports the components, and assembles a
+    self-contained package at <code>~/.pixeltje/models/FLUX.2-klein-9B-fp8-1024</code>. It does not
+    require <code>~/coreai-models</code>. To use other locations, pass <code>--workspace</code> and
+    <code>--model-library</code> with full directory paths. For help, pass <code>--help</code>.</p>
+
+  <h2>3. Optionally build the Real HD 2K variant</h2>
+  <p>Download <code>HighDetail.safetensors</code> yourself from the
+    <a href="https://civitai.com/models/2636697/real-hd-2k-sfwnsfw">Real HD 2K page</a>.
+    This example requires the reviewed file with SHA-256
+    <code>108c649190f0953852feb15dad3d8ef8821753814a386ae46006d6949f722616</code>.
+    Then run:</p>
+  <pre><code>"/Applications/Pixeltje Pipeline.app/Contents/Resources/ModelSetup/setup-flux2-klein-9b.command" \
+  --variant real-hd-2k --adapter "$HOME/Downloads/HighDetail.safetensors"</code></pre>
+  <p>This creates <code>~/.pixeltje/models/FLUX.2-klein-9B-fp8-1024-real-hd-2k</code> with the
+    adapter fused into the denoiser. The name “2K” belongs to the adapter; this workflow generates
+    at 1024 × 1024. Use <code>--variant both</code> with the same adapter to build both packages
+    together.</p>
+
+  <h2>4. Open a workflow</h2>
+  <p>In Pixeltje Pipeline, choose <strong>File → Show Example Workflows</strong> to see the
+    bundled examples in Finder. Then choose <strong>File → Open…</strong> in Pixeltje Pipeline and select either
+    <code>image_flux2_klein_text_to_image_9b_fp8_coreai.pixpipeline.json</code> or
+    <code>image_flux2_klein_text_to_image_9b_real_hd_2k_coreai.pixpipeline.json</code>.
+    Choose the matching directory above when the editor asks for a Model Package. Use
+    <strong>Save As…</strong> to save your edited copy outside the app bundle.</p>
+
+  <h2>What is stored where?</h2>
+  <p>The build workspace defaults to <code>~/Pixeltje Model Build</code>; it holds the Apple tools,
+    publisher checkpoints, and intermediate exports. The app reads only the final Core AI package
+    under <code>~/.pixeltje/models</code>. The workflows link to those packages; they never embed
+    model weights. You can back up or move a complete final package, then select its new directory
+    again in Pixeltje Pipeline.</p>
+  <p>Source: <a href="https://github.com/apple/coreai-models">Apple coreai-models</a>.
+    For build failures, keep the Terminal error text. Downloads can be retried; if an export is
+    reported as incomplete, move that intermediate export directory aside before retrying.</p>
+</body>
+</html>

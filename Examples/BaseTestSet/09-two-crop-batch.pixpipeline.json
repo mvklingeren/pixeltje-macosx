@@ -1,0 +1,251 @@
+{
+  "connections": [
+    {
+      "id": "source.image->left.image",
+      "input": {
+        "nodeID": "left",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "source",
+        "port": "image"
+      }
+    },
+    {
+      "id": "source.image->right.image",
+      "input": {
+        "nodeID": "right",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "source",
+        "port": "image"
+      }
+    },
+    {
+      "id": "right.image->invert.image",
+      "input": {
+        "nodeID": "invert",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "right",
+        "port": "image"
+      }
+    },
+    {
+      "id": "left.image->batch.imageA",
+      "input": {
+        "nodeID": "batch",
+        "port": "imageA"
+      },
+      "output": {
+        "nodeID": "left",
+        "port": "image"
+      }
+    },
+    {
+      "id": "invert.image->batch.imageB",
+      "input": {
+        "nodeID": "batch",
+        "port": "imageB"
+      },
+      "output": {
+        "nodeID": "invert",
+        "port": "image"
+      }
+    },
+    {
+      "id": "batch.image->select.image",
+      "input": {
+        "nodeID": "select",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "batch",
+        "port": "image"
+      }
+    },
+    {
+      "id": "select.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "select",
+        "port": "image"
+      }
+    }
+  ],
+  "exposedParameters": [
+    {
+      "defaultValue": {
+        "$type": "integer",
+        "value": 0
+      },
+      "id": "batch-index",
+      "label": "Batch index",
+      "maximum": 1,
+      "minimum": 0,
+      "target": {
+        "nodeID": "select",
+        "parameter": "batchIndex"
+      },
+      "valueType": "integer"
+    }
+  ],
+  "id": "org.pixeltje.examples.base-test-set.09-two-crop-batch",
+  "mode": "imageToImage",
+  "name": "Base Test Set 09 · Two Crop Batch",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "source",
+      "kind": "input.image",
+      "parameters": {
+        "sourceName": "test-card.png"
+      },
+      "resources": {},
+      "title": "Test card"
+    },
+    {
+      "executionState": "enabled",
+      "id": "left",
+      "kind": "image.crop",
+      "parameters": {
+        "height": {
+          "$type": "integer",
+          "value": 128
+        },
+        "width": {
+          "$type": "integer",
+          "value": 128
+        },
+        "x": {
+          "$type": "integer",
+          "value": 32
+        },
+        "y": {
+          "$type": "integer",
+          "value": 40
+        }
+      },
+      "resources": {},
+      "title": "Upper-left crop"
+    },
+    {
+      "executionState": "enabled",
+      "id": "right",
+      "kind": "image.crop",
+      "parameters": {
+        "height": {
+          "$type": "integer",
+          "value": 128
+        },
+        "width": {
+          "$type": "integer",
+          "value": 128
+        },
+        "x": {
+          "$type": "integer",
+          "value": 336
+        },
+        "y": {
+          "$type": "integer",
+          "value": 208
+        }
+      },
+      "resources": {},
+      "title": "Lower-right crop"
+    },
+    {
+      "executionState": "enabled",
+      "id": "invert",
+      "kind": "image.invert",
+      "parameters": {},
+      "resources": {},
+      "title": "Invert second crop"
+    },
+    {
+      "executionState": "enabled",
+      "id": "batch",
+      "kind": "image.batch",
+      "parameters": {},
+      "resources": {},
+      "title": "Two crops"
+    },
+    {
+      "executionState": "enabled",
+      "id": "select",
+      "kind": "image.fromBatch",
+      "parameters": {
+        "batchIndex": {
+          "$type": "integer",
+          "value": 0
+        },
+        "length": {
+          "$type": "integer",
+          "value": 1
+        }
+      },
+      "resources": {},
+      "title": "Select crop"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.image",
+      "parameters": {},
+      "resources": {},
+      "title": "Image result"
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "batch": {
+        "x": 720,
+        "y": 180
+      },
+      "invert": {
+        "x": 480,
+        "y": 340
+      },
+      "left": {
+        "x": 240,
+        "y": 40
+      },
+      "output": {
+        "x": 1200,
+        "y": 180
+      },
+      "right": {
+        "x": 240,
+        "y": 340
+      },
+      "select": {
+        "x": 960,
+        "y": 180
+      },
+      "source": {
+        "x": 0,
+        "y": 200
+      }
+    },
+    "nodeSizes": {},
+    "viewportOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "viewportScale": 0.8
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

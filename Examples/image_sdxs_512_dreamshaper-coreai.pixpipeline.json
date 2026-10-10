@@ -1,0 +1,221 @@
+{
+  "connections" : [
+    {
+      "id" : "prompt.prompt->generate.prompt",
+      "input" : {
+        "nodeID" : "generate",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed.seed->generate.seed",
+      "input" : {
+        "nodeID" : "generate",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate.image->output-preview.image",
+      "input" : {
+        "nodeID" : "output-preview",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "generate",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "output-preview.image->output.image",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "output-preview",
+        "port" : "image"
+      }
+    }
+  ],
+  "controlConnections" : [
+
+  ],
+  "exposedParameters" : [
+
+  ],
+  "id" : "org.pixeltje.pipeline.sdxs-512-dreamshaper-text-to-image",
+  "mode" : "textToImage",
+  "name" : "SDXS 512 DreamShaper — Prompt to Image",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "prompt",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "Scene of diablo game"
+      },
+      "resources" : {
+
+      },
+      "title" : "Prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed",
+      "kind" : "input.seed",
+      "parameters" : {
+        "mode" : "random",
+        "value" : {
+          "$type" : "integer",
+          "value" : 42
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate",
+      "kind" : "coreai.sdxsGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 0
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 512
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 1
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 512
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "bfeacb45c5d75f84fea181297319ac3ecb4174a575ea7e86b7253da25980c120",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "acc841490e1cad1df183b42144879c5c8dfe3062d34a3057b9558f301f05bf1e",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "6ea8c60c7d82cd85c1966124b2f472509ef617dd22f95d7d571a04903158ffd9",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "SDXS 512 Generate"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output",
+      "kind" : "output.image",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Image Output"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output-preview",
+      "kind" : "output.preview",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Image Preview"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "generate" : {
+        "x" : 360,
+        "y" : 120
+      },
+      "output" : {
+        "x" : 859,
+        "y" : 123
+      },
+      "output-preview" : {
+        "x" : 359,
+        "y" : 295
+      },
+      "prompt" : {
+        "x" : 40,
+        "y" : 120
+      },
+      "seed" : {
+        "x" : 40,
+        "y" : 400
+      }
+    },
+    "nodeSizes" : {
+      "output-preview" : {
+        "height" : 477,
+        "width" : 437
+      }
+    },
+    "viewportOrigin" : {
+      "x" : -39,
+      "y" : 97
+    },
+    "viewportScale" : 1
+  },
+  "primaryOutputNodeIDs" : [
+    "output"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

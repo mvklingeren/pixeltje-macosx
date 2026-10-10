@@ -1,0 +1,269 @@
+{
+  "connections": [
+    {
+      "id": "state.state->render.state",
+      "input": {
+        "nodeID": "render",
+        "port": "state"
+      },
+      "output": {
+        "nodeID": "state",
+        "port": "state"
+      }
+    },
+    {
+      "id": "render.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "render",
+        "port": "image"
+      }
+    },
+    {
+      "id": "primitive-int.value->render.width",
+      "input": {
+        "nodeID": "render",
+        "port": "width"
+      },
+      "output": {
+        "nodeID": "primitive-int",
+        "port": "value"
+      }
+    },
+    {
+      "id": "primitive-int-2.value->render.height",
+      "input": {
+        "nodeID": "render",
+        "port": "height"
+      },
+      "output": {
+        "nodeID": "primitive-int-2",
+        "port": "value"
+      }
+    },
+    {
+      "id": "shader-text.value->render.source",
+      "input": {
+        "nodeID": "render",
+        "port": "source"
+      },
+      "output": {
+        "nodeID": "shader-text",
+        "port": "value"
+      }
+    }
+  ],
+  "controlConnections": [
+    {
+      "id": "output.completed->loop.completed",
+      "input": {
+        "nodeID": "loop",
+        "port": "completed"
+      },
+      "output": {
+        "nodeID": "output",
+        "port": "completed"
+      }
+    },
+    {
+      "id": "loop.repeat->start.again",
+      "input": {
+        "nodeID": "start",
+        "port": "again"
+      },
+      "output": {
+        "nodeID": "loop",
+        "port": "repeat"
+      }
+    }
+  ],
+  "exposedParameters": [],
+  "id": "org.pixeltje.examples.halloween-shader-video-inline",
+  "mode": "generic",
+  "name": "Halloween Night · Metal Shader Movie",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "start",
+      "kind": "control.start",
+      "parameters": {},
+      "resources": {},
+      "title": "Start / Next Frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "state",
+      "kind": "input.state",
+      "parameters": {
+        "initialState": "{\n  \"version\": 1,\n  \"mode\": \"shader\",\n  \"fragmentFunction\": \"halloweenFragment\",\n  \"width\": 640,\n  \"height\": 360,\n  \"timeSeconds\": 0,\n  \"secondsPerFrame\": 0.03333333333333333\n}"
+      },
+      "resources": {},
+      "title": "Halloween movie clock"
+    },
+    {
+      "executionState": "enabled",
+      "id": "shader-text",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": "#include <metal_stdlib>\nusing namespace metal;\n\n// A six-second Halloween postcard: every shape and light is drawn here.\nstruct ShaderUniforms {\n    float4 resolutionTime;\n    float4 mouse;\n};\n\nconstant float PI = 3.14159265358979323846;\n\nfloat hash21(float2 p) {\n    return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);\n}\n\nfloat noise2(float2 p) {\n    float2 i = floor(p);\n    float2 f = fract(p);\n    f = f * f * (3.0 - 2.0 * f);\n    return mix(mix(hash21(i), hash21(i + float2(1.0, 0.0)), f.x),\n               mix(hash21(i + float2(0.0, 1.0)),\n                   hash21(i + float2(1.0, 1.0)), f.x), f.y);\n}\n\nfloat segmentDistance(float2 p, float2 a, float2 b) {\n    float2 v = b - a;\n    return length(p - (a + v * clamp(dot(p - a, v) / dot(v, v), 0.0, 1.0)));\n}\n\nfloat boxDistance(float2 p, float2 halfSize) {\n    float2 d = abs(p) - halfSize;\n    return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);\n}\n\nfloat webSilk(float2 p, float side, float time) {\n    // The left corner owns a broad web; the right is a smaller echo of it.\n    float webScale = side < 0.0 ? 1.28 : 0.70;\n    float2 q = (p - float2(side * 0.89, 0.51)) / webScale;\n    q.x *= -side;\n    if (q.x < 0.0 || q.y > 0.0) return 0.0;\n    float r = length(q);\n    if (r > 0.56 || r < 0.025) return 0.0;\n    float angle = atan2(-q.y, q.x);\n    if (angle > PI * 0.5) return 0.0;\n    float ray = r * abs(sin(angle * 16.0)) / 16.0;\n    float strand = 1.0 - smoothstep(0.0010, 0.0028, ray);\n    float sector = fract(angle * 16.0 / PI);\n    float scallop = 0.016 * sin(sector * PI);\n    float ring = abs(sin(PI * (r + scallop) / 0.073)) * 0.073 / PI;\n    float ringLine = (1.0 - smoothstep(0.0010, 0.0027, ring))\n                   * smoothstep(0.045, 0.075, r);\n    float glint = 0.65 + 0.35 * sin(2.2 * time + 12.0 * r + side);\n    return max(strand, ringLine) * glint;\n}\n\nfloat spiderShape(float2 p, float time) {\n    float sway = 0.012 * sin(1.8 * time);\n    float2 c = float2(-0.57 + sway, 0.18 + 0.035 * sin(1.35 * time));\n    float silkThread = 1.0 - smoothstep(0.001, 0.0028,\n        segmentDistance(p, float2(-0.57, 0.43), c + float2(0.0, 0.021)));\n    float body = 1.0 - smoothstep(0.96, 1.08,\n        length((p - c) / float2(0.025, 0.032)));\n    float head = 1.0 - smoothstep(0.92, 1.08,\n        length((p - c - float2(0.0, 0.030)) / float2(0.015, 0.014)));\n    float legs = 0.0;\n    for (int i = 0; i < 4; ++i) {\n        float y = 0.017 - float(i) * 0.011;\n        float reach = 0.048 - float(i) * 0.003;\n        for (int s = -1; s <= 1; s += 2) {\n            float side = float(s);\n            float2 a = c + float2(side * 0.012, y);\n            float2 b = c + float2(side * 0.030, y + 0.018 - 0.010 * float(i));\n            float2 d = c + float2(side * reach, y - 0.018);\n            float line = min(segmentDistance(p, a, b), segmentDistance(p, b, d));\n            legs = max(legs, 1.0 - smoothstep(0.0010, 0.0026, line));\n        }\n    }\n    return max(silkThread * 0.55, max(body, max(head, legs)));\n}\n\nfloat eyeShape(float2 q, float x) {\n    float y = q.y - 0.07;\n    float width = 0.16 * (0.21 - y) / 0.24;\n    float d = max(abs(q.x - x) - width, max(-0.03 - y, y - 0.21));\n    return 1.0 - smoothstep(-0.012, 0.012, d);\n}\n\nfloat lobeDistance(float2 q, float2 center, float2 radii) {\n    return length((q - center) / radii) - 1.0;\n}\n\nfloat3 drawPumpkin(float2 p, float2 center, float scale,\n                   float time, float seed, float3 under) {\n    float2 q = (p - center) / scale;\n    if (abs(q.x) > 2.2 || abs(q.y) > 2.2) return under;\n    float flicker = 0.82 + 0.13 * sin(time * 10.0 + seed * 4.0)\n                    + 0.05 * sin(time * 23.0 + seed);\n    float halo = exp(-dot(q / float2(1.30, 1.05),\n                          q / float2(1.30, 1.05)) * 2.0);\n    under += float3(0.24, 0.075, 0.008) * halo * flicker;\n\n    float stemLean = 0.04 + 0.13 * (q.y - 0.70);\n    float stem = 1.0 - smoothstep(-0.025, 0.025,\n        boxDistance(q - float2(stemLean, 0.76), float2(0.075, 0.24)));\n    under = mix(under, float3(0.20, 0.29, 0.075), stem);\n    float curl = 1.0 - smoothstep(0.020, 0.045,\n        segmentDistance(q, float2(0.08, 0.94), float2(0.34, 1.03)));\n    under = mix(under, float3(0.31, 0.39, 0.10), curl);\n\n    // Five uneven overlapping ribs give it shoulders, a stem dip and a\n    // flattened, tapered base instead of the outline of a round ball.\n    float d = lobeDistance(q, float2(0.00, -0.05), float2(0.43, 0.66));\n    d = min(d, lobeDistance(q, float2(-0.35, -0.07), float2(0.43, 0.70)));\n    d = min(d, lobeDistance(q, float2(0.34, -0.05), float2(0.44, 0.69)));\n    d = min(d, lobeDistance(q, float2(-0.66, -0.10), float2(0.33, 0.54)));\n    d = min(d, lobeDistance(q, float2(0.65, -0.09), float2(0.34, 0.55)));\n    float body = 1.0 - smoothstep(-0.018, 0.018, d);\n    float seam = exp(-pow((abs(q.x) - 0.25) / 0.042, 2.0))\n               + exp(-pow((abs(q.x) - 0.59) / 0.048, 2.0));\n    float bulge = exp(-pow(q.x / 0.22, 2.0))\n                + 0.65 * exp(-pow((abs(q.x) - 0.43) / 0.18, 2.0));\n    float shade = clamp(0.86 + 0.13 * q.y + 0.09 * bulge\n                        - 0.21 * seam - 0.25 * smoothstep(-0.22, 0.02, d),\n                        0.44, 1.15);\n    float3 orange = float3(0.94, 0.29, 0.045) * shade;\n    orange += float3(0.16, 0.044, 0.006) * exp(-pow((q.x + 0.32) * 3.0, 2.0));\n    orange *= 0.94 + 0.10 * noise2(q * 11.0 + seed);\n\n    float eyes = max(eyeShape(q, -0.31), eyeShape(q, 0.31));\n    float nose = eyeShape(q - float2(0.0, -0.18), 0.0) * 0.75;\n    float mouth = 1.0 - smoothstep(0.91, 1.04,\n        length((q - float2(0.0, -0.34)) / float2(0.55, 0.25)));\n    mouth *= 1.0 - smoothstep(-0.20, -0.15, q.y);\n    float teeth = 1.0 - smoothstep(-0.015, 0.015,\n        min(boxDistance(q - float2(-0.19, -0.30), float2(0.050, 0.09)),\n            boxDistance(q - float2(0.18, -0.39), float2(0.052, 0.075))));\n    mouth *= 1.0 - teeth;\n    float face = clamp(max(eyes, max(nose, mouth)), 0.0, 1.0);\n    orange = mix(orange, float3(1.0, 0.77, 0.20) * flicker, face);\n    orange += float3(0.28, 0.10, 0.0) * flicker *\n              exp(-9.0 * (q.x * q.x + (q.y + 0.12) * (q.y + 0.12)));\n    return mix(under, orange, body);\n}\n\nfloat3 drawCandy(float2 p, float time, float3 under) {\n    for (int i = 0; i < 18; ++i) {\n        float n = float(i);\n        float seed = hash21(float2(n, 4.7));\n        float speed = 0.095 + 0.060 * hash21(float2(n, 8.1));\n        float fall = fract(seed + time * speed);\n        float2 center = float2(-0.89 + 1.78 * hash21(float2(n, 13.2))\n                                  + 0.045 * sin(time * 1.3 + n),\n                               0.58 - 1.18 * fall);\n        float size = 0.014 + 0.012 * hash21(float2(n, 21.4));\n        float2 delta = p - center;\n        if (abs(delta.x) > 2.0 * size || abs(delta.y) > 2.0 * size)\n            continue;\n        float a = time * (0.8 + seed) + n;\n        float2 q = float2(cos(a) * delta.x + sin(a) * delta.y,\n                          -sin(a) * delta.x + cos(a) * delta.y) / size;\n        float mask;\n        float3 candy;\n        if (i % 3 == 0) {\n            float width = 0.50 * (1.0 - q.y);\n            float edge = max(abs(q.x) - width, max(-1.0 - q.y, q.y - 1.0));\n            mask = 1.0 - smoothstep(-0.08, 0.08, edge);\n            candy = q.y > 0.35 ? float3(1.0, 0.92, 0.71)\n                    : (q.y > -0.30 ? float3(1.0, 0.40, 0.08)\n                                     : float3(1.0, 0.78, 0.12));\n        } else {\n            float centerPiece = 1.0 - smoothstep(0.91, 1.05,\n                length(q / float2(0.57, 0.47)));\n            float wing = 1.0 - smoothstep(-0.05, 0.07,\n                max(0.55 - abs(q.x), max(abs(q.x) - 1.05,\n                    abs(q.y) - (0.43 - 0.21 * (abs(q.x) - 0.55)))));\n            mask = max(centerPiece, wing);\n            float stripe = 0.5 + 0.5 * cos(q.x * 12.0 + n);\n            candy = (i % 2 == 0 ? float3(0.99, 0.18, 0.43)\n                                : float3(0.37, 0.91, 0.70));\n            candy = mix(candy, float3(1.0, 0.91, 0.75), stripe * 0.30);\n            candy *= 0.76 + 0.20 * q.y;\n        }\n        under = mix(under, candy, mask * 0.95);\n    }\n    return under;\n}\n\nfloat3 halloweenScene(float2 p, float2 resolution, float time) {\n    float sky = smoothstep(-0.48, 0.48, p.y);\n    float3 color = mix(float3(0.16, 0.065, 0.20),\n                       float3(0.025, 0.033, 0.105), sky);\n    float cloud = noise2(float2(p.x * 3.0 + time * 0.028,\n                                p.y * 6.0)) * 0.07;\n    color += float3(0.30, 0.10, 0.28) * cloud;\n\n    // The moon blooms against the sky; three distant lightning bursts flare.\n    float moonD = length(p - float2(0.43, 0.25));\n    color += float3(0.23, 0.20, 0.30) * exp(-pow(moonD / 0.23, 2.0));\n    float moon = 1.0 - smoothstep(0.090, 0.097, moonD);\n    color = mix(color, float3(0.89, 0.83, 0.66), moon);\n    color -= float3(0.07, 0.055, 0.04) * moon\n             * exp(-pow(length((p - float2(0.40, 0.28)) / 0.033), 2.0));\n    float flash = 0.70 * exp(-pow((time - 1.14) / 0.075, 2.0));\n    flash += exp(-pow((time - 3.39) / 0.065, 2.0));\n    flash += 0.48 * exp(-pow((time - 3.54) / 0.055, 2.0));\n    flash += 0.82 * exp(-pow((time - 5.20) / 0.080, 2.0));\n    color += float3(0.30, 0.25, 0.43) * flash\n             * (0.48 + 0.52 * exp(-pow((p.x + 0.20) / 0.55, 2.0)));\n    float boltDistance = segmentDistance(p, float2(-0.17, 0.49), float2(-0.24, 0.30));\n    boltDistance = min(boltDistance,\n        segmentDistance(p, float2(-0.24, 0.30), float2(-0.15, 0.20)));\n    boltDistance = min(boltDistance,\n        segmentDistance(p, float2(-0.15, 0.20), float2(-0.20, 0.03)));\n    color += float3(0.31, 0.29, 0.53) * flash\n             * exp(-pow(boltDistance / 0.047, 2.0));\n    color = mix(color, float3(0.89, 0.85, 1.0),\n                (1.0 - smoothstep(0.002, 0.006, boltDistance)) * flash);\n\n    float2 starCell = floor((p + float2(0.92, 0.48)) * 50.0);\n    float2 starLocal = fract((p + float2(0.92, 0.48)) * 50.0) - 0.5;\n    float starSeed = hash21(starCell);\n    float star = (1.0 - smoothstep(0.012, 0.092, length(starLocal)))\n                 * step(0.972, starSeed) * (0.5 + 0.5 * sin(time * 2.0 + starSeed * 19.0));\n    color += float3(0.60, 0.68, 0.82) * star;\n\n    float hillY = -0.35 + 0.035 * sin(p.x * 6.0 + 0.5)\n                       + 0.020 * sin(p.x * 14.0);\n    float hill = 1.0 - smoothstep(hillY - 0.006, hillY + 0.006, p.y);\n    color = mix(color, float3(0.035, 0.048, 0.075), hill);\n    color += float3(0.11, 0.09, 0.17) * flash * hill;\n    float fog = exp(-pow((p.y + 0.33 - 0.022 * sin(p.x * 8.0 + time * 0.5)) / 0.10, 2.0));\n    color += float3(0.10, 0.064, 0.13) * fog * 0.32;\n\n    float silk = max(webSilk(p, -1.0, time), webSilk(p, 1.0, time));\n    color = mix(color, float3(0.66, 0.72, 0.77), silk * 0.79);\n    color = mix(color, float3(0.011, 0.012, 0.026), spiderShape(p, time));\n\n    color = drawPumpkin(p, float2(-0.47, -0.30), 0.20, time, 0.5, color);\n    color = drawPumpkin(p, float2(0.47, -0.30), 0.18, time, 1.8, color);\n    color = drawPumpkin(p, float2(0.00, -0.32), 0.29, time, 3.1, color);\n    color = drawCandy(p, time, color);\n\n    // Rising colored motes swell and blink, with tiny cross-shaped glints.\n    for (int i = 0; i < 32; ++i) {\n        float n = float(i);\n        float seed = hash21(float2(n, 51.0));\n        float rise = fract(hash21(float2(n, 76.0)) + time * (0.08 + 0.035 * seed));\n        float2 mote = float2(-0.79 + 1.58 * seed\n                            + 0.036 * sin(time * 1.7 + n * 2.2),\n                            -0.38 + 0.79 * rise);\n        float2 delta = p - mote;\n        if (abs(delta.x) > 0.065 || abs(delta.y) > 0.065) continue;\n        float d = length(delta);\n        float pulse = 0.48 + 0.52 * sin(time * 3.4 + n * 3.2);\n        float3 tint = i % 3 == 0 ? float3(0.44, 0.31, 0.92)\n                    : (i % 3 == 1 ? float3(1.0, 0.58, 0.13)\n                                  : float3(0.31, 0.88, 0.72));\n        color += tint * exp(-pow(d / 0.023, 2.0)) * pulse * 0.34;\n        color += tint * exp(-pow(d / 0.0045, 2.0)) * pulse * 0.79;\n        float cross = exp(-abs(delta.x) / 0.0022 - abs(delta.y) / 0.023)\n                    + exp(-abs(delta.y) / 0.0022 - abs(delta.x) / 0.023);\n        color += tint * cross * pulse * 0.23;\n    }\n    float2 vignetteUV = p / float2(resolution.x / resolution.y * 0.5, 0.5);\n    float vignette = 1.0 - 0.20 * smoothstep(0.35, 1.3, length(vignetteUV));\n    return clamp(color * vignette, float3(0.0), float3(1.0));\n}\n\nvertex float4 fullscreenVertex(uint vertexID [[vertex_id]]) {\n    float2 p = float2((vertexID << 1) & 2, vertexID & 2);\n    return float4(p * 2.0 - 1.0, 0.0, 1.0);\n}\n\nfragment float4 halloweenFragment(\n    float4 position [[position]], constant ShaderUniforms &uniforms [[buffer(0)]]) {\n    float2 resolution = uniforms.resolutionTime.xy;\n    float2 frag = float2(position.x, resolution.y - position.y);\n    float2 screen = (frag - 0.5 * resolution) / resolution.y;\n    return float4(halloweenScene(screen, resolution,\n                                 uniforms.resolutionTime.z), 1.0);\n}\n"
+      },
+      "resources": {},
+      "title": "Halloween Metal shader"
+    },
+    {
+      "executionState": "enabled",
+      "id": "render",
+      "kind": "render.metal",
+      "parameters": {},
+      "resources": {},
+      "title": "Metal shader · Halloween night"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.video",
+      "parameters": {
+        "filenamePrefix": "halloween-night",
+        "format": "mp4",
+        "codec": "h264",
+        "framesPerSecond": {
+          "$type": "number",
+          "value": 30
+        }
+      },
+      "resources": {},
+      "title": "Halloween movie · MP4"
+    },
+    {
+      "executionState": "enabled",
+      "id": "loop",
+      "kind": "control.loop",
+      "parameters": {
+        "autoPause": false,
+        "delayMilliseconds": {
+          "$type": "integer",
+          "value": 0
+        },
+        "feedback": "none",
+        "limitHz": {
+          "$type": "integer",
+          "value": 30
+        },
+        "maxCalls": {
+          "$type": "integer",
+          "value": 180
+        },
+        "seedStrategy": "fixed"
+      },
+      "resources": {},
+      "title": "180 frames · six seconds"
+    },
+    {
+      "executionState": "enabled",
+      "id": "note",
+      "kind": "edit.markdownNote",
+      "parameters": {
+        "text": "# Halloween Night · Inline Metal Shader Movie\nA six-second, 30 fps Halloween postcard. A large web fills the left corner and a smaller web balances the right; a spider hangs from the larger one. Three squat, unevenly ribbed jack-o-lanterns glow beneath falling wrapped candy and candy corn. Colored magic motes rise through the scene while distant lightning flashes several times. All artwork is generated by the Text node shader; no texture or model is required. JSON State advances time by 1/30 second per Loop call. The finite 180-call Loop feeds Video Output, which saves one 640 × 360 H.264 MP4."
+      },
+      "resources": {},
+      "title": "How it works"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 640
+        }
+      },
+      "resources": {},
+      "title": "Output width"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int-2",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 360
+        }
+      },
+      "resources": {},
+      "title": "Output height"
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "loop": {
+        "x": 1385,
+        "y": 502
+      },
+      "note": {
+        "x": 0,
+        "y": 892
+      },
+      "output": {
+        "x": 1282,
+        "y": 4
+      },
+      "primitive-int": {
+        "x": 268,
+        "y": 105
+      },
+      "primitive-int-2": {
+        "x": 265,
+        "y": 261
+      },
+      "render": {
+        "x": 570,
+        "y": 150
+      },
+      "shader-text": {
+        "x": 137,
+        "y": 417
+      },
+      "start": {
+        "x": 1382,
+        "y": 328
+      },
+      "state": {
+        "x": 0,
+        "y": 150
+      }
+    },
+    "nodeSizes": {
+      "note": {
+        "height": 260,
+        "width": 520
+      },
+      "render": {
+        "height": 700,
+        "width": 723
+      },
+      "shader-text": {
+        "height": 422,
+        "width": 355
+      }
+    },
+    "viewportOrigin": {
+      "x": -131.17647058823545,
+      "y": -55.294117647058926
+    },
+    "viewportScale": 0.68
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

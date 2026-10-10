@@ -1,0 +1,370 @@
+{
+  "connections" : [
+    {
+      "id" : "render.image->output.image",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "render",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "primitive-int.value->render.width",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "width"
+      },
+      "output" : {
+        "nodeID" : "primitive-int",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "primitive-int-2.value->render.height",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "height"
+      },
+      "output" : {
+        "nodeID" : "primitive-int-2",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "program-text.value->render.program",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "program"
+      },
+      "output" : {
+        "nodeID" : "program-text",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "parameters-text.value->render.parameters",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "parameters"
+      },
+      "output" : {
+        "nodeID" : "parameters-text",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "primitive-string.value->render.source",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "source"
+      },
+      "output" : {
+        "nodeID" : "primitive-string",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "shader-text.contents->primitive-string.value",
+      "input" : {
+        "nodeID" : "primitive-string",
+        "port" : "value"
+      },
+      "output" : {
+        "nodeID" : "shader-text",
+        "port" : "contents"
+      }
+    }
+  ],
+  "controlConnections" : [
+    {
+      "id" : "output.completed->loop.completed",
+      "input" : {
+        "nodeID" : "loop",
+        "port" : "completed"
+      },
+      "output" : {
+        "nodeID" : "output",
+        "port" : "completed"
+      }
+    },
+    {
+      "id" : "loop.repeat->start.again",
+      "input" : {
+        "nodeID" : "start",
+        "port" : "again"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "repeat"
+      }
+    }
+  ],
+  "exposedParameters" : [
+
+  ],
+  "id" : "org.pixeltje.examples.flurry-gpu-program-copy",
+  "mode" : "generic",
+  "name" : "Flurry · GPU Particle Program",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "start",
+      "kind" : "control.start",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Start \/ Next Frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "shader-text",
+      "kind" : "primitive.filePath",
+      "parameters" : {
+        "mode" : "relative",
+        "path" : "FlurryProgram.metal"
+      },
+      "resources" : {
+
+      },
+      "title" : "Metal file beside workflow"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "render",
+      "kind" : "gpu.program",
+      "parameters" : {
+        "framesPerSecond" : {
+          "$type" : "number",
+          "value" : 120
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 512
+        },
+        "seed" : {
+          "$type" : "integer",
+          "value" : 1
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "GPU Program · Flurry"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output",
+      "kind" : "output.image",
+      "parameters" : {
+        "filenamePrefix" : "flurry",
+        "format" : "png"
+      },
+      "resources" : {
+
+      },
+      "title" : "Flurry frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "loop",
+      "kind" : "control.loop",
+      "parameters" : {
+        "autoPause" : false,
+        "delayMilliseconds" : {
+          "$type" : "integer",
+          "value" : 0
+        },
+        "feedback" : "none",
+        "limitHz" : {
+          "$type" : "integer",
+          "value" : 60
+        },
+        "maxCalls" : {
+          "$type" : "integer",
+          "value" : -1
+        },
+        "seedStrategy" : "fixed"
+      },
+      "resources" : {
+
+      },
+      "title" : "Advance five smoke streams"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "note",
+      "kind" : "edit.markdownNote",
+      "parameters" : {
+        "text" : "# Flurry · Five coupled smoke streams\nThe generic GPU Program holds 3,600 smoke particles and a half-float frame history. A slow moving star emits two particles into each of five streams per 60 Hz frame. The star and five sparks are invisible guides: every particle is attracted to all sparks, with stronger attraction to its assigned spark. Its color comes from that spark at birth. Only soft motion-blurred smoke quads are drawn, then their light is added to the faded previous frame. A final pass maps the accumulated light to sRGB for Image Output. Width and Height control both rendering and saved images; changing either restarts the simulation. FlurryProgram.metal sits beside this workflow through the Source File port. This is an independently authored reconstruction informed by Calum Robinson’s public Flurry source."
+      },
+      "resources" : {
+
+      },
+      "title" : "How the effect is built"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 1440
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Output width"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int-2",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 900
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Output height"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "program-text",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "{\"version\":1,\"parameters\":[\"persistence\",\"brightness\",\"incohesion\",\"spread\"],\"resources\":[{\"name\":\"smoke\",\"kind\":\"buffer\",\"bytes\":230400},{\"name\":\"history\",\"kind\":\"texture\"},{\"name\":\"historyNext\",\"kind\":\"texture\"},{\"name\":\"display\",\"kind\":\"texture\"}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeSmoke\",\"threads\":[3600],\"buffers\":{\"1\":\"smoke\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceSmoke\",\"threads\":[3600],\"buffers\":{\"1\":\"smoke\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"fadeFragment\",\"target\":\"historyNext\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentTextures\":{\"1\":\"history\"}},{\"kind\":\"render\",\"vertex\":\"smokeVertex\",\"fragment\":\"smokeFragment\",\"target\":\"historyNext\",\"load\":\"load\",\"blend\":\"additive\",\"vertexCount\":6,\"instanceCount\":3600,\"vertexBuffers\":{\"1\":\"smoke\"}}],\"swaps\":[[\"history\",\"historyNext\"]],\"present\":[{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"presentFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentTextures\":{\"1\":\"history\"}}],\"output\":\"display\"}"
+      },
+      "resources" : {
+
+      },
+      "title" : "Bounded GPU passes and resources"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "parameters-text",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "{\"persistence\":0.94,\"brightness\":1.6,\"incohesion\":0.07,\"spread\":1.0}"
+      },
+      "resources" : {
+
+      },
+      "title" : "Trail, brightness, incohesion, spread"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-string",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : ""
+      },
+      "resources" : {
+
+      },
+      "title" : "Text"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "loop" : {
+        "x" : 1819,
+        "y" : 550
+      },
+      "note" : {
+        "x" : 81,
+        "y" : 732
+      },
+      "output" : {
+        "x" : 1819,
+        "y" : 217
+      },
+      "parameters-text" : {
+        "x" : 82,
+        "y" : 265
+      },
+      "primitive-int" : {
+        "x" : 766,
+        "y" : 159
+      },
+      "primitive-int-2" : {
+        "x" : 764,
+        "y" : 309
+      },
+      "primitive-string" : {
+        "x" : 519,
+        "y" : 487
+      },
+      "program-text" : {
+        "x" : 76,
+        "y" : 20
+      },
+      "render" : {
+        "x" : 1063,
+        "y" : 98
+      },
+      "shader-text" : {
+        "x" : 88,
+        "y" : 480
+      },
+      "start" : {
+        "x" : 1818,
+        "y" : 421
+      }
+    },
+    "nodeSizes" : {
+      "note" : {
+        "height" : 275,
+        "width" : 408
+      },
+      "parameters-text" : {
+        "height" : 165,
+        "width" : 400
+      },
+      "primitive-string" : {
+        "height" : 507,
+        "width" : 508
+      },
+      "program-text" : {
+        "height" : 229,
+        "width" : 674
+      },
+      "render" : {
+        "height" : 575,
+        "width" : 660
+      },
+      "shader-text" : {
+        "height" : 160,
+        "width" : 400
+      }
+    },
+    "viewportOrigin" : {
+      "x" : 594.6490611869754,
+      "y" : 111.49123339001414
+    },
+    "viewportScale" : 1.100372314453125
+  },
+  "primaryOutputNodeIDs" : [
+    "output"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

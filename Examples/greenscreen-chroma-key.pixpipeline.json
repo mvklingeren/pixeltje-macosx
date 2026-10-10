@@ -1,0 +1,607 @@
+{
+  "schemaVersion": 2,
+  "id": "org.pixeltje.examples.greenscreen-chroma-key",
+  "name": "Green Screen \u00b7 Video Chroma Key",
+  "mode": "generic",
+  "requirements": {
+    "minimumEngineVersion": 1,
+    "familyABIs": []
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "control.start",
+      "title": "Start / next frame",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    },
+    {
+      "id": "loop",
+      "kind": "control.loop",
+      "title": "Process all 1,070 frames",
+      "executionState": "enabled",
+      "parameters": {
+        "maxCalls": {
+          "$type": "integer",
+          "value": 1070
+        },
+        "delayMilliseconds": {
+          "$type": "integer",
+          "value": 0
+        },
+        "autoPause": false,
+        "seedStrategy": "fixed",
+        "feedback": "none"
+      },
+      "resources": {}
+    },
+    {
+      "id": "source",
+      "kind": "input.video",
+      "title": "Green screen source",
+      "executionState": "enabled",
+      "parameters": {
+        "sourceName": "greenscreen.mp4"
+      },
+      "resources": {}
+    },
+    {
+      "id": "video-preview",
+      "kind": "output.videoPreview",
+      "title": "Play source / emit frame",
+      "executionState": "enabled",
+      "parameters": {
+        "framesPerSecond": {
+          "$type": "number",
+          "value": 60
+        }
+      },
+      "resources": {}
+    },
+    {
+      "id": "scale",
+      "kind": "image.scaleBy",
+      "title": "Half-size processing",
+      "executionState": "enabled",
+      "parameters": {
+        "scaleBy": {
+          "$type": "number",
+          "value": 0.5
+        },
+        "upscaleMethod": "bicubic"
+      },
+      "resources": {}
+    },
+    {
+      "id": "red",
+      "kind": "mask.fromImage",
+      "title": "Red channel",
+      "executionState": "enabled",
+      "parameters": {
+        "channel": "red"
+      },
+      "resources": {}
+    },
+    {
+      "id": "blue",
+      "kind": "mask.fromImage",
+      "title": "Blue channel",
+      "executionState": "enabled",
+      "parameters": {
+        "channel": "blue"
+      },
+      "resources": {}
+    },
+    {
+      "id": "green",
+      "kind": "mask.fromImage",
+      "title": "Green channel",
+      "executionState": "enabled",
+      "parameters": {
+        "channel": "green"
+      },
+      "resources": {}
+    },
+    {
+      "id": "red-or-blue",
+      "kind": "mask.composite",
+      "title": "Max of red and blue",
+      "executionState": "enabled",
+      "parameters": {
+        "operation": "or"
+      },
+      "resources": {}
+    },
+    {
+      "id": "green-excess",
+      "kind": "mask.composite",
+      "title": "Green minus red/blue",
+      "executionState": "enabled",
+      "parameters": {
+        "operation": "subtract"
+      },
+      "resources": {}
+    },
+    {
+      "id": "key",
+      "kind": "mask.threshold",
+      "title": "Green-screen threshold",
+      "executionState": "enabled",
+      "parameters": {
+        "value": {
+          "$type": "number",
+          "value": 0.18
+        }
+      },
+      "resources": {}
+    },
+    {
+      "id": "soft-key",
+      "kind": "mask.feather",
+      "title": "Soften key edge",
+      "executionState": "enabled",
+      "parameters": {
+        "left": {
+          "$type": "integer",
+          "value": 2
+        },
+        "right": {
+          "$type": "integer",
+          "value": 2
+        },
+        "top": {
+          "$type": "integer",
+          "value": 2
+        },
+        "bottom": {
+          "$type": "integer",
+          "value": 2
+        }
+      },
+      "resources": {}
+    },
+    {
+      "id": "subject",
+      "kind": "mask.invert",
+      "title": "Keep subject",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    },
+    {
+      "id": "seed",
+      "kind": "input.seed",
+      "title": "Fixed background seed",
+      "executionState": "enabled",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 12026
+        }
+      },
+      "resources": {}
+    },
+    {
+      "id": "background",
+      "kind": "image.proceduralNoise",
+      "title": "Aurora replacement background",
+      "executionState": "enabled",
+      "parameters": {
+        "width": {
+          "$type": "integer",
+          "value": 540
+        },
+        "height": {
+          "$type": "integer",
+          "value": 960
+        },
+        "scale": {
+          "$type": "number",
+          "value": 5
+        },
+        "octaves": {
+          "$type": "integer",
+          "value": 4
+        },
+        "salt": {
+          "$type": "integer",
+          "value": 7
+        },
+        "pattern": "smooth",
+        "palette": "aurora"
+      },
+      "resources": {}
+    },
+    {
+      "id": "composite",
+      "kind": "image.compositeMasked",
+      "title": "Subject over new background",
+      "executionState": "enabled",
+      "parameters": {
+        "x": {
+          "$type": "integer",
+          "value": 0
+        },
+        "y": {
+          "$type": "integer",
+          "value": 0
+        },
+        "resizeSource": false
+      },
+      "resources": {}
+    },
+    {
+      "id": "preview",
+      "kind": "output.preview",
+      "title": "Processed frame preview",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    },
+    {
+      "id": "output",
+      "kind": "output.video",
+      "title": "Final chroma-key video",
+      "executionState": "enabled",
+      "parameters": {
+        "filenamePrefix": "greenscreen-keyed",
+        "format": "mp4",
+        "codec": "h264",
+        "framesPerSecond": {
+          "$type": "number",
+          "value": 60
+        }
+      },
+      "resources": {}
+    }
+  ],
+  "connections": [
+    {
+      "id": "source.video->video-preview.video",
+      "output": {
+        "nodeID": "source",
+        "port": "video"
+      },
+      "input": {
+        "nodeID": "video-preview",
+        "port": "video"
+      }
+    },
+    {
+      "id": "loop.callIndex->video-preview.frameIndex",
+      "output": {
+        "nodeID": "loop",
+        "port": "callIndex"
+      },
+      "input": {
+        "nodeID": "video-preview",
+        "port": "frameIndex"
+      }
+    },
+    {
+      "id": "video-preview.image->scale.image",
+      "output": {
+        "nodeID": "video-preview",
+        "port": "image"
+      },
+      "input": {
+        "nodeID": "scale",
+        "port": "image"
+      }
+    },
+    {
+      "id": "scale.image->red.image",
+      "output": {
+        "nodeID": "scale",
+        "port": "image"
+      },
+      "input": {
+        "nodeID": "red",
+        "port": "image"
+      }
+    },
+    {
+      "id": "scale.image->blue.image",
+      "output": {
+        "nodeID": "scale",
+        "port": "image"
+      },
+      "input": {
+        "nodeID": "blue",
+        "port": "image"
+      }
+    },
+    {
+      "id": "scale.image->green.image",
+      "output": {
+        "nodeID": "scale",
+        "port": "image"
+      },
+      "input": {
+        "nodeID": "green",
+        "port": "image"
+      }
+    },
+    {
+      "id": "red.mask->red-or-blue.destination",
+      "output": {
+        "nodeID": "red",
+        "port": "mask"
+      },
+      "input": {
+        "nodeID": "red-or-blue",
+        "port": "destination"
+      }
+    },
+    {
+      "id": "blue.mask->red-or-blue.source",
+      "output": {
+        "nodeID": "blue",
+        "port": "mask"
+      },
+      "input": {
+        "nodeID": "red-or-blue",
+        "port": "source"
+      }
+    },
+    {
+      "id": "green.mask->green-excess.destination",
+      "output": {
+        "nodeID": "green",
+        "port": "mask"
+      },
+      "input": {
+        "nodeID": "green-excess",
+        "port": "destination"
+      }
+    },
+    {
+      "id": "red-or-blue.mask->green-excess.source",
+      "output": {
+        "nodeID": "red-or-blue",
+        "port": "mask"
+      },
+      "input": {
+        "nodeID": "green-excess",
+        "port": "source"
+      }
+    },
+    {
+      "id": "green-excess.mask->key.mask",
+      "output": {
+        "nodeID": "green-excess",
+        "port": "mask"
+      },
+      "input": {
+        "nodeID": "key",
+        "port": "mask"
+      }
+    },
+    {
+      "id": "key.mask->soft-key.mask",
+      "output": {
+        "nodeID": "key",
+        "port": "mask"
+      },
+      "input": {
+        "nodeID": "soft-key",
+        "port": "mask"
+      }
+    },
+    {
+      "id": "soft-key.mask->subject.mask",
+      "output": {
+        "nodeID": "soft-key",
+        "port": "mask"
+      },
+      "input": {
+        "nodeID": "subject",
+        "port": "mask"
+      }
+    },
+    {
+      "id": "seed.seed->background.seed",
+      "output": {
+        "nodeID": "seed",
+        "port": "seed"
+      },
+      "input": {
+        "nodeID": "background",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "background.image->composite.destination",
+      "output": {
+        "nodeID": "background",
+        "port": "image"
+      },
+      "input": {
+        "nodeID": "composite",
+        "port": "destination"
+      }
+    },
+    {
+      "id": "scale.image->composite.source",
+      "output": {
+        "nodeID": "scale",
+        "port": "image"
+      },
+      "input": {
+        "nodeID": "composite",
+        "port": "source"
+      }
+    },
+    {
+      "id": "subject.mask->composite.mask",
+      "output": {
+        "nodeID": "subject",
+        "port": "mask"
+      },
+      "input": {
+        "nodeID": "composite",
+        "port": "mask"
+      }
+    },
+    {
+      "id": "composite.image->preview.image",
+      "output": {
+        "nodeID": "composite",
+        "port": "image"
+      },
+      "input": {
+        "nodeID": "preview",
+        "port": "image"
+      }
+    },
+    {
+      "id": "preview.image->output.image",
+      "output": {
+        "nodeID": "preview",
+        "port": "image"
+      },
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      }
+    }
+  ],
+  "controlConnections": [
+    {
+      "id": "output.completed->loop.completed",
+      "output": {
+        "nodeID": "output",
+        "port": "completed"
+      },
+      "input": {
+        "nodeID": "loop",
+        "port": "completed"
+      }
+    },
+    {
+      "id": "loop.repeat->start.again",
+      "output": {
+        "nodeID": "loop",
+        "port": "repeat"
+      },
+      "input": {
+        "nodeID": "start",
+        "port": "again"
+      }
+    }
+  ],
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "exposedParameters": [
+    {
+      "id": "key-threshold",
+      "label": "Green excess threshold",
+      "target": {
+        "nodeID": "key",
+        "parameter": "value"
+      },
+      "valueType": "number",
+      "defaultValue": {
+        "$type": "number",
+        "value": 0.18
+      },
+      "minimum": 0,
+      "maximum": 1
+    }
+  ],
+  "presentation": {
+    "nodePositions": {
+      "start": {
+        "x": 0,
+        "y": 0
+      },
+      "loop": {
+        "x": 0,
+        "y": 190
+      },
+      "source": {
+        "x": 270,
+        "y": 0
+      },
+      "video-preview": {
+        "x": 540,
+        "y": 0
+      },
+      "scale": {
+        "x": 900,
+        "y": 0
+      },
+      "red": {
+        "x": 1170,
+        "y": 0
+      },
+      "blue": {
+        "x": 1170,
+        "y": 160
+      },
+      "green": {
+        "x": 1170,
+        "y": 320
+      },
+      "red-or-blue": {
+        "x": 1440,
+        "y": 80
+      },
+      "green-excess": {
+        "x": 1710,
+        "y": 200
+      },
+      "key": {
+        "x": 1980,
+        "y": 200
+      },
+      "soft-key": {
+        "x": 2250,
+        "y": 200
+      },
+      "subject": {
+        "x": 2520,
+        "y": 200
+      },
+      "seed": {
+        "x": 1170,
+        "y": 500
+      },
+      "background": {
+        "x": 1440,
+        "y": 500
+      },
+      "composite": {
+        "x": 2790,
+        "y": 200
+      },
+      "preview": {
+        "x": 3060,
+        "y": 100
+      },
+      "output": {
+        "x": 3410,
+        "y": 120
+      }
+    },
+    "nodeSizes": {
+      "video-preview": {
+        "width": 320,
+        "height": 300
+      },
+      "preview": {
+        "width": 320,
+        "height": 300
+      }
+    },
+    "groups": [],
+    "viewportOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "viewportScale": 0.8
+  }
+}

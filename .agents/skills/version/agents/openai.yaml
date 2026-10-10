@@ -1,0 +1,4 @@
+interface:
+  display_name: "Version"
+  short_description: "Set the app release version consistently"
+  default_prompt: "Use $version to set the Pixeltje Mac release version."

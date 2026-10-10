@@ -1,0 +1,336 @@
+{
+  "connections": [
+    {
+      "id": "render.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "render",
+        "port": "image"
+      }
+    },
+    {
+      "id": "primitive-int.value->render.width",
+      "input": {
+        "nodeID": "render",
+        "port": "width"
+      },
+      "output": {
+        "nodeID": "primitive-int",
+        "port": "value"
+      }
+    },
+    {
+      "id": "primitive-int-2.value->render.height",
+      "input": {
+        "nodeID": "render",
+        "port": "height"
+      },
+      "output": {
+        "nodeID": "primitive-int-2",
+        "port": "value"
+      }
+    },
+    {
+      "id": "program-text.value->render.program",
+      "input": {
+        "nodeID": "render",
+        "port": "program"
+      },
+      "output": {
+        "nodeID": "program-text",
+        "port": "value"
+      }
+    },
+    {
+      "id": "shader-text.value->render.sourceFile",
+      "input": {
+        "nodeID": "render",
+        "port": "sourceFile"
+      },
+      "output": {
+        "nodeID": "shader-text",
+        "port": "value"
+      }
+    },
+    {
+      "id": "trackpad.x->render.pointerX",
+      "input": {
+        "nodeID": "render",
+        "port": "pointerX"
+      },
+      "output": {
+        "nodeID": "trackpad",
+        "port": "x"
+      }
+    },
+    {
+      "id": "trackpad.y->render.pointerY",
+      "input": {
+        "nodeID": "render",
+        "port": "pointerY"
+      },
+      "output": {
+        "nodeID": "trackpad",
+        "port": "y"
+      }
+    },
+    {
+      "id": "trackpad.actionCount->render.actionCount",
+      "input": {
+        "nodeID": "render",
+        "port": "actionCount"
+      },
+      "output": {
+        "nodeID": "trackpad",
+        "port": "actionCount"
+      }
+    }
+  ],
+  "controlConnections": [
+    {
+      "id": "output.completed->loop.completed",
+      "input": {
+        "nodeID": "loop",
+        "port": "completed"
+      },
+      "output": {
+        "nodeID": "output",
+        "port": "completed"
+      }
+    },
+    {
+      "id": "loop.repeat->start.again",
+      "input": {
+        "nodeID": "start",
+        "port": "again"
+      },
+      "output": {
+        "nodeID": "loop",
+        "port": "repeat"
+      }
+    }
+  ],
+  "exposedParameters": [],
+  "id": "org.pixeltje.examples.ashen-path-isometric-game",
+  "mode": "generic",
+  "name": "Ashen Path · Four Planes",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "start",
+      "kind": "control.start",
+      "parameters": {},
+      "resources": {},
+      "title": "Start / Next Frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "shader-text",
+      "kind": "primitive.filePath",
+      "parameters": {
+        "mode": "relative",
+        "path": "AshenPathProgram.metal"
+      },
+      "resources": {},
+      "title": "Game shader beside workflow"
+    },
+    {
+      "executionState": "enabled",
+      "id": "render",
+      "kind": "gpu.program",
+      "parameters": {
+        "framesPerSecond": {
+          "$type": "number",
+          "value": 60
+        },
+        "seed": {
+          "$type": "integer",
+          "value": 1
+        }
+      },
+      "resources": {},
+      "title": "GPU Program · Ashen Path"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.image",
+      "parameters": {
+        "filenamePrefix": "ashen-path",
+        "format": "png"
+      },
+      "resources": {},
+      "title": "Game frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "loop",
+      "kind": "control.loop",
+      "parameters": {
+        "autoPause": false,
+        "delayMilliseconds": {
+          "$type": "integer",
+          "value": 0
+        },
+        "feedback": "none",
+        "limitHz": {
+          "$type": "integer",
+          "value": 60
+        },
+        "maxCalls": {
+          "$type": "integer",
+          "value": -1
+        },
+        "seedStrategy": "fixed"
+      },
+      "resources": {},
+      "title": "Advance game world"
+    },
+    {
+      "executionState": "enabled",
+      "id": "note",
+      "kind": "edit.markdownNote",
+      "parameters": {
+        "text": "# Ashen Path · four connected planes\nRun the workflow. Click a revealed stone tile in the Trackpad to walk there. The adventurer follows a route across bridges; the camera follows them. New sections of the map appear as you explore, and explored tiles remain visible. Collect all seven gold coins across the four planes. The gold markers at the upper left show your progress. The horned creature guards the eastern plane. Approach it and click Action on the Trackpad, or press Space, to swing your sword. Three hits defeat it. The creature can hurt you; three empty hearts end the attempt. Collect every coin and defeat the creature to light the central portal. Stop and start Run to begin again. The GPU Program owns movement, explored tiles, coins, combat, and health between frames. Its program remains generic; AshenPathProgram.metal contains this example game. The 60 Hz Loop continues until Stop Loop."
+      },
+      "resources": {},
+      "title": "How to play"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 1280
+        }
+      },
+      "resources": {},
+      "title": "Output width"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int-2",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 800
+        }
+      },
+      "resources": {},
+      "title": "Output height"
+    },
+    {
+      "executionState": "enabled",
+      "id": "program-text",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": "{\"version\":1,\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":16384},{\"name\":\"display\",\"kind\":\"texture\"}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeGame\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceGame\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"present\":[{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"gameFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"}}],\"swaps\":[],\"output\":\"display\"}"
+      },
+      "resources": {},
+      "title": "Game state and render passes"
+    },
+    {
+      "executionState": "enabled",
+      "id": "trackpad",
+      "kind": "input.trackpad",
+      "parameters": {
+        "x": {
+          "$type": "number",
+          "value": 0.5
+        },
+        "y": {
+          "$type": "number",
+          "value": 0.5
+        }
+      },
+      "resources": {},
+      "title": "Move / Action (Space)"
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "loop": {
+        "x": 1820,
+        "y": 540
+      },
+      "note": {
+        "x": 80,
+        "y": 610
+      },
+      "output": {
+        "x": 1820,
+        "y": 210
+      },
+      "primitive-int": {
+        "x": 730,
+        "y": 130
+      },
+      "primitive-int-2": {
+        "x": 730,
+        "y": 280
+      },
+      "program-text": {
+        "x": 80,
+        "y": 30
+      },
+      "render": {
+        "x": 1085,
+        "y": 100
+      },
+      "shader-text": {
+        "x": 82,
+        "y": 325
+      },
+      "start": {
+        "x": 1820,
+        "y": 410
+      },
+      "trackpad": {
+        "x": 740,
+        "y": 470
+      }
+    },
+    "nodeSizes": {
+      "note": {
+        "width": 500,
+        "height": 440
+      },
+      "program-text": {
+        "width": 610,
+        "height": 225
+      },
+      "render": {
+        "width": 660,
+        "height": 575
+      },
+      "shader-text": {
+        "height": 160,
+        "width": 400
+      },
+      "trackpad": {
+        "width": 300,
+        "height": 360
+      }
+    },
+    "viewportOrigin": {
+      "x": 80,
+      "y": 15
+    },
+    "viewportScale": 0.9
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

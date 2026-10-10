@@ -1,0 +1,292 @@
+{
+  "connections": [
+    {
+      "id": "source.value->trim.string",
+      "input": {
+        "nodeID": "trim",
+        "port": "string"
+      },
+      "output": {
+        "nodeID": "source",
+        "port": "value"
+      }
+    },
+    {
+      "id": "trim.value->collapse.string",
+      "input": {
+        "nodeID": "collapse",
+        "port": "string"
+      },
+      "output": {
+        "nodeID": "trim",
+        "port": "value"
+      }
+    },
+    {
+      "id": "collapse.value->case.string",
+      "input": {
+        "nodeID": "case",
+        "port": "string"
+      },
+      "output": {
+        "nodeID": "collapse",
+        "port": "value"
+      }
+    },
+    {
+      "id": "case.value->contains.string",
+      "input": {
+        "nodeID": "contains",
+        "port": "string"
+      },
+      "output": {
+        "nodeID": "case",
+        "port": "value"
+      }
+    },
+    {
+      "id": "contains.result->switch.condition",
+      "input": {
+        "nodeID": "switch",
+        "port": "condition"
+      },
+      "output": {
+        "nodeID": "contains",
+        "port": "result"
+      }
+    },
+    {
+      "id": "case.value->switch.trueValue",
+      "input": {
+        "nodeID": "switch",
+        "port": "trueValue"
+      },
+      "output": {
+        "nodeID": "case",
+        "port": "value"
+      }
+    },
+    {
+      "id": "fallback.value->switch.falseValue",
+      "input": {
+        "nodeID": "switch",
+        "port": "falseValue"
+      },
+      "output": {
+        "nodeID": "fallback",
+        "port": "value"
+      }
+    },
+    {
+      "id": "switch.value->join.stringA",
+      "input": {
+        "nodeID": "join",
+        "port": "stringA"
+      },
+      "output": {
+        "nodeID": "switch",
+        "port": "value"
+      }
+    },
+    {
+      "id": "suffix.value->join.stringB",
+      "input": {
+        "nodeID": "join",
+        "port": "stringB"
+      },
+      "output": {
+        "nodeID": "suffix",
+        "port": "value"
+      }
+    },
+    {
+      "id": "join.value->output.text",
+      "input": {
+        "nodeID": "output",
+        "port": "text"
+      },
+      "output": {
+        "nodeID": "join",
+        "port": "value"
+      }
+    }
+  ],
+  "exposedParameters": [
+    {
+      "defaultValue": "  pipeline   test CARD  ",
+      "id": "source-text",
+      "label": "Source text",
+      "target": {
+        "nodeID": "source",
+        "parameter": "value"
+      },
+      "valueType": "string"
+    }
+  ],
+  "id": "org.pixeltje.examples.base-test-set.01-text-cleanup",
+  "mode": "generic",
+  "name": "Base Test Set 01 · Text Cleanup",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "source",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": "  pipeline   test CARD  "
+      },
+      "resources": {},
+      "title": "Source text"
+    },
+    {
+      "executionState": "enabled",
+      "id": "trim",
+      "kind": "text.trim",
+      "parameters": {
+        "mode": "Both"
+      },
+      "resources": {},
+      "title": "Trim spaces"
+    },
+    {
+      "executionState": "enabled",
+      "id": "collapse",
+      "kind": "text.regexReplace",
+      "parameters": {
+        "count": {
+          "$type": "integer",
+          "value": 0
+        },
+        "pattern": "\\s+",
+        "replacement": " "
+      },
+      "resources": {},
+      "title": "Collapse whitespace"
+    },
+    {
+      "executionState": "enabled",
+      "id": "case",
+      "kind": "text.changeCase",
+      "parameters": {
+        "mode": "Title Case"
+      },
+      "resources": {},
+      "title": "Title case"
+    },
+    {
+      "executionState": "enabled",
+      "id": "contains",
+      "kind": "text.contains",
+      "parameters": {
+        "caseSensitive": true,
+        "substring": "Test"
+      },
+      "resources": {},
+      "title": "Has Test"
+    },
+    {
+      "executionState": "enabled",
+      "id": "fallback",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": "No test label"
+      },
+      "resources": {},
+      "title": "Fallback"
+    },
+    {
+      "executionState": "enabled",
+      "id": "switch",
+      "kind": "logic.ifElse",
+      "parameters": {},
+      "resources": {},
+      "title": "Use title or fallback"
+    },
+    {
+      "executionState": "enabled",
+      "id": "suffix",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": " | ready"
+      },
+      "resources": {},
+      "title": "Status suffix"
+    },
+    {
+      "executionState": "enabled",
+      "id": "join",
+      "kind": "text.concatenate",
+      "parameters": {
+        "delimiter": ""
+      },
+      "resources": {},
+      "title": "Append status"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.text",
+      "parameters": {},
+      "resources": {},
+      "title": "Text result"
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "case": {
+        "x": 720,
+        "y": 120
+      },
+      "collapse": {
+        "x": 480,
+        "y": 120
+      },
+      "contains": {
+        "x": 960,
+        "y": 0
+      },
+      "fallback": {
+        "x": 960,
+        "y": 360
+      },
+      "join": {
+        "x": 1440,
+        "y": 120
+      },
+      "output": {
+        "x": 1680,
+        "y": 120
+      },
+      "source": {
+        "x": 0,
+        "y": 120
+      },
+      "suffix": {
+        "x": 1200,
+        "y": 360
+      },
+      "switch": {
+        "x": 1200,
+        "y": 120
+      },
+      "trim": {
+        "x": 240,
+        "y": 120
+      }
+    },
+    "nodeSizes": {},
+    "viewportOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "viewportScale": 0.8
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

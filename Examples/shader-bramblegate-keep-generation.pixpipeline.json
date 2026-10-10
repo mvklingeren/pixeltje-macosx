@@ -1,0 +1,1313 @@
+{
+  "connections" : [
+    {
+      "id" : "render.image->output.image",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "render",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "primitive-int.value->render.width",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "width"
+      },
+      "output" : {
+        "nodeID" : "primitive-int",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "primitive-int-2.value->render.height",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "height"
+      },
+      "output" : {
+        "nodeID" : "primitive-int-2",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "program-text.value->render.program",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "program"
+      },
+      "output" : {
+        "nodeID" : "program-text",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "shader-text.value->render.sourceFile",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "sourceFile"
+      },
+      "output" : {
+        "nodeID" : "shader-text",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "trackpad.x->render.pointerX",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "pointerX"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "x"
+      }
+    },
+    {
+      "id" : "trackpad.y->render.pointerY",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "pointerY"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "y"
+      }
+    },
+    {
+      "id" : "trackpad.actionCount->render.actionCount",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "actionCount"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "actionCount"
+      }
+    },
+    {
+      "id" : "game-settings.value->render.parameters",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "parameters"
+      },
+      "output" : {
+        "nodeID" : "game-settings",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "prompt-grass.prompt->generate-grass.prompt",
+      "input" : {
+        "nodeID" : "generate-grass",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-grass",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-grass.seed->generate-grass.seed",
+      "input" : {
+        "nodeID" : "generate-grass",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-grass",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate-grass.image->texture-cache.asset0",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset0"
+      },
+      "output" : {
+        "nodeID" : "generate-grass",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-cobble.prompt->generate-cobble.prompt",
+      "input" : {
+        "nodeID" : "generate-cobble",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-cobble",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-cobble.seed->generate-cobble.seed",
+      "input" : {
+        "nodeID" : "generate-cobble",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-cobble",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate-cobble.image->texture-cache.asset1",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset1"
+      },
+      "output" : {
+        "nodeID" : "generate-cobble",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-stone.prompt->generate-stone.prompt",
+      "input" : {
+        "nodeID" : "generate-stone",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-stone",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-stone.seed->generate-stone.seed",
+      "input" : {
+        "nodeID" : "generate-stone",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-stone",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate-stone.image->texture-cache.asset2",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset2"
+      },
+      "output" : {
+        "nodeID" : "generate-stone",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-roof.prompt->generate-roof.prompt",
+      "input" : {
+        "nodeID" : "generate-roof",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-roof",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-roof.seed->generate-roof.seed",
+      "input" : {
+        "nodeID" : "generate-roof",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-roof",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate-roof.image->texture-cache.asset3",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset3"
+      },
+      "output" : {
+        "nodeID" : "generate-roof",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-foliage.prompt->generate-foliage.prompt",
+      "input" : {
+        "nodeID" : "generate-foliage",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-foliage",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-foliage.seed->generate-foliage.seed",
+      "input" : {
+        "nodeID" : "generate-foliage",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-foliage",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate-foliage.image->texture-cache.asset4",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset4"
+      },
+      "output" : {
+        "nodeID" : "generate-foliage",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-wood.prompt->generate-wood.prompt",
+      "input" : {
+        "nodeID" : "generate-wood",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-wood",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-wood.seed->generate-wood.seed",
+      "input" : {
+        "nodeID" : "generate-wood",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-wood",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate-wood.image->texture-cache.asset5",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset5"
+      },
+      "output" : {
+        "nodeID" : "generate-wood",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-poster.prompt->generate-poster.prompt",
+      "input" : {
+        "nodeID" : "generate-poster",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-poster",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-poster.seed->generate-poster.seed",
+      "input" : {
+        "nodeID" : "generate-poster",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-poster",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate-poster.image->texture-cache.asset6",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset6"
+      },
+      "output" : {
+        "nodeID" : "generate-poster",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "texture-cache.assets->render.assets",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "assets"
+      },
+      "output" : {
+        "nodeID" : "texture-cache",
+        "port" : "assets"
+      }
+    }
+  ],
+  "controlConnections" : [
+    {
+      "id" : "output.completed->loop.completed",
+      "input" : {
+        "nodeID" : "loop",
+        "port" : "completed"
+      },
+      "output" : {
+        "nodeID" : "output",
+        "port" : "completed"
+      }
+    },
+    {
+      "id" : "loop.repeat->start.again",
+      "input" : {
+        "nodeID" : "start",
+        "port" : "again"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "repeat"
+      }
+    }
+  ],
+  "exposedParameters" : [],
+  "id" : "org.pixeltje.examples.bramblegate-keep-generation",
+  "mode" : "generic",
+  "name" : "Bramblegate Keep · Isometric Tower Defence · Generated Textures",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "start",
+      "kind" : "control.start",
+      "parameters" : {},
+      "resources" : {},
+      "title" : "Start \/ Next Frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "shader-text",
+      "kind" : "primitive.filePath",
+      "parameters" : {
+        "mode" : "relative",
+        "path" : "BramblegateKeepGenerationProgram.metal"
+      },
+      "resources" : {},
+      "title" : "Bramblegate Keep shader beside workflow"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "render",
+      "kind" : "gpu.program",
+      "parameters" : {
+        "framesPerSecond" : {
+          "$type" : "number",
+          "value" : 60
+        },
+        "seed" : {
+          "$type" : "integer",
+          "value" : 1
+        }
+      },
+      "resources" : {},
+      "title" : "GPU Program · Bramblegate Keep"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output",
+      "kind" : "output.image",
+      "parameters" : {
+        "filenamePrefix" : "bramblegate-keep",
+        "format" : "png"
+      },
+      "resources" : {},
+      "title" : "Game frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "loop",
+      "kind" : "control.loop",
+      "parameters" : {
+        "autoPause" : false,
+        "delayMilliseconds" : {
+          "$type" : "integer",
+          "value" : 0
+        },
+        "feedback" : "none",
+        "limitHz" : {
+          "$type" : "integer",
+          "value" : 60
+        },
+        "maxCalls" : {
+          "$type" : "integer",
+          "value" : -1
+        },
+        "seedStrategy" : "fixed"
+      },
+      "resources" : {},
+      "title" : "Advance the siege"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "note",
+      "kind" : "edit.markdownNote",
+      "parameters" : {
+        "text" : "# Bramblegate Keep · Generated textures\nAn isometric tower-defence game. Goblin scouts, hounds, armoured brutes, bats and finally the troll king march along a winding cobbled road across a diorama board towards Bramblegate Keep. Build archer, cannon and frost towers on the meadow beside the road, upgrade them twice, and hold the gate for ten waves. Archers are cheap and hit anything; cannon shells splash the ground and cut through armour but cannot hit bats; frost towers send out an ice pulse that slows and chills every foe near them. Kills pay gold, each cleared wave pays a bonus, and every foe that reaches the gate costs lives (a brute costs 2, the troll king 10). The board is ray-cast per pixel with an orthographic isometric camera: towers, trees, rocks, the keep and every foe are lit 3D shapes with soft shadows, standing on a board that sits like a model on a wooden table. On each Run, seven fixed-seed FLUX.2 Klein 4B Distilled jobs paint 1024 × 1024 images: meadow grass, cobblestones, castle stone, roof shingles, autumn foliage, oak planks and the title poster. The program box-filters the six materials once into a prefiltered atlas so they stay crisp at the small isometric scale; the grass and cobbles cover the board and road, the stone builds the towers, keep and board sides, the shingles roof them, the foliage clothes the trees, the planks make the table and the tower cards, and the poster fills the title screen. Asset Cache stores the seven images as named slots and previews each one as it becomes ready; the game starts after all seven are ready, and later frames reuse the bundle without running the model again. The cache keeps its images between Runs of the same workflow revision, so only the first Run (or a Run after editing the workflow or pressing Clear) generates them. The model package remains link-only; link the Klein nodes to the same 4B Distilled package as the bundled Klein example.\n\n**Controls.** The Trackpad is your mouse: drag its crosshair, or drag on the full-screen preview, to move the arrow cursor, and press Action or Space to click. Click a tower card at the bottom left (Archer 50, Cannon 80, Frost 65 gold, or Sell), then click a grass cell: the highlighted cell, a translucent preview and the range ring show what you will build, and the panel at the bottom right explains it. Click one of your towers to upgrade it (each tower has three levels; the panel shows the price), or pick Sell and click a tower to get 70% of its cost back. Between waves, CALL NOW starts the next wave early for bonus gold; the 1X\/2X button switches to double speed. Space starts the game from the title screen and starts a new game from the result screen.\n\n**Goal.** Survive all ten waves with at least one life left (you start with 20). The wave banner announces each wave and what it brings; wave 4 brings armour, waves 5, 7, 9 and 10 bring bats, and wave 10 the troll king. Your score counts kills, cleared waves and 100 points per life left at the end; the result screen shows your best score of the run.\n\n**Settings.** The Game settings JSON sets `startGold` (20–5000, default 150), `startLives` (1–99, default 20), `enemyHealth` (0.25–4, default 1; lower is easier), `breakSeconds` (3–120, default 15 seconds between waves) and `firstBreakSeconds` (5–300, default 30 seconds before the first wave). Changing a setting restarts the run."
+      },
+      "resources" : {},
+      "title" : "How to play"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 960
+        }
+      },
+      "resources" : {},
+      "title" : "Output width"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int-2",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 600
+        }
+      },
+      "resources" : {},
+      "title" : "Output height"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "program-text",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "{\"version\":1,\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":16384},{\"name\":\"display\",\"kind\":\"texture\"},{\"name\":\"atlas\",\"kind\":\"texture\"},{\"name\":\"grassTexture\",\"kind\":\"inputTexture\",\"input\":\"asset0\"},{\"name\":\"cobbleTexture\",\"kind\":\"inputTexture\",\"input\":\"asset1\"},{\"name\":\"stoneTexture\",\"kind\":\"inputTexture\",\"input\":\"asset2\"},{\"name\":\"roofTexture\",\"kind\":\"inputTexture\",\"input\":\"asset3\"},{\"name\":\"foliageTexture\",\"kind\":\"inputTexture\",\"input\":\"asset4\"},{\"name\":\"woodTexture\",\"kind\":\"inputTexture\",\"input\":\"asset5\"},{\"name\":\"posterTexture\",\"kind\":\"inputTexture\",\"input\":\"asset6\"}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeKeep\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"prepareAtlas\",\"threads\":[4096,4096],\"textures\":{\"1\":\"grassTexture\",\"2\":\"cobbleTexture\",\"3\":\"stoneTexture\",\"4\":\"roofTexture\",\"5\":\"foliageTexture\",\"6\":\"woodTexture\",\"7\":\"atlas\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceKeep\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"present\":[{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"keepFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"atlas\",\"2\":\"posterTexture\"}}],\"swaps\":[],\"output\":\"display\",\"parameters\":[\"startGold\",\"startLives\",\"enemyHealth\",\"breakSeconds\",\"firstBreakSeconds\"]}"
+      },
+      "resources" : {},
+      "title" : "Game state and render passes"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "trackpad",
+      "kind" : "input.trackpad",
+      "parameters" : {
+        "engaged" : false,
+        "engagedAtCall" : {
+          "$type" : "integer",
+          "value" : 0
+        },
+        "x" : {
+          "$type" : "number",
+          "value" : 0.5
+        },
+        "y" : {
+          "$type" : "number",
+          "value" : 0.5
+        }
+      },
+      "resources" : {},
+      "title" : "Move the cursor · Click (Action \/ Space)"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "game-settings",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "{\"startGold\":150,\"startLives\":20,\"enemyHealth\":1,\"breakSeconds\":15,\"firstBreakSeconds\":30}"
+      },
+      "resources" : {},
+      "title" : "Game settings (start gold, start lives, enemy health, break seconds, first break seconds)"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-grass",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless top-down photograph of a lush green autumn meadow lawn, short grass with scattered small fallen orange and yellow leaves and tiny clover, no horizon, soft even light, uniform texture filling the whole image, no objects, no shadows, no text"
+      },
+      "resources" : {},
+      "title" : "Meadow Grass prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-grass",
+      "kind" : "input.seed",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 51207
+        }
+      },
+      "resources" : {},
+      "title" : "Meadow Grass fixed seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-grass",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Meadow Grass · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-cobble",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless top-down photograph of an old cobblestone road made of many small rounded grey and brown cobbles, about thirty stones across the image, packed earth and moss in the joints, soft even light, uniform texture filling the whole image, no objects, no shadows, no text"
+      },
+      "resources" : {},
+      "title" : "Cobblestone Road prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-cobble",
+      "kind" : "input.seed",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 70411
+        }
+      },
+      "resources" : {},
+      "title" : "Cobblestone Road fixed seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-cobble",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Cobblestone Road · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-stone",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless front-view photograph of a medieval castle wall built from rough pale grey limestone blocks in regular courses with light mortar joints, about eight blocks across the image, no windows, no doors, no plants, soft even light, uniform texture filling the whole image, no objects, no shadows, no text"
+      },
+      "resources" : {},
+      "title" : "Castle Stone prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-stone",
+      "kind" : "input.seed",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 30318
+        }
+      },
+      "resources" : {},
+      "title" : "Castle Stone fixed seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-stone",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Castle Stone · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-roof",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless front-view photograph of weathered red clay roof shingles in neat overlapping horizontal rows, about twenty rows from top to bottom, no sky, no chimney, soft even light, uniform texture filling the whole image, no objects, no shadows, no text"
+      },
+      "resources" : {},
+      "title" : "Roof Shingles prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-roof",
+      "kind" : "input.seed",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 88123
+        }
+      },
+      "resources" : {},
+      "title" : "Roof Shingles fixed seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-roof",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Roof Shingles · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-foliage",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless close-up photograph of dense autumn tree foliage, overlapping orange, red and golden leaves filling the whole frame, no sky, no branches, no trunk, soft even light, uniform texture filling the whole image, no objects, no shadows, no text"
+      },
+      "resources" : {},
+      "title" : "Autumn Foliage prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-foliage",
+      "kind" : "input.seed",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 16009
+        }
+      },
+      "resources" : {},
+      "title" : "Autumn Foliage fixed seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-foliage",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Autumn Foliage · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-wood",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless front-view photograph of dark weathered oak planks running vertically, rich wood grain and a few small iron nails, soft even light, uniform texture filling the whole image, no objects, no shadows, no text"
+      },
+      "resources" : {},
+      "title" : "Oak Planks prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-wood",
+      "kind" : "input.seed",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 42042
+        }
+      },
+      "resources" : {},
+      "title" : "Oak Planks fixed seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-wood",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Oak Planks · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-poster",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "storybook fantasy painting of a small stone castle keep with red roofed round towers on a green hill in an autumn valley at golden sunset, a winding cobblestone road leads up to the castle gate, a horde of goblins with torches marches along the road in the distance, archers on the towers, warm glowing light, rich colours, painterly illustration, no text, no letters, no words, no logos"
+      },
+      "resources" : {},
+      "title" : "Title Poster prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-poster",
+      "kind" : "input.seed",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 20261005
+        }
+      },
+      "resources" : {},
+      "title" : "Title Poster fixed seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-poster",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Title Poster · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "texture-cache",
+      "kind" : "cache.assets",
+      "parameters" : {
+        "keepBetweenRuns" : true,
+        "slotCount" : {
+          "$type" : "integer",
+          "value" : 7
+        }
+      },
+      "resources" : {},
+      "title" : "Generated textures · run cache"
+    }
+  ],
+  "presentation" : {
+    "groups" : [],
+    "nodePositions" : {
+      "game-settings" : {
+        "x" : 80,
+        "y" : 500
+      },
+      "generate-cobble" : {
+        "x" : 805,
+        "y" : 1350
+      },
+      "generate-foliage" : {
+        "x" : 2245,
+        "y" : 1350
+      },
+      "generate-grass" : {
+        "x" : 325,
+        "y" : 1350
+      },
+      "generate-poster" : {
+        "x" : 3205,
+        "y" : 1350
+      },
+      "generate-roof" : {
+        "x" : 1765,
+        "y" : 1350
+      },
+      "generate-stone" : {
+        "x" : 1285,
+        "y" : 1350
+      },
+      "generate-wood" : {
+        "x" : 2725,
+        "y" : 1350
+      },
+      "loop" : {
+        "x" : 1840,
+        "y" : 480
+      },
+      "note" : {
+        "x" : 80,
+        "y" : 700
+      },
+      "output" : {
+        "x" : 1840,
+        "y" : 100
+      },
+      "primitive-int" : {
+        "x" : 740,
+        "y" : 60
+      },
+      "primitive-int-2" : {
+        "x" : 740,
+        "y" : 220
+      },
+      "program-text" : {
+        "x" : 80,
+        "y" : 40
+      },
+      "prompt-cobble" : {
+        "x" : 560,
+        "y" : 1300
+      },
+      "prompt-foliage" : {
+        "x" : 2000,
+        "y" : 1300
+      },
+      "prompt-grass" : {
+        "x" : 80,
+        "y" : 1300
+      },
+      "prompt-poster" : {
+        "x" : 2960,
+        "y" : 1300
+      },
+      "prompt-roof" : {
+        "x" : 1520,
+        "y" : 1300
+      },
+      "prompt-stone" : {
+        "x" : 1040,
+        "y" : 1300
+      },
+      "prompt-wood" : {
+        "x" : 2480,
+        "y" : 1300
+      },
+      "render" : {
+        "x" : 1120,
+        "y" : 60
+      },
+      "seed-cobble" : {
+        "x" : 560,
+        "y" : 1410
+      },
+      "seed-foliage" : {
+        "x" : 2000,
+        "y" : 1410
+      },
+      "seed-grass" : {
+        "x" : 80,
+        "y" : 1410
+      },
+      "seed-poster" : {
+        "x" : 2960,
+        "y" : 1410
+      },
+      "seed-roof" : {
+        "x" : 1520,
+        "y" : 1410
+      },
+      "seed-stone" : {
+        "x" : 1040,
+        "y" : 1410
+      },
+      "seed-wood" : {
+        "x" : 2480,
+        "y" : 1410
+      },
+      "shader-text" : {
+        "x" : 80,
+        "y" : 300
+      },
+      "start" : {
+        "x" : 1840,
+        "y" : 340
+      },
+      "texture-cache" : {
+        "x" : 1520,
+        "y" : 1640
+      },
+      "trackpad" : {
+        "x" : 740,
+        "y" : 400
+      }
+    },
+    "nodeSizes" : {
+      "game-settings" : {
+        "height" : 160,
+        "width" : 480
+      },
+      "note" : {
+        "height" : 580,
+        "width" : 640
+      },
+      "program-text" : {
+        "height" : 225,
+        "width" : 610
+      },
+      "render" : {
+        "height" : 700,
+        "width" : 652
+      },
+      "shader-text" : {
+        "height" : 160,
+        "width" : 400
+      },
+      "texture-cache" : {
+        "height" : 470,
+        "width" : 360
+      },
+      "trackpad" : {
+        "height" : 360,
+        "width" : 300
+      }
+    },
+    "viewportOrigin" : {
+      "x" : 40,
+      "y" : 20
+    },
+    "viewportScale" : 0.55
+  },
+  "primaryOutputNodeIDs" : [
+    "output"
+  ],
+  "requirements" : {
+    "familyABIs" : [],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

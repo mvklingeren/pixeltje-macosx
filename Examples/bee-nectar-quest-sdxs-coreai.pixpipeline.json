@@ -1,0 +1,1375 @@
+{
+  "schemaVersion": 2,
+  "id": "bee-nectar-quest-sdxs-qwen3-coreai",
+  "name": "Bee Nectar Quest · SDXS + JSON State",
+  "mode": "generic",
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "control.start",
+      "title": "Start / Next Turn",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    },
+    {
+      "id": "state",
+      "kind": "input.state",
+      "title": "Bee Game State",
+      "executionState": "enabled",
+      "parameters": {
+        "initialState": "{\n  \"version\": 3,\n  \"turn\": 0,\n  \"score\": 0,\n  \"location\": \"sunny nectar meadow\",\n  \"lastFlower\": \"\",\n  \"bee\": {\n    \"id\": \"bee_1\",\n    \"description\": \"one fluffy golden yellow bee with black stripes and translucent wings\",\n    \"action\": \"hovering above flowers, searching for nectar\"\n  },\n  \"entities\": {\n    \"poppy_1\": {\n      \"label\": \"red poppy flower\",\n      \"nectar\": true\n    },\n    \"sunflower_1\": {\n      \"label\": \"yellow sunflower\",\n      \"nectar\": true\n    },\n    \"lavender_1\": {\n      \"label\": \"purple lavender flower\",\n      \"nectar\": true\n    }\n  },\n  \"subjects\": [\n    \"red poppy flower\",\n    \"yellow sunflower\",\n    \"purple lavender flower\"\n  ],\n  \"visualStyle\": \"storybook illustration\",\n  \"lighting\": \"warm summer sunlight\",\n  \"entityIDsByLabel\": {\n    \"label:\": \"\",\n    \"label:red poppy flower\": \"poppy_1\",\n    \"label:yellow sunflower\": \"sunflower_1\",\n    \"label:purple lavender flower\": \"lavender_1\"\n  }\n}"
+      },
+      "resources": {}
+    },
+    {
+      "id": "previousFrame",
+      "kind": "input.previousFrame",
+      "title": "Previous Frame + Flower Masks",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    },
+    {
+      "id": "trackpad",
+      "kind": "input.trackpad",
+      "title": "Click Flowers to Collect Nectar",
+      "executionState": "enabled",
+      "parameters": {
+        "x": {
+          "$type": "number",
+          "value": 0.5
+        },
+        "y": {
+          "$type": "number",
+          "value": 0.5
+        }
+      },
+      "resources": {}
+    },
+    {
+      "id": "hitTest",
+      "kind": "mask.hitTest",
+      "title": "Flower Under the Pointer",
+      "executionState": "enabled",
+      "parameters": {
+        "coverageThreshold": {
+          "$type": "number",
+          "value": 0.5
+        },
+        "radiusPixels": {
+          "$type": "integer",
+          "value": 2
+        }
+      },
+      "resources": {}
+    },
+    {
+      "id": "loop",
+      "kind": "control.loop",
+      "title": "One Click = One Turn",
+      "executionState": "enabled",
+      "parameters": {
+        "maxCalls": {
+          "$type": "integer",
+          "value": -1
+        },
+        "delayMilliseconds": {
+          "$type": "integer",
+          "value": 0
+        },
+        "autoPause": true,
+        "feedback": "stateAndImage",
+        "seedStrategy": "increment"
+      },
+      "resources": {}
+    },
+    {
+      "id": "laterTurn",
+      "kind": "math.expression",
+      "title": "After Opening Frame?",
+      "executionState": "enabled",
+      "parameters": {
+        "expression": "a+0"
+      },
+      "resources": {}
+    },
+    {
+      "id": "false",
+      "kind": "primitive.boolean",
+      "title": "Opening Frame Has No Action",
+      "executionState": "enabled",
+      "parameters": {
+        "value": false
+      },
+      "resources": {}
+    },
+    {
+      "id": "flowerAction",
+      "kind": "logic.ifElse",
+      "title": "Committed Flower Click",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    },
+    {
+      "id": "readScore",
+      "kind": "text.jsonExtract",
+      "title": "Current Nectar Score",
+      "executionState": "enabled",
+      "parameters": {
+        "key": "score"
+      },
+      "resources": {}
+    },
+    {
+      "id": "plusPoint",
+      "kind": "math.expression",
+      "title": "Add One Nectar Point",
+      "executionState": "enabled",
+      "parameters": {
+        "expression": "a+1"
+      },
+      "resources": {}
+    },
+    {
+      "id": "nextScore",
+      "kind": "logic.ifElse",
+      "title": "Hit Adds One; Miss Keeps Score",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    },
+    {
+      "id": "writeScore",
+      "kind": "text.jsonExtract",
+      "title": "Write Nectar Score",
+      "executionState": "enabled",
+      "parameters": {
+        "key": "score"
+      },
+      "resources": {}
+    },
+    {
+      "id": "readTurn",
+      "kind": "text.jsonExtract",
+      "title": "Current Turn",
+      "executionState": "enabled",
+      "parameters": {
+        "key": "turn"
+      },
+      "resources": {}
+    },
+    {
+      "id": "plusTurn",
+      "kind": "math.expression",
+      "title": "Advance One Turn",
+      "executionState": "enabled",
+      "parameters": {
+        "expression": "a+1"
+      },
+      "resources": {}
+    },
+    {
+      "id": "nextTurn",
+      "kind": "logic.ifElse",
+      "title": "Opening Frame Keeps Turn Zero",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    },
+    {
+      "id": "writeTurn",
+      "kind": "text.jsonExtract",
+      "title": "Write Turn",
+      "executionState": "enabled",
+      "parameters": {
+        "key": "turn"
+      },
+      "resources": {}
+    },
+    {
+      "id": "readFlower",
+      "kind": "text.jsonExtract",
+      "title": "Previous Flower ID",
+      "executionState": "enabled",
+      "parameters": {
+        "key": "lastFlower"
+      },
+      "resources": {}
+    },
+    {
+      "id": "flowerIDs",
+      "kind": "text.jsonExtract",
+      "title": "Flower Identities from State",
+      "executionState": "enabled",
+      "parameters": {
+        "key": "entityIDsByLabel"
+      },
+      "resources": {}
+    },
+    {
+      "id": "flowerKey",
+      "kind": "text.concatenate",
+      "title": "Look Up the Mask Label",
+      "executionState": "enabled",
+      "parameters": {
+        "stringA": "label:",
+        "delimiter": ""
+      },
+      "resources": {}
+    },
+    {
+      "id": "flowerID",
+      "kind": "text.jsonExtract",
+      "title": "Resolve Stable Flower Identity",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    },
+    {
+      "id": "nextFlower",
+      "kind": "logic.ifElse",
+      "title": "Keep Stable Flower Identity",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    },
+    {
+      "id": "writeFlower",
+      "kind": "text.jsonExtract",
+      "title": "Next Bee Game State",
+      "executionState": "enabled",
+      "parameters": {
+        "key": "lastFlower"
+      },
+      "resources": {}
+    },
+    {
+      "id": "directorRequest",
+      "kind": "text.concatenate",
+      "title": "Direct the Bee from State",
+      "executionState": "enabled",
+      "parameters": {
+        "stringA": "Describe the setting and composition for this updated state. State:",
+        "delimiter": "\n"
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "director",
+      "kind": "coreai.textGenerate",
+      "parameters": {
+        "maxTokens": {
+          "$type": "integer",
+          "value": 40
+        },
+        "systemPrompt": "Describe only the scene setting, visual style, lighting and flower background from the JSON state, in at most 18 words. Choose the framing and composition. The bee appearance and action are supplied separately, so do not describe the bee or invent an action. Return only image-prompt context, without IDs, JSON, scores, counters, captions or explanations. /no_think",
+        "temperature": {
+          "$type": "number",
+          "value": 0.2
+        },
+        "topK": {
+          "$type": "integer",
+          "value": 40
+        }
+      },
+      "resources": {
+        "manifest": {
+          "reference": {
+            "componentRole": "languageModelManifest",
+            "contentHash": "4ddc5300b4b5062b386e3ce2e4c46705f5dbbb0447d998a35b6b5c648836ad9d",
+            "familyABI": "coreai-language-model@1",
+            "kind": "data",
+            "packageID": "coreai.qwen-qwen3-0-6b",
+            "packageVersion": "sha256.5721a1598e0ae574cc315a78148820f4466ea3db46964614e25d9583f6af6dce"
+          },
+          "state": "linked"
+        },
+        "model": {
+          "reference": {
+            "componentRole": "languageModel",
+            "contentHash": "6495d7dcf2b0027b81602481dc8ba8c8fc3f6a87b8938a088f33a2e04e421604",
+            "familyABI": "coreai-language-model@1",
+            "kind": "coreAIModel",
+            "packageID": "coreai.qwen-qwen3-0-6b",
+            "packageVersion": "sha256.5721a1598e0ae574cc315a78148820f4466ea3db46964614e25d9583f6af6dce"
+          },
+          "state": "linked"
+        },
+        "tokenizer": {
+          "reference": {
+            "componentRole": "tokenizer",
+            "contentHash": "094ac736e86dc9173a6349cb5009ca5f807f01ca2745af05b20fffe5608df7a9",
+            "familyABI": "coreai-language-model@1",
+            "kind": "tokenizer",
+            "packageID": "coreai.qwen-qwen3-0-6b",
+            "packageVersion": "sha256.5721a1598e0ae574cc315a78148820f4466ea3db46964614e25d9583f6af6dce"
+          },
+          "state": "linked"
+        }
+      },
+      "title": "Qwen3 Scene Composition Director"
+    },
+    {
+      "id": "seed",
+      "kind": "input.seed",
+      "title": "Base Seed · Advances Each Turn",
+      "executionState": "enabled",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 417
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate",
+      "kind": "coreai.sdxsGenerate",
+      "parameters": {
+        "guidance": {
+          "$type": "number",
+          "value": 0
+        },
+        "height": {
+          "$type": "integer",
+          "value": 512
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 1
+        },
+        "width": {
+          "$type": "integer",
+          "value": 512
+        }
+      },
+      "resources": {
+        "denoiser": {
+          "reference": {
+            "componentRole": "denoiser",
+            "contentHash": "bfeacb45c5d75f84fea181297319ac3ecb4174a575ea7e86b7253da25980c120",
+            "familyABI": "sdxs-512-dreamshaper-coreai@1",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion": "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state": "linked"
+        },
+        "textEncoder": {
+          "reference": {
+            "componentRole": "textEncoder",
+            "contentHash": "acc841490e1cad1df183b42144879c5c8dfe3062d34a3057b9558f301f05bf1e",
+            "familyABI": "sdxs-512-dreamshaper-coreai@1",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion": "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state": "linked"
+        },
+        "vaeDecoder": {
+          "reference": {
+            "componentRole": "vae",
+            "contentHash": "6ea8c60c7d82cd85c1966124b2f472509ef617dd22f95d7d571a04903158ffd9",
+            "familyABI": "sdxs-512-dreamshaper-coreai@1",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion": "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state": "linked"
+        }
+      },
+      "title": "SDXS 512 Generate"
+    },
+    {
+      "id": "subjects",
+      "kind": "text.jsonExtract",
+      "title": "Flower Queries from State",
+      "executionState": "enabled",
+      "parameters": {
+        "key": "subjects"
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "sam31",
+      "kind": "coreai.sam31Select",
+      "parameters": {
+        "maskThreshold": {
+          "$type": "number",
+          "value": 0.5
+        },
+        "maxSegments": {
+          "$type": "integer",
+          "value": 8
+        },
+        "scoreThreshold": {
+          "$type": "number",
+          "value": 0.4
+        }
+      },
+      "resources": {
+        "model": {
+          "reference": {
+            "componentRole": "detector",
+            "contentHash": "e41c0a848dcd286d180386edb5a6a998650255f2d65eadd7327413c57da2962d",
+            "kind": "coreAIModel",
+            "packageID": "coreai.meta.sam3.1-image-selection",
+            "packageVersion": "facebook-sam3.1-daa63191845a-coreai-fp16"
+          },
+          "state": "linked"
+        },
+        "tokenizer": {
+          "reference": {
+            "componentRole": "tokenizer",
+            "contentHash": "6d9109cc838977f3ca94a379eec36aecc7c807e1785cd729660ca2fc0171fb35",
+            "kind": "tokenizer",
+            "packageID": "coreai.meta.sam3.1-image-selection",
+            "packageVersion": "facebook-sam3.1-daa63191845a-coreai-fp16"
+          },
+          "state": "linked"
+        }
+      },
+      "title": "Segment This Frame’s Flowers"
+    },
+    {
+      "id": "output",
+      "kind": "output.image",
+      "title": "Commit Image + State + Flower Masks",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    },
+    {
+      "id": "preview",
+      "kind": "output.preview",
+      "title": "Bee Meadow",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    },
+    {
+      "id": "notes",
+      "kind": "edit.markdownNote",
+      "title": "How to Play",
+      "executionState": "enabled",
+      "parameters": {
+        "text": "# Bee nectar quest\nRun once to open the meadow. The Trackpad shows the actual image. Click or drag onto a highlighted flower, then release: one turn runs and a flower hit adds **one nectar point**. A click on empty space keeps the score. The opening frame never scores. Repeat clicks can collect more nectar.\n\nThe JSON State inspector shows `score`, `turn`, and `lastFlower`. Stop Loop finishes the current turn. Run continues the committed state; Reset State starts over. Load State restores a `.state.json` checkpoint and Run recreates the scene. Every completed PNG has state and turn-journal sidecars.\n\nSDXS renders the complete scene each turn; flower placement can change. SAM masks describe the displayed frame. Missing flowers cannot score. The initial JSON state defines the location, visual style, lighting, bee appearance and flower entities. A flower hit writes `bee.action` from the actual mask label. The prompt starts with the state-owned bee appearance and action; Qwen supplies compact scene context and composition. The render seed advances each turn. There is no fixed flower placement. Swift graph nodes own scoring and actions.\n\nTo change the scene, edit the JSON State node while stopped, then Reset State and Run. Keep `subjects` and `entityIDsByLabel` consistent with the entity labels. The `label:` entry represents no flower; every other mapping key is `label:` followed by its exact SAM query. Rebuild the app and Reset State after reloading this version if your current session came from the old workflow. The inspector lists detected subjects; only detected flowers can score.\n\nRelink the SDXS, Qwen3 no-thinking and SAM 3.1 Core AI packages if requested."
+      },
+      "resources": {}
+    },
+    {
+      "id": "readBeeAction",
+      "kind": "text.jsonExtract",
+      "title": "Current Bee Action",
+      "executionState": "enabled",
+      "parameters": {
+        "key": "/bee/action"
+      },
+      "resources": {}
+    },
+    {
+      "id": "collectAction",
+      "kind": "text.concatenate",
+      "title": "Flower Click Becomes a Bee Action",
+      "executionState": "enabled",
+      "parameters": {
+        "stringA": "collecting nectar from ",
+        "delimiter": ""
+      },
+      "resources": {}
+    },
+    {
+      "id": "nextAction",
+      "kind": "logic.ifElse",
+      "title": "Hit Changes Action; Miss Keeps Action",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    },
+    {
+      "id": "writeAction",
+      "kind": "text.jsonExtract",
+      "title": "Commit the Bee Action",
+      "executionState": "enabled",
+      "parameters": {
+        "key": "/bee/action"
+      },
+      "resources": {}
+    },
+    {
+      "id": "readBeeDescription",
+      "kind": "text.jsonExtract",
+      "title": "Bee Appearance from State",
+      "executionState": "enabled",
+      "parameters": {
+        "key": "/bee/description"
+      },
+      "resources": {}
+    },
+    {
+      "id": "beeActionPrompt",
+      "kind": "text.concatenate",
+      "title": "Authoritative Bee + Action",
+      "executionState": "enabled",
+      "parameters": {
+        "delimiter": " "
+      },
+      "resources": {}
+    },
+    {
+      "id": "renderPrompt",
+      "kind": "text.concatenate",
+      "title": "Bee Action First, Scene Context Second",
+      "executionState": "enabled",
+      "parameters": {
+        "delimiter": ", "
+      },
+      "resources": {}
+    }
+  ],
+  "connections": [
+    {
+      "output": {
+        "nodeID": "trackpad",
+        "port": "x"
+      },
+      "input": {
+        "nodeID": "hitTest",
+        "port": "x"
+      },
+      "id": "trackpad.x->hitTest.x"
+    },
+    {
+      "output": {
+        "nodeID": "trackpad",
+        "port": "y"
+      },
+      "input": {
+        "nodeID": "hitTest",
+        "port": "y"
+      },
+      "id": "trackpad.y->hitTest.y"
+    },
+    {
+      "output": {
+        "nodeID": "previousFrame",
+        "port": "masks"
+      },
+      "input": {
+        "nodeID": "hitTest",
+        "port": "masks"
+      },
+      "id": "previousFrame.masks->hitTest.masks"
+    },
+    {
+      "output": {
+        "nodeID": "loop",
+        "port": "callIndex"
+      },
+      "input": {
+        "nodeID": "laterTurn",
+        "port": "a"
+      },
+      "id": "loop.callIndex->laterTurn.a"
+    },
+    {
+      "output": {
+        "nodeID": "laterTurn",
+        "port": "boolean"
+      },
+      "input": {
+        "nodeID": "flowerAction",
+        "port": "condition"
+      },
+      "id": "laterTurn.boolean->flowerAction.condition"
+    },
+    {
+      "output": {
+        "nodeID": "false",
+        "port": "value"
+      },
+      "input": {
+        "nodeID": "flowerAction",
+        "port": "falseValue"
+      },
+      "id": "false.value->flowerAction.falseValue"
+    },
+    {
+      "output": {
+        "nodeID": "hitTest",
+        "port": "found"
+      },
+      "input": {
+        "nodeID": "flowerAction",
+        "port": "trueValue"
+      },
+      "id": "hitTest.found->flowerAction.trueValue"
+    },
+    {
+      "output": {
+        "nodeID": "state",
+        "port": "state"
+      },
+      "input": {
+        "nodeID": "readScore",
+        "port": "json"
+      },
+      "id": "state.state->readScore.json"
+    },
+    {
+      "output": {
+        "nodeID": "readScore",
+        "port": "number"
+      },
+      "input": {
+        "nodeID": "plusPoint",
+        "port": "a"
+      },
+      "id": "readScore.number->plusPoint.a"
+    },
+    {
+      "output": {
+        "nodeID": "flowerAction",
+        "port": "value"
+      },
+      "input": {
+        "nodeID": "nextScore",
+        "port": "condition"
+      },
+      "id": "flowerAction.value->nextScore.condition"
+    },
+    {
+      "output": {
+        "nodeID": "readScore",
+        "port": "number"
+      },
+      "input": {
+        "nodeID": "nextScore",
+        "port": "falseValue"
+      },
+      "id": "readScore.number->nextScore.falseValue"
+    },
+    {
+      "output": {
+        "nodeID": "plusPoint",
+        "port": "number"
+      },
+      "input": {
+        "nodeID": "nextScore",
+        "port": "trueValue"
+      },
+      "id": "plusPoint.number->nextScore.trueValue"
+    },
+    {
+      "output": {
+        "nodeID": "state",
+        "port": "state"
+      },
+      "input": {
+        "nodeID": "writeScore",
+        "port": "json"
+      },
+      "id": "state.state->writeScore.json"
+    },
+    {
+      "output": {
+        "nodeID": "nextScore",
+        "port": "value"
+      },
+      "input": {
+        "nodeID": "writeScore",
+        "port": "setValue"
+      },
+      "id": "nextScore.value->writeScore.setValue"
+    },
+    {
+      "output": {
+        "nodeID": "state",
+        "port": "state"
+      },
+      "input": {
+        "nodeID": "readTurn",
+        "port": "json"
+      },
+      "id": "state.state->readTurn.json"
+    },
+    {
+      "output": {
+        "nodeID": "readTurn",
+        "port": "number"
+      },
+      "input": {
+        "nodeID": "plusTurn",
+        "port": "a"
+      },
+      "id": "readTurn.number->plusTurn.a"
+    },
+    {
+      "output": {
+        "nodeID": "laterTurn",
+        "port": "boolean"
+      },
+      "input": {
+        "nodeID": "nextTurn",
+        "port": "condition"
+      },
+      "id": "laterTurn.boolean->nextTurn.condition"
+    },
+    {
+      "output": {
+        "nodeID": "readTurn",
+        "port": "number"
+      },
+      "input": {
+        "nodeID": "nextTurn",
+        "port": "falseValue"
+      },
+      "id": "readTurn.number->nextTurn.falseValue"
+    },
+    {
+      "output": {
+        "nodeID": "plusTurn",
+        "port": "number"
+      },
+      "input": {
+        "nodeID": "nextTurn",
+        "port": "trueValue"
+      },
+      "id": "plusTurn.number->nextTurn.trueValue"
+    },
+    {
+      "output": {
+        "nodeID": "writeScore",
+        "port": "json"
+      },
+      "input": {
+        "nodeID": "writeTurn",
+        "port": "json"
+      },
+      "id": "writeScore.json->writeTurn.json"
+    },
+    {
+      "output": {
+        "nodeID": "nextTurn",
+        "port": "value"
+      },
+      "input": {
+        "nodeID": "writeTurn",
+        "port": "setValue"
+      },
+      "id": "nextTurn.value->writeTurn.setValue"
+    },
+    {
+      "output": {
+        "nodeID": "state",
+        "port": "state"
+      },
+      "input": {
+        "nodeID": "readFlower",
+        "port": "json"
+      },
+      "id": "state.state->readFlower.json"
+    },
+    {
+      "output": {
+        "nodeID": "flowerAction",
+        "port": "value"
+      },
+      "input": {
+        "nodeID": "nextFlower",
+        "port": "condition"
+      },
+      "id": "flowerAction.value->nextFlower.condition"
+    },
+    {
+      "output": {
+        "nodeID": "readFlower",
+        "port": "value"
+      },
+      "input": {
+        "nodeID": "nextFlower",
+        "port": "falseValue"
+      },
+      "id": "readFlower.value->nextFlower.falseValue"
+    },
+    {
+      "output": {
+        "nodeID": "writeTurn",
+        "port": "json"
+      },
+      "input": {
+        "nodeID": "writeFlower",
+        "port": "json"
+      },
+      "id": "writeTurn.json->writeFlower.json"
+    },
+    {
+      "output": {
+        "nodeID": "nextFlower",
+        "port": "value"
+      },
+      "input": {
+        "nodeID": "writeFlower",
+        "port": "setValue"
+      },
+      "id": "nextFlower.value->writeFlower.setValue"
+    },
+    {
+      "output": {
+        "nodeID": "writeAction",
+        "port": "json"
+      },
+      "input": {
+        "nodeID": "directorRequest",
+        "port": "stringB"
+      },
+      "id": "writeAction.json->directorRequest.stringB"
+    },
+    {
+      "output": {
+        "nodeID": "directorRequest",
+        "port": "value"
+      },
+      "input": {
+        "nodeID": "director",
+        "port": "prompt"
+      },
+      "id": "directorRequest.value->director.prompt"
+    },
+    {
+      "output": {
+        "nodeID": "seed",
+        "port": "seed"
+      },
+      "input": {
+        "nodeID": "generate",
+        "port": "seed"
+      },
+      "id": "seed.seed->generate.seed"
+    },
+    {
+      "output": {
+        "nodeID": "seed",
+        "port": "seed"
+      },
+      "input": {
+        "nodeID": "director",
+        "port": "seed"
+      },
+      "id": "seed.seed->director.seed"
+    },
+    {
+      "output": {
+        "nodeID": "writeAction",
+        "port": "json"
+      },
+      "input": {
+        "nodeID": "subjects",
+        "port": "json"
+      },
+      "id": "writeAction.json->subjects.json"
+    },
+    {
+      "output": {
+        "nodeID": "generate",
+        "port": "image"
+      },
+      "input": {
+        "nodeID": "sam31",
+        "port": "image"
+      },
+      "id": "generate.image->sam31.image"
+    },
+    {
+      "output": {
+        "nodeID": "subjects",
+        "port": "items"
+      },
+      "input": {
+        "nodeID": "sam31",
+        "port": "subjects"
+      },
+      "id": "subjects.items->sam31.subjects"
+    },
+    {
+      "output": {
+        "nodeID": "generate",
+        "port": "image"
+      },
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "id": "generate.image->output.image"
+    },
+    {
+      "output": {
+        "nodeID": "writeAction",
+        "port": "json"
+      },
+      "input": {
+        "nodeID": "output",
+        "port": "nextState"
+      },
+      "id": "writeAction.json->output.nextState"
+    },
+    {
+      "output": {
+        "nodeID": "sam31",
+        "port": "masks"
+      },
+      "input": {
+        "nodeID": "output",
+        "port": "interactionMasks"
+      },
+      "id": "sam31.masks->output.interactionMasks"
+    },
+    {
+      "output": {
+        "nodeID": "generate",
+        "port": "image"
+      },
+      "input": {
+        "nodeID": "preview",
+        "port": "image"
+      },
+      "id": "generate.image->preview.image"
+    },
+    {
+      "output": {
+        "nodeID": "state",
+        "port": "state"
+      },
+      "input": {
+        "nodeID": "flowerIDs",
+        "port": "json"
+      },
+      "id": "state.state->flowerIDs.json"
+    },
+    {
+      "output": {
+        "nodeID": "hitTest",
+        "port": "label"
+      },
+      "input": {
+        "nodeID": "flowerKey",
+        "port": "stringB"
+      },
+      "id": "hitTest.label->flowerKey.stringB"
+    },
+    {
+      "output": {
+        "nodeID": "flowerIDs",
+        "port": "value"
+      },
+      "input": {
+        "nodeID": "flowerID",
+        "port": "json"
+      },
+      "id": "flowerIDs.value->flowerID.json"
+    },
+    {
+      "output": {
+        "nodeID": "flowerKey",
+        "port": "value"
+      },
+      "input": {
+        "nodeID": "flowerID",
+        "port": "key"
+      },
+      "id": "flowerKey.value->flowerID.key"
+    },
+    {
+      "output": {
+        "nodeID": "flowerID",
+        "port": "value"
+      },
+      "input": {
+        "nodeID": "nextFlower",
+        "port": "trueValue"
+      },
+      "id": "flowerID.value->nextFlower.trueValue"
+    },
+    {
+      "output": {
+        "nodeID": "renderPrompt",
+        "port": "value"
+      },
+      "input": {
+        "nodeID": "generate",
+        "port": "prompt"
+      },
+      "id": "renderPrompt.value->generate.prompt"
+    },
+    {
+      "output": {
+        "nodeID": "renderPrompt",
+        "port": "value"
+      },
+      "input": {
+        "nodeID": "output",
+        "port": "feedbackText"
+      },
+      "id": "renderPrompt.value->output.feedbackText"
+    },
+    {
+      "id": "state.state->readBeeAction.json",
+      "output": {
+        "nodeID": "state",
+        "port": "state"
+      },
+      "input": {
+        "nodeID": "readBeeAction",
+        "port": "json"
+      }
+    },
+    {
+      "id": "hitTest.label->collectAction.stringB",
+      "output": {
+        "nodeID": "hitTest",
+        "port": "label"
+      },
+      "input": {
+        "nodeID": "collectAction",
+        "port": "stringB"
+      }
+    },
+    {
+      "id": "flowerAction.value->nextAction.condition",
+      "output": {
+        "nodeID": "flowerAction",
+        "port": "value"
+      },
+      "input": {
+        "nodeID": "nextAction",
+        "port": "condition"
+      }
+    },
+    {
+      "id": "readBeeAction.value->nextAction.falseValue",
+      "output": {
+        "nodeID": "readBeeAction",
+        "port": "value"
+      },
+      "input": {
+        "nodeID": "nextAction",
+        "port": "falseValue"
+      }
+    },
+    {
+      "id": "collectAction.value->nextAction.trueValue",
+      "output": {
+        "nodeID": "collectAction",
+        "port": "value"
+      },
+      "input": {
+        "nodeID": "nextAction",
+        "port": "trueValue"
+      }
+    },
+    {
+      "id": "writeFlower.json->writeAction.json",
+      "output": {
+        "nodeID": "writeFlower",
+        "port": "json"
+      },
+      "input": {
+        "nodeID": "writeAction",
+        "port": "json"
+      }
+    },
+    {
+      "id": "nextAction.value->writeAction.setValue",
+      "output": {
+        "nodeID": "nextAction",
+        "port": "value"
+      },
+      "input": {
+        "nodeID": "writeAction",
+        "port": "setValue"
+      }
+    },
+    {
+      "id": "writeAction.json->readBeeDescription.json",
+      "output": {
+        "nodeID": "writeAction",
+        "port": "json"
+      },
+      "input": {
+        "nodeID": "readBeeDescription",
+        "port": "json"
+      }
+    },
+    {
+      "id": "readBeeDescription.value->beeActionPrompt.stringA",
+      "output": {
+        "nodeID": "readBeeDescription",
+        "port": "value"
+      },
+      "input": {
+        "nodeID": "beeActionPrompt",
+        "port": "stringA"
+      }
+    },
+    {
+      "id": "nextAction.value->beeActionPrompt.stringB",
+      "output": {
+        "nodeID": "nextAction",
+        "port": "value"
+      },
+      "input": {
+        "nodeID": "beeActionPrompt",
+        "port": "stringB"
+      }
+    },
+    {
+      "id": "beeActionPrompt.value->renderPrompt.stringA",
+      "output": {
+        "nodeID": "beeActionPrompt",
+        "port": "value"
+      },
+      "input": {
+        "nodeID": "renderPrompt",
+        "port": "stringA"
+      }
+    },
+    {
+      "id": "director.text->renderPrompt.stringB",
+      "output": {
+        "nodeID": "director",
+        "port": "text"
+      },
+      "input": {
+        "nodeID": "renderPrompt",
+        "port": "stringB"
+      }
+    }
+  ],
+  "controlConnections": [
+    {
+      "id": "output.completed->loop.completed",
+      "output": {
+        "nodeID": "output",
+        "port": "completed"
+      },
+      "input": {
+        "nodeID": "loop",
+        "port": "completed"
+      }
+    },
+    {
+      "id": "loop.repeat->start.again",
+      "output": {
+        "nodeID": "loop",
+        "port": "repeat"
+      },
+      "input": {
+        "nodeID": "start",
+        "port": "again"
+      }
+    },
+    {
+      "id": "loop.incrementSeed->seed.increment",
+      "output": {
+        "nodeID": "loop",
+        "port": "incrementSeed"
+      },
+      "input": {
+        "nodeID": "seed",
+        "port": "increment"
+      }
+    }
+  ],
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "exposedParameters": [],
+  "presentation": {
+    "nodePositions": {
+      "start": {
+        "x": 0,
+        "y": 0
+      },
+      "state": {
+        "x": 0,
+        "y": 250
+      },
+      "readScore": {
+        "x": 0,
+        "y": 500
+      },
+      "readTurn": {
+        "x": 0,
+        "y": 750
+      },
+      "readFlower": {
+        "x": 0,
+        "y": 1000
+      },
+      "notes": {
+        "x": 0,
+        "y": 1750
+      },
+      "previousFrame": {
+        "x": 330,
+        "y": 0
+      },
+      "trackpad": {
+        "x": 330,
+        "y": 250
+      },
+      "hitTest": {
+        "x": 330,
+        "y": 850
+      },
+      "loop": {
+        "x": 330,
+        "y": 1100
+      },
+      "laterTurn": {
+        "x": 330,
+        "y": 1350
+      },
+      "false": {
+        "x": 330,
+        "y": 1600
+      },
+      "flowerAction": {
+        "x": 660,
+        "y": 0
+      },
+      "plusPoint": {
+        "x": 660,
+        "y": 250
+      },
+      "nextScore": {
+        "x": 660,
+        "y": 500
+      },
+      "writeScore": {
+        "x": 660,
+        "y": 750
+      },
+      "plusTurn": {
+        "x": 660,
+        "y": 1000
+      },
+      "nextTurn": {
+        "x": 660,
+        "y": 1250
+      },
+      "writeTurn": {
+        "x": 660,
+        "y": 1500
+      },
+      "nextFlower": {
+        "x": 990,
+        "y": 750
+      },
+      "writeFlower": {
+        "x": 990,
+        "y": 1000
+      },
+      "directorRequest": {
+        "x": 1650,
+        "y": 0
+      },
+      "director": {
+        "x": 1650,
+        "y": 250
+      },
+      "seed": {
+        "x": 1650,
+        "y": 750
+      },
+      "generate": {
+        "x": 1650,
+        "y": 1000
+      },
+      "subjects": {
+        "x": 1980,
+        "y": 0
+      },
+      "sam31": {
+        "x": 1980,
+        "y": 250
+      },
+      "preview": {
+        "x": 1980,
+        "y": 500
+      },
+      "output": {
+        "x": 1980,
+        "y": 750
+      },
+      "flowerIDs": {
+        "x": 990,
+        "y": 0
+      },
+      "flowerKey": {
+        "x": 990,
+        "y": 250
+      },
+      "flowerID": {
+        "x": 990,
+        "y": 500
+      },
+      "readBeeAction": {
+        "x": 0,
+        "y": 1250
+      },
+      "readBeeDescription": {
+        "x": 0,
+        "y": 1500
+      },
+      "collectAction": {
+        "x": 1320,
+        "y": 0
+      },
+      "nextAction": {
+        "x": 1320,
+        "y": 250
+      },
+      "writeAction": {
+        "x": 1320,
+        "y": 500
+      },
+      "beeActionPrompt": {
+        "x": 1320,
+        "y": 750
+      },
+      "renderPrompt": {
+        "x": 1650,
+        "y": 500
+      }
+    },
+    "nodeSizes": {
+      "trackpad": {
+        "width": 380,
+        "height": 520
+      },
+      "notes": {
+        "width": 530,
+        "height": 550
+      }
+    },
+    "viewportOrigin": {
+      "x": -20,
+      "y": -20
+    },
+    "viewportScale": 0.65
+  }
+}

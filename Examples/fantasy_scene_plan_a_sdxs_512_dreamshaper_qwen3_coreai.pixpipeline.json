@@ -1,0 +1,447 @@
+{
+  "connections": [
+    {
+      "id": "prompt.prompt->nextView.originalPrompt",
+      "input": {
+        "nodeID": "nextView",
+        "port": "originalPrompt"
+      },
+      "output": {
+        "nodeID": "prompt",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "previousPlan.scenePlan->nextView.previousPlan",
+      "input": {
+        "nodeID": "nextView",
+        "port": "previousPlan"
+      },
+      "output": {
+        "nodeID": "previousPlan",
+        "port": "scenePlan"
+      }
+    },
+    {
+      "id": "trackpad.x->nextView.x",
+      "input": {
+        "nodeID": "nextView",
+        "port": "x"
+      },
+      "output": {
+        "nodeID": "trackpad",
+        "port": "x"
+      }
+    },
+    {
+      "id": "trackpad.y->nextView.y",
+      "input": {
+        "nodeID": "nextView",
+        "port": "y"
+      },
+      "output": {
+        "nodeID": "trackpad",
+        "port": "y"
+      }
+    },
+    {
+      "id": "nextView.prompt->characterWriter.prompt",
+      "input": {
+        "nodeID": "characterWriter",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "nextView",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed.seed->characterWriter.seed",
+      "input": {
+        "nodeID": "characterWriter",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "characterWriter.text->parsePlan.text",
+      "input": {
+        "nodeID": "parsePlan",
+        "port": "text"
+      },
+      "output": {
+        "nodeID": "characterWriter",
+        "port": "text"
+      }
+    },
+    {
+      "id": "parsePlan.prompt->generate.prompt",
+      "input": {
+        "nodeID": "generate",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "parsePlan",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed.seed->generate.seed",
+      "input": {
+        "nodeID": "generate",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "generate",
+        "port": "image"
+      }
+    },
+    {
+      "id": "parsePlan.scenePlan->output.scenePlan",
+      "input": {
+        "nodeID": "output",
+        "port": "scenePlan"
+      },
+      "output": {
+        "nodeID": "parsePlan",
+        "port": "scenePlan"
+      }
+    }
+  ],
+  "controlConnections": [
+    {
+      "id": "output.completed->loop.completed",
+      "input": {
+        "nodeID": "loop",
+        "port": "completed"
+      },
+      "output": {
+        "nodeID": "output",
+        "port": "completed"
+      }
+    },
+    {
+      "id": "loop.repeat->start.again",
+      "input": {
+        "nodeID": "start",
+        "port": "again"
+      },
+      "output": {
+        "nodeID": "loop",
+        "port": "repeat"
+      }
+    },
+    {
+      "id": "loop.incrementSeed->seed.increment",
+      "input": {
+        "nodeID": "seed",
+        "port": "increment"
+      },
+      "output": {
+        "nodeID": "loop",
+        "port": "incrementSeed"
+      }
+    }
+  ],
+  "exposedParameters": [],
+  "id": "org.pixeltje.pipeline.fantasy-scene-plan-a-qwen3-sdxs-512-dreamshaper",
+  "mode": "textToImage",
+  "name": "Plan-A Open Fantasy World — Qwen3 and SDXS 512",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "start",
+      "kind": "control.start",
+      "parameters": {},
+      "resources": {},
+      "title": "Start / Next Pass"
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt",
+      "kind": "input.prompt",
+      "parameters": {
+        "value": "An explorable, original high-fantasy world seen from a traveler’s eye level. Begin on a weathered stone road outside a vast hilltop castle. A small, expressive mouse-like adventurer wearing a blue traveling cloak stands in the near foreground; the castle fills the central distance and its arched gate is visible slightly to the right, with towers, market banners, ancient trees, mountains, and warm late-afternoon light. Keep a coherent storybook-meets-cinematic visual style, believable architecture, natural depth, and clear landmarks. Each new view should move into the subject selected from the previous view’s planned layout, revealing plausible nearby details and inviting further exploration. Invent only the next local view as needed; do not predefine a complete world map. Avoid copyrighted characters, logos, captions, interface elements, and text in the image."
+      },
+      "resources": {},
+      "title": "Open World Brief"
+    },
+    {
+      "executionState": "enabled",
+      "id": "previousPlan",
+      "kind": "input.previousScenePlan",
+      "parameters": {},
+      "resources": {},
+      "title": "Previous Planned Layout"
+    },
+    {
+      "executionState": "enabled",
+      "id": "trackpad",
+      "kind": "input.trackpad",
+      "parameters": {
+        "x": {
+          "$type": "number",
+          "value": 0.8159877232142858
+        },
+        "y": {
+          "$type": "number",
+          "value": 0.5212823275862078
+        }
+      },
+      "resources": {},
+      "title": "Trackpad"
+    },
+    {
+      "executionState": "enabled",
+      "id": "nextView",
+      "kind": "scene.navigate",
+      "parameters": {},
+      "resources": {},
+      "title": "Next View Brief"
+    },
+    {
+      "executionState": "enabled",
+      "id": "characterWriter",
+      "kind": "coreai.textGenerate",
+      "parameters": {
+        "maxTokens": {
+          "$type": "integer",
+          "value": 1000
+        },
+        "systemPrompt": "You plan ONE view of an explorable original fantasy world. /no_think\nReturn ONLY a valid JSON object, no markdown or commentary. Use this shape: {\"imagePrompt\":\"complete visual description\",\"defaultNextView\":\"what moving forward reveals\",\"regions\":{\"castle\":{\"label\":\"castle\",\"box\":[0.45,0.2,0.8,0.8]},\"gate\":{\"label\":\"gate\",\"box\":[0.55,0.5,0.65,0.7]}}}. imagePrompt is a complete standalone prompt for the CURRENT image. It describes only visible content: never put planning phrases such as Next view, Regions, boxes, coordinates, or future instructions inside it. Describe subjects, environment, camera viewpoint, foreground/background placement, architecture, materials, light, mood, and continuity. Say where visible objects appear in ordinary spatial language, but do not put JSON or coordinates inside imagePrompt. regions is a JSON OBJECT keyed by short unique object names. Give 3 to 7 visible objects, paths, doors, or landmarks. Every region must have a label and a box [left,top,right,bottom] with values from 0 to 1; top is 0. A smaller detail box may sit inside a larger landmark box. A region may also have nextView text describing a closer view, but this field is optional. The layout describes what you INTEND to draw, not pixels you have inspected. On later calls, the camera has moved into the selected subject: place it large and central, abandon the previous wide framing, and reveal a new explorable detail. Make new boxes for the new composition instead of copying old boxes. Keep established visual motifs. Invent only this next local view, not a whole world map.",
+        "temperature": {
+          "$type": "number",
+          "value": 0.35
+        },
+        "topK": {
+          "$type": "integer",
+          "value": 30
+        }
+      },
+      "resources": {
+        "manifest": {
+          "reference": {
+            "componentRole": "languageModelManifest",
+            "contentHash": "4ddc5300b4b5062b386e3ce2e4c46705f5dbbb0447d998a35b6b5c648836ad9d",
+            "familyABI": "coreai-language-model@1",
+            "kind": "data",
+            "packageID": "coreai.qwen-qwen3-0-6b",
+            "packageVersion": "sha256.0a89d27cf3a82f2b0ce63bb1bdc16963b4b3078ba26fe564b0b809ddf2e92041"
+          },
+          "state": "linked"
+        },
+        "model": {
+          "reference": {
+            "componentRole": "languageModel",
+            "contentHash": "6495d7dcf2b0027b81602481dc8ba8c8fc3f6a87b8938a088f33a2e04e421604",
+            "familyABI": "coreai-language-model@1",
+            "kind": "coreAIModel",
+            "packageID": "coreai.qwen-qwen3-0-6b",
+            "packageVersion": "sha256.0a89d27cf3a82f2b0ce63bb1bdc16963b4b3078ba26fe564b0b809ddf2e92041"
+          },
+          "state": "linked"
+        },
+        "tokenizer": {
+          "reference": {
+            "componentRole": "tokenizer",
+            "contentHash": "0682a040763905c927476457261ce62fcb5e5038f7d0037b37f8f174792cc292",
+            "familyABI": "coreai-language-model@1",
+            "kind": "tokenizer",
+            "packageID": "coreai.qwen-qwen3-0-6b",
+            "packageVersion": "sha256.0a89d27cf3a82f2b0ce63bb1bdc16963b4b3078ba26fe564b0b809ddf2e92041"
+          },
+          "state": "linked"
+        }
+      },
+      "title": "Qwen3 Scene Writer"
+    },
+    {
+      "executionState": "enabled",
+      "id": "parsePlan",
+      "kind": "scene.parsePlan",
+      "parameters": {},
+      "resources": {},
+      "title": "Parse Qwen3 Scene Plan"
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed",
+      "kind": "input.seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 1008116446
+        }
+      },
+      "resources": {},
+      "title": "Shared Seed"
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate",
+      "kind": "coreai.sdxsGenerate",
+      "parameters": {
+        "width": {
+          "$type": "integer",
+          "value": 512
+        },
+        "height": {
+          "$type": "integer",
+          "value": 512
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 1
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 0
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion": "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395",
+            "contentHash": "acc841490e1cad1df183b42144879c5c8dfe3062d34a3057b9558f301f05bf1e",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "sdxs-512-dreamshaper-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion": "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395",
+            "contentHash": "bfeacb45c5d75f84fea181297319ac3ecb4174a575ea7e86b7253da25980c120",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "sdxs-512-dreamshaper-coreai@1"
+          }
+        },
+        "vaeDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion": "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395",
+            "contentHash": "6ea8c60c7d82cd85c1966124b2f472509ef617dd22f95d7d571a04903158ffd9",
+            "componentRole": "vae",
+            "functionName": "main",
+            "familyABI": "sdxs-512-dreamshaper-coreai@1"
+          }
+        }
+      },
+      "title": "SDXS 512 Generate"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.image",
+      "parameters": {},
+      "resources": {},
+      "title": "Image Output"
+    },
+    {
+      "executionState": "enabled",
+      "id": "loop",
+      "kind": "control.loop",
+      "parameters": {
+        "delayMilliseconds": {
+          "$type": "integer",
+          "value": 100
+        },
+        "feedback": "scenePlanToNextView",
+        "maxCalls": {
+          "$type": "integer",
+          "value": 100
+        },
+        "seedStrategy": "fixed"
+      },
+      "resources": {},
+      "title": "Loop"
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "characterWriter": {
+        "x": 600,
+        "y": 80
+      },
+      "generate": {
+        "x": 1140,
+        "y": 80
+      },
+      "loop": {
+        "x": 1061,
+        "y": 537
+      },
+      "nextView": {
+        "x": 320,
+        "y": 220
+      },
+      "output": {
+        "x": 1410,
+        "y": 80
+      },
+      "parsePlan": {
+        "x": 870,
+        "y": 80
+      },
+      "previousPlan": {
+        "x": 40,
+        "y": 270
+      },
+      "prompt": {
+        "x": 40,
+        "y": 80
+      },
+      "seed": {
+        "x": 600,
+        "y": 390
+      },
+      "start": {
+        "x": 1348,
+        "y": 829
+      },
+      "trackpad": {
+        "x": 40,
+        "y": 420
+      }
+    },
+    "nodeSizes": {},
+    "viewportOrigin": {
+      "x": -30,
+      "y": -98.5714285714286
+    },
+    "viewportScale": 0.7
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

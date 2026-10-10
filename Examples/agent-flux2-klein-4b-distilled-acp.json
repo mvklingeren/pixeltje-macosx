@@ -1,0 +1,12 @@
+{
+  "defaultModel": "flux2-klein-distilled",
+  "models": [],
+  "imageModels": [
+    {
+      "id": "flux2-klein-distilled",
+      "name": "FLUX.2 Klein 4B Distilled",
+      "pipeline": "image_flux2_klein_text_to_image_4b_distilled-acp.pixpipeline.json",
+      "package": "/Users/you/coreai-models/exports/FLUX.2-klein-4B"
+    }
+  ]
+}

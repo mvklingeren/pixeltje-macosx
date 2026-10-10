@@ -1,0 +1,41 @@
+name: Standalone Swift package
+
+# The job runs on a self-hosted runner. Pull requests, including those from
+# forks, must not trigger it, or untrusted code would run on that machine.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: xcode-27
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: Check dependency boundary
+        run: ./Scripts/check-independence.sh
+
+      - name: Build and test an isolated source copy
+        shell: bash
+        run: |
+          set -euo pipefail
+          standalone_dir="$(mktemp -d "${RUNNER_TEMP}/pixeltje-standalone.XXXXXX")"
+          trap 'rm -rf "$standalone_dir"' EXIT
+          git archive HEAD | tar -x -C "$standalone_dir"
+          cd "$standalone_dir"
+          ./Scripts/check-independence.sh
+          swift build --disable-automatic-resolution
+          swift test --disable-automatic-resolution

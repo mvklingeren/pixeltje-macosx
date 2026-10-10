@@ -1,0 +1,1252 @@
+{
+  "connections" : [
+    {
+      "id" : "comfyui-link-75:137",
+      "input" : {
+        "nodeID" : "comfyui-node-75:62",
+        "port" : "width"
+      },
+      "output" : {
+        "nodeID" : "comfyui-node-75:68",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "comfyui-link-75:138",
+      "input" : {
+        "nodeID" : "comfyui-node-75:62",
+        "port" : "height"
+      },
+      "output" : {
+        "nodeID" : "comfyui-node-75:69",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "comfyui-link-75:139",
+      "input" : {
+        "nodeID" : "comfyui-node-75:63",
+        "port" : "denoiser"
+      },
+      "output" : {
+        "nodeID" : "comfyui-node-75:70",
+        "port" : "function"
+      }
+    },
+    {
+      "id" : "comfyui-link-75:140",
+      "input" : {
+        "nodeID" : "comfyui-node-75:63",
+        "port" : "positive"
+      },
+      "output" : {
+        "nodeID" : "comfyui-node-75:74",
+        "port" : "conditioning"
+      }
+    },
+    {
+      "id" : "comfyui-link-75:141",
+      "input" : {
+        "nodeID" : "comfyui-node-75:63",
+        "port" : "negative"
+      },
+      "output" : {
+        "nodeID" : "comfyui-node-75:67",
+        "port" : "conditioning"
+      }
+    },
+    {
+      "id" : "comfyui-link-75:142",
+      "input" : {
+        "nodeID" : "comfyui-node-75:64",
+        "port" : "noise"
+      },
+      "output" : {
+        "nodeID" : "comfyui-node-75:73",
+        "port" : "noise"
+      }
+    },
+    {
+      "id" : "comfyui-link-75:143",
+      "input" : {
+        "nodeID" : "comfyui-node-75:64",
+        "port" : "guider"
+      },
+      "output" : {
+        "nodeID" : "comfyui-node-75:63",
+        "port" : "guider"
+      }
+    },
+    {
+      "id" : "comfyui-link-75:144",
+      "input" : {
+        "nodeID" : "comfyui-node-75:64",
+        "port" : "sampler"
+      },
+      "output" : {
+        "nodeID" : "comfyui-node-75:61",
+        "port" : "function"
+      }
+    },
+    {
+      "id" : "comfyui-link-75:145",
+      "input" : {
+        "nodeID" : "comfyui-node-75:64",
+        "port" : "schedule"
+      },
+      "output" : {
+        "nodeID" : "comfyui-node-75:62",
+        "port" : "schedule"
+      }
+    },
+    {
+      "id" : "comfyui-link-75:146",
+      "input" : {
+        "nodeID" : "comfyui-node-75:64",
+        "port" : "sourceLatent"
+      },
+      "output" : {
+        "nodeID" : "comfyui-node-75:66",
+        "port" : "latent"
+      }
+    },
+    {
+      "id" : "comfyui-link-75:147",
+      "input" : {
+        "nodeID" : "comfyui-node-75:65",
+        "port" : "latent"
+      },
+      "output" : {
+        "nodeID" : "comfyui-node-75:64",
+        "port" : "latent"
+      }
+    },
+    {
+      "id" : "comfyui-link-75:148",
+      "input" : {
+        "nodeID" : "comfyui-node-75:65",
+        "port" : "vae"
+      },
+      "output" : {
+        "nodeID" : "comfyui-node-75:72",
+        "port" : "function"
+      }
+    },
+    {
+      "id" : "comfyui-link-75:149",
+      "input" : {
+        "nodeID" : "comfyui-node-75:66",
+        "port" : "width"
+      },
+      "output" : {
+        "nodeID" : "comfyui-node-75:68",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "comfyui-link-75:150",
+      "input" : {
+        "nodeID" : "comfyui-node-75:66",
+        "port" : "height"
+      },
+      "output" : {
+        "nodeID" : "comfyui-node-75:69",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "comfyui-link-75:152",
+      "input" : {
+        "nodeID" : "comfyui-node-75:67",
+        "port" : "textEncoder"
+      },
+      "output" : {
+        "nodeID" : "comfyui-node-75:71",
+        "port" : "function"
+      }
+    },
+    {
+      "id" : "comfyui-link-75:151",
+      "input" : {
+        "nodeID" : "comfyui-node-75:74",
+        "port" : "textEncoder"
+      },
+      "output" : {
+        "nodeID" : "comfyui-node-75:71",
+        "port" : "function"
+      }
+    },
+    {
+      "id" : "comfyui-link-154:0:0",
+      "input" : {
+        "nodeID" : "comfyui-node-9",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "comfyui-node-75:65",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "comfyui-link-155:0:0",
+      "input" : {
+        "nodeID" : "comfyui-node-75:74",
+        "port" : "text"
+      },
+      "output" : {
+        "nodeID" : "comfyui-node-76",
+        "port" : "value"
+      }
+    }
+  ],
+  "exposedParameters" : [
+
+  ],
+  "id" : "comfyui.92112d97-bb64-4b44-86f2-ea5691ef8f6e.output-9",
+  "mode" : "textToImage",
+  "name" : "image_flux2_klein_text_to_image_4b_base",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "comfyui-node-9",
+      "kind" : "output.image",
+      "origin" : {
+        "metadata" : {
+          "properties" : {
+            "Node name for S&R" : "SaveImage",
+            "cnr_id" : "comfy-core",
+            "enableTabs" : false,
+            "hasSecondTab" : false,
+            "secondTabOffset" : {
+              "$type" : "integer",
+              "value" : 80
+            },
+            "secondTabText" : "Send Back",
+            "secondTabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabXOffset" : {
+              "$type" : "integer",
+              "value" : 10
+            },
+            "ver" : "0.8.2"
+          },
+          "widgets" : [
+            "Flux2-Klein"
+          ]
+        },
+        "sourceNodeID" : "9",
+        "sourceType" : "SaveImage",
+        "system" : "comfyui.frontend"
+      },
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Image Output"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "comfyui-node-76",
+      "kind" : "primitive.string",
+      "origin" : {
+        "metadata" : {
+          "properties" : {
+            "Node name for S&R" : "PrimitiveStringMultiline",
+            "cnr_id" : "comfy-core",
+            "enableTabs" : false,
+            "hasSecondTab" : false,
+            "secondTabOffset" : {
+              "$type" : "integer",
+              "value" : 80
+            },
+            "secondTabText" : "Send Back",
+            "secondTabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabXOffset" : {
+              "$type" : "integer",
+              "value" : 10
+            },
+            "ver" : "0.9.1"
+          },
+          "widgets" : [
+            "A hedgehog wearing a tiny party hat surrounded by confetti, early digital camera style, slight noise, flash photography, candid moment, 2000s digicam aesthetic, festive birthday celebration atmosphere\n"
+          ]
+        },
+        "sourceNodeID" : "76",
+        "sourceType" : "PrimitiveStringMultiline",
+        "system" : "comfyui.frontend"
+      },
+      "parameters" : {
+        "value" : "A hedgehog wearing a tiny party hat surrounded by confetti, early digital camera style, slight noise, flash photography, candid moment, 2000s digicam aesthetic, festive birthday celebration atmosphere\n"
+      },
+      "resources" : {
+
+      },
+      "title" : "Prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "comfyui-node-75:61",
+      "kind" : "diffusion.samplerSelector",
+      "origin" : {
+        "metadata" : {
+          "properties" : {
+            "Node name for S&R" : "KSamplerSelect",
+            "cnr_id" : "comfy-core",
+            "enableTabs" : false,
+            "hasSecondTab" : false,
+            "secondTabOffset" : {
+              "$type" : "integer",
+              "value" : 80
+            },
+            "secondTabText" : "Send Back",
+            "secondTabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabXOffset" : {
+              "$type" : "integer",
+              "value" : 10
+            },
+            "ver" : "0.8.2"
+          },
+          "widgets" : [
+            "euler"
+          ]
+        },
+        "sourceNodeID" : "75:61",
+        "sourceType" : "KSamplerSelect",
+        "system" : "comfyui.frontend"
+      },
+      "parameters" : {
+        "samplerName" : "euler"
+      },
+      "resources" : {
+
+      },
+      "title" : "Sampler Selector"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "comfyui-node-75:62",
+      "kind" : "diffusion.flux2Scheduler",
+      "origin" : {
+        "metadata" : {
+          "properties" : {
+            "Node name for S&R" : "Flux2Scheduler",
+            "cnr_id" : "comfy-core",
+            "enableTabs" : false,
+            "hasSecondTab" : false,
+            "secondTabOffset" : {
+              "$type" : "integer",
+              "value" : 80
+            },
+            "secondTabText" : "Send Back",
+            "secondTabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabXOffset" : {
+              "$type" : "integer",
+              "value" : 10
+            },
+            "ver" : "0.8.2"
+          },
+          "widgets" : [
+            {
+              "$type" : "integer",
+              "value" : 20
+            },
+            {
+              "$type" : "integer",
+              "value" : 1024
+            },
+            {
+              "$type" : "integer",
+              "value" : 1024
+            }
+          ]
+        },
+        "sourceNodeID" : "75:62",
+        "sourceType" : "Flux2Scheduler",
+        "system" : "comfyui.frontend"
+      },
+      "parameters" : {
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 20
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "FLUX.2 Scheduler"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "comfyui-node-75:63",
+      "kind" : "diffusion.cfgGuider",
+      "origin" : {
+        "metadata" : {
+          "properties" : {
+            "Node name for S&R" : "CFGGuider",
+            "cnr_id" : "comfy-core",
+            "enableTabs" : false,
+            "hasSecondTab" : false,
+            "secondTabOffset" : {
+              "$type" : "integer",
+              "value" : 80
+            },
+            "secondTabText" : "Send Back",
+            "secondTabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabXOffset" : {
+              "$type" : "integer",
+              "value" : 10
+            },
+            "ver" : "0.8.2"
+          },
+          "widgets" : [
+            {
+              "$type" : "integer",
+              "value" : 5
+            }
+          ]
+        },
+        "sourceNodeID" : "75:63",
+        "sourceType" : "CFGGuider",
+        "system" : "comfyui.frontend"
+      },
+      "parameters" : {
+        "guidance" : {
+          "$type" : "integer",
+          "value" : 5
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "CFG Guider"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "comfyui-node-75:64",
+      "kind" : "diffusion.advancedSampler",
+      "origin" : {
+        "metadata" : {
+          "properties" : {
+            "Node name for S&R" : "SamplerCustomAdvanced",
+            "cnr_id" : "comfy-core",
+            "enableTabs" : false,
+            "hasSecondTab" : false,
+            "secondTabOffset" : {
+              "$type" : "integer",
+              "value" : 80
+            },
+            "secondTabText" : "Send Back",
+            "secondTabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabXOffset" : {
+              "$type" : "integer",
+              "value" : 10
+            },
+            "ver" : "0.8.2"
+          },
+          "widgets" : [
+
+          ]
+        },
+        "sourceNodeID" : "75:64",
+        "sourceType" : "SamplerCustomAdvanced",
+        "system" : "comfyui.frontend"
+      },
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Advanced Sampler"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "comfyui-node-75:65",
+      "kind" : "coreai.vaeImageDecoder",
+      "origin" : {
+        "metadata" : {
+          "properties" : {
+            "Node name for S&R" : "VAEDecode",
+            "cnr_id" : "comfy-core",
+            "enableTabs" : false,
+            "hasSecondTab" : false,
+            "secondTabOffset" : {
+              "$type" : "integer",
+              "value" : 80
+            },
+            "secondTabText" : "Send Back",
+            "secondTabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabXOffset" : {
+              "$type" : "integer",
+              "value" : 10
+            },
+            "ver" : "0.8.2"
+          },
+          "widgets" : [
+
+          ]
+        },
+        "sourceNodeID" : "75:65",
+        "sourceType" : "VAEDecode",
+        "system" : "comfyui.frontend"
+      },
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "VAE Image Decoder"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "comfyui-node-75:66",
+      "kind" : "latent.emptyFlux2Image",
+      "origin" : {
+        "metadata" : {
+          "properties" : {
+            "Node name for S&R" : "EmptyFlux2LatentImage",
+            "cnr_id" : "comfy-core",
+            "enableTabs" : false,
+            "hasSecondTab" : false,
+            "secondTabOffset" : {
+              "$type" : "integer",
+              "value" : 80
+            },
+            "secondTabText" : "Send Back",
+            "secondTabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabXOffset" : {
+              "$type" : "integer",
+              "value" : 10
+            },
+            "ver" : "0.8.2"
+          },
+          "widgets" : [
+            {
+              "$type" : "integer",
+              "value" : 1024
+            },
+            {
+              "$type" : "integer",
+              "value" : 1024
+            },
+            {
+              "$type" : "integer",
+              "value" : 1
+            }
+          ]
+        },
+        "sourceNodeID" : "75:66",
+        "sourceType" : "EmptyFlux2LatentImage",
+        "system" : "comfyui.frontend"
+      },
+      "parameters" : {
+        "batchSize" : {
+          "$type" : "integer",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Empty FLUX.2 Latent Image"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "comfyui-node-75:67",
+      "kind" : "conditioning.textEncode",
+      "origin" : {
+        "metadata" : {
+          "properties" : {
+            "Node name for S&R" : "CLIPTextEncode",
+            "cnr_id" : "comfy-core",
+            "enableTabs" : false,
+            "hasSecondTab" : false,
+            "secondTabOffset" : {
+              "$type" : "integer",
+              "value" : 80
+            },
+            "secondTabText" : "Send Back",
+            "secondTabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabXOffset" : {
+              "$type" : "integer",
+              "value" : 10
+            },
+            "ver" : "0.8.2"
+          },
+          "widgets" : [
+            ""
+          ]
+        },
+        "sourceNodeID" : "75:67",
+        "sourceType" : "CLIPTextEncode",
+        "system" : "comfyui.frontend"
+      },
+      "parameters" : {
+        "text" : ""
+      },
+      "resources" : {
+
+      },
+      "title" : "CLIP Text Encode (Negative Prompt)"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "comfyui-node-75:68",
+      "kind" : "primitive.int",
+      "origin" : {
+        "metadata" : {
+          "properties" : {
+            "Node name for S&R" : "PrimitiveInt",
+            "cnr_id" : "comfy-core",
+            "enableTabs" : false,
+            "hasSecondTab" : false,
+            "secondTabOffset" : {
+              "$type" : "integer",
+              "value" : 80
+            },
+            "secondTabText" : "Send Back",
+            "secondTabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabXOffset" : {
+              "$type" : "integer",
+              "value" : 10
+            },
+            "ver" : "0.8.2"
+          },
+          "widgets" : [
+            {
+              "$type" : "integer",
+              "value" : 1024
+            },
+            "fixed"
+          ]
+        },
+        "sourceNodeID" : "75:68",
+        "sourceType" : "PrimitiveInt",
+        "system" : "comfyui.frontend"
+      },
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Width"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "comfyui-node-75:69",
+      "kind" : "primitive.int",
+      "origin" : {
+        "metadata" : {
+          "properties" : {
+            "Node name for S&R" : "PrimitiveInt",
+            "cnr_id" : "comfy-core",
+            "enableTabs" : false,
+            "hasSecondTab" : false,
+            "secondTabOffset" : {
+              "$type" : "integer",
+              "value" : 80
+            },
+            "secondTabText" : "Send Back",
+            "secondTabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabXOffset" : {
+              "$type" : "integer",
+              "value" : 10
+            },
+            "ver" : "0.8.2"
+          },
+          "widgets" : [
+            {
+              "$type" : "integer",
+              "value" : 1024
+            },
+            "fixed"
+          ]
+        },
+        "sourceNodeID" : "75:69",
+        "sourceType" : "PrimitiveInt",
+        "system" : "comfyui.frontend"
+      },
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Height"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "comfyui-node-75:73",
+      "kind" : "latent.randomNoise",
+      "origin" : {
+        "metadata" : {
+          "properties" : {
+            "Node name for S&R" : "RandomNoise",
+            "cnr_id" : "comfy-core",
+            "enableTabs" : false,
+            "hasSecondTab" : false,
+            "secondTabOffset" : {
+              "$type" : "integer",
+              "value" : 80
+            },
+            "secondTabText" : "Send Back",
+            "secondTabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabXOffset" : {
+              "$type" : "integer",
+              "value" : 10
+            },
+            "ver" : "0.8.2"
+          },
+          "widgets" : [
+            {
+              "$type" : "integer",
+              "value" : 0
+            },
+            "randomize"
+          ]
+        },
+        "sourceNodeID" : "75:73",
+        "sourceType" : "RandomNoise",
+        "system" : "comfyui.frontend"
+      },
+      "parameters" : {
+        "seed" : {
+          "$type" : "integer",
+          "value" : 0
+        },
+        "seedControl" : "randomize"
+      },
+      "resources" : {
+
+      },
+      "title" : "Random Noise"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "comfyui-node-75:70",
+      "kind" : "coreai.denoiser",
+      "origin" : {
+        "metadata" : {
+          "properties" : {
+            "Node name for S&R" : "UNETLoader",
+            "cnr_id" : "comfy-core",
+            "enableTabs" : false,
+            "hasSecondTab" : false,
+            "models" : [
+              {
+                "directory" : "diffusion_models",
+                "name" : "flux-2-klein-base-4b.safetensors",
+                "url" : "https:\/\/huggingface.co\/Comfy-Org\/flux2-klein\/resolve\/main\/split_files\/diffusion_models\/flux-2-klein-base-4b.safetensors"
+              }
+            ],
+            "secondTabOffset" : {
+              "$type" : "integer",
+              "value" : 80
+            },
+            "secondTabText" : "Send Back",
+            "secondTabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabXOffset" : {
+              "$type" : "integer",
+              "value" : 10
+            },
+            "ver" : "0.8.2"
+          },
+          "widgets" : [
+            "flux-2-klein-base-4b.safetensors",
+            "default"
+          ]
+        },
+        "sourceNodeID" : "75:70",
+        "sourceType" : "UNETLoader",
+        "system" : "comfyui.frontend"
+      },
+      "parameters" : {
+        "modelName" : "flux-2-klein-base-4b.safetensors",
+        "weightType" : "default"
+      },
+      "resources" : {
+        "model" : {
+          "requirement" : {
+            "componentRole" : "denoiser",
+            "kind" : "coreAIModel",
+            "sourceFormat" : "safetensors",
+            "sourceName" : "diffusion_models\/flux-2-klein-base-4b.safetensors",
+            "sourceURL" : "https:\/\/huggingface.co\/Comfy-Org\/flux2-klein\/resolve\/main\/split_files\/diffusion_models\/flux-2-klein-base-4b.safetensors"
+          },
+          "state" : "unresolved"
+        }
+      },
+      "title" : "Denoiser"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "comfyui-node-75:71",
+      "kind" : "coreai.textEncoderModel",
+      "origin" : {
+        "metadata" : {
+          "properties" : {
+            "Node name for S&R" : "CLIPLoader",
+            "cnr_id" : "comfy-core",
+            "enableTabs" : false,
+            "hasSecondTab" : false,
+            "models" : [
+              {
+                "directory" : "text_encoders",
+                "name" : "qwen_3_4b.safetensors",
+                "url" : "https:\/\/huggingface.co\/Comfy-Org\/flux2-klein\/resolve\/main\/split_files\/text_encoders\/qwen_3_4b.safetensors"
+              }
+            ],
+            "secondTabOffset" : {
+              "$type" : "integer",
+              "value" : 80
+            },
+            "secondTabText" : "Send Back",
+            "secondTabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabXOffset" : {
+              "$type" : "integer",
+              "value" : 10
+            },
+            "ver" : "0.8.2"
+          },
+          "widgets" : [
+            "qwen_3_4b.safetensors",
+            "flux2",
+            "default"
+          ]
+        },
+        "sourceNodeID" : "75:71",
+        "sourceType" : "CLIPLoader",
+        "system" : "comfyui.frontend"
+      },
+      "parameters" : {
+        "device" : "default",
+        "encoderType" : "flux2",
+        "modelName" : "qwen_3_4b.safetensors"
+      },
+      "resources" : {
+        "model" : {
+          "requirement" : {
+            "componentRole" : "textEncoder",
+            "kind" : "coreAIModel",
+            "sourceFormat" : "safetensors",
+            "sourceName" : "text_encoders\/qwen_3_4b.safetensors",
+            "sourceURL" : "https:\/\/huggingface.co\/Comfy-Org\/flux2-klein\/resolve\/main\/split_files\/text_encoders\/qwen_3_4b.safetensors"
+          },
+          "state" : "unresolved"
+        }
+      },
+      "title" : "Text Encoder Model"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "comfyui-node-75:72",
+      "kind" : "coreai.vaeModel",
+      "origin" : {
+        "metadata" : {
+          "properties" : {
+            "Node name for S&R" : "VAELoader",
+            "cnr_id" : "comfy-core",
+            "enableTabs" : false,
+            "hasSecondTab" : false,
+            "models" : [
+              {
+                "directory" : "vae",
+                "name" : "flux2-vae.safetensors",
+                "url" : "https:\/\/huggingface.co\/Comfy-Org\/flux2-dev\/resolve\/main\/split_files\/vae\/flux2-vae.safetensors"
+              }
+            ],
+            "secondTabOffset" : {
+              "$type" : "integer",
+              "value" : 80
+            },
+            "secondTabText" : "Send Back",
+            "secondTabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabXOffset" : {
+              "$type" : "integer",
+              "value" : 10
+            },
+            "ver" : "0.8.2"
+          },
+          "widgets" : [
+            "flux2-vae.safetensors"
+          ]
+        },
+        "sourceNodeID" : "75:72",
+        "sourceType" : "VAELoader",
+        "system" : "comfyui.frontend"
+      },
+      "parameters" : {
+        "modelName" : "flux2-vae.safetensors"
+      },
+      "resources" : {
+        "model" : {
+          "requirement" : {
+            "componentRole" : "vae",
+            "kind" : "coreAIModel",
+            "sourceFormat" : "safetensors",
+            "sourceName" : "vae\/flux2-vae.safetensors",
+            "sourceURL" : "https:\/\/huggingface.co\/Comfy-Org\/flux2-dev\/resolve\/main\/split_files\/vae\/flux2-vae.safetensors"
+          },
+          "state" : "unresolved"
+        }
+      },
+      "title" : "VAE Model"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "comfyui-node-75:74",
+      "kind" : "conditioning.textEncode",
+      "origin" : {
+        "metadata" : {
+          "properties" : {
+            "Node name for S&R" : "CLIPTextEncode",
+            "cnr_id" : "comfy-core",
+            "enableTabs" : false,
+            "hasSecondTab" : false,
+            "secondTabOffset" : {
+              "$type" : "integer",
+              "value" : 80
+            },
+            "secondTabText" : "Send Back",
+            "secondTabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabWidth" : {
+              "$type" : "integer",
+              "value" : 65
+            },
+            "tabXOffset" : {
+              "$type" : "integer",
+              "value" : 10
+            },
+            "ver" : "0.8.2"
+          },
+          "widgets" : [
+            ""
+          ]
+        },
+        "sourceNodeID" : "75:74",
+        "sourceType" : "CLIPTextEncode",
+        "system" : "comfyui.frontend"
+      },
+      "parameters" : {
+        "text" : ""
+      },
+      "resources" : {
+
+      },
+      "title" : "CLIP Text Encode (Positive Prompt)"
+    },
+    {
+      "executionState" : "disabled",
+      "id" : "pixeltje-resource-guide-public.coreai.flux2-klein-4b",
+      "kind" : "edit.markdownNote",
+      "origin" : {
+        "metadata" : {
+
+        },
+        "sourceNodeID" : "public.coreai.flux2-klein-4b",
+        "sourceType" : "ResourceGuidance",
+        "system" : "pixeltje.resource-guidance"
+      },
+      "parameters" : {
+        "text" : "<!-- pixeltje-resource-guide:public.coreai.flux2-klein-4b -->\n\n## FLUX.2 Klein 4B for Core AI\n\nThis workflow uses FLUX.2 Klein 4B. Pixeltje requires Apple's current in-graph RoPE model ABI; the older public bundle with `rotary_emb_cos` and `rotary_emb_sin` inputs is not compatible.\n\n[View Apple's pinned FLUX.2 export recipe](https:\/\/github.com\/apple\/coreai-models\/tree\/3f109efd54273391f9fd9f5f5b3d8c6e99836d55\/models\/flux2)\n\nExport the package outside Pixeltje, then link `exports\/FLUX.2-klein-4B` in place:\n\n```sh\ngit clone https:\/\/github.com\/apple\/coreai-models.git\ncd coreai-models\ngit checkout 3f109efd54273391f9fd9f5f5b3d8c6e99836d55\nuv run coreai.diffusion.export flux2-klein-4b --platform macOS\n```\n\nThe export downloads the original publisher weights and creates the multi-gigabyte Core AI package. Pixeltje does not run the export, download or copy the model, or hash its large weight files.\n\nThe exported package contains the distilled Klein 4B transformer. It must not be silently substituted for a workflow's Base transformer."
+      },
+      "resources" : {
+
+      },
+      "title" : "Tips & Tricks: FLUX.2 Klein 4B for Core AI"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "comfyui-node-75:61" : {
+        "x" : 1426.6667732157443,
+        "y" : 632.6666838325343
+      },
+      "comfyui-node-75:62" : {
+        "x" : 1426.6667732157443,
+        "y" : 732.6666838325343
+      },
+      "comfyui-node-75:63" : {
+        "x" : 1426.6667732157443,
+        "y" : 492.66668383253426
+      },
+      "comfyui-node-75:64" : {
+        "x" : 1726.6667732157443,
+        "y" : 412.66668383253426
+      },
+      "comfyui-node-75:65" : {
+        "x" : 1980.6667732157443,
+        "y" : 342.66668383253426
+      },
+      "comfyui-node-75:66" : {
+        "x" : 1420.6667732157443,
+        "y" : 992.6666838325343
+      },
+      "comfyui-node-75:67" : {
+        "x" : 930.6667732157442,
+        "y" : 722.6666838325343
+      },
+      "comfyui-node-75:68" : {
+        "x" : 550.6667732157442,
+        "y" : 972.6666838325343
+      },
+      "comfyui-node-75:69" : {
+        "x" : 550.6667732157442,
+        "y" : 1122.6666838325343
+      },
+      "comfyui-node-75:70" : {
+        "x" : 500.66677321574423,
+        "y" : 392.5000342644175
+      },
+      "comfyui-node-75:71" : {
+        "x" : 500.66677321574423,
+        "y" : 542.5000342644175
+      },
+      "comfyui-node-75:72" : {
+        "x" : 500.66677321574423,
+        "y" : 712.5000342644175
+      },
+      "comfyui-node-75:73" : {
+        "x" : 1426.6667732157443,
+        "y" : 372.66668383253426
+      },
+      "comfyui-node-75:74" : {
+        "x" : 930.6667732157442,
+        "y" : 392.66668383253426
+      },
+      "comfyui-node-76" : {
+        "x" : 80,
+        "y" : 350
+      },
+      "comfyui-node-9" : {
+        "x" : 930.666786213013,
+        "y" : 342.6666838325343
+      },
+      "pixeltje-resource-guide-public.coreai.flux2-klein-4b" : {
+        "x" : 2280.6667732157443,
+        "y" : 342.66668383253426
+      }
+    },
+    "nodeSizes" : {
+      "comfyui-node-75:61" : {
+        "height" : 58,
+        "width" : 270
+      },
+      "comfyui-node-75:62" : {
+        "height" : 106,
+        "width" : 270
+      },
+      "comfyui-node-75:63" : {
+        "height" : 98,
+        "width" : 270
+      },
+      "comfyui-node-75:64" : {
+        "height" : 106,
+        "width" : 212.3638671875
+      },
+      "comfyui-node-75:65" : {
+        "height" : 46,
+        "width" : 220
+      },
+      "comfyui-node-75:66" : {
+        "height" : 106,
+        "width" : 270
+      },
+      "comfyui-node-75:67" : {
+        "height" : 100,
+        "width" : 430
+      },
+      "comfyui-node-75:68" : {
+        "height" : 82,
+        "width" : 270
+      },
+      "comfyui-node-75:69" : {
+        "height" : 82,
+        "width" : 270
+      },
+      "comfyui-node-75:70" : {
+        "height" : 82,
+        "width" : 364.42708333333337
+      },
+      "comfyui-node-75:71" : {
+        "height" : 106,
+        "width" : 364.42708333333337
+      },
+      "comfyui-node-75:72" : {
+        "height" : 58,
+        "width" : 364.42708333333337
+      },
+      "comfyui-node-75:73" : {
+        "height" : 82,
+        "width" : 270
+      },
+      "comfyui-node-75:74" : {
+        "height" : 280,
+        "width" : 430
+      },
+      "comfyui-node-76" : {
+        "height" : 145,
+        "width" : 400
+      },
+      "comfyui-node-9" : {
+        "height" : 495,
+        "width" : 520
+      },
+      "pixeltje-resource-guide-public.coreai.flux2-klein-4b" : {
+        "height" : 220,
+        "width" : 380
+      }
+    },
+    "viewportOrigin" : {
+      "x" : 2240.6667732157443,
+      "y" : 302.66668383253426
+    },
+    "viewportScale" : 0.5514957865568056
+  },
+  "primaryOutputNodeIDs" : [
+    "comfyui-node-9"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

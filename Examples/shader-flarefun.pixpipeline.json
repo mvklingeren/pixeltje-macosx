@@ -1,0 +1,384 @@
+{
+  "connections" : [
+    {
+      "id" : "render.image->output.image",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "render",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "primitive-int.value->render.width",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "width"
+      },
+      "output" : {
+        "nodeID" : "primitive-int",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "primitive-int-2.value->render.height",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "height"
+      },
+      "output" : {
+        "nodeID" : "primitive-int-2",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "program-text.value->render.program",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "program"
+      },
+      "output" : {
+        "nodeID" : "program-text",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "parameters-text.value->render.parameters",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "parameters"
+      },
+      "output" : {
+        "nodeID" : "parameters-text",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "shader-text.value->render.sourceFile",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "sourceFile"
+      },
+      "output" : {
+        "nodeID" : "shader-text",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "trackpad.x->render.pointerX",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "pointerX"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "x"
+      }
+    },
+    {
+      "id" : "trackpad.y->render.pointerY",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "pointerY"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "y"
+      }
+    }
+  ],
+  "controlConnections" : [
+    {
+      "id" : "output.completed->loop.completed",
+      "input" : {
+        "nodeID" : "loop",
+        "port" : "completed"
+      },
+      "output" : {
+        "nodeID" : "output",
+        "port" : "completed"
+      }
+    },
+    {
+      "id" : "loop.repeat->start.again",
+      "input" : {
+        "nodeID" : "start",
+        "port" : "again"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "repeat"
+      }
+    }
+  ],
+  "exposedParameters" : [
+
+  ],
+  "id" : "org.pixeltje.examples.flarefun-gpu-program",
+  "mode" : "generic",
+  "name" : "Flarefun · Trackpad Flurry",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "start",
+      "kind" : "control.start",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Start \/ Next Frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "shader-text",
+      "kind" : "primitive.filePath",
+      "parameters" : {
+        "mode" : "relative",
+        "path" : "FlarefunProgram.metal"
+      },
+      "resources" : {
+
+      },
+      "title" : "Metal file beside workflow"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "render",
+      "kind" : "gpu.program",
+      "parameters" : {
+        "framesPerSecond" : {
+          "$type" : "number",
+          "value" : 60
+        },
+        "seed" : {
+          "$type" : "integer",
+          "value" : 1
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "GPU Program · Flarefun"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output",
+      "kind" : "output.image",
+      "parameters" : {
+        "filenamePrefix" : "flarefun",
+        "format" : "png"
+      },
+      "resources" : {
+
+      },
+      "title" : "Flarefun frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "loop",
+      "kind" : "control.loop",
+      "parameters" : {
+        "autoPause" : false,
+        "delayMilliseconds" : {
+          "$type" : "integer",
+          "value" : 0
+        },
+        "feedback" : "none",
+        "limitHz" : {
+          "$type" : "integer",
+          "value" : 60
+        },
+        "maxCalls" : {
+          "$type" : "integer",
+          "value" : -1
+        },
+        "seedStrategy" : "fixed"
+      },
+      "resources" : {
+
+      },
+      "title" : "Advance five smoke streams"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "note",
+      "kind" : "edit.markdownNote",
+      "parameters" : {
+        "text" : "# Flarefun · Steer the flurry\nDrag the Trackpad crosshair to move the smoke across the frame. Its center (0.5, 0.5) matches the original flurry position. X moves left to right; Y moves top to bottom. The GPU Program samples the latest position for each 60 Hz frame without restarting its 3,600-particle simulation. Earlier smoke remains in the fading frame history, creating a trail as you move. Reset centers the flurry. Width and Height control the render and saved image size; changing either restarts the simulation. FlarefunProgram.metal sits beside this workflow."
+      },
+      "resources" : {
+
+      },
+      "title" : "How the effect is built"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 1440
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Output width"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int-2",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 900
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Output height"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "program-text",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "{\"version\":1,\"parameters\":[\"persistence\",\"brightness\",\"incohesion\",\"spread\"],\"resources\":[{\"name\":\"smoke\",\"kind\":\"buffer\",\"bytes\":230400},{\"name\":\"history\",\"kind\":\"texture\"},{\"name\":\"historyNext\",\"kind\":\"texture\"},{\"name\":\"display\",\"kind\":\"texture\"}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeSmoke\",\"threads\":[3600],\"buffers\":{\"1\":\"smoke\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceSmoke\",\"threads\":[3600],\"buffers\":{\"1\":\"smoke\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"fadeFragment\",\"target\":\"historyNext\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentTextures\":{\"1\":\"history\"}},{\"kind\":\"render\",\"vertex\":\"smokeVertex\",\"fragment\":\"smokeFragment\",\"target\":\"historyNext\",\"load\":\"load\",\"blend\":\"additive\",\"vertexCount\":6,\"instanceCount\":3600,\"vertexBuffers\":{\"1\":\"smoke\"}}],\"swaps\":[[\"history\",\"historyNext\"]],\"present\":[{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"presentFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentTextures\":{\"1\":\"history\"}}],\"output\":\"display\"}"
+      },
+      "resources" : {
+
+      },
+      "title" : "Bounded GPU passes and resources"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "parameters-text",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "{\"persistence\":0.94,\"brightness\":1.6,\"incohesion\":0.07,\"spread\":1.0}"
+      },
+      "resources" : {
+
+      },
+      "title" : "Trail, brightness, incohesion, spread"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "trackpad",
+      "kind" : "input.trackpad",
+      "parameters" : {
+        "x" : {
+          "$type" : "number",
+          "value" : 0.5
+        },
+        "y" : {
+          "$type" : "number",
+          "value" : 0.5
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Flurry position"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "loop" : {
+        "x" : 1819,
+        "y" : 550
+      },
+      "note" : {
+        "x" : 81,
+        "y" : 732
+      },
+      "output" : {
+        "x" : 1819,
+        "y" : 217
+      },
+      "parameters-text" : {
+        "x" : 82,
+        "y" : 265
+      },
+      "primitive-int" : {
+        "x" : 766,
+        "y" : 159
+      },
+      "primitive-int-2" : {
+        "x" : 764,
+        "y" : 309
+      },
+      "program-text" : {
+        "x" : 76,
+        "y" : 20
+      },
+      "render" : {
+        "x" : 1063,
+        "y" : 98
+      },
+      "shader-text" : {
+        "x" : 88,
+        "y" : 480
+      },
+      "start" : {
+        "x" : 1818,
+        "y" : 421
+      },
+      "trackpad" : {
+        "x" : 758,
+        "y" : 485
+      }
+    },
+    "nodeSizes" : {
+      "note" : {
+        "height" : 275,
+        "width" : 408
+      },
+      "parameters-text" : {
+        "height" : 165,
+        "width" : 400
+      },
+      "program-text" : {
+        "height" : 229,
+        "width" : 674
+      },
+      "render" : {
+        "height" : 575,
+        "width" : 660
+      },
+      "shader-text" : {
+        "height" : 160,
+        "width" : 400
+      },
+      "trackpad" : {
+        "height" : 300,
+        "width" : 280
+      }
+    },
+    "viewportOrigin" : {
+      "x" : 734.6016917441493,
+      "y" : 87.86286719205037
+    },
+    "viewportScale" : 1.100372314453125
+  },
+  "primaryOutputNodeIDs" : [
+    "output"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

@@ -1,0 +1,315 @@
+{
+  "connections": [
+    {
+      "id": "source.image->invert.image",
+      "input": {
+        "nodeID": "invert",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "source",
+        "port": "image"
+      }
+    },
+    {
+      "id": "empty-mask.mask->place-mask.destination",
+      "input": {
+        "nodeID": "place-mask",
+        "port": "destination"
+      },
+      "output": {
+        "nodeID": "empty-mask",
+        "port": "mask"
+      }
+    },
+    {
+      "id": "rectangle-mask.mask->place-mask.source",
+      "input": {
+        "nodeID": "place-mask",
+        "port": "source"
+      },
+      "output": {
+        "nodeID": "rectangle-mask",
+        "port": "mask"
+      }
+    },
+    {
+      "id": "place-mask.mask->grow.mask",
+      "input": {
+        "nodeID": "grow",
+        "port": "mask"
+      },
+      "output": {
+        "nodeID": "place-mask",
+        "port": "mask"
+      }
+    },
+    {
+      "id": "grow.mask->feather.mask",
+      "input": {
+        "nodeID": "feather",
+        "port": "mask"
+      },
+      "output": {
+        "nodeID": "grow",
+        "port": "mask"
+      }
+    },
+    {
+      "id": "source.image->composite.destination",
+      "input": {
+        "nodeID": "composite",
+        "port": "destination"
+      },
+      "output": {
+        "nodeID": "source",
+        "port": "image"
+      }
+    },
+    {
+      "id": "invert.image->composite.source",
+      "input": {
+        "nodeID": "composite",
+        "port": "source"
+      },
+      "output": {
+        "nodeID": "invert",
+        "port": "image"
+      }
+    },
+    {
+      "id": "feather.mask->composite.mask",
+      "input": {
+        "nodeID": "composite",
+        "port": "mask"
+      },
+      "output": {
+        "nodeID": "feather",
+        "port": "mask"
+      }
+    },
+    {
+      "id": "composite.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "composite",
+        "port": "image"
+      }
+    }
+  ],
+  "exposedParameters": [
+    {
+      "defaultValue": {
+        "$type": "integer",
+        "value": 12
+      },
+      "id": "mask-growth",
+      "label": "Mask growth",
+      "maximum": 32,
+      "minimum": -32,
+      "target": {
+        "nodeID": "grow",
+        "parameter": "expand"
+      },
+      "valueType": "integer"
+    }
+  ],
+  "id": "org.pixeltje.examples.base-test-set.03-masked-image-edit",
+  "mode": "inpainting",
+  "name": "Base Test Set 03 · Masked Image Edit",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "source",
+      "kind": "input.image",
+      "parameters": {
+        "sourceName": "test-card.png"
+      },
+      "resources": {},
+      "title": "Test card"
+    },
+    {
+      "executionState": "enabled",
+      "id": "invert",
+      "kind": "image.invert",
+      "parameters": {},
+      "resources": {},
+      "title": "Inverted candidate"
+    },
+    {
+      "executionState": "enabled",
+      "id": "empty-mask",
+      "kind": "mask.solid",
+      "parameters": {
+        "height": {
+          "$type": "integer",
+          "value": 384
+        },
+        "value": {
+          "$type": "number",
+          "value": 0
+        },
+        "width": {
+          "$type": "integer",
+          "value": 512
+        }
+      },
+      "resources": {},
+      "title": "Empty full-size mask"
+    },
+    {
+      "executionState": "enabled",
+      "id": "rectangle-mask",
+      "kind": "mask.solid",
+      "parameters": {
+        "height": {
+          "$type": "integer",
+          "value": 120
+        },
+        "value": {
+          "$type": "number",
+          "value": 1
+        },
+        "width": {
+          "$type": "integer",
+          "value": 160
+        }
+      },
+      "resources": {},
+      "title": "Solid rectangle"
+    },
+    {
+      "executionState": "enabled",
+      "id": "place-mask",
+      "kind": "mask.composite",
+      "parameters": {
+        "operation": "add",
+        "x": {
+          "$type": "integer",
+          "value": 176
+        },
+        "y": {
+          "$type": "integer",
+          "value": 104
+        }
+      },
+      "resources": {},
+      "title": "Place rectangle"
+    },
+    {
+      "executionState": "enabled",
+      "id": "grow",
+      "kind": "mask.grow",
+      "parameters": {
+        "expand": {
+          "$type": "integer",
+          "value": 12
+        },
+        "taperedCorners": true
+      },
+      "resources": {},
+      "title": "Grow selection"
+    },
+    {
+      "executionState": "enabled",
+      "id": "feather",
+      "kind": "mask.feather",
+      "parameters": {
+        "bottom": {
+          "$type": "integer",
+          "value": 8
+        },
+        "left": {
+          "$type": "integer",
+          "value": 8
+        },
+        "right": {
+          "$type": "integer",
+          "value": 8
+        },
+        "top": {
+          "$type": "integer",
+          "value": 8
+        }
+      },
+      "resources": {},
+      "title": "Soften edge"
+    },
+    {
+      "executionState": "enabled",
+      "id": "composite",
+      "kind": "image.compositeMasked",
+      "parameters": {},
+      "resources": {},
+      "title": "Masked replacement"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.image",
+      "parameters": {
+        "filenamePrefix": "masked-edit"
+      },
+      "resources": {},
+      "title": "Image result"
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "composite": {
+        "x": 960,
+        "y": 180
+      },
+      "empty-mask": {
+        "x": 0,
+        "y": 360
+      },
+      "feather": {
+        "x": 720,
+        "y": 420
+      },
+      "grow": {
+        "x": 480,
+        "y": 420
+      },
+      "invert": {
+        "x": 240,
+        "y": 20
+      },
+      "output": {
+        "x": 1200,
+        "y": 180
+      },
+      "place-mask": {
+        "x": 240,
+        "y": 420
+      },
+      "rectangle-mask": {
+        "x": 0,
+        "y": 570
+      },
+      "source": {
+        "x": 0,
+        "y": 120
+      }
+    },
+    "nodeSizes": {},
+    "viewportOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "viewportScale": 0.8
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

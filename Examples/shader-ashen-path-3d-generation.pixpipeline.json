@@ -1,0 +1,832 @@
+{
+  "connections" : [
+    {
+      "id" : "render.image->output.image",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "render",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "primitive-int.value->render.width",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "width"
+      },
+      "output" : {
+        "nodeID" : "primitive-int",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "primitive-int-2.value->render.height",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "height"
+      },
+      "output" : {
+        "nodeID" : "primitive-int-2",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "program-text.value->render.program",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "program"
+      },
+      "output" : {
+        "nodeID" : "program-text",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "shader-text.value->render.sourceFile",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "sourceFile"
+      },
+      "output" : {
+        "nodeID" : "shader-text",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "trackpad.x->render.pointerX",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "pointerX"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "x"
+      }
+    },
+    {
+      "id" : "trackpad.y->render.pointerY",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "pointerY"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "y"
+      }
+    },
+    {
+      "id" : "trackpad.actionCount->render.actionCount",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "actionCount"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "actionCount"
+      }
+    },
+    {
+      "id" : "camera-angles.value->render.parameters",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "parameters"
+      },
+      "output" : {
+        "nodeID" : "camera-angles",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "prompt-stone-top.prompt->generate-stone-top.prompt",
+      "input" : {
+        "nodeID" : "generate-stone-top",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-stone-top",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-stone-top.value->generate-stone-top.seed",
+      "input" : {
+        "nodeID" : "generate-stone-top",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-stone-top",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "prompt-bridge-top.prompt->generate-bridge-top.prompt",
+      "input" : {
+        "nodeID" : "generate-bridge-top",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-bridge-top",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-bridge-top.value->generate-bridge-top.seed",
+      "input" : {
+        "nodeID" : "generate-bridge-top",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-bridge-top",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "prompt-slab-side.prompt->generate-slab-side.prompt",
+      "input" : {
+        "nodeID" : "generate-slab-side",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-slab-side",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-slab-side.value->generate-slab-side.seed",
+      "input" : {
+        "nodeID" : "generate-slab-side",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-slab-side",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "generate-stone-top.image->texture-cache.asset0",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset0"
+      },
+      "output" : {
+        "nodeID" : "generate-stone-top",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "generate-bridge-top.image->texture-cache.asset1",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset1"
+      },
+      "output" : {
+        "nodeID" : "generate-bridge-top",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "generate-slab-side.image->texture-cache.asset2",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset2"
+      },
+      "output" : {
+        "nodeID" : "generate-slab-side",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "texture-cache.assets->render.assets",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "assets"
+      },
+      "output" : {
+        "nodeID" : "texture-cache",
+        "port" : "assets"
+      }
+    }
+  ],
+  "controlConnections" : [
+    {
+      "id" : "output.completed->loop.completed",
+      "input" : {
+        "nodeID" : "loop",
+        "port" : "completed"
+      },
+      "output" : {
+        "nodeID" : "output",
+        "port" : "completed"
+      }
+    },
+    {
+      "id" : "loop.repeat->start.again",
+      "input" : {
+        "nodeID" : "start",
+        "port" : "again"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "repeat"
+      }
+    }
+  ],
+  "exposedParameters" : [
+
+  ],
+  "id" : "org.pixeltje.examples.ashen-path-perspective-3d-game-generation",
+  "mode" : "generic",
+  "name" : "Ashen Path · 3D Camera · Generated Textures",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "start",
+      "kind" : "control.start",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Start \/ Next Frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "shader-text",
+      "kind" : "primitive.filePath",
+      "parameters" : {
+        "mode" : "relative",
+        "path" : "AshenPath3DGenerationProgram.metal"
+      },
+      "resources" : {
+
+      },
+      "title" : "3D game shader beside workflow"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "render",
+      "kind" : "gpu.program",
+      "parameters" : {
+        "framesPerSecond" : {
+          "$type" : "number",
+          "value" : 30
+        },
+        "seed" : {
+          "$type" : "integer",
+          "value" : 1
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "GPU Program · Ashen Path 3D"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output",
+      "kind" : "output.image",
+      "parameters" : {
+        "filenamePrefix" : "ashen-path-3d",
+        "format" : "png"
+      },
+      "resources" : {
+
+      },
+      "title" : "Game frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "loop",
+      "kind" : "control.loop",
+      "parameters" : {
+        "autoPause" : false,
+        "delayMilliseconds" : {
+          "$type" : "integer",
+          "value" : 0
+        },
+        "feedback" : "none",
+        "limitHz" : {
+          "$type" : "integer",
+          "value" : 30
+        },
+        "maxCalls" : {
+          "$type" : "integer",
+          "value" : -1
+        },
+        "seedStrategy" : "fixed"
+      },
+      "resources" : {
+
+      },
+      "title" : "Advance game world"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "note",
+      "kind" : "edit.markdownNote",
+      "parameters" : {
+        "text" : "# Ashen Path · Generated 3D textures\nOn each Run, three fixed-seed SDXS 512 jobs generate rocky earth, bridge decking, and cliff sides. Asset Cache stores the three generated images as named slots for this run. Its card previews each texture as it becomes ready. The game starts after all three are ready; later frames reuse the bundle without invoking SDXS again. Cancel and Run starts a fresh cache and regenerates all three. The model package remains link-only.\n\nThe larger continuous wilderness has no walkable cell outlines. Dense woods and boulder fields are impassable; follow the open ground around them. Click a revealed place in the Trackpad to walk; use Action or Space near the creature. Collect all seven coins and defeat the creature to light the portal."
+      },
+      "resources" : {
+
+      },
+      "title" : "How to play"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 1440
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Output width"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int-2",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 900
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Output height"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "program-text",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "{\"version\":1,\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":24576},{\"name\":\"display\",\"kind\":\"texture\"},{\"name\":\"stoneTop\",\"kind\":\"inputTexture\",\"input\":\"asset0\"},{\"name\":\"bridgeTop\",\"kind\":\"inputTexture\",\"input\":\"asset1\"},{\"name\":\"slabSide\",\"kind\":\"inputTexture\",\"input\":\"asset2\"}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeGame\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceGame\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"present\":[{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"gameFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"stoneTop\",\"2\":\"bridgeTop\",\"3\":\"slabSide\"}}],\"swaps\":[],\"output\":\"display\",\"parameters\":[\"yawDegrees\",\"pitchDegrees\"]}"
+      },
+      "resources" : {
+
+      },
+      "title" : "Game state and render passes"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "trackpad",
+      "kind" : "input.trackpad",
+      "parameters" : {
+        "engaged" : true,
+        "engagedAtCall" : {
+          "$type" : "integer",
+          "value" : 78
+        },
+        "x" : {
+          "$type" : "number",
+          "value" : 0.6580904030244173
+        },
+        "y" : {
+          "$type" : "number",
+          "value" : 0.45796770948945614
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Move \/ Action (Space)"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "camera-angles",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "{\"yawDegrees\":45,\"pitchDegrees\":55}"
+      },
+      "resources" : {
+
+      },
+      "title" : "Camera yaw \/ pitch (degrees)"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-stone-top",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless albedo material texture of dark weathered earth, scattered small flat stones, moss and gravel, irregular organic detail, evenly lit, no grid, no borders, no objects, no shadows, no writing"
+      },
+      "resources" : {
+
+      },
+      "title" : "Stone Top prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-stone-top",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 3
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Stone Top fixed seed value"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-stone-top",
+      "kind" : "coreai.sdxsGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 0
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 512
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 1
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 512
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "bfeacb45c5d75f84fea181297319ac3ecb4174a575ea7e86b7253da25980c120",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "acc841490e1cad1df183b42144879c5c8dfe3062d34a3057b9558f301f05bf1e",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "6ea8c60c7d82cd85c1966124b2f472509ef617dd22f95d7d571a04903158ffd9",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Stone Top · SDXS 512"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-bridge-top",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless albedo material texture ancient weathered warm brown timber wooden planks and worn grain, evenly lit"
+      },
+      "resources" : {
+
+      },
+      "title" : "Bridge Top prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-bridge-top",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 3119120694
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Bridge Top fixed seed value"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-bridge-top",
+      "kind" : "coreai.sdxsGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 0
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 512
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 1
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 512
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "bfeacb45c5d75f84fea181297319ac3ecb4174a575ea7e86b7253da25980c120",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "acc841490e1cad1df183b42144879c5c8dfe3062d34a3057b9558f301f05bf1e",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "6ea8c60c7d82cd85c1966124b2f472509ef617dd22f95d7d571a04903158ffd9",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Bridge Top · SDXS 512"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-slab-side",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless albedo material texture of dark weathered rock face, layered rough stone and mortar, evenly lit, no landscape, no objects, no shadows, no writing"
+      },
+      "resources" : {
+
+      },
+      "title" : "Slab Side prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-slab-side",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 60335965
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Slab Side fixed seed value"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-slab-side",
+      "kind" : "coreai.sdxsGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 0
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 512
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 1
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 512
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "bfeacb45c5d75f84fea181297319ac3ecb4174a575ea7e86b7253da25980c120",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "acc841490e1cad1df183b42144879c5c8dfe3062d34a3057b9558f301f05bf1e",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "6ea8c60c7d82cd85c1966124b2f472509ef617dd22f95d7d571a04903158ffd9",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Slab Side · SDXS 512"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "texture-cache",
+      "kind" : "cache.assets",
+      "parameters" : {
+        "slotCount" : {
+          "$type" : "integer",
+          "value" : 3
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Generated textures · run cache"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "camera-angles" : {
+        "x" : 80,
+        "y" : 500
+      },
+      "generate-bridge-top" : {
+        "x" : 1002,
+        "y" : 1149
+      },
+      "generate-slab-side" : {
+        "x" : 1610,
+        "y" : 1100
+      },
+      "generate-stone-top" : {
+        "x" : 369,
+        "y" : 1150
+      },
+      "loop" : {
+        "x" : 1990,
+        "y" : 613
+      },
+      "note" : {
+        "x" : 78,
+        "y" : 695
+      },
+      "output" : {
+        "x" : 1986,
+        "y" : 186
+      },
+      "primitive-int" : {
+        "x" : 730,
+        "y" : 130
+      },
+      "primitive-int-2" : {
+        "x" : 730,
+        "y" : 280
+      },
+      "program-text" : {
+        "x" : 112,
+        "y" : 54
+      },
+      "prompt-bridge-top" : {
+        "x" : 730,
+        "y" : 1150
+      },
+      "prompt-slab-side" : {
+        "x" : 1380,
+        "y" : 1150
+      },
+      "prompt-stone-top" : {
+        "x" : 80,
+        "y" : 1150
+      },
+      "render" : {
+        "x" : 1217,
+        "y" : 119
+      },
+      "seed-bridge-top" : {
+        "x" : 783,
+        "y" : 1278
+      },
+      "seed-slab-side" : {
+        "x" : 1380,
+        "y" : 1360
+      },
+      "seed-stone-top" : {
+        "x" : 84,
+        "y" : 1269
+      },
+      "shader-text" : {
+        "x" : 82,
+        "y" : 325
+      },
+      "start" : {
+        "x" : 1975,
+        "y" : 419
+      },
+      "texture-cache" : {
+        "x" : 825,
+        "y" : 1473
+      },
+      "trackpad" : {
+        "x" : 740,
+        "y" : 470
+      }
+    },
+    "nodeSizes" : {
+      "camera-angles" : {
+        "height" : 145,
+        "width" : 480
+      },
+      "note" : {
+        "height" : 306,
+        "width" : 310
+      },
+      "program-text" : {
+        "height" : 225,
+        "width" : 610
+      },
+      "render" : {
+        "height" : 700,
+        "width" : 652
+      },
+      "shader-text" : {
+        "height" : 160,
+        "width" : 400
+      },
+      "trackpad" : {
+        "height" : 360,
+        "width" : 300
+      }
+    },
+    "viewportOrigin" : {
+      "x" : 253.79023044272176,
+      "y" : 946.2498809448323
+    },
+    "viewportScale" : 0.967364372208415
+  },
+  "primaryOutputNodeIDs" : [
+    "output"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

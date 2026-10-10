@@ -1,0 +1,496 @@
+{
+  "connections" : [
+    {
+      "id" : "seed.seed->mosaic.seed",
+      "input" : {
+        "nodeID" : "mosaic",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "seed.seed->grain.seed",
+      "input" : {
+        "nodeID" : "grain",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "grain.image->shift.image",
+      "input" : {
+        "nodeID" : "shift",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "grain",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "trackpad.x->shift.normalizedX",
+      "input" : {
+        "nodeID" : "shift",
+        "port" : "normalizedX"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "x"
+      }
+    },
+    {
+      "id" : "mosaic.image->difference.imageA",
+      "input" : {
+        "nodeID" : "difference",
+        "port" : "imageA"
+      },
+      "output" : {
+        "nodeID" : "mosaic",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "shift.image->difference.imageB",
+      "input" : {
+        "nodeID" : "difference",
+        "port" : "imageB"
+      },
+      "output" : {
+        "nodeID" : "shift",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "trackpad.y->stripes.phase",
+      "input" : {
+        "nodeID" : "stripes",
+        "port" : "phase"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "y"
+      }
+    },
+    {
+      "id" : "mosaic.image->composite.destination",
+      "input" : {
+        "nodeID" : "composite",
+        "port" : "destination"
+      },
+      "output" : {
+        "nodeID" : "mosaic",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "difference.image->composite.source",
+      "input" : {
+        "nodeID" : "composite",
+        "port" : "source"
+      },
+      "output" : {
+        "nodeID" : "difference",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "stripes.mask->composite.mask",
+      "input" : {
+        "nodeID" : "composite",
+        "port" : "mask"
+      },
+      "output" : {
+        "nodeID" : "stripes",
+        "port" : "mask"
+      }
+    },
+    {
+      "id" : "composite.image->preview.image",
+      "input" : {
+        "nodeID" : "preview",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "composite",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "preview.image->output.image",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "preview",
+        "port" : "image"
+      }
+    }
+  ],
+  "controlConnections" : [
+    {
+      "id" : "output.completed->loop.completed",
+      "input" : {
+        "nodeID" : "loop",
+        "port" : "completed"
+      },
+      "output" : {
+        "nodeID" : "output",
+        "port" : "completed"
+      }
+    },
+    {
+      "id" : "loop.repeat->start.again",
+      "input" : {
+        "nodeID" : "start",
+        "port" : "again"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "repeat"
+      }
+    },
+    {
+      "id" : "loop.incrementSeed->seed.increment",
+      "input" : {
+        "nodeID" : "seed",
+        "port" : "increment"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "incrementSeed"
+      }
+    }
+  ],
+  "exposedParameters" : [
+
+  ],
+  "id" : "org.pixeltje.examples.artest.03-glitch-weave",
+  "mode" : "textToImage",
+  "name" : "Artest 03 · Glitch Weave",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "seed",
+      "kind" : "input.seed",
+      "parameters" : {
+        "mode" : "fixed",
+        "value" : {
+          "$type" : "integer",
+          "value" : 24092603
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Fixed art seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "trackpad",
+      "kind" : "input.trackpad",
+      "parameters" : {
+        "x" : {
+          "$type" : "number",
+          "value" : 0.8404631696428578
+        },
+        "y" : {
+          "$type" : "number",
+          "value" : 0.4868572967980307
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Offset and stripe phase"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "mosaic",
+      "kind" : "image.proceduralNoise",
+      "parameters" : {
+        "height" : {
+          "$type" : "integer",
+          "value" : 640
+        },
+        "octaves" : {
+          "$type" : "integer",
+          "value" : 3
+        },
+        "palette" : "neon",
+        "pattern" : "mosaic",
+        "salt" : {
+          "$type" : "integer",
+          "value" : 9
+        },
+        "scale" : {
+          "$type" : "number",
+          "value" : 14
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 640
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Seeded mosaic"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "grain",
+      "kind" : "image.proceduralNoise",
+      "parameters" : {
+        "height" : {
+          "$type" : "integer",
+          "value" : 640
+        },
+        "octaves" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "palette" : "coral",
+        "salt" : {
+          "$type" : "integer",
+          "value" : 56
+        },
+        "scale" : {
+          "$type" : "number",
+          "value" : 24
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 640
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Fine interference"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "shift",
+      "kind" : "image.translate",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "X shifts grain"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "difference",
+      "kind" : "image.blend",
+      "parameters" : {
+        "blendFactor" : {
+          "$type" : "number",
+          "value" : 0.84
+        },
+        "blendMode" : "difference"
+      },
+      "resources" : {
+
+      },
+      "title" : "Difference interference"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "stripes",
+      "kind" : "mask.stripes",
+      "parameters" : {
+        "count" : {
+          "$type" : "integer",
+          "value" : 15
+        },
+        "duty" : {
+          "$type" : "number",
+          "value" : 0.43
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 640
+        },
+        "orientation" : "horizontal",
+        "width" : {
+          "$type" : "integer",
+          "value" : 640
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Y moves horizontal stripes"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "composite",
+      "kind" : "image.compositeMasked",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Weave affected bands"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "preview",
+      "kind" : "output.preview",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Art preview"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output",
+      "kind" : "output.image",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Image result"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "note",
+      "kind" : "edit.markdownNote",
+      "parameters" : {
+        "text" : "# Glitch weave\nTrackpad X shifts the interference layer horizontally. Y slides the striped mask through the mosaic. With one image, release the crosshair to render; for a series, press Run. Edit the fixed seed for a new weave.\nThe Loop makes one image by default. Increase Max calls to make a series with successive seeds. Move the Trackpad while the series runs; the next image uses its latest position."
+      },
+      "resources" : {
+
+      },
+      "title" : "How to play"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "start",
+      "kind" : "control.start",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Start \/ Next Pass"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "loop",
+      "kind" : "control.loop",
+      "parameters" : {
+        "delayMilliseconds" : {
+          "$type" : "integer",
+          "value" : 0
+        },
+        "feedback" : "none",
+        "maxCalls" : {
+          "$type" : "integer",
+          "value" : -1
+        },
+        "seedStrategy" : "increment"
+      },
+      "resources" : {
+
+      },
+      "title" : "Loop · 1 image"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "composite" : {
+        "x" : 1100,
+        "y" : 130
+      },
+      "difference" : {
+        "x" : 820,
+        "y" : 70
+      },
+      "grain" : {
+        "x" : 270,
+        "y" : 190
+      },
+      "loop" : {
+        "x" : 1366,
+        "y" : 659
+      },
+      "mosaic" : {
+        "x" : 370,
+        "y" : 9
+      },
+      "note" : {
+        "x" : 0,
+        "y" : 670
+      },
+      "output" : {
+        "x" : 1463,
+        "y" : 414
+      },
+      "preview" : {
+        "x" : 1370,
+        "y" : -40
+      },
+      "seed" : {
+        "x" : 2,
+        "y" : 7
+      },
+      "shift" : {
+        "x" : 550,
+        "y" : 180
+      },
+      "start" : {
+        "x" : 1365,
+        "y" : 858
+      },
+      "stripes" : {
+        "x" : 820,
+        "y" : 370
+      },
+      "trackpad" : {
+        "x" : 825,
+        "y" : 541
+      }
+    },
+    "nodeSizes" : {
+      "preview" : {
+        "height" : 374,
+        "width" : 316
+      }
+    },
+    "viewportOrigin" : {
+      "x" : -187.14285714285734,
+      "y" : -137.14285714285748
+    },
+    "viewportScale" : 0.7
+  },
+  "primaryOutputNodeIDs" : [
+    "output"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

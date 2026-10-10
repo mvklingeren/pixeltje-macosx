@@ -1,0 +1,1247 @@
+{
+  "connections" : [
+    {
+      "id" : "render.image->output.image",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "render",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "primitive-int.value->render.width",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "width"
+      },
+      "output" : {
+        "nodeID" : "primitive-int",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "primitive-int-2.value->render.height",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "height"
+      },
+      "output" : {
+        "nodeID" : "primitive-int-2",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "program-text.value->render.program",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "program"
+      },
+      "output" : {
+        "nodeID" : "program-text",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "shader-text.value->render.sourceFile",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "sourceFile"
+      },
+      "output" : {
+        "nodeID" : "shader-text",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "trackpad.x->render.pointerX",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "pointerX"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "x"
+      }
+    },
+    {
+      "id" : "trackpad.y->render.pointerY",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "pointerY"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "y"
+      }
+    },
+    {
+      "id" : "trackpad.actionCount->render.actionCount",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "actionCount"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "actionCount"
+      }
+    },
+    {
+      "id" : "game-settings.value->render.parameters",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "parameters"
+      },
+      "output" : {
+        "nodeID" : "game-settings",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "prompt-backdrop.prompt->generate-backdrop.prompt",
+      "input" : {
+        "nodeID" : "generate-backdrop",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-backdrop",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-backdrop.seed->generate-backdrop.seed",
+      "input" : {
+        "nodeID" : "generate-backdrop",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-backdrop",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "generate-backdrop.image->texture-cache.asset0",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset0"
+      },
+      "output" : {
+        "nodeID" : "generate-backdrop",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-sand.prompt->generate-sand.prompt",
+      "input" : {
+        "nodeID" : "generate-sand",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-sand",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-sand.value->generate-sand.seed",
+      "input" : {
+        "nodeID" : "generate-sand",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-sand",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "generate-sand.image->texture-cache.asset1",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset1"
+      },
+      "output" : {
+        "nodeID" : "generate-sand",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-jelly.prompt->generate-jelly.prompt",
+      "input" : {
+        "nodeID" : "generate-jelly",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-jelly",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-jelly.value->generate-jelly.seed",
+      "input" : {
+        "nodeID" : "generate-jelly",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-jelly",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "generate-jelly.image->texture-cache.asset2",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset2"
+      },
+      "output" : {
+        "nodeID" : "generate-jelly",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-fruit.prompt->generate-fruit.prompt",
+      "input" : {
+        "nodeID" : "generate-fruit",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-fruit",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-fruit.value->generate-fruit.seed",
+      "input" : {
+        "nodeID" : "generate-fruit",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-fruit",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "generate-fruit.image->texture-cache.asset3",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset3"
+      },
+      "output" : {
+        "nodeID" : "generate-fruit",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-pebbles.prompt->generate-pebbles.prompt",
+      "input" : {
+        "nodeID" : "generate-pebbles",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-pebbles",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-pebbles.value->generate-pebbles.seed",
+      "input" : {
+        "nodeID" : "generate-pebbles",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-pebbles",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "generate-pebbles.image->texture-cache.asset4",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset4"
+      },
+      "output" : {
+        "nodeID" : "generate-pebbles",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-shell.prompt->generate-shell.prompt",
+      "input" : {
+        "nodeID" : "generate-shell",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-shell",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-shell.value->generate-shell.seed",
+      "input" : {
+        "nodeID" : "generate-shell",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-shell",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "generate-shell.image->texture-cache.asset5",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset5"
+      },
+      "output" : {
+        "nodeID" : "generate-shell",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "texture-cache.assets->render.assets",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "assets"
+      },
+      "output" : {
+        "nodeID" : "texture-cache",
+        "port" : "assets"
+      }
+    }
+  ],
+  "controlConnections" : [
+    {
+      "id" : "output.completed->loop.completed",
+      "input" : {
+        "nodeID" : "loop",
+        "port" : "completed"
+      },
+      "output" : {
+        "nodeID" : "output",
+        "port" : "completed"
+      }
+    },
+    {
+      "id" : "loop.repeat->start.again",
+      "input" : {
+        "nodeID" : "start",
+        "port" : "again"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "repeat"
+      }
+    }
+  ],
+  "exposedParameters" : [
+
+  ],
+  "id" : "org.pixeltje.examples.jellyloop-lagoon-generation",
+  "mode" : "generic",
+  "name" : "Jellyloop Lagoon · Bubble Lasso · Generated Textures",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "start",
+      "kind" : "control.start",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Start \/ Next Frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "shader-text",
+      "kind" : "primitive.filePath",
+      "parameters" : {
+        "mode" : "relative",
+        "path" : "JellyloopLagoonGenerationProgram.metal"
+      },
+      "resources" : {
+
+      },
+      "title" : "Jellyloop Lagoon shader beside workflow"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "render",
+      "kind" : "gpu.program",
+      "parameters" : {
+        "framesPerSecond" : {
+          "$type" : "number",
+          "value" : 120
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 768
+        },
+        "seed" : {
+          "$type" : "integer",
+          "value" : 1
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "GPU Program · Tiltwood Labyrinth"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output",
+      "kind" : "output.image",
+      "parameters" : {
+        "filenamePrefix" : "jellyloop-lagoon",
+        "format" : "png"
+      },
+      "resources" : {
+
+      },
+      "title" : "Game frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "loop",
+      "kind" : "control.loop",
+      "parameters" : {
+        "autoPause" : false,
+        "delayMilliseconds" : {
+          "$type" : "integer",
+          "value" : 0
+        },
+        "feedback" : "none",
+        "limitHz" : {
+          "$type" : "integer",
+          "value" : 30
+        },
+        "maxCalls" : {
+          "$type" : "integer",
+          "value" : -1
+        },
+        "seedStrategy" : "fixed"
+      },
+      "resources" : {
+
+      },
+      "title" : "Advance the lagoon"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "note",
+      "kind" : "edit.markdownNote",
+      "parameters" : {
+        "text" : "# Jellyloop Lagoon · Generated textures\nA lasso-drawing arcade game in a goofy cartoon seabed town. Bixby the seahorse fills jelly orders for the Soggy Bun, a scallop-shell diner in Fizzwater Flats, between pear, pebble and lemon houses. On each Run, one fixed-seed FLUX.2 Klein 4B Distilled job paints the 1024 × 1024 lagoon backdrop, and five fixed-seed SDXS 512 jobs generate the seabed sand, the jelly skin, the fruit-house peel, the pastel pebbles and the striped diner shell. Asset Cache stores the six images as named slots for this run and previews each one as it becomes ready. The game starts after all six are ready; later frames reuse the bundle without running either model again. Cancel and Run starts a fresh cache and regenerates all six. Both model packages remain link-only; link the Klein node to the same 4B Distilled package as the bundled Klein example.\n\n**Controls.** Drag in the Trackpad, or drag on the full-screen preview, to swim: Bixby's bubble wand follows the pointer and leaves a trail of soap bubbles. Press Action or Space to start, to toot the bubble horn during a shift (it pushes nearby Grumbles away and stuns them; three toots per shift), and to continue from a result screen.\n\n**Goal.** Draw loops around jellyfish. When your trail crosses itself, or the wand touches an older bubble (the glowing ring), every jelly inside the loop is caught; several jellies in one loop multiply their points. Fill each shift's order (pink, blue and lime counts in the top bar) before the clock runs out. Golden jellies are shy, score extra and add five seconds. Grumbles, the spiky pufferfish, pop any trail they touch and cost a heart when they bump Bixby or end up inside your loop. Serve all four shifts to win. Running out of time or hearts lets you retry the shift with full hearts.\n\n**Settings.** The Game settings JSON sets `shiftTimeScale` (0.5–3), `startingHearts` (1–9), `tootsPerShift` (0–9) and `firstShift` (1–4). Changing a setting restarts the run."
+      },
+      "resources" : {
+
+      },
+      "title" : "How to play"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 1440
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Output width"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int-2",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 900
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Output height"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "program-text",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "{\"version\":1,\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":4096},{\"name\":\"display\",\"kind\":\"texture\"},{\"name\":\"backdropTexture\",\"kind\":\"inputTexture\",\"input\":\"asset0\"},{\"name\":\"sandTexture\",\"kind\":\"inputTexture\",\"input\":\"asset1\"},{\"name\":\"jellyTexture\",\"kind\":\"inputTexture\",\"input\":\"asset2\"},{\"name\":\"fruitTexture\",\"kind\":\"inputTexture\",\"input\":\"asset3\"},{\"name\":\"pebbleTexture\",\"kind\":\"inputTexture\",\"input\":\"asset4\"},{\"name\":\"shellTexture\",\"kind\":\"inputTexture\",\"input\":\"asset5\"}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeLagoon\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceLagoon\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"present\":[{\"kind\":\"render\",\"vertex\":\"lagoonVertex\",\"fragment\":\"lagoonFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"backdropTexture\",\"2\":\"sandTexture\",\"3\":\"jellyTexture\",\"4\":\"fruitTexture\",\"5\":\"pebbleTexture\",\"6\":\"shellTexture\"}}],\"swaps\":[],\"output\":\"display\",\"parameters\":[\"shiftTimeScale\",\"startingHearts\",\"tootsPerShift\",\"firstShift\"]}"
+      },
+      "resources" : {
+
+      },
+      "title" : "Game state and render passes"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "trackpad",
+      "kind" : "input.trackpad",
+      "parameters" : {
+        "engaged" : true,
+        "engagedAtCall" : {
+          "$type" : "integer",
+          "value" : 146
+        },
+        "x" : {
+          "$type" : "number",
+          "value" : 0.2847042782325194
+        },
+        "y" : {
+          "$type" : "number",
+          "value" : 0.5807999791897891
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Swim with the wand · Toot (Action \/ Space)"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "game-settings",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "{\"shiftTimeScale\":1,\"startingHearts\":3,\"tootsPerShift\":3,\"firstShift\":1}"
+      },
+      "resources" : {
+
+      },
+      "title" : "Game settings (time scale, hearts, toots, first shift)"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-backdrop",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "bright cheerful cartoon underwater lagoon background for a 2D game, looking through clear turquoise water toward a sunlit surface, big flat pastel flower-shaped light patches drifting in the water, soft sunbeams and small bubbles, distant pink coral reef and swaying green kelp silhouettes along the bottom, playful hand-drawn vector illustration, soft gradients, saturated pastel colors, no characters, no animals, no buildings, no text"
+      },
+      "resources" : {
+
+      },
+      "title" : "Lagoon Backdrop prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-backdrop",
+      "kind" : "input.seed",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 20261004
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Lagoon Backdrop fixed seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-backdrop",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Lagoon Backdrop · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-sand",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless albedo material texture of soft pastel peach cartoon seabed sand, fine grains with tiny white seashells and pink pebbles, flat bright colors, evenly lit, no borders, no objects, no shadows, no writing"
+      },
+      "resources" : {
+
+      },
+      "title" : "Seabed Sand prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-sand",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 4242
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Seabed Sand fixed seed value"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-sand",
+      "kind" : "coreai.sdxsGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 0
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 512
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 1
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 512
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "bfeacb45c5d75f84fea181297319ac3ecb4174a575ea7e86b7253da25980c120",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "acc841490e1cad1df183b42144879c5c8dfe3062d34a3057b9558f301f05bf1e",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "6ea8c60c7d82cd85c1966124b2f472509ef617dd22f95d7d571a04903158ffd9",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Seabed Sand · SDXS 512"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-jelly",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless texture of glossy translucent pink jelly, soft swirls and tiny air bubbles, candy colored gelatin surface, evenly lit, no borders, no objects, no writing"
+      },
+      "resources" : {
+
+      },
+      "title" : "Jelly Skin prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-jelly",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 77031
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Jelly Skin fixed seed value"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-jelly",
+      "kind" : "coreai.sdxsGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 0
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 512
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 1
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 512
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "bfeacb45c5d75f84fea181297319ac3ecb4174a575ea7e86b7253da25980c120",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "acc841490e1cad1df183b42144879c5c8dfe3062d34a3057b9558f301f05bf1e",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "6ea8c60c7d82cd85c1966124b2f472509ef617dd22f95d7d571a04903158ffd9",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Jelly Skin · SDXS 512"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-fruit",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless albedo material texture of bright cartoon pear skin, glossy yellow green peel with small brown speckles, evenly lit, no stem, no borders, no objects, no shadows, no writing"
+      },
+      "resources" : {
+
+      },
+      "title" : "Fruit House Peel prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-fruit",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 9001
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Fruit House Peel fixed seed value"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-fruit",
+      "kind" : "coreai.sdxsGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 0
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 512
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 1
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 512
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "bfeacb45c5d75f84fea181297319ac3ecb4174a575ea7e86b7253da25980c120",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "acc841490e1cad1df183b42144879c5c8dfe3062d34a3057b9558f301f05bf1e",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "6ea8c60c7d82cd85c1966124b2f472509ef617dd22f95d7d571a04903158ffd9",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Fruit House Peel · SDXS 512"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-pebbles",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless albedo material texture of smooth rounded pastel lilac and sky blue pebbles packed together, cartoon stone wall, evenly lit, no borders, no objects, no shadows, no writing"
+      },
+      "resources" : {
+
+      },
+      "title" : "Pastel Pebbles prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-pebbles",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 31337
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Pastel Pebbles fixed seed value"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-pebbles",
+      "kind" : "coreai.sdxsGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 0
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 512
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 1
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 512
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "bfeacb45c5d75f84fea181297319ac3ecb4174a575ea7e86b7253da25980c120",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "acc841490e1cad1df183b42144879c5c8dfe3062d34a3057b9558f301f05bf1e",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "6ea8c60c7d82cd85c1966124b2f472509ef617dd22f95d7d571a04903158ffd9",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Pastel Pebbles · SDXS 512"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-shell",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless albedo material texture of a glossy pink and cream striped seashell surface with a pearly iridescent sheen, cartoon style, evenly lit, no borders, no objects, no shadows, no writing"
+      },
+      "resources" : {
+
+      },
+      "title" : "Diner Shell prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-shell",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 161803
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Diner Shell fixed seed value"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-shell",
+      "kind" : "coreai.sdxsGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 0
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 512
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 1
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 512
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "bfeacb45c5d75f84fea181297319ac3ecb4174a575ea7e86b7253da25980c120",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "acc841490e1cad1df183b42144879c5c8dfe3062d34a3057b9558f301f05bf1e",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "6ea8c60c7d82cd85c1966124b2f472509ef617dd22f95d7d571a04903158ffd9",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Diner Shell · SDXS 512"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "texture-cache",
+      "kind" : "cache.assets",
+      "parameters" : {
+        "keepBetweenRuns" : true,
+        "slotCount" : {
+          "$type" : "integer",
+          "value" : 6
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Generated textures · run cache"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "game-settings" : {
+        "x" : 80,
+        "y" : 548
+      },
+      "generate-backdrop" : {
+        "x" : 325,
+        "y" : 1350
+      },
+      "generate-fruit" : {
+        "x" : 1765,
+        "y" : 1350
+      },
+      "generate-jelly" : {
+        "x" : 1285,
+        "y" : 1350
+      },
+      "generate-pebbles" : {
+        "x" : 2245,
+        "y" : 1350
+      },
+      "generate-sand" : {
+        "x" : 805,
+        "y" : 1350
+      },
+      "generate-shell" : {
+        "x" : 2725,
+        "y" : 1350
+      },
+      "loop" : {
+        "x" : 1840,
+        "y" : 480
+      },
+      "note" : {
+        "x" : 80,
+        "y" : 700
+      },
+      "output" : {
+        "x" : 1840,
+        "y" : 100
+      },
+      "primitive-int" : {
+        "x" : 740,
+        "y" : 60
+      },
+      "primitive-int-2" : {
+        "x" : 740,
+        "y" : 220
+      },
+      "program-text" : {
+        "x" : 79,
+        "y" : 92
+      },
+      "prompt-backdrop" : {
+        "x" : 80,
+        "y" : 1300
+      },
+      "prompt-fruit" : {
+        "x" : 1520,
+        "y" : 1300
+      },
+      "prompt-jelly" : {
+        "x" : 1040,
+        "y" : 1300
+      },
+      "prompt-pebbles" : {
+        "x" : 2000,
+        "y" : 1300
+      },
+      "prompt-sand" : {
+        "x" : 560,
+        "y" : 1300
+      },
+      "prompt-shell" : {
+        "x" : 2480,
+        "y" : 1300
+      },
+      "render" : {
+        "x" : 1121,
+        "y" : 77
+      },
+      "seed-backdrop" : {
+        "x" : 80,
+        "y" : 1410
+      },
+      "seed-fruit" : {
+        "x" : 1520,
+        "y" : 1410
+      },
+      "seed-jelly" : {
+        "x" : 1040,
+        "y" : 1410
+      },
+      "seed-pebbles" : {
+        "x" : 2000,
+        "y" : 1410
+      },
+      "seed-sand" : {
+        "x" : 560,
+        "y" : 1410
+      },
+      "seed-shell" : {
+        "x" : 2480,
+        "y" : 1410
+      },
+      "shader-text" : {
+        "x" : 115,
+        "y" : 334
+      },
+      "start" : {
+        "x" : 1840,
+        "y" : 340
+      },
+      "texture-cache" : {
+        "x" : 1280,
+        "y" : 1640
+      },
+      "trackpad" : {
+        "x" : 732,
+        "y" : 392
+      }
+    },
+    "nodeSizes" : {
+      "game-settings" : {
+        "height" : 160,
+        "width" : 480
+      },
+      "note" : {
+        "height" : 540,
+        "width" : 640
+      },
+      "program-text" : {
+        "height" : 225,
+        "width" : 610
+      },
+      "render" : {
+        "height" : 700,
+        "width" : 652
+      },
+      "shader-text" : {
+        "height" : 160,
+        "width" : 400
+      },
+      "texture-cache" : {
+        "height" : 470,
+        "width" : 360
+      },
+      "trackpad" : {
+        "height" : 360,
+        "width" : 300
+      }
+    },
+    "viewportOrigin" : {
+      "x" : -109.09090909090904,
+      "y" : -34.545454545454476
+    },
+    "viewportScale" : 0.55
+  },
+  "primaryOutputNodeIDs" : [
+    "output"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

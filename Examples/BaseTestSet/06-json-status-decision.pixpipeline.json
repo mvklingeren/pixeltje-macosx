@@ -1,0 +1,202 @@
+{
+  "connections": [
+    {
+      "id": "status.value->extract.json",
+      "input": {
+        "nodeID": "extract",
+        "port": "json"
+      },
+      "output": {
+        "nodeID": "status",
+        "port": "value"
+      }
+    },
+    {
+      "id": "extract.value->compare.stringA",
+      "input": {
+        "nodeID": "compare",
+        "port": "stringA"
+      },
+      "output": {
+        "nodeID": "extract",
+        "port": "value"
+      }
+    },
+    {
+      "id": "compare.result->decision.condition",
+      "input": {
+        "nodeID": "decision",
+        "port": "condition"
+      },
+      "output": {
+        "nodeID": "compare",
+        "port": "result"
+      }
+    },
+    {
+      "id": "yes.value->decision.trueValue",
+      "input": {
+        "nodeID": "decision",
+        "port": "trueValue"
+      },
+      "output": {
+        "nodeID": "yes",
+        "port": "value"
+      }
+    },
+    {
+      "id": "no.value->decision.falseValue",
+      "input": {
+        "nodeID": "decision",
+        "port": "falseValue"
+      },
+      "output": {
+        "nodeID": "no",
+        "port": "value"
+      }
+    },
+    {
+      "id": "decision.value->output.text",
+      "input": {
+        "nodeID": "output",
+        "port": "text"
+      },
+      "output": {
+        "nodeID": "decision",
+        "port": "value"
+      }
+    }
+  ],
+  "exposedParameters": [
+    {
+      "defaultValue": "{\"status\":\"ready\"}",
+      "id": "status-json",
+      "label": "Status JSON",
+      "target": {
+        "nodeID": "status",
+        "parameter": "value"
+      },
+      "valueType": "string"
+    }
+  ],
+  "id": "org.pixeltje.examples.base-test-set.06-json-status-decision",
+  "mode": "generic",
+  "name": "Base Test Set 06 · JSON Status Decision",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "status",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": "{\"status\":\"ready\"}"
+      },
+      "resources": {},
+      "title": "JSON status"
+    },
+    {
+      "executionState": "enabled",
+      "id": "extract",
+      "kind": "text.jsonExtract",
+      "parameters": {
+        "key": "status"
+      },
+      "resources": {},
+      "title": "Extract status"
+    },
+    {
+      "executionState": "enabled",
+      "id": "compare",
+      "kind": "text.compare",
+      "parameters": {
+        "caseSensitive": true,
+        "mode": "Equal",
+        "stringB": "ready"
+      },
+      "resources": {},
+      "title": "Is ready"
+    },
+    {
+      "executionState": "enabled",
+      "id": "yes",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": "Dispatch approved"
+      },
+      "resources": {},
+      "title": "Approved"
+    },
+    {
+      "executionState": "enabled",
+      "id": "no",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": "Dispatch paused"
+      },
+      "resources": {},
+      "title": "Paused"
+    },
+    {
+      "executionState": "enabled",
+      "id": "decision",
+      "kind": "logic.ifElse",
+      "parameters": {},
+      "resources": {},
+      "title": "Choose message"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.text",
+      "parameters": {},
+      "resources": {},
+      "title": "Text result"
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "compare": {
+        "x": 480,
+        "y": 120
+      },
+      "decision": {
+        "x": 720,
+        "y": 180
+      },
+      "extract": {
+        "x": 240,
+        "y": 120
+      },
+      "no": {
+        "x": 480,
+        "y": 500
+      },
+      "output": {
+        "x": 960,
+        "y": 180
+      },
+      "status": {
+        "x": 0,
+        "y": 120
+      },
+      "yes": {
+        "x": 480,
+        "y": 340
+      }
+    },
+    "nodeSizes": {},
+    "viewportOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "viewportScale": 0.8
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

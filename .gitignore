@@ -1,0 +1,36 @@
+.DS_Store
+.build/
+.swiftpm/
+*.xcuserstate
+xcuserdata/
+
+
+# Agent worktrees and local session state
+.claude/
+.hermes/
+.vscode/
+
+# Offline learned-model inputs and generated Core AI packages must never enter Git.
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.mlmodel
+*.mlpackage/
+*.mlmodelc/
+*.aimodel/
+*.aimodelc/
+*.pixaimodel/
+.zimage-build/
+__pycache__/
+.worktrees/
+
+# The green-screen example links to a local user-supplied clip.
+Examples/greenscreen.mp4
+
+# Documentation is not published yet. Only the model setup guide, which the
+# Pipeline app bundles, is tracked.
+/Documentation/*
+!/Documentation/UserGuide/
+/Documentation/UserGuide/*
+!/Documentation/UserGuide/Model-Setup-Guide.html

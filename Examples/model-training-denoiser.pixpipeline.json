@@ -1,0 +1,169 @@
+{
+  "connections" : [
+    {
+      "id" : "6a04758f-d8da-4667-b234-d37fe896a550.tensor->06200cc7-1f0c-4ed5-9ae0-18a2f1262f07.input",
+      "input" : {
+        "nodeID" : "06200cc7-1f0c-4ed5-9ae0-18a2f1262f07",
+        "port" : "input"
+      },
+      "output" : {
+        "nodeID" : "6a04758f-d8da-4667-b234-d37fe896a550",
+        "port" : "tensor"
+      }
+    },
+    {
+      "id" : "06200cc7-1f0c-4ed5-9ae0-18a2f1262f07.tensor->b38e2249-abf1-41f8-92c1-e00f43dc282f.input",
+      "input" : {
+        "nodeID" : "b38e2249-abf1-41f8-92c1-e00f43dc282f",
+        "port" : "input"
+      },
+      "output" : {
+        "nodeID" : "06200cc7-1f0c-4ed5-9ae0-18a2f1262f07",
+        "port" : "tensor"
+      }
+    },
+    {
+      "id" : "b38e2249-abf1-41f8-92c1-e00f43dc282f.model->model-train.model",
+      "input" : {
+        "nodeID" : "model-train",
+        "port" : "model"
+      },
+      "output" : {
+        "nodeID" : "b38e2249-abf1-41f8-92c1-e00f43dc282f",
+        "port" : "model"
+      }
+    }
+  ],
+  "controlConnections" : [
+
+  ],
+  "exposedParameters" : [
+
+  ],
+  "id" : "ea81de75-a7d7-4010-9300-e18482d9ab66",
+  "mode" : "generic",
+  "name" : "Image Model",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "6a04758f-d8da-4667-b234-d37fe896a550",
+      "kind" : "model.input",
+      "parameters" : {
+        "channels" : {
+          "$type" : "integer",
+          "value" : 3
+        },
+        "dtype" : "float32",
+        "height" : {
+          "$type" : "integer",
+          "value" : 64
+        },
+        "name" : "image",
+        "width" : {
+          "$type" : "integer",
+          "value" : 64
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "image"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "06200cc7-1f0c-4ed5-9ae0-18a2f1262f07",
+      "kind" : "model.layer",
+      "parameters" : {
+        "kernelSize" : {
+          "$type" : "integer",
+          "value" : 3
+        },
+        "name" : "Conv2D",
+        "operation" : "conv2d",
+        "units" : {
+          "$type" : "integer",
+          "value" : 3
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Conv2D"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "b38e2249-abf1-41f8-92c1-e00f43dc282f",
+      "kind" : "model.output",
+      "parameters" : {
+        "name" : "output"
+      },
+      "resources" : {
+
+      },
+      "title" : "output"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "model-train",
+      "kind" : "model.train",
+      "parameters" : {
+        "batchSize" : {
+          "$type" : "integer",
+          "value" : 8
+        },
+        "epochs" : {
+          "$type" : "integer",
+          "value" : 10
+        },
+        "learningRate" : {
+          "$type" : "number",
+          "value" : 0.001
+        },
+        "seed" : {
+          "$type" : "integer",
+          "value" : 42
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Train Model"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "06200cc7-1f0c-4ed5-9ae0-18a2f1262f07" : {
+        "x" : 280,
+        "y" : 150
+      },
+      "6a04758f-d8da-4667-b234-d37fe896a550" : {
+        "x" : 40,
+        "y" : 150
+      },
+      "b38e2249-abf1-41f8-92c1-e00f43dc282f" : {
+        "x" : 520,
+        "y" : 150
+      },
+      "model-train" : {
+        "x" : 760,
+        "y" : 150
+      }
+    },
+    "nodeSizes" : {
+
+    }
+  },
+  "primaryOutputNodeIDs" : [
+    "model-train"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

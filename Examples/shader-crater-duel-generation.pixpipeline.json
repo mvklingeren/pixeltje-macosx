@@ -1,0 +1,1048 @@
+{
+  "connections" : [
+    {
+      "id" : "render.image->output.image",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "render",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "primitive-int.value->render.width",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "width"
+      },
+      "output" : {
+        "nodeID" : "primitive-int",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "primitive-int-2.value->render.height",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "height"
+      },
+      "output" : {
+        "nodeID" : "primitive-int-2",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "program-text.value->render.program",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "program"
+      },
+      "output" : {
+        "nodeID" : "program-text",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "shader-text.value->render.sourceFile",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "sourceFile"
+      },
+      "output" : {
+        "nodeID" : "shader-text",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "trackpad.x->render.pointerX",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "pointerX"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "x"
+      }
+    },
+    {
+      "id" : "trackpad.y->render.pointerY",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "pointerY"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "y"
+      }
+    },
+    {
+      "id" : "trackpad.actionCount->render.actionCount",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "actionCount"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "actionCount"
+      }
+    },
+    {
+      "id" : "game-settings.value->render.parameters",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "parameters"
+      },
+      "output" : {
+        "nodeID" : "game-settings",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "prompt-soil.prompt->generate-soil.prompt",
+      "input" : {
+        "nodeID" : "generate-soil",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-soil",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-soil.value->generate-soil.seed",
+      "input" : {
+        "nodeID" : "generate-soil",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-soil",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "generate-soil.image->texture-cache.asset0",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset0"
+      },
+      "output" : {
+        "nodeID" : "generate-soil",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-grass.prompt->generate-grass.prompt",
+      "input" : {
+        "nodeID" : "generate-grass",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-grass",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-grass.value->generate-grass.seed",
+      "input" : {
+        "nodeID" : "generate-grass",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-grass",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "generate-grass.image->texture-cache.asset1",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset1"
+      },
+      "output" : {
+        "nodeID" : "generate-grass",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-bedrock.prompt->generate-bedrock.prompt",
+      "input" : {
+        "nodeID" : "generate-bedrock",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-bedrock",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-bedrock.value->generate-bedrock.seed",
+      "input" : {
+        "nodeID" : "generate-bedrock",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-bedrock",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "generate-bedrock.image->texture-cache.asset2",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset2"
+      },
+      "output" : {
+        "nodeID" : "generate-bedrock",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-armor.prompt->generate-armor.prompt",
+      "input" : {
+        "nodeID" : "generate-armor",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-armor",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-armor.value->generate-armor.seed",
+      "input" : {
+        "nodeID" : "generate-armor",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-armor",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "generate-armor.image->texture-cache.asset3",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset3"
+      },
+      "output" : {
+        "nodeID" : "generate-armor",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "prompt-sky.prompt->generate-sky.prompt",
+      "input" : {
+        "nodeID" : "generate-sky",
+        "port" : "prompt"
+      },
+      "output" : {
+        "nodeID" : "prompt-sky",
+        "port" : "prompt"
+      }
+    },
+    {
+      "id" : "seed-sky.value->generate-sky.seed",
+      "input" : {
+        "nodeID" : "generate-sky",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed-sky",
+        "port" : "value"
+      }
+    },
+    {
+      "id" : "generate-sky.image->texture-cache.asset4",
+      "input" : {
+        "nodeID" : "texture-cache",
+        "port" : "asset4"
+      },
+      "output" : {
+        "nodeID" : "generate-sky",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "texture-cache.assets->render.assets",
+      "input" : {
+        "nodeID" : "render",
+        "port" : "assets"
+      },
+      "output" : {
+        "nodeID" : "texture-cache",
+        "port" : "assets"
+      }
+    }
+  ],
+  "controlConnections" : [
+    {
+      "id" : "output.completed->loop.completed",
+      "input" : {
+        "nodeID" : "loop",
+        "port" : "completed"
+      },
+      "output" : {
+        "nodeID" : "output",
+        "port" : "completed"
+      }
+    },
+    {
+      "id" : "loop.repeat->start.again",
+      "input" : {
+        "nodeID" : "start",
+        "port" : "again"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "repeat"
+      }
+    }
+  ],
+  "exposedParameters" : [],
+  "id" : "org.pixeltje.examples.crater-duel-generation",
+  "mode" : "generic",
+  "name" : "Crater Duel · Artillery · Generated Textures",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "start",
+      "kind" : "control.start",
+      "parameters" : {},
+      "resources" : {},
+      "title" : "Start \/ Next Frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "shader-text",
+      "kind" : "primitive.filePath",
+      "parameters" : {
+        "mode" : "relative",
+        "path" : "CraterDuelGenerationProgram.metal"
+      },
+      "resources" : {},
+      "title" : "Crater Duel shader beside workflow"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "render",
+      "kind" : "gpu.program",
+      "parameters" : {
+        "framesPerSecond" : {
+          "$type" : "number",
+          "value" : 30
+        },
+        "seed" : {
+          "$type" : "integer",
+          "value" : 1
+        }
+      },
+      "resources" : {},
+      "title" : "GPU Program · Crater Duel"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output",
+      "kind" : "output.image",
+      "parameters" : {
+        "filenamePrefix" : "crater-duel",
+        "format" : "png"
+      },
+      "resources" : {},
+      "title" : "Game frame"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "loop",
+      "kind" : "control.loop",
+      "parameters" : {
+        "autoPause" : false,
+        "delayMilliseconds" : {
+          "$type" : "integer",
+          "value" : 0
+        },
+        "feedback" : "none",
+        "limitHz" : {
+          "$type" : "integer",
+          "value" : 30
+        },
+        "maxCalls" : {
+          "$type" : "integer",
+          "value" : -1
+        },
+        "seedStrategy" : "fixed"
+      },
+      "resources" : {},
+      "title" : "Advance the duel"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "note",
+      "kind" : "edit.markdownNote",
+      "parameters" : {
+        "text" : "# Crater Duel · Generated textures\nA turn-based artillery duel across a destructible ridge. On each Run, one fixed-seed FLUX.2 Klein 4B Distilled job generates the soil at 1024 × 1024, and four fixed-seed SDXS 512 jobs generate the meadow turf, the bedrock, the tank armor plate, and the dusk sky backdrop. Asset Cache stores the five images as named slots for this run and previews each one as it becomes ready. The duel starts after all five are ready; later frames reuse the bundle without invoking either model again. Cancel and Run starts a fresh cache and regenerates all five. Both model packages remain link-only.\n\n**Controls.** Drag the Trackpad crosshair, or drag on the full-screen preview, to aim your green tank on the left: the direction from its turret to the crosshair sets the barrel angle, and the distance sets the power (both are shown top left). The dotted guide shows the start of the arc without wind. Press Action or Space to fire.\n\n**Goal.** Shells fall under gravity and drift with the wind shown at the top. Every blast carves a crater and damages nearby tanks; tanks drop into craters dug beneath them. The red enemy fires back and tightens its aim after each shot, so strike first. Destroy it to win the round, then press Space for a new ridge; win five rounds to conquer the ridge. Score counts damage dealt, direct hits, and round bonuses for remaining armor and few shots. If your tank is destroyed, press Space to start a new campaign.\n\n**Settings.** The game settings JSON sets `windStrength` (0 calm, 1 normal, up to 3), `enemySkill` (1 normal; higher aims better), and `roundsToWin` (1–9). Changing a setting restarts the duel."
+      },
+      "resources" : {},
+      "title" : "How to play"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 1440
+        }
+      },
+      "resources" : {},
+      "title" : "Output width"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "primitive-int-2",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 900
+        }
+      },
+      "resources" : {},
+      "title" : "Output height"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "program-text",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "{\"version\":1,\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":8192},{\"name\":\"display\",\"kind\":\"texture\"},{\"name\":\"soilTexture\",\"kind\":\"inputTexture\",\"input\":\"asset0\"},{\"name\":\"grassTexture\",\"kind\":\"inputTexture\",\"input\":\"asset1\"},{\"name\":\"rockTexture\",\"kind\":\"inputTexture\",\"input\":\"asset2\"},{\"name\":\"armorTexture\",\"kind\":\"inputTexture\",\"input\":\"asset3\"},{\"name\":\"skyTexture\",\"kind\":\"inputTexture\",\"input\":\"asset4\"}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeDuel\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceDuel\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"present\":[{\"kind\":\"render\",\"vertex\":\"duelVertex\",\"fragment\":\"duelFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"soilTexture\",\"2\":\"grassTexture\",\"3\":\"rockTexture\",\"4\":\"armorTexture\",\"5\":\"skyTexture\"}}],\"swaps\":[],\"output\":\"display\",\"parameters\":[\"windStrength\",\"enemySkill\",\"roundsToWin\"]}"
+      },
+      "resources" : {},
+      "title" : "Game state and render passes"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "trackpad",
+      "kind" : "input.trackpad",
+      "parameters" : {
+        "engaged" : false,
+        "engagedAtCall" : {
+          "$type" : "integer",
+          "value" : 0
+        },
+        "x" : {
+          "$type" : "number",
+          "value" : 0.5
+        },
+        "y" : {
+          "$type" : "number",
+          "value" : 0.5
+        }
+      },
+      "resources" : {},
+      "title" : "Aim crosshair · Fire (Action \/ Space)"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "game-settings",
+      "kind" : "primitive.string",
+      "parameters" : {
+        "value" : "{\"windStrength\":1,\"enemySkill\":1,\"roundsToWin\":5}"
+      },
+      "resources" : {},
+      "title" : "Game settings (wind, enemy skill, rounds)"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-soil",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless albedo material texture of layered brown earth cross-section, packed soil with small pebbles, roots and clay streaks, evenly lit, no grid, no borders, no objects, no shadows, no writing"
+      },
+      "resources" : {},
+      "title" : "Soil prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-soil",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 7
+        }
+      },
+      "resources" : {},
+      "title" : "Soil fixed seed value"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-soil",
+      "kind" : "coreai.flux2KleinGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 1
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 1024
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 1024
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI" : "flux2-klein-4b-coreai@2",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion" : "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Soil · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-grass",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless albedo material texture of dense short green meadow grass, fresh lush blades, evenly lit, no flowers, no borders, no objects, no shadows, no writing"
+      },
+      "resources" : {},
+      "title" : "Meadow Turf prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-grass",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 1129
+        }
+      },
+      "resources" : {},
+      "title" : "Meadow Turf fixed seed value"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-grass",
+      "kind" : "coreai.sdxsGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 0
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 512
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 1
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 512
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "bfeacb45c5d75f84fea181297319ac3ecb4174a575ea7e86b7253da25980c120",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "acc841490e1cad1df183b42144879c5c8dfe3062d34a3057b9558f301f05bf1e",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "6ea8c60c7d82cd85c1966124b2f472509ef617dd22f95d7d571a04903158ffd9",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Meadow Turf · SDXS 512"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-bedrock",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless albedo material texture of dark grey granite bedrock, cracked layered stone strata, evenly lit, no landscape, no objects, no shadows, no writing"
+      },
+      "resources" : {},
+      "title" : "Bedrock prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-bedrock",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 40213
+        }
+      },
+      "resources" : {},
+      "title" : "Bedrock fixed seed value"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-bedrock",
+      "kind" : "coreai.sdxsGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 0
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 512
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 1
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 512
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "bfeacb45c5d75f84fea181297319ac3ecb4174a575ea7e86b7253da25980c120",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "acc841490e1cad1df183b42144879c5c8dfe3062d34a3057b9558f301f05bf1e",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "6ea8c60c7d82cd85c1966124b2f472509ef617dd22f95d7d571a04903158ffd9",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Bedrock · SDXS 512"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-armor",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "seamless albedo material texture of weathered grey steel armor plate with rivets, welded seams, scratches and chipped paint, evenly lit, no objects, no shadows, no writing"
+      },
+      "resources" : {},
+      "title" : "Armor Plate prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-armor",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 2718281
+        }
+      },
+      "resources" : {},
+      "title" : "Armor Plate fixed seed value"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-armor",
+      "kind" : "coreai.sdxsGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 0
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 512
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 1
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 512
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "bfeacb45c5d75f84fea181297319ac3ecb4174a575ea7e86b7253da25980c120",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "acc841490e1cad1df183b42144879c5c8dfe3062d34a3057b9558f301f05bf1e",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "6ea8c60c7d82cd85c1966124b2f472509ef617dd22f95d7d571a04903158ffd9",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Armor Plate · SDXS 512"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "prompt-sky",
+      "kind" : "input.prompt",
+      "parameters" : {
+        "value" : "painted dusk sky panorama, warm orange horizon glow fading to deep violet blue, soft scattered clouds, atmospheric digital matte painting, empty sky, no text"
+      },
+      "resources" : {},
+      "title" : "Dusk Sky prompt"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "seed-sky",
+      "kind" : "primitive.int",
+      "parameters" : {
+        "value" : {
+          "$type" : "integer",
+          "value" : 31415926
+        }
+      },
+      "resources" : {},
+      "title" : "Dusk Sky fixed seed value"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "generate-sky",
+      "kind" : "coreai.sdxsGenerate",
+      "parameters" : {
+        "guidance" : {
+          "$type" : "number",
+          "value" : 0
+        },
+        "height" : {
+          "$type" : "integer",
+          "value" : 512
+        },
+        "steps" : {
+          "$type" : "integer",
+          "value" : 1
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 512
+        }
+      },
+      "resources" : {
+        "denoiser" : {
+          "reference" : {
+            "componentRole" : "denoiser",
+            "contentHash" : "bfeacb45c5d75f84fea181297319ac3ecb4174a575ea7e86b7253da25980c120",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "textEncoder" : {
+          "reference" : {
+            "componentRole" : "textEncoder",
+            "contentHash" : "acc841490e1cad1df183b42144879c5c8dfe3062d34a3057b9558f301f05bf1e",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        },
+        "vaeDecoder" : {
+          "reference" : {
+            "componentRole" : "vae",
+            "contentHash" : "6ea8c60c7d82cd85c1966124b2f472509ef617dd22f95d7d571a04903158ffd9",
+            "familyABI" : "sdxs-512-dreamshaper-coreai@1",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.idkiro.sdxs-512-dreamshaper",
+            "packageVersion" : "sha256.af40c169409dcb49870cdc005e1e4be2bbef063d020b4d863054afe598236395"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Dusk Sky · SDXS 512"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "texture-cache",
+      "kind" : "cache.assets",
+      "parameters" : {
+        "slotCount" : {
+          "$type" : "integer",
+          "value" : 5
+        }
+      },
+      "resources" : {},
+      "title" : "Generated textures · run cache"
+    }
+  ],
+  "presentation" : {
+    "groups" : [],
+    "nodePositions" : {
+      "game-settings" : {
+        "x" : 80,
+        "y" : 530
+      },
+      "generate-armor" : {
+        "x" : 1765,
+        "y" : 1280
+      },
+      "generate-bedrock" : {
+        "x" : 1285,
+        "y" : 1280
+      },
+      "generate-grass" : {
+        "x" : 805,
+        "y" : 1280
+      },
+      "generate-sky" : {
+        "x" : 2245,
+        "y" : 1280
+      },
+      "generate-soil" : {
+        "x" : 325,
+        "y" : 1280
+      },
+      "loop" : {
+        "x" : 1840,
+        "y" : 480
+      },
+      "note" : {
+        "x" : 80,
+        "y" : 700
+      },
+      "output" : {
+        "x" : 1840,
+        "y" : 100
+      },
+      "primitive-int" : {
+        "x" : 740,
+        "y" : 60
+      },
+      "primitive-int-2" : {
+        "x" : 740,
+        "y" : 220
+      },
+      "program-text" : {
+        "x" : 80,
+        "y" : 40
+      },
+      "prompt-armor" : {
+        "x" : 1520,
+        "y" : 1230
+      },
+      "prompt-bedrock" : {
+        "x" : 1040,
+        "y" : 1230
+      },
+      "prompt-grass" : {
+        "x" : 560,
+        "y" : 1230
+      },
+      "prompt-sky" : {
+        "x" : 2000,
+        "y" : 1230
+      },
+      "prompt-soil" : {
+        "x" : 80,
+        "y" : 1230
+      },
+      "render" : {
+        "x" : 1120,
+        "y" : 60
+      },
+      "seed-armor" : {
+        "x" : 1520,
+        "y" : 1340
+      },
+      "seed-bedrock" : {
+        "x" : 1040,
+        "y" : 1340
+      },
+      "seed-grass" : {
+        "x" : 560,
+        "y" : 1340
+      },
+      "seed-sky" : {
+        "x" : 2000,
+        "y" : 1340
+      },
+      "seed-soil" : {
+        "x" : 80,
+        "y" : 1340
+      },
+      "shader-text" : {
+        "x" : 80,
+        "y" : 300
+      },
+      "start" : {
+        "x" : 1840,
+        "y" : 340
+      },
+      "texture-cache" : {
+        "x" : 1040,
+        "y" : 1540
+      },
+      "trackpad" : {
+        "x" : 740,
+        "y" : 400
+      }
+    },
+    "nodeSizes" : {
+      "game-settings" : {
+        "height" : 145,
+        "width" : 480
+      },
+      "note" : {
+        "height" : 470,
+        "width" : 600
+      },
+      "program-text" : {
+        "height" : 225,
+        "width" : 610
+      },
+      "render" : {
+        "height" : 700,
+        "width" : 652
+      },
+      "shader-text" : {
+        "height" : 160,
+        "width" : 400
+      },
+      "trackpad" : {
+        "height" : 360,
+        "width" : 300
+      }
+    },
+    "viewportOrigin" : {
+      "x" : 40,
+      "y" : 20
+    },
+    "viewportScale" : 0.62
+  },
+  "primaryOutputNodeIDs" : [
+    "output"
+  ],
+  "requirements" : {
+    "familyABIs" : [],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

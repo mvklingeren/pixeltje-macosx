@@ -1,0 +1,134 @@
+{
+  "connections" : [
+    {
+      "id" : "digit-image.image->digit-classifier.image",
+      "input" : {
+        "nodeID" : "digit-classifier",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "digit-image",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "digit-classifier.prediction->digit-output.text",
+      "input" : {
+        "nodeID" : "digit-output",
+        "port" : "text"
+      },
+      "output" : {
+        "nodeID" : "digit-classifier",
+        "port" : "prediction"
+      }
+    }
+  ],
+  "controlConnections" : [
+
+  ],
+  "exposedParameters" : [
+
+  ],
+  "id" : "49e1064a-10d8-4de0-ac5b-b481808c7723",
+  "mode" : "generic",
+  "name" : "Recognize MNIST Digit",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "digit-image",
+      "kind" : "input.image",
+      "parameters" : {
+        "sourceName" : "digit-8.png"
+      },
+      "resources" : {
+
+      },
+      "title" : "Digit Image"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "digit-classifier",
+      "kind" : "coreai.imageClassifier",
+      "parameters" : {
+        "channels" : {
+          "$type" : "integer",
+          "value" : 1
+        },
+        "classLabels" : "",
+        "height" : {
+          "$type" : "integer",
+          "value" : 28
+        },
+        "inputName" : "image",
+        "outputName" : "scores",
+        "width" : {
+          "$type" : "integer",
+          "value" : 28
+        }
+      },
+      "resources" : {
+        "model" : {
+          "reference" : {
+            "componentRole" : "classifier",
+            "contentHash" : "f1ca44d0b56b8795e3ca8cd7940825cec790d829b67d014918ba41b6685a635f",
+            "functionName" : "main",
+            "kind" : "coreAIModel",
+            "packageID" : "coreai.classifier.f1ca44d0b56b8795",
+            "packageVersion" : "sha256.f1ca44d0b56b8795e3ca8cd7940825cec790d829b67d014918ba41b6685a635f"
+          },
+          "state" : "linked"
+        }
+      },
+      "title" : "Core AI Image Classifier"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "digit-output",
+      "kind" : "output.text",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Recognized Number"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "digit-classifier" : {
+        "x" : 350,
+        "y" : 170
+      },
+      "digit-image" : {
+        "x" : 60,
+        "y" : 170
+      },
+      "digit-output" : {
+        "x" : 670,
+        "y" : 170
+      }
+    },
+    "nodeSizes" : {
+
+    },
+    "viewportOrigin" : {
+      "x" : 40,
+      "y" : 20
+    },
+    "viewportScale" : 1
+  },
+  "primaryOutputNodeIDs" : [
+    "digit-output"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

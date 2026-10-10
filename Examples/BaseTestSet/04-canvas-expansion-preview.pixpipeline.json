@@ -1,0 +1,286 @@
+{
+  "connections": [
+    {
+      "id": "source.image->pad.image",
+      "input": {
+        "nodeID": "pad",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "source",
+        "port": "image"
+      }
+    },
+    {
+      "id": "pad.image->fill.image",
+      "input": {
+        "nodeID": "fill",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "pad",
+        "port": "image"
+      }
+    },
+    {
+      "id": "pad.mask->fill.mask",
+      "input": {
+        "nodeID": "fill",
+        "port": "mask"
+      },
+      "output": {
+        "nodeID": "pad",
+        "port": "mask"
+      }
+    },
+    {
+      "id": "pad.mask->threshold.mask",
+      "input": {
+        "nodeID": "threshold",
+        "port": "mask"
+      },
+      "output": {
+        "nodeID": "pad",
+        "port": "mask"
+      }
+    },
+    {
+      "id": "threshold.mask->mask-image.mask",
+      "input": {
+        "nodeID": "mask-image",
+        "port": "mask"
+      },
+      "output": {
+        "nodeID": "threshold",
+        "port": "mask"
+      }
+    },
+    {
+      "id": "fill.image->composite.destination",
+      "input": {
+        "nodeID": "composite",
+        "port": "destination"
+      },
+      "output": {
+        "nodeID": "fill",
+        "port": "image"
+      }
+    },
+    {
+      "id": "mask-image.image->composite.source",
+      "input": {
+        "nodeID": "composite",
+        "port": "source"
+      },
+      "output": {
+        "nodeID": "mask-image",
+        "port": "image"
+      }
+    },
+    {
+      "id": "threshold.mask->composite.mask",
+      "input": {
+        "nodeID": "composite",
+        "port": "mask"
+      },
+      "output": {
+        "nodeID": "threshold",
+        "port": "mask"
+      }
+    },
+    {
+      "id": "mask-image.image->preview.image",
+      "input": {
+        "nodeID": "preview",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "mask-image",
+        "port": "image"
+      }
+    },
+    {
+      "id": "composite.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "composite",
+        "port": "image"
+      }
+    }
+  ],
+  "exposedParameters": [
+    {
+      "defaultValue": {
+        "$type": "integer",
+        "value": 80
+      },
+      "id": "right-padding",
+      "label": "Right padding",
+      "maximum": 256,
+      "minimum": 0,
+      "target": {
+        "nodeID": "pad",
+        "parameter": "right"
+      },
+      "valueType": "integer"
+    }
+  ],
+  "id": "org.pixeltje.examples.base-test-set.04-canvas-expansion-preview",
+  "mode": "outpainting",
+  "name": "Base Test Set 04 · Canvas Expansion Preview",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "source",
+      "kind": "input.image",
+      "parameters": {
+        "sourceName": "test-card.png"
+      },
+      "resources": {},
+      "title": "Test card"
+    },
+    {
+      "executionState": "enabled",
+      "id": "pad",
+      "kind": "image.padForOutpaint",
+      "parameters": {
+        "bottom": {
+          "$type": "integer",
+          "value": 40
+        },
+        "feathering": {
+          "$type": "integer",
+          "value": 16
+        },
+        "left": {
+          "$type": "integer",
+          "value": 48
+        },
+        "right": {
+          "$type": "integer",
+          "value": 80
+        },
+        "top": {
+          "$type": "integer",
+          "value": 24
+        }
+      },
+      "resources": {},
+      "title": "Expand canvas"
+    },
+    {
+      "executionState": "enabled",
+      "id": "fill",
+      "kind": "image.fillMasked",
+      "parameters": {
+        "value": {
+          "$type": "number",
+          "value": 0.5
+        }
+      },
+      "resources": {},
+      "title": "Fill border"
+    },
+    {
+      "executionState": "enabled",
+      "id": "threshold",
+      "kind": "mask.threshold",
+      "parameters": {
+        "value": {
+          "$type": "number",
+          "value": 0.5
+        }
+      },
+      "resources": {},
+      "title": "Binary border"
+    },
+    {
+      "executionState": "enabled",
+      "id": "mask-image",
+      "kind": "mask.toImage",
+      "parameters": {},
+      "resources": {},
+      "title": "Show mask as image"
+    },
+    {
+      "executionState": "enabled",
+      "id": "composite",
+      "kind": "image.compositeMasked",
+      "parameters": {},
+      "resources": {},
+      "title": "Overlay border guide"
+    },
+    {
+      "executionState": "enabled",
+      "id": "preview",
+      "kind": "output.preview",
+      "parameters": {},
+      "resources": {},
+      "title": "Mask preview"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.image",
+      "parameters": {
+        "filenamePrefix": "canvas-expansion"
+      },
+      "resources": {},
+      "title": "Image result"
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "composite": {
+        "x": 960,
+        "y": 180
+      },
+      "fill": {
+        "x": 480,
+        "y": 120
+      },
+      "mask-image": {
+        "x": 720,
+        "y": 420
+      },
+      "output": {
+        "x": 1200,
+        "y": 180
+      },
+      "pad": {
+        "x": 240,
+        "y": 180
+      },
+      "preview": {
+        "x": 960,
+        "y": 420
+      },
+      "source": {
+        "x": 0,
+        "y": 180
+      },
+      "threshold": {
+        "x": 480,
+        "y": 420
+      }
+    },
+    "nodeSizes": {},
+    "viewportOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "viewportScale": 0.8
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

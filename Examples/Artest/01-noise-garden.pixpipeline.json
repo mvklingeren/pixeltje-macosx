@@ -1,0 +1,478 @@
+{
+  "connections" : [
+    {
+      "id" : "seed.seed->night.seed",
+      "input" : {
+        "nodeID" : "night",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "seed.seed->aurora.seed",
+      "input" : {
+        "nodeID" : "aurora",
+        "port" : "seed"
+      },
+      "output" : {
+        "nodeID" : "seed",
+        "port" : "seed"
+      }
+    },
+    {
+      "id" : "night.image->blend.imageA",
+      "input" : {
+        "nodeID" : "blend",
+        "port" : "imageA"
+      },
+      "output" : {
+        "nodeID" : "night",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "aurora.image->blend.imageB",
+      "input" : {
+        "nodeID" : "blend",
+        "port" : "imageB"
+      },
+      "output" : {
+        "nodeID" : "aurora",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "trackpad.x->focus.centerX",
+      "input" : {
+        "nodeID" : "focus",
+        "port" : "centerX"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "x"
+      }
+    },
+    {
+      "id" : "trackpad.y->focus.centerY",
+      "input" : {
+        "nodeID" : "focus",
+        "port" : "centerY"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "y"
+      }
+    },
+    {
+      "id" : "night.image->composite.destination",
+      "input" : {
+        "nodeID" : "composite",
+        "port" : "destination"
+      },
+      "output" : {
+        "nodeID" : "night",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "blend.image->composite.source",
+      "input" : {
+        "nodeID" : "composite",
+        "port" : "source"
+      },
+      "output" : {
+        "nodeID" : "blend",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "focus.mask->composite.mask",
+      "input" : {
+        "nodeID" : "composite",
+        "port" : "mask"
+      },
+      "output" : {
+        "nodeID" : "focus",
+        "port" : "mask"
+      }
+    },
+    {
+      "id" : "composite.image->preview.image",
+      "input" : {
+        "nodeID" : "preview",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "composite",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "preview.image->output.image",
+      "input" : {
+        "nodeID" : "output",
+        "port" : "image"
+      },
+      "output" : {
+        "nodeID" : "preview",
+        "port" : "image"
+      }
+    },
+    {
+      "id" : "trackpad.x->blend.blendFactor",
+      "input" : {
+        "nodeID" : "blend",
+        "port" : "blendFactor"
+      },
+      "output" : {
+        "nodeID" : "trackpad",
+        "port" : "x"
+      }
+    }
+  ],
+  "controlConnections" : [
+    {
+      "id" : "output.completed->loop.completed",
+      "input" : {
+        "nodeID" : "loop",
+        "port" : "completed"
+      },
+      "output" : {
+        "nodeID" : "output",
+        "port" : "completed"
+      }
+    },
+    {
+      "id" : "loop.repeat->start.again",
+      "input" : {
+        "nodeID" : "start",
+        "port" : "again"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "repeat"
+      }
+    },
+    {
+      "id" : "loop.incrementSeed->seed.increment",
+      "input" : {
+        "nodeID" : "seed",
+        "port" : "increment"
+      },
+      "output" : {
+        "nodeID" : "loop",
+        "port" : "incrementSeed"
+      }
+    }
+  ],
+  "exposedParameters" : [
+
+  ],
+  "id" : "org.pixeltje.examples.artest.01-noise-garden",
+  "mode" : "textToImage",
+  "name" : "Artest 01 · Noise Garden",
+  "nodes" : [
+    {
+      "executionState" : "enabled",
+      "id" : "seed",
+      "kind" : "input.seed",
+      "parameters" : {
+        "mode" : "fixed",
+        "value" : {
+          "$type" : "integer",
+          "value" : 24092601
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Fixed art seed"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "trackpad",
+      "kind" : "input.trackpad",
+      "parameters" : {
+        "x" : {
+          "$type" : "number",
+          "value" : 0.7692243303571431
+        },
+        "y" : {
+          "$type" : "number",
+          "value" : 0.4019781403940896
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Move the bloom"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "night",
+      "kind" : "image.proceduralNoise",
+      "parameters" : {
+        "height" : {
+          "$type" : "integer",
+          "value" : 640
+        },
+        "octaves" : {
+          "$type" : "integer",
+          "value" : 5
+        },
+        "palette" : "night",
+        "salt" : {
+          "$type" : "integer",
+          "value" : 11
+        },
+        "scale" : {
+          "$type" : "number",
+          "value" : 5
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 640
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Night field"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "aurora",
+      "kind" : "image.proceduralNoise",
+      "parameters" : {
+        "height" : {
+          "$type" : "integer",
+          "value" : 640
+        },
+        "octaves" : {
+          "$type" : "integer",
+          "value" : 4
+        },
+        "palette" : "aurora",
+        "salt" : {
+          "$type" : "integer",
+          "value" : 29
+        },
+        "scale" : {
+          "$type" : "number",
+          "value" : 9
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 640
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Aurora field"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "blend",
+      "kind" : "image.blend",
+      "parameters" : {
+        "blendFactor" : {
+          "$type" : "number",
+          "value" : 0.85
+        },
+        "blendMode" : "screen"
+      },
+      "resources" : {
+
+      },
+      "title" : "Screen the two fields"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "focus",
+      "kind" : "mask.radial",
+      "parameters" : {
+        "height" : {
+          "$type" : "integer",
+          "value" : 640
+        },
+        "radius" : {
+          "$type" : "number",
+          "value" : 0.36
+        },
+        "softness" : {
+          "$type" : "number",
+          "value" : 0.23
+        },
+        "width" : {
+          "$type" : "integer",
+          "value" : 640
+        }
+      },
+      "resources" : {
+
+      },
+      "title" : "Soft focus mask"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "composite",
+      "kind" : "image.compositeMasked",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Reveal color near pointer"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "preview",
+      "kind" : "output.preview",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Art preview"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "output",
+      "kind" : "output.image",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Image result"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "note",
+      "kind" : "edit.markdownNote",
+      "parameters" : {
+        "text" : "# Noise garden\nDrag the Trackpad crosshair: X moves the luminous opening and strengthens its color blend; Y moves it vertically. With one image, release to render; for a series, press Run. Change the fixed seed for another landscape; keep it fixed while steering.\nThe Loop makes one image by default. Increase Max calls to make a series with successive seeds. Move the Trackpad while the series runs; the next image uses its latest position."
+      },
+      "resources" : {
+
+      },
+      "title" : "How to play"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "start",
+      "kind" : "control.start",
+      "parameters" : {
+
+      },
+      "resources" : {
+
+      },
+      "title" : "Start \/ Next Pass"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "loop",
+      "kind" : "control.loop",
+      "parameters" : {
+        "delayMilliseconds" : {
+          "$type" : "integer",
+          "value" : 100
+        },
+        "feedback" : "none",
+        "maxCalls" : {
+          "$type" : "integer",
+          "value" : -1
+        },
+        "seedStrategy" : "increment"
+      },
+      "resources" : {
+
+      },
+      "title" : "Loop · 1 image"
+    }
+  ],
+  "presentation" : {
+    "groups" : [
+
+    ],
+    "nodePositions" : {
+      "aurora" : {
+        "x" : 260,
+        "y" : 170
+      },
+      "blend" : {
+        "x" : 530,
+        "y" : 30
+      },
+      "composite" : {
+        "x" : 810,
+        "y" : 120
+      },
+      "focus" : {
+        "x" : 530,
+        "y" : 340
+      },
+      "loop" : {
+        "x" : 773,
+        "y" : 715
+      },
+      "night" : {
+        "x" : 259,
+        "y" : 0
+      },
+      "note" : {
+        "x" : 0,
+        "y" : 646
+      },
+      "output" : {
+        "x" : 823,
+        "y" : 464
+      },
+      "preview" : {
+        "x" : 1142,
+        "y" : 31
+      },
+      "seed" : {
+        "x" : 15,
+        "y" : 0
+      },
+      "start" : {
+        "x" : 532,
+        "y" : 647
+      },
+      "trackpad" : {
+        "x" : 0,
+        "y" : 330
+      }
+    },
+    "nodeSizes" : {
+      "preview" : {
+        "height" : 639,
+        "width" : 576
+      }
+    },
+    "viewportOrigin" : {
+      "x" : -365.71428571428544,
+      "y" : -205.7142857142855
+    },
+    "viewportScale" : 0.7
+  },
+  "primaryOutputNodeIDs" : [
+    "output"
+  ],
+  "requirements" : {
+    "familyABIs" : [
+
+    ],
+    "minimumEngineVersion" : 1
+  },
+  "schemaVersion" : 2
+}

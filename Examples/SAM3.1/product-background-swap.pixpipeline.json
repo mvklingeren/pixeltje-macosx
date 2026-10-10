@@ -1,0 +1,368 @@
+{
+  "schemaVersion": 2,
+  "id": "org.pixeltje.examples.sam31.product-background-swap",
+  "name": "SAM 3.1 · Text-Selected Background Swap",
+  "mode": "selection",
+  "requirements": {
+    "minimumEngineVersion": 1,
+    "familyABIs": []
+  },
+  "nodes": [
+    {
+      "id": "subject",
+      "kind": "input.image",
+      "title": "Choose subject photo",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    },
+    {
+      "id": "background",
+      "kind": "input.image",
+      "title": "Choose new background",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    },
+    {
+      "id": "prompt",
+      "kind": "input.prompt",
+      "title": "Select subject by text",
+      "executionState": "enabled",
+      "parameters": {
+        "value": "product"
+      },
+      "resources": {}
+    },
+    {
+      "id": "sam31",
+      "kind": "coreai.sam31Select",
+      "title": "Find subject",
+      "executionState": "enabled",
+      "parameters": {
+        "scoreThreshold": {
+          "$type": "number",
+          "value": 0.5
+        },
+        "maskThreshold": {
+          "$type": "number",
+          "value": 0.5
+        },
+        "maxSegments": {
+          "$type": "integer",
+          "value": 32
+        }
+      },
+      "resources": {
+        "model": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.meta.sam3.1-image-selection",
+            "packageVersion": "facebook-sam3.1-daa63191845a-coreai-fp16",
+            "contentHash": "e41c0a848dcd286d180386edb5a6a998650255f2d65eadd7327413c57da2962d",
+            "componentRole": "detector"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.meta.sam3.1-image-selection",
+            "packageVersion": "facebook-sam3.1-daa63191845a-coreai-fp16",
+            "contentHash": "6d9109cc838977f3ca94a379eec36aecc7c807e1785cd729660ca2fc0171fb35",
+            "componentRole": "tokenizer"
+          }
+        }
+      }
+    },
+    {
+      "id": "grow",
+      "kind": "mask.grow",
+      "title": "Expand selection slightly",
+      "executionState": "enabled",
+      "parameters": {
+        "expand": {
+          "$type": "integer",
+          "value": 2
+        },
+        "taperedCorners": true
+      },
+      "resources": {}
+    },
+    {
+      "id": "feather",
+      "kind": "mask.feather",
+      "title": "Soften selection edge",
+      "executionState": "enabled",
+      "parameters": {
+        "left": {
+          "$type": "integer",
+          "value": 3
+        },
+        "top": {
+          "$type": "integer",
+          "value": 3
+        },
+        "right": {
+          "$type": "integer",
+          "value": 3
+        },
+        "bottom": {
+          "$type": "integer",
+          "value": 3
+        }
+      },
+      "resources": {}
+    },
+    {
+      "id": "dimensions",
+      "kind": "image.dimensions",
+      "title": "Subject photo size",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    },
+    {
+      "id": "fit",
+      "kind": "image.scale",
+      "title": "Fit background to photo",
+      "executionState": "enabled",
+      "parameters": {
+        "upscaleMethod": "lanczos",
+        "crop": "center"
+      },
+      "resources": {}
+    },
+    {
+      "id": "composite",
+      "kind": "image.compositeMasked",
+      "title": "Place subject on background",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    },
+    {
+      "id": "preview",
+      "kind": "output.preview",
+      "title": "Preview background swap",
+      "executionState": "enabled",
+      "parameters": {},
+      "resources": {}
+    },
+    {
+      "id": "output",
+      "kind": "output.image",
+      "title": "Save background swap",
+      "executionState": "enabled",
+      "parameters": {
+        "filenamePrefix": "background-swap"
+      },
+      "resources": {}
+    }
+  ],
+  "connections": [
+    {
+      "id": "subject.image->sam31.image",
+      "output": {
+        "nodeID": "subject",
+        "port": "image"
+      },
+      "input": {
+        "nodeID": "sam31",
+        "port": "image"
+      }
+    },
+    {
+      "id": "prompt.prompt->sam31.prompt",
+      "output": {
+        "nodeID": "prompt",
+        "port": "prompt"
+      },
+      "input": {
+        "nodeID": "sam31",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "sam31.mask->grow.mask",
+      "output": {
+        "nodeID": "sam31",
+        "port": "mask"
+      },
+      "input": {
+        "nodeID": "grow",
+        "port": "mask"
+      }
+    },
+    {
+      "id": "grow.mask->feather.mask",
+      "output": {
+        "nodeID": "grow",
+        "port": "mask"
+      },
+      "input": {
+        "nodeID": "feather",
+        "port": "mask"
+      }
+    },
+    {
+      "id": "subject.image->dimensions.image",
+      "output": {
+        "nodeID": "subject",
+        "port": "image"
+      },
+      "input": {
+        "nodeID": "dimensions",
+        "port": "image"
+      }
+    },
+    {
+      "id": "background.image->fit.image",
+      "output": {
+        "nodeID": "background",
+        "port": "image"
+      },
+      "input": {
+        "nodeID": "fit",
+        "port": "image"
+      }
+    },
+    {
+      "id": "dimensions.width->fit.width",
+      "output": {
+        "nodeID": "dimensions",
+        "port": "width"
+      },
+      "input": {
+        "nodeID": "fit",
+        "port": "width"
+      }
+    },
+    {
+      "id": "dimensions.height->fit.height",
+      "output": {
+        "nodeID": "dimensions",
+        "port": "height"
+      },
+      "input": {
+        "nodeID": "fit",
+        "port": "height"
+      }
+    },
+    {
+      "id": "fit.image->composite.destination",
+      "output": {
+        "nodeID": "fit",
+        "port": "image"
+      },
+      "input": {
+        "nodeID": "composite",
+        "port": "destination"
+      }
+    },
+    {
+      "id": "subject.image->composite.source",
+      "output": {
+        "nodeID": "subject",
+        "port": "image"
+      },
+      "input": {
+        "nodeID": "composite",
+        "port": "source"
+      }
+    },
+    {
+      "id": "feather.mask->composite.mask",
+      "output": {
+        "nodeID": "feather",
+        "port": "mask"
+      },
+      "input": {
+        "nodeID": "composite",
+        "port": "mask"
+      }
+    },
+    {
+      "id": "composite.image->preview.image",
+      "output": {
+        "nodeID": "composite",
+        "port": "image"
+      },
+      "input": {
+        "nodeID": "preview",
+        "port": "image"
+      }
+    },
+    {
+      "id": "composite.image->output.image",
+      "output": {
+        "nodeID": "composite",
+        "port": "image"
+      },
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      }
+    }
+  ],
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "exposedParameters": [],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "subject": {
+        "x": 0,
+        "y": 0
+      },
+      "background": {
+        "x": 0,
+        "y": 280
+      },
+      "prompt": {
+        "x": 0,
+        "y": 550
+      },
+      "sam31": {
+        "x": 290,
+        "y": 0
+      },
+      "grow": {
+        "x": 590,
+        "y": 0
+      },
+      "feather": {
+        "x": 890,
+        "y": 0
+      },
+      "dimensions": {
+        "x": 290,
+        "y": 290
+      },
+      "fit": {
+        "x": 590,
+        "y": 290
+      },
+      "composite": {
+        "x": 1190,
+        "y": 150
+      },
+      "preview": {
+        "x": 1500,
+        "y": 0
+      },
+      "output": {
+        "x": 1500,
+        "y": 290
+      }
+    },
+    "nodeSizes": {},
+    "viewportOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "viewportScale": 0.6
+  }
+}
