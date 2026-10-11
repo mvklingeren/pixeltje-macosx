@@ -76,7 +76,6 @@ import Testing
       }, "\(file.lastPathComponent): \(report.diagnostics)")
     case "basic-coreai-text-completion.pixpipeline.json",
       "gemma-3-12b-instruct-coreai.pixpipeline.json",
-      "model-inference-mnist.pixpipeline.json",
       "z-image example workflow.pixpipeline.json":
       #expect(report.diagnostics.contains { $0.code == .unresolvedResource })
       #expect(report.errors.allSatisfy { $0.code == .unresolvedResource },

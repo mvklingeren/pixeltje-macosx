@@ -56,7 +56,7 @@ import Testing
 
   #expect(restored == project)
   #expect(restored.schemaVersion == ProjectRecipe.currentSchemaVersion)
-  #expect(ProjectRecipe.currentSchemaVersion == 32)
+  #expect(ProjectRecipe.currentSchemaVersion == 34)
 }
 
 @Test func rawSourceCreatesAnInitialBackgroundLayer() {

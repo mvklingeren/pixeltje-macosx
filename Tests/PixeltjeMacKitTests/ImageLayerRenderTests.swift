@@ -370,9 +370,10 @@ private func solidVectorLayer(_ color: VectorColor, zOrder: Int) -> ProjectLayer
     return try await engine.render(request)
   }
 
+  // sRGB red samples at about 0.82 in the linear Display P3 working space.
   let frozen = try await render(edit, preview: true)
   #expect(frozen.differencePreviewSurface != nil)
-  #expect(samples(frozen, at: CGPoint(x: 16, y: 16))[0] > 0.9)
+  #expect(samples(frozen, at: CGPoint(x: 16, y: 16))[0] > 0.8)
   var live = edit
   live.compositing.differenceReference = .currentBackdrop
   let liveFrame = try await render(live)
@@ -383,5 +384,5 @@ private func solidVectorLayer(_ color: VectorColor, zOrder: Int) -> ProjectLayer
   #expect(samples(revealed, at: CGPoint(x: 16, y: 16))[2] > 0.9)
   edit.compositing.differenceProtectMask = .layerMask(revealsLayer: true)
   let protected = try await render(edit)
-  #expect(samples(protected, at: CGPoint(x: 16, y: 16))[0] > 0.9)
+  #expect(samples(protected, at: CGPoint(x: 16, y: 16))[0] > 0.8)
 }
