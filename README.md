@@ -5,6 +5,8 @@ camera RAW files with Apple's public `CIRAWFilter` API, composes layers in a
 native editor, and renders through Metal-backed Core Image. A companion
 Pixeltje Pipeline app authors and runs typed `*.pixpipeline.json` workflows.
 
+![Pixeltje Mac generating an image through ComfyUI, with the canvas, prompt box, generation tasks and layers inspector](.github/images/pixeltje-mac.png)
+
 The active external generation path connects to a user-managed ComfyUI server.
 Core AI workflows are a separate, in-process pipeline under development. Models
 and source images are linked from the user's machine; model weights are not
