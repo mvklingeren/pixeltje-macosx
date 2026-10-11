@@ -5,6 +5,13 @@ camera RAW files with Apple's public `CIRAWFilter` API, composes layers in a
 native editor, and renders through Metal-backed Core Image. A companion
 Pixeltje Pipeline app authors and runs typed `*.pixpipeline.json` workflows.
 
+<p align="center">
+  <a href=".github/images/comfyui-generation.png"><img src=".github/images/comfyui-generation.png" width="24%" alt="A ComfyUI Z-Image Turbo generation on the canvas, with the prompt box, generation tasks and layers inspector"></a>
+  <a href=".github/images/brush-generation-progress.png"><img src=".github/images/brush-generation-progress.png" width="24%" alt="Brush tool settings and presets while a ComfyUI generation runs from the prompt box"></a>
+  <a href=".github/images/flux2-klein-result.png"><img src=".github/images/flux2-klein-result.png" width="24%" alt="A FLUX.2 Klein 4B Base generation placed as a raster layer above paint layers"></a>
+  <a href=".github/images/marquee-colors.png"><img src=".github/images/marquee-colors.png" width="24%" alt="Marquee selection settings and the macOS Colors panel over a linear gradient paint layer"></a>
+</p>
+
 The active external generation path connects to a user-managed ComfyUI server.
 Core AI workflows are a separate, in-process pipeline under development. Models
 and source images are linked from the user's machine; model weights are not
