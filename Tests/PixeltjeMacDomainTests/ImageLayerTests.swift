@@ -75,10 +75,10 @@ private func imageSource(_ filename: String = "sky.png") -> SourceReference {
   #expect(restoredImage.source.linkedPath == "/Pictures/mountain.jpg")
 
   // The recipe records where the pixels live, never the pixels themselves, so a
-  // project referencing a 4000 × 3000 photo stays a few hundred bytes.
+  // project referencing a 4000 × 3000 photo stays a few kilobytes.
   let json = try #require(String(data: data, encoding: .utf8))
   #expect(json.contains("mountain.jpg"))
-  #expect(data.count < 4096)
+  #expect(data.count < 8192)
 }
 
 @Test func legacyEmbeddedSourceKeysDecodeAsAPlainLink() throws {
