@@ -13,9 +13,15 @@ import PixeltjeMacDomain
 ///
 /// Reading prefers the private payload for the same reason: it is the same
 /// pixels, in the working space, without a trip through a display encoding.
+@MainActor
 enum SelectionPasteboard {
   /// Private to the app, so no other application tries to interpret it.
   static let type = NSPasteboard.PasteboardType("org.pixeltje.PixeltjeMacApp.selection-raster")
+
+  /// Where Copy writes and Paste reads: the general pasteboard every
+  /// application shares. Tests point it at a private one, so nothing outside
+  /// the test can replace a copy while it is still rendering.
+  static var pasteboard = NSPasteboard.general
 
   /// The pixels a copy took, and the canvas geometry needed to put them back
   /// where they were.
@@ -60,7 +66,6 @@ enum SelectionPasteboard {
     let encoder = PropertyListEncoder()
     encoder.outputFormat = .binary
     let encoded = try encoder.encode(payload)
-    let pasteboard = NSPasteboard.general
     pasteboard.clearContents()
     pasteboard.setData(encoded, forType: type)
     pasteboard.setData(png, forType: .png)
@@ -68,7 +73,7 @@ enum SelectionPasteboard {
 
   /// The project's own pixels, when the copy came from Pixeltje.
   static func readPayload() -> Payload? {
-    guard let data = NSPasteboard.general.data(forType: type) else { return nil }
+    guard let data = pasteboard.data(forType: type) else { return nil }
     return try? PropertyListDecoder().decode(Payload.self, from: data)
   }
 
@@ -79,7 +84,6 @@ enum SelectionPasteboard {
   /// screenshot read that way arrives at half its pixels; going through the data
   /// first keeps every pixel the other application put on the pasteboard.
   static func readCIImage() -> CIImage? {
-    let pasteboard = NSPasteboard.general
     for imageType in readableImageTypes {
       guard let data = pasteboard.data(forType: imageType),
         let image = CIImage(data: data)
@@ -92,7 +96,6 @@ enum SelectionPasteboard {
 
   /// An image copied from another application.
   static func readImage() -> NSImage? {
-    let pasteboard = NSPasteboard.general
     for imageType in readableImageTypes {
       guard let data = pasteboard.data(forType: imageType),
         let image = NSImage(data: data)
@@ -138,7 +141,7 @@ enum SelectionPasteboard {
   /// Whether Paste has anything to work with. Read cheaply, from the type list
   /// alone, because menu validation asks on every menu open.
   static var hasContent: Bool {
-    NSPasteboard.general.canReadItem(withDataConformingToTypes:
+    pasteboard.canReadItem(withDataConformingToTypes:
       [type.rawValue] + readableImageTypes.map(\.rawValue))
   }
 }

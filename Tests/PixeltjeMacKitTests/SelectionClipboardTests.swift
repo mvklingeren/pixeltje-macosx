@@ -264,30 +264,44 @@ private func payload(canvas: Int = 100) -> SelectionPasteboard.Payload {
   #expect(!payload().fitsInPlace(on: .unresolved))
 }
 
+/// The tests that put something on the pasteboard or read it back.
+///
+/// The general pasteboard is shared by every test in this process and every
+/// application on the machine, so a copy could be cleared or replaced while a
+/// test was still waiting for it to land. These tests use a pasteboard of
+/// their own and take turns with it.
 @MainActor
-@Test func pasteStandsDownWithoutACanvasOrAClipboard() {
-  NSPasteboard.general.clearContents()
-  let (document, _) = documentWithCanvas()
+@Suite(.serialized)
+struct PasteboardTests {
+  private static let privatePasteboard = NSPasteboard.withUniqueName()
 
-  #expect(!document.canPaste)
-  #expect(!SelectionPasteboard.hasContent)
-  #expect(SelectionPasteboard.readPayload() == nil)
+  init() { SelectionPasteboard.pasteboard = Self.privatePasteboard }
 }
 
-@MainActor
-@Test func aDamagedPayloadIsRefusedRatherThanPasted() throws {
-  // Pasteboard data comes from outside the document; a payload whose pixels do
-  // not match the identity recorded beside them must not become a layer that
-  // breaks every render afterwards.
-  try SelectionPasteboard.write(payload(), png: Data([0x00]))
-  let (document, _) = documentWithCanvas()
-  let before = document.editorModel.recipe.layerStack.contentLayers.count
+extension PasteboardTests {
+  @Test func pasteStandsDownWithoutACanvasOrAClipboard() {
+    SelectionPasteboard.pasteboard.clearContents()
+    let (document, _) = documentWithCanvas()
 
-  #expect(document.canPaste)
-  document.paste()
+    #expect(!document.canPaste)
+    #expect(!SelectionPasteboard.hasContent)
+    #expect(SelectionPasteboard.readPayload() == nil)
+  }
 
-  #expect(document.editorModel.recipe.layerStack.contentLayers.count == before)
-  NSPasteboard.general.clearContents()
+  @Test func aDamagedPayloadIsRefusedRatherThanPasted() throws {
+    // Pasteboard data comes from outside the document; a payload whose pixels do
+    // not match the identity recorded beside them must not become a layer that
+    // breaks every render afterwards.
+    try SelectionPasteboard.write(payload(), png: Data([0x00]))
+    let (document, _) = documentWithCanvas()
+    let before = document.editorModel.recipe.layerStack.contentLayers.count
+
+    #expect(document.canPaste)
+    document.paste()
+
+    #expect(document.editorModel.recipe.layerStack.contentLayers.count == before)
+    SelectionPasteboard.pasteboard.clearContents()
+  }
 }
 
 @MainActor
@@ -318,104 +332,104 @@ private func payload(canvas: Int = 100) -> SelectionPasteboard.Payload {
   #expect(!document.canCopySelection)
 }
 
-@MainActor
-@Test func workflowSelectionCopiesVisiblePixelsAndCanPasteThem() async throws {
-  guard MTLCreateSystemDefaultDevice() != nil else { return }
-  let redPixel: [UInt8] = [0, 0x3c, 0, 0, 0, 0, 0, 0x3c]
-  var pixels = Data()
-  for _ in 0..<(16 * 16) { pixels.append(contentsOf: redPixel) }
-  let source = try RasterAssetPayload.encode(pixels, width: 16, height: 16)
-  let document = try ProjectDocument(clipboard: .payload(
-    SelectionPasteboard.Payload(
-      reference: source.reference,
-      compressedPixels: source.compressedPixels,
-      frame: LayerFrame(x: 0, y: 0, width: 16, height: 16),
-      canvasWidth: 16,
-      canvasHeight: 16)))
-  // The workflow analyzes the visible composite, but Copy used to read this
-  // empty active paint layer and put transparent pixels on the pasteboard.
-  edit(document) {
-    document.perform(.addLayer(ProjectLayer.paint(PaintLayerRecipe())), interactive: false)
-  }
-  var rgba = [UInt8](repeating: 0, count: 4 * 4 * 4)
-  for y in 1..<3 {
-    for x in 1..<3 { rgba[(y * 4 + x) * 4] = 255 }
-  }
-  let selection = try SelectionWorkflowSupport.mask(
-    rgba: rgba,
-    width: 4,
-    height: 4,
-    placement: LayerFrame(x: 0, y: 0, width: 16, height: 16),
-    canvas: CanvasRecipe(width: 16, height: 16),
-    prompt: "red square")
-  edit(document) { document.setSelection(selection, actionName: "Select red square") }
-  // A workflow pixel selection keeps clipboard priority under Select/Move.
-  document.editorModel.setActiveTool(.move)
-  let controller = ProjectWindowController(projectDocument: document)
-  let copyItem = NSMenuItem(
-    title: "Copy", action: #selector(ProjectWindowController.copy(_:)), keyEquivalent: "c")
-  #expect(controller.validateMenuItem(copyItem))
-  let pasteItem = NSMenuItem(
-    title: "Paste", action: #selector(ProjectWindowController.paste(_:)), keyEquivalent: "v")
-  NSPasteboard.general.clearContents()
+extension PasteboardTests {
+  @Test func workflowSelectionCopiesVisiblePixelsAndCanPasteThem() async throws {
+    guard MTLCreateSystemDefaultDevice() != nil else { return }
+    let redPixel: [UInt8] = [0, 0x3c, 0, 0, 0, 0, 0, 0x3c]
+    var pixels = Data()
+    for _ in 0..<(16 * 16) { pixels.append(contentsOf: redPixel) }
+    let source = try RasterAssetPayload.encode(pixels, width: 16, height: 16)
+    let document = try ProjectDocument(clipboard: .payload(
+      SelectionPasteboard.Payload(
+        reference: source.reference,
+        compressedPixels: source.compressedPixels,
+        frame: LayerFrame(x: 0, y: 0, width: 16, height: 16),
+        canvasWidth: 16,
+        canvasHeight: 16)))
+    // The workflow analyzes the visible composite, but Copy used to read this
+    // empty active paint layer and put transparent pixels on the pasteboard.
+    edit(document) {
+      document.perform(.addLayer(ProjectLayer.paint(PaintLayerRecipe())), interactive: false)
+    }
+    var rgba = [UInt8](repeating: 0, count: 4 * 4 * 4)
+    for y in 1..<3 {
+      for x in 1..<3 { rgba[(y * 4 + x) * 4] = 255 }
+    }
+    let selection = try SelectionWorkflowSupport.mask(
+      rgba: rgba,
+      width: 4,
+      height: 4,
+      placement: LayerFrame(x: 0, y: 0, width: 16, height: 16),
+      canvas: CanvasRecipe(width: 16, height: 16),
+      prompt: "red square")
+    edit(document) { document.setSelection(selection, actionName: "Select red square") }
+    // A workflow pixel selection keeps clipboard priority under Select/Move.
+    document.editorModel.setActiveTool(.move)
+    let controller = ProjectWindowController(projectDocument: document)
+    let copyItem = NSMenuItem(
+      title: "Copy", action: #selector(ProjectWindowController.copy(_:)), keyEquivalent: "c")
+    #expect(controller.validateMenuItem(copyItem))
+    let pasteItem = NSMenuItem(
+      title: "Paste", action: #selector(ProjectWindowController.paste(_:)), keyEquivalent: "v")
+    SelectionPasteboard.pasteboard.clearContents()
 
-  let beforePaste = document.editorModel.recipe.layerStack.contentLayers.count
-  controller.copy(nil)
-  // The copy renders in the background. A quick Command-V must wait for these
-  // pixels instead of pasting an older clipboard entry or doing nothing.
-  #expect(controller.validateMenuItem(pasteItem))
-  controller.paste(nil)
-  for _ in 0..<500 where SelectionPasteboard.readPayload() == nil {
-    try await Task.sleep(for: .milliseconds(10))
-  }
-  for _ in 0..<500
-  where document.editorModel.recipe.layerStack.contentLayers.count == beforePaste {
-    try await Task.sleep(for: .milliseconds(10))
-  }
-  let copied = try #require(SelectionPasteboard.readPayload())
-  #expect(copied.frame == LayerFrame(x: 4, y: 4, width: 8, height: 8))
-  #expect(NSPasteboard.general.data(forType: .png) != nil)
-  let copiedPixels = try RasterAssetPayload.decode(
-    copied.compressedPixels, reference: copied.reference)
-  let red = UInt16(copiedPixels[0]) | (UInt16(copiedPixels[1]) << 8)
-  let alpha = UInt16(copiedPixels[6]) | (UInt16(copiedPixels[7]) << 8)
-  #expect(Float16(bitPattern: red) > 0.9)
-  #expect(Float16(bitPattern: alpha) > 0.9)
+    let beforePaste = document.editorModel.recipe.layerStack.contentLayers.count
+    controller.copy(nil)
+    // The copy renders in the background. A quick Command-V must wait for these
+    // pixels instead of pasting an older clipboard entry or doing nothing.
+    #expect(controller.validateMenuItem(pasteItem))
+    controller.paste(nil)
+    for _ in 0..<500 where SelectionPasteboard.readPayload() == nil {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    for _ in 0..<500
+    where document.editorModel.recipe.layerStack.contentLayers.count == beforePaste {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    let copied = try #require(SelectionPasteboard.readPayload())
+    #expect(copied.frame == LayerFrame(x: 4, y: 4, width: 8, height: 8))
+    #expect(SelectionPasteboard.pasteboard.data(forType: .png) != nil)
+    let copiedPixels = try RasterAssetPayload.decode(
+      copied.compressedPixels, reference: copied.reference)
+    let red = UInt16(copiedPixels[0]) | (UInt16(copiedPixels[1]) << 8)
+    let alpha = UInt16(copiedPixels[6]) | (UInt16(copiedPixels[7]) << 8)
+    #expect(Float16(bitPattern: red) > 0.9)
+    #expect(Float16(bitPattern: alpha) > 0.9)
 
-  #expect(document.editorModel.recipe.layerStack.contentLayers.count == beforePaste + 1)
-  #expect(document.editorModel.recipe.layerStack.contentLayers.first?.rasterLayer?.frame
-    == copied.frame)
-  NSPasteboard.general.clearContents()
-}
-
-@MainActor
-@Test func cutPutsThePixelsOnTheClipboardBeforeItTakesThemOut() async throws {
-  // A cut has to end with the pixels on the pasteboard and gone from the layer.
-  // The copy is snapshotted before the delete and rendered after it, so the
-  // delete cannot abort the copy it was paired with.
-  guard MTLCreateSystemDefaultDevice() != nil else { return }
-  let (document, layerID) = documentWithCanvas(16)
-  NSPasteboard.general.clearContents()
-  edit(document) {
-    document.setSelection(rectangleSelection(x: 0.2, y: 0.2, size: 0.5), actionName: "Select")
+    #expect(document.editorModel.recipe.layerStack.contentLayers.count == beforePaste + 1)
+    #expect(document.editorModel.recipe.layerStack.contentLayers.first?.rasterLayer?.frame
+      == copied.frame)
+    SelectionPasteboard.pasteboard.clearContents()
   }
 
-  edit(document) { document.cutSelection(merged: false) }
-  // The delete lands inside the command's own undo group, so it is there at
-  // once rather than arriving later out of a background task.
-  #expect(document.editorModel.recipe.layerStack.layer(id: layerID)?.layerMask?.isInverted == true)
-  #expect(document.undoManager?.undoActionName == "Delete")
+  @Test func cutPutsThePixelsOnTheClipboardBeforeItTakesThemOut() async throws {
+    // A cut has to end with the pixels on the pasteboard and gone from the layer.
+    // The copy is snapshotted before the delete and rendered after it, so the
+    // delete cannot abort the copy it was paired with.
+    guard MTLCreateSystemDefaultDevice() != nil else { return }
+    let (document, layerID) = documentWithCanvas(16)
+    SelectionPasteboard.pasteboard.clearContents()
+    edit(document) {
+      document.setSelection(rectangleSelection(x: 0.2, y: 0.2, size: 0.5), actionName: "Select")
+    }
 
-  for _ in 0..<500 where SelectionPasteboard.readPayload() == nil {
-    try await Task.sleep(for: .milliseconds(10))
+    edit(document) { document.cutSelection(merged: false) }
+    // The delete lands inside the command's own undo group, so it is there at
+    // once rather than arriving later out of a background task.
+    #expect(document.editorModel.recipe.layerStack.layer(id: layerID)?.layerMask?.isInverted == true)
+    #expect(document.undoManager?.undoActionName == "Delete")
+
+    for _ in 0..<500 where SelectionPasteboard.readPayload() == nil {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+
+    // The pixels on the pasteboard are the ones that were there before the cut:
+    // the copy was snapshotted from the recipe as it stood, then rendered.
+    let payload = try #require(SelectionPasteboard.readPayload())
+    #expect(payload.canvasWidth == 16)
+    #expect(payload.frame.width > 0)
+    SelectionPasteboard.pasteboard.clearContents()
   }
-
-  // The pixels on the pasteboard are the ones that were there before the cut:
-  // the copy was snapshotted from the recipe as it stood, then rendered.
-  let payload = try #require(SelectionPasteboard.readPayload())
-  #expect(payload.canvasWidth == 16)
-  #expect(payload.frame.width > 0)
-  NSPasteboard.general.clearContents()
 }
 
 // MARK: - New from clipboard
@@ -451,39 +465,41 @@ private func png(width: Int, height: Int) throws -> Data {
   return try #require(image?.representation(using: .png, properties: [:]))
 }
 
-@Test func theClipboardSaysWhatIsOnItAndHowBigItIs() throws {
-  let pasteboard = NSPasteboard.general
-  pasteboard.clearContents()
-  #expect(SelectionPasteboard.readContent() == nil)
+extension PasteboardTests {
+  @Test func theClipboardSaysWhatIsOnItAndHowBigItIs() throws {
+    let pasteboard = SelectionPasteboard.pasteboard
+    pasteboard.clearContents()
+    #expect(SelectionPasteboard.readContent() == nil)
 
-  pasteboard.clearContents()
-  pasteboard.setString("not an image", forType: .string)
-  #expect(SelectionPasteboard.readContent() == nil)
-  #expect(!SelectionPasteboard.hasContent)
+    pasteboard.clearContents()
+    pasteboard.setString("not an image", forType: .string)
+    #expect(SelectionPasteboard.readContent() == nil)
+    #expect(!SelectionPasteboard.hasContent)
 
-  // Another application's PNG, read at its own pixels rather than its points:
-  // a Retina screenshot must not arrive at half its size.
-  pasteboard.clearContents()
-  pasteboard.setData(try png(width: 64, height: 32), forType: .png)
-  guard case .image = try #require(SelectionPasteboard.readContent()) else {
-    Issue.record("A PNG on the pasteboard should read back as an image.")
-    return
+    // Another application's PNG, read at its own pixels rather than its points:
+    // a Retina screenshot must not arrive at half its size.
+    pasteboard.clearContents()
+    pasteboard.setData(try png(width: 64, height: 32), forType: .png)
+    guard case .image = try #require(SelectionPasteboard.readContent()) else {
+      Issue.record("A PNG on the pasteboard should read back as an image.")
+      return
+    }
+    #expect(try #require(SelectionPasteboard.readContent()).pixelSize
+      == CanvasRecipe(width: 64, height: 32))
+
+    // The project's own payload wins when both are there, and knows its size
+    // from the pixels it carries rather than the canvas it came from.
+    let payload = try validPayload(width: 20, height: 10)
+    try SelectionPasteboard.write(payload, png: try png(width: 64, height: 32))
+    guard case .payload(let read) = try #require(SelectionPasteboard.readContent()) else {
+      Issue.record("The project's own payload should be preferred over the PNG beside it.")
+      return
+    }
+    #expect(read == payload)
+    #expect(try #require(SelectionPasteboard.readContent()).pixelSize
+      == CanvasRecipe(width: 20, height: 10))
+    pasteboard.clearContents()
   }
-  #expect(try #require(SelectionPasteboard.readContent()).pixelSize
-    == CanvasRecipe(width: 64, height: 32))
-
-  // The project's own payload wins when both are there, and knows its size
-  // from the pixels it carries rather than the canvas it came from.
-  let payload = try validPayload(width: 20, height: 10)
-  try SelectionPasteboard.write(payload, png: try png(width: 64, height: 32))
-  guard case .payload(let read) = try #require(SelectionPasteboard.readContent()) else {
-    Issue.record("The project's own payload should be preferred over the PNG beside it.")
-    return
-  }
-  #expect(read == payload)
-  #expect(try #require(SelectionPasteboard.readContent()).pixelSize
-    == CanvasRecipe(width: 20, height: 10))
-  pasteboard.clearContents()
 }
 
 @MainActor
@@ -545,22 +561,23 @@ private func png(width: Int, height: Int) throws -> Data {
   #expect(document.editorModel.recipe.layerStack.contentLayers.isEmpty)
 }
 
-@MainActor
-@Test func aClipboardImageBecomesTheOnlyLayerOfANewDocument() async throws {
-  guard MTLCreateSystemDefaultDevice() != nil else { return }
-  let pasteboard = NSPasteboard.general
-  pasteboard.clearContents()
-  pasteboard.setData(try png(width: 48, height: 24), forType: .png)
-  let content = try #require(SelectionPasteboard.readContent())
+extension PasteboardTests {
+  @Test func aClipboardImageBecomesTheOnlyLayerOfANewDocument() async throws {
+    guard MTLCreateSystemDefaultDevice() != nil else { return }
+    let pasteboard = SelectionPasteboard.pasteboard
+    pasteboard.clearContents()
+    pasteboard.setData(try png(width: 48, height: 24), forType: .png)
+    let content = try #require(SelectionPasteboard.readContent())
 
-  let document = try ProjectDocument(clipboard: content)
-  #expect(document.editorModel.recipe.layerStack.canvas == CanvasRecipe(width: 48, height: 24))
+    let document = try ProjectDocument(clipboard: content)
+    #expect(document.editorModel.recipe.layerStack.canvas == CanvasRecipe(width: 48, height: 24))
 
-  for _ in 0..<500 where document.editorModel.recipe.layerStack.contentLayers.isEmpty {
-    try await Task.sleep(for: .milliseconds(10))
+    for _ in 0..<500 where document.editorModel.recipe.layerStack.contentLayers.isEmpty {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    let layers = document.editorModel.recipe.layerStack.contentLayers
+    #expect(layers.count == 1)
+    #expect(layers.first?.rasterLayer?.frame == LayerFrame(x: 0, y: 0, width: 48, height: 24))
+    pasteboard.clearContents()
   }
-  let layers = document.editorModel.recipe.layerStack.contentLayers
-  #expect(layers.count == 1)
-  #expect(layers.first?.rasterLayer?.frame == LayerFrame(x: 0, y: 0, width: 48, height: 24))
-  pasteboard.clearContents()
 }
