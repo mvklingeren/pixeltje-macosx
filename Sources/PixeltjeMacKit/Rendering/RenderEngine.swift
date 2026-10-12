@@ -2358,9 +2358,12 @@ public actor RenderEngine {
     in space: CompositeSpace
   ) -> CIImage {
     guard !crop.isFullFrame else { return image }
-    let reference = space.rect(for: frame).intersection(image.extent)
-    guard !reference.isNull, !reference.isEmpty else { return image }
-    return applyStraightenAndCrop(crop, to: image.cropped(to: reference))
+    // Measure against the layer's whole frame, never the part of it that has
+    // pixels here: a layer mask trims a layer that overhangs the canvas, and
+    // the crop must still keep the rectangle the Crop tool drew over the frame.
+    let reference = space.rect(for: frame)
+    guard !reference.isEmpty else { return image }
+    return applyStraightenAndCrop(crop, to: image.cropped(to: reference), reference: reference)
   }
 
   private func paintImage(
@@ -2892,9 +2895,17 @@ public actor RenderEngine {
   /// before and after, and one rectangle serves both this stage and the crop
   /// tool's overlay. Cropping to it afterwards is what makes the canvas extent
   /// follow the crop.
-  private func applyStraightenAndCrop(_ recipe: CropRecipe, to image: CIImage) -> CIImage {
+  ///
+  /// `reference` is the rectangle the unit crop is written against. It
+  /// defaults to the image's own extent; a layer crop passes the layer's frame,
+  /// which can be larger than the pixels a trimmed layer still has.
+  private func applyStraightenAndCrop(
+    _ recipe: CropRecipe,
+    to image: CIImage,
+    reference: CGRect? = nil
+  ) -> CIImage {
     let crop = recipe.clamped
-    let extent = image.extent
+    let extent = reference ?? image.extent
     guard extent.width > 0, extent.height > 0 else { return image }
 
     var output = image

@@ -17,7 +17,10 @@ extension LayerFrame {
 }
 
 extension LayerStackRecipe {
-  /// The untransformed pixel bounds authored by one layer.
+  /// The untransformed pixel bounds authored by one layer, before its own crop.
+  ///
+  /// A layer crop is stored as unit fractions of this rectangle, so the
+  /// renderer measures the crop against it.
   public func cropFrame(of id: ProjectLayerID) -> LayerFrame? {
     guard let layer = layer(id: id) else { return nil }
     return frame(of: layer)
@@ -45,8 +48,27 @@ extension LayerStackRecipe {
   /// geometry yet — an empty vector layer, an empty group, or anything on a
   /// canvas whose size is still unresolved — has no rectangle rather than an
   /// arbitrary one.
+  ///
+  /// A cropped layer occupies only its crop rectangle. The pixels outside it
+  /// are hidden, not deleted, so `uncroppedFrame(of:)` still reaches them.
   public func frame(of id: ProjectLayerID) -> LayerFrame? {
-    guard let entry = entry(id: id), var result = frame(of: entry.layer) else { return nil }
+    guard let entry = entry(id: id), let visible = visibleFrame(of: entry.layer) else {
+      return nil
+    }
+    return transformed(visible, for: entry)
+  }
+
+  /// The rectangle a layer would occupy on the canvas without its own crop.
+  ///
+  /// The Crop tool measures its rectangle against this, so an applied crop
+  /// stays editable: the hidden pixels are still there to widen it over.
+  public func uncroppedFrame(of id: ProjectLayerID) -> LayerFrame? {
+    guard let entry = entry(id: id), let authored = frame(of: entry.layer) else { return nil }
+    return transformed(authored, for: entry)
+  }
+
+  private func transformed(_ frame: LayerFrame, for entry: LayerStackEntry) -> LayerFrame {
+    var result = frame
     // A child is first mapped by itself, then by its nearest parent outward.
     for layerID in [entry.id] + entry.ancestorIDs.reversed() {
       if let transform = layer(id: layerID)?.transform {
@@ -54,6 +76,21 @@ extension LayerStackRecipe {
       }
     }
     return result
+  }
+
+  /// What a layer shows before any transform: its authored bounds trimmed to
+  /// its own crop. The crop is applied ahead of the transform, exactly as the
+  /// renderer applies it, so a moved or scaled layer keeps the same window.
+  private func visibleFrame(of layer: ProjectLayer) -> LayerFrame? {
+    guard let frame = frame(of: layer) else { return nil }
+    guard let crop = layer.crop, !crop.isFullFrame else { return frame }
+    let rect = CropGeometry.pixelRect(crop, imageWidth: frame.width, imageHeight: frame.height)
+    return LayerFrame(
+      x: frame.x + rect.x,
+      y: frame.y + rect.y,
+      width: rect.width,
+      height: rect.height
+    )
   }
 
   private func frame(of layer: ProjectLayer) -> LayerFrame? {
@@ -98,9 +135,9 @@ extension LayerStackRecipe {
     case .vector(let vectorLayer):
       return frame(ofVector: vectorLayer)
     case .group(let group):
-      // A group is wherever its children are.
+      // A group is wherever its children are visible.
       return group.children.compactMap { child in
-        frame(of: child).map { child.transform?.affineBounds(of: $0) ?? $0 }
+        visibleFrame(of: child).map { child.transform?.affineBounds(of: $0) ?? $0 }
       }.reduce(nil) { union, frame in
         union.map { $0.union(frame) } ?? frame
       }
@@ -139,11 +176,12 @@ extension LayerStackRecipe {
       copy.updateLayer(id: id) { $0 = moved }
       return copy
     }
-    guard canTransform(id), let reference = frame(of: layer) else { return self }
+    guard canTransform(id), let reference = visibleFrame(of: layer) else { return self }
 
     // Translation is now part of the shared placement model. Old recipes retain
     // their legacy geometry until the first move, when the stable reference is
-    // captured atomically with the edit.
+    // captured atomically with the edit. Like Free Transform's, the reference
+    // is what the layer shows, so a cropped layer pivots on its visible center.
     var moved = layer
     var transform = layer.transform ?? .identity(for: reference)
     transform.position.x += deltaX
@@ -208,7 +246,8 @@ extension LayerStackRecipe {
       if case .group(let group) = layer.content, let warp = layer.transform?.warp {
         // A fixed mesh domain is not silently expanded by text reflow, source
         // replacement, a nested transform, or an inserted child. Every direct
-        // child must remain fully authorable through the parent's mesh.
+        // child must remain fully authorable through the parent's mesh,
+        // including pixels its crop hides, since that crop can be widened.
         for child in group.children {
           guard let rawBounds = frame(of: child) else { continue }
           let bounds = child.transform?.affineBounds(of: rawBounds) ?? rawBounds

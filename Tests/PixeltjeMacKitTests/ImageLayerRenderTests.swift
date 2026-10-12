@@ -118,6 +118,72 @@ private func solidVectorLayer(_ color: VectorColor, zOrder: Int) -> ProjectLayer
 }
 
 @MainActor
+@Test func appliedLayerCropReportsTheCroppedBoundsAndCanBeWidenedAgain() throws {
+  let url = try writeRedPNG(width: 100, height: 50)
+  defer { try? FileManager.default.removeItem(at: url) }
+
+  let document = try ProjectDocument(importingImage: url)
+  let layerID = try #require(document.editorModel.recipe.layerStack.activeLayerID)
+  let whole = LayerFrame(x: 0, y: 0, width: 100, height: 50)
+  document.editorModel.setActiveTool(.crop)
+  document.beginCropSession()
+  document.updateCropDraft(
+    CropRecipe(left: 0.25, bottom: 0.125, right: 0.75, top: 0.875), interactive: false)
+  document.commitCropDraft()
+
+  let stack = document.editorModel.recipe.layerStack
+  #expect(stack.frame(of: layerID) == LayerFrame(x: 25, y: 6.25, width: 50, height: 37.5))
+  #expect(stack.layer(id: layerID)?.imageLayer?.frame == whole)
+  // The session that stays open after Apply still measures against the whole
+  // layer, so the hidden pixels are there to draw the rectangle back over.
+  let reference = try #require(document.editorModel.cropReferenceSize(for: .layer(layerID)))
+  #expect(reference.width == 100)
+  #expect(reference.height == 50)
+
+  document.updateCropDraft(CropRecipe(), interactive: false)
+  document.commitCropDraft()
+  #expect(document.editorModel.recipe.layerStack.frame(of: layerID) == whole)
+}
+
+@MainActor
+@Test func aLayerCropKeepsItsRectangleWhenTheLayerOverhangsTheCanvas() async throws {
+  let url = try writeRedPNG(width: 100, height: 50)
+  defer { try? FileManager.default.removeItem(at: url) }
+
+  let canvas = CanvasRecipe(width: 200, height: 100)
+  var layer = try ImageLayerFactory.makeLayer(for: url, canvas: canvas)
+  var image = try #require(layer.imageLayer)
+  // Half of the layer lies beyond the canvas's right edge, and its layer mask
+  // trims its pixels to the canvas before the crop runs.
+  image.frame = LayerFrame(x: 150, y: 25, width: 100, height: 50)
+  layer.content = .image(image)
+  layer.layerMask = MaskRecipe.layerMask(revealsLayer: true)
+  let recipe = ProjectRecipe(
+    layerStack: LayerStackRecipe(layers: [layer, .canvasBase(canvas)], activeLayerID: layer.id)
+  ).applying(
+    .setLayerCrop(
+      layer.id,
+      CropRecipe(left: 0, bottom: 0, right: 0.25, top: 1),
+      actionName: "Crop Layer"
+    ))
+  #expect(
+    recipe.layerStack.frame(of: layer.id) == LayerFrame(x: 150, y: 25, width: 25, height: 50))
+
+  let engine = try RenderEngine(observesMemoryPressure: false)
+  let frame = try await engine.render(
+    RenderRequest(
+      documentID: UUID(), revision: 1, input: nil,
+      recipe: recipe, quality: .full)
+  )
+
+  // The first quarter of the whole layer is x 150–175, not a quarter of the
+  // part that happens to lie on the canvas.
+  #expect(samples(frame, at: CGPoint(x: 155, y: 50))[3] > 0.99)
+  #expect(samples(frame, at: CGPoint(x: 170, y: 50))[3] > 0.99)
+  #expect(samples(frame, at: CGPoint(x: 180, y: 50))[3] < 0.01)
+}
+
+@MainActor
 @Test func aCanvasDocumentWithNoRawRendersItsPlacedImages() async throws {
   let url = try writeRedPNG(width: 100, height: 50)
   defer { try? FileManager.default.removeItem(at: url) }
