@@ -2632,7 +2632,7 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
     let size: CGSize
     switch cropDraft?.target {
     case .layer(let id):
-      guard let frame = recipe.layerStack.frame(of: id) else { return nil }
+      guard let frame = recipe.layerStack.uncroppedFrame(of: id) else { return nil }
       size = CGSize(width: frame.width, height: frame.height)
     case .canvas, nil:
       if let visible = committedRawCanvasCropBounds,
@@ -2649,11 +2649,12 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
     return size
   }
 
-  /// The full bounds of the current crop target in view points.
+  /// The full bounds of the current crop target in view points. For a layer
+  /// that is its uncropped frame, so an applied crop can be widened again.
   private var cropReferenceRectInView: CGRect {
     switch cropDraft?.target {
     case .layer(let id):
-      guard let frame = recipe.layerStack.frame(of: id) else { return .zero }
+      guard let frame = recipe.layerStack.uncroppedFrame(of: id) else { return .zero }
       return viewRect(fromCanvas: frame)
     case .canvas, nil:
       return imageRectInView()

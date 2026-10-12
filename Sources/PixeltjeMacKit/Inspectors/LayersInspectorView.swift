@@ -208,7 +208,7 @@ struct LayersInspectorView: View {
           case .generatedInpaint(let inpaint):
             InpaintResultInspectorView(layer: layer, inpaint: inpaint, send: send)
           case .image(let image):
-            ImageLayerInspectorView(image: image)
+            ImageLayerInspectorView(image: image, crop: layer.crop)
           case .canvas(let canvas):
             CanvasLayerInspectorView(
               canvas: canvas,
@@ -722,10 +722,13 @@ extension ProjectLayer {
 
   fileprivate var rowDescription: String {
     switch content {
-    case .developedRaw: "Developed RAW"
-    case .image(let image): image.naturalSizeDescription
-    case .raster(let raster): raster.naturalSizeDescription
-    case .generatedInpaint(let inpaint): inpaint.naturalSizeDescription
+    case .developedRaw: isCropped ? "Developed RAW, cropped" : "Developed RAW"
+    case .image(let image):
+      pixelSizeDescription(width: Double(image.naturalWidth), height: Double(image.naturalHeight))
+    case .raster(let raster):
+      pixelSizeDescription(width: Double(raster.asset.width), height: Double(raster.asset.height))
+    case .generatedInpaint(let inpaint):
+      pixelSizeDescription(width: Double(inpaint.source.width), height: Double(inpaint.source.height))
     case .paint(let paint):
       paint.surface.strokes.count == 1
         ? "1 stroke" : "\(paint.surface.strokes.count) strokes"
@@ -740,6 +743,16 @@ extension ProjectLayer {
       group.children.count == 1 ? "1 layer" : "\(group.children.count) layers"
     case .adjustment(let adjustment): adjustment.summary
     }
+  }
+
+  private var isCropped: Bool { crop.map { !$0.isFullFrame } ?? false }
+
+  /// The layer's source pixels that its crop keeps. The crop hides the rest
+  /// rather than deleting it, and the row says so.
+  private func pixelSizeDescription(width: Double, height: Double) -> String {
+    guard let crop, isCropped else { return "\(Int(width)) × \(Int(height)) px" }
+    let kept = CropGeometry.croppedPixelSize(crop, imageWidth: width, imageHeight: height)
+    return "\(kept.width) × \(kept.height) px, cropped"
   }
 
   fileprivate var symbolName: String {
@@ -1884,6 +1897,15 @@ private struct AdjustmentCurveControls: View {
 
 private struct ImageLayerInspectorView: View {
   let image: ImageLayer
+  let crop: CropRecipe?
+
+  /// The placed size the layer's crop keeps, when it hides anything.
+  private var croppedDescription: String? {
+    guard let crop, !crop.isFullFrame else { return nil }
+    let kept = CropGeometry.croppedPixelSize(
+      crop, imageWidth: image.frame.width, imageHeight: image.frame.height)
+    return "\(kept.width) × \(kept.height) px"
+  }
 
   var body: some View {
     RightPanelDisclosureSection(
@@ -1901,6 +1923,9 @@ private struct ImageLayerInspectorView: View {
           "Placed",
           value: "\(Int(image.frame.width)) × \(Int(image.frame.height)) px"
         )
+        if let croppedDescription {
+          LabeledContent("Cropped", value: croppedDescription)
+        }
         if let path = image.source.linkedPath {
           LabeledContent("Path", value: path)
             .lineLimit(3)

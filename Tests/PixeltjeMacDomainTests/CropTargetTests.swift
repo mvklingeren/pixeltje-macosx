@@ -96,6 +96,66 @@ private func cropTargetImageLayer(
   #expect(decoded.layerStack.layer(id: otherID)?.crop == nil)
 }
 
+@Test func appliedLayerCropShrinksTheLayerBoundsWithoutTouchingItsPixels() throws {
+  let imageID = ProjectLayerID(rawValue: "bounded-crop-image")
+  let recipe = ProjectRecipe(
+    layerStack: LayerStackRecipe(
+      layers: [cropTargetImageLayer(id: imageID), .canvasBase(CanvasRecipe(width: 200, height: 100))],
+      activeLayerID: imageID
+    )
+  )
+  let authored = LayerFrame(x: 20, y: 10, width: 160, height: 80)
+  let crop = CropRecipe(left: 0.25, bottom: 0.125, right: 0.75, top: 0.875)
+
+  let cropped = recipe.applying(.setLayerCrop(imageID, crop, actionName: "Crop Layer"))
+  let stack = cropped.layerStack
+
+  // The layer now occupies only what its crop keeps.
+  #expect(stack.frame(of: imageID) == LayerFrame(x: 60, y: 20, width: 80, height: 60))
+  // Its placement and the rectangle the crop is measured in are untouched, so
+  // the hidden pixels remain available to the Crop tool.
+  #expect(stack.layer(id: imageID)?.imageLayer?.frame == authored)
+  #expect(stack.cropFrame(of: imageID) == authored)
+  #expect(stack.uncroppedFrame(of: imageID) == authored)
+  #expect(stack.canCropLayer(imageID))
+
+  // Widening the crop back to the full frame restores the original bounds.
+  let restored = cropped.applying(.setLayerCrop(imageID, .identity, actionName: "Crop Layer"))
+  #expect(restored.layerStack.frame(of: imageID) == authored)
+}
+
+@Test func croppedLayerKeepsItsWindowWhenMovedOrScaled() throws {
+  let imageID = ProjectLayerID(rawValue: "transformed-crop-image")
+  let authored = LayerFrame(x: 20, y: 10, width: 160, height: 80)
+  let cropped = ProjectRecipe(
+    layerStack: LayerStackRecipe(
+      layers: [cropTargetImageLayer(id: imageID), .canvasBase(CanvasRecipe(width: 200, height: 100))],
+      activeLayerID: imageID
+    )
+  ).applying(
+    .setLayerCrop(
+      imageID,
+      CropRecipe(left: 0.25, bottom: 0.125, right: 0.75, top: 0.875),
+      actionName: "Crop Layer"
+    ))
+
+  // The crop is applied before the transform, so the window travels with the
+  // content rather than staying where it was on the canvas.
+  let moved = cropped.applying(.translateLayer(imageID, byX: 10, y: 5))
+  #expect(moved.layerStack.frame(of: imageID) == LayerFrame(x: 70, y: 25, width: 80, height: 60))
+  #expect(
+    moved.layerStack.uncroppedFrame(of: imageID)
+      == LayerFrame(x: 30, y: 15, width: 160, height: 80))
+
+  let scaled = cropped.applying(
+    .setLayerTransform(imageID, LayerTransform(referenceRect: authored, scaleX: 2, scaleY: 2)))
+  #expect(
+    scaled.layerStack.frame(of: imageID) == LayerFrame(x: 20, y: -10, width: 160, height: 120))
+  #expect(
+    scaled.layerStack.uncroppedFrame(of: imageID)
+      == LayerFrame(x: -60, y: -30, width: 320, height: 160))
+}
+
 @Test func lockedPrimaryRawCanStillBeCroppedAsALayer() throws {
   var stack = LayerStackRecipe.initialRawBackground()
   stack.canvas = CanvasRecipe(width: 300, height: 200)

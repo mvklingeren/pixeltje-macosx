@@ -1656,7 +1656,9 @@ public final class EditorModel: ObservableObject {
       guard canvas.isResolved else { return nil }
       return (width: Double(canvas.width), height: Double(canvas.height))
     case .layer(let id):
-      guard recipe.layerStack.canCropLayer(id), let frame = recipe.layerStack.frame(of: id),
+      // The whole layer, not its applied crop: the crop is measured in it.
+      guard recipe.layerStack.canCropLayer(id),
+        let frame = recipe.layerStack.uncroppedFrame(of: id),
         !frame.isEmpty
       else { return nil }
       return (width: frame.width, height: frame.height)
