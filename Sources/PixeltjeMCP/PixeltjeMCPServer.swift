@@ -114,7 +114,7 @@ public final class PixeltjeMCPServer {
         result: [
           "protocolVersion": version,
           "capabilities": ["tools": ["listChanged": false]],
-          "serverInfo": ["name": "Pixeltje Mac", "version": "0.2"],
+          "serverInfo": ["name": "Pixeltje Mac", "version": "0.3"],
           "instructions":
             "Inspect open documents before editing. Pass the current contentRevision and a unique idempotencyKey with every mutation. Pixeltje rejects stale revisions and in-progress human gestures.",
         ]

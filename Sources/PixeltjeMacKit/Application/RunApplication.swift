@@ -335,7 +335,7 @@ public final class PixeltjeMacAppDelegate: NSObject, NSApplicationDelegate, NSMe
   @objc public func showAboutPanel(_ sender: Any?) {
     NSApp.orderFrontStandardAboutPanel(options: [
       .applicationName: "Pixeltje Mac",
-      .applicationVersion: "0.2",
+      .applicationVersion: "0.3",
       .credits: NSAttributedString(
         string: "A native macOS 27 RAW developer powered directly by Core Image.\n\n"
           + "ComfyUI is a trademark of Comfy Org. Pixeltje is an independent integration "
