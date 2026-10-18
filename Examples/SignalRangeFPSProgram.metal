@@ -94,6 +94,7 @@ struct SceneHit {
     uint material;
     int enemy;
     uint variant;            // spider appearance or fixture placement index
+    float4 fur;              // spider strand tangent and height; zero elsewhere
 };
 
 struct ChromePose {
@@ -1093,7 +1094,7 @@ SurfaceMaterial surfaceMaterial(SceneHit hit,
         || hit.material == 16u || hit.material == 17u
         || hit.material == 18u || hit.material == 19u)
         return spiderSurfaceMaterial(hit.material, furPosition,
-            SpiderVariant(hit.variant));
+            hit.fur, SpiderVariant(hit.variant));
     return {float3(0.0f),
         1.0f, 0.0f, float3(0.0f)};
 }
@@ -1139,6 +1140,11 @@ float3 shadePointLight(SceneHit hit, SurfaceMaterial material,
         return float3(0.0f);
     }
 
+    float3 radiance = light.color * light.power
+        / (4.0f * rangePi * distanceSquared);
+    if (dot(hit.fur.xyz, hit.fur.xyz) > 0.0f)
+        return spiderFurReflectance(material.albedo, hit.fur, hit.normal,
+            l, viewDirection) * radiance;
     float3 h = normalize(l + viewDirection);
     float nDotV = max(dot(hit.normal, viewDirection), 0.001f);
     float nDotH = max(dot(hit.normal, h), 0.0f);
@@ -1158,8 +1164,6 @@ float3 shadePointLight(SceneHit hit, SurfaceMaterial material,
         * material.albedo / rangePi;
     float3 specular = distribution * geometryV * geometryL * fresnel
         / max(4.0f * nDotV * nDotL, 0.001f);
-    float3 radiance = light.color * light.power
-        / (4.0f * rangePi * distanceSquared);
     return (diffuse + specular) * radiance * nDotL;
 }
 
@@ -1177,7 +1181,7 @@ void traceScene(thread SceneHit &hit, thread float3 &furPosition,
         if (spider.material != 0u) {
             hit = {spider.distance, spider.normal,
                 origin + direction * spider.distance, spider.material,
-                int(i), uint(spiderVariantForSlot(i))};
+                int(i), uint(spiderVariantForSlot(i)), spider.fur};
             furPosition = spider.furPosition;
         }
     }
@@ -1198,7 +1202,7 @@ void traceScene(thread SceneHit &hit, thread float3 &furPosition,
         if (spider.material != 0u) {
             hit = {spider.distance, spider.normal,
                 origin + direction * spider.distance, spider.material,
-                -1, fallen.appearance.x};
+                -1, fallen.appearance.x, spider.fur};
             furPosition = spider.furPosition;
         }
     }

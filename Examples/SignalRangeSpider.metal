@@ -99,6 +99,7 @@ struct SpiderHit {
     float3 normal;
     uint material;
     float3 furPosition;
+    float4 fur;     // strand tangent and height in coat lengths; zero off fur
 };
 
 float smoothNoise(float2 p);
@@ -149,6 +150,151 @@ void acceptSpiderLeg(thread SpiderHit &hit, float3 origin,
     }
     acceptSpiderSphere(hit, origin, direction, start, radius, material);
     acceptSpiderSphere(hit, origin, direction, end, radius, material);
+}
+
+// Furry parts are wrapped in a shell one coat deep. A ray entering the shell
+// marches toward the core and stops at the first procedural strand; a ray
+// that slips between strands reaches the core or leaves the shell again,
+// which gives the silhouette its loose, hairy edge.
+constant float spiderFurDensity = 55.0f;    // strand cells per local unit
+constant float spiderFurLean = 1.25f;       // tip offset along the comb, in coats
+// One pixel spans about 1 / (focal 1.1 * 900 rows) radians. Strands never get
+// thinner than a pixel, so a distant coat reads as solid instead of sparkling.
+// shortcut: assumes the 900-row default preview; pass the real resolution in
+// if much larger or smaller previews alias or look blobby.
+constant float spiderFurPixelAngle = 0.001f;
+
+struct SpiderFurPoint {
+    float height;   // above the core surface, in local units
+    float3 normal;
+    float3 comb;    // surface tangent the coat lies along
+};
+
+// Shapes are a capsule from a to b with the given radius, or an ellipsoid at a
+// with radii b when the radius is zero.
+SpiderFurPoint spiderFurPoint(float3 p, float3 a, float3 b, float radius) {
+    SpiderFurPoint point;
+    if (radius > 0.0f) {
+        // Leg hair lies toward the foot.
+        float3 axis = b - a;
+        float3 offset = p - a
+            - axis * saturate(dot(p - a, axis) / dot(axis, axis));
+        float distance = length(offset);
+        point = {distance - radius, offset / max(distance, 0.0001f), axis};
+    } else {
+        // Body hair lies rearward (+Z) and down the flanks.
+        float3 gradient = (p - a) / (b * b);
+        float k0 = length((p - a) / b), k1 = length(gradient);
+        point = {k0 * (k0 - 1.0f) / k1, gradient / k1,
+            float3(0.0f, -0.45f, 1.0f)};
+    }
+    float3 comb = point.comb - point.normal * dot(point.comb, point.normal);
+    point.comb = length(comb) > 0.001f ? normalize(comb)
+        : normalize(cross(point.normal, abs(point.normal.x) < 0.9f
+            ? float3(1.0f, 0.0f, 0.0f) : float3(0.0f, 1.0f, 0.0f)));
+    return point;
+}
+
+// Strand-cell coordinates of a root: around and along a capsule, or on the
+// cube face an ellipsoid direction projects onto. A cell holds one strand.
+float2 spiderFurCell(float3 root, float3 a, float3 b, float radius) {
+    if (radius > 0.0f) {
+        float3 axis = normalize(b - a);
+        float3 side = normalize(cross(axis, abs(axis.y) < 0.9f
+            ? float3(0.0f, 1.0f, 0.0f) : float3(0.0f, 0.0f, 1.0f)));
+        float3 offset = root - a;
+        // A whole number of cells around the leg hides the atan2 seam.
+        float around = max(round(
+            2.0f * rangePi * radius * spiderFurDensity), 3.0f);
+        float angle = atan2(dot(offset, cross(side, axis)),
+            dot(offset, side));
+        return float2((angle / (2.0f * rangePi) + 0.5f) * around,
+            dot(offset, axis) * spiderFurDensity);
+    }
+    float3 q = (root - a) / b;
+    float3 m = abs(q);
+    // Whole-number face offsets keep neighbouring faces' strands distinct.
+    if (m.x >= m.y && m.x >= m.z)
+        return q.yz / m.x * b.yz * spiderFurDensity
+            + float2(q.x > 0.0f ? 70.0f : 140.0f, 0.0f);
+    if (m.y >= m.z)
+        return q.xz / m.y * b.xz * spiderFurDensity
+            + float2(q.y > 0.0f ? 210.0f : 280.0f, 0.0f);
+    return q.xy / m.z * b.xy * spiderFurDensity
+        + float2(q.z > 0.0f ? 350.0f : 420.0f, 0.0f);
+}
+
+// Each cell grows one tapered strand with its own length and position.
+bool spiderFurStrand(float2 cell, float height, float minimumWidth) {
+    float2 id = floor(cell);
+    float strandLength = 0.55f + 0.45f * hashTile(id + 23.17f);
+    if (height > strandLength) return false;
+    float width = clamp(0.34f * (1.0f - 0.8f * height / strandLength),
+        minimumWidth, 0.5f);
+    float2 centre = 0.5f + (float2(hashTile(id), hashTile(id + 41.3f))
+        - 0.5f) * (1.0f - 2.0f * width);
+    return distance(fract(cell), centre) < width;
+}
+
+void acceptSpiderFur(thread SpiderHit &hit, float3 origin,
+    float3 direction, float3 a, float3 b, float radius, float coat,
+    uint material) {
+    SpiderHit shell = {hit.distance, float3(0.0f), 0u, float3(0.0f)};
+    SpiderHit core = shell;
+    if (radius > 0.0f) {
+        acceptSpiderLeg(shell, origin, direction, a, b, radius + coat,
+            material);
+        acceptSpiderLeg(core, origin, direction, a, b, radius, material);
+    } else {
+        acceptSpiderEllipsoid(shell, origin, direction, a, b + coat,
+            material);
+        acceptSpiderEllipsoid(core, origin, direction, a, b, material);
+    }
+    if (shell.material == 0u) return;
+    // Steps shorter than a strand cell keep slanted rays from skipping strands.
+    float step = 0.6f / spiderFurDensity;
+    for (uint i = 0u; i < 24u; ++i) {
+        float t = shell.distance + step * float(i);
+        if (t >= core.distance) break;
+        float3 p = origin + direction * t;
+        SpiderFurPoint point = spiderFurPoint(p, a, b, radius);
+        float height = max(point.height / coat, 0.0f);
+        if (height > 1.0f) {
+            if (dot(direction, point.normal) > 0.0f) break;
+            continue;
+        }
+        // Strands rise from the root, then curve over along the comb.
+        float3 root = p - point.comb
+            * (coat * spiderFurLean * height * height);
+        if (spiderFurStrand(spiderFurCell(root, a, b, radius), height,
+                0.5f * t * spiderFurPixelAngle * spiderFurDensity)) {
+            hit = {t, point.normal, material,
+                root - point.normal * point.height - a,
+                float4(normalize(point.normal
+                    + point.comb * (2.0f * spiderFurLean * height)),
+                    height)};
+            return;
+        }
+    }
+    if (core.material != 0u) {
+        hit = core;
+        hit.fur = float4(spiderFurPoint(origin + direction * core.distance,
+            a, b, radius).comb, 0.0f);
+    }
+}
+
+void acceptSpiderFurEllipsoid(thread SpiderHit &hit, float3 origin,
+    float3 direction, float3 centre, float3 radii, float coat,
+    uint material) {
+    acceptSpiderFur(hit, origin, direction, centre, radii, 0.0f, coat,
+        material);
+}
+
+void acceptSpiderFurLeg(thread SpiderHit &hit, float3 origin,
+    float3 direction, float3 start, float3 end, float radius, float coat,
+    uint material) {
+    acceptSpiderFur(hit, origin, direction, start, end, radius, coat,
+        material);
 }
 
 float3 spiderLegCorner(uint corner, float3 sideways, float3 upwards) {
@@ -225,13 +371,13 @@ void acceptSpiderPaw(thread SpiderHit &hit, float3 origin,
         && bound >= hit.distance)) return;
 
     float previousDistance = hit.distance;
-    acceptSpiderEllipsoid(hit, origin, direction, paw,
-        float3(0.19f, 0.12f, 0.20f), 18u);
+    acceptSpiderFurEllipsoid(hit, origin, direction, paw,
+        float3(0.19f, 0.12f, 0.20f), 0.045f, 18u);
     for (uint toe = 0u; toe < 3u; ++toe) {
         float spread = (float(toe) - 1.0f) * 0.09f;
-        acceptSpiderEllipsoid(hit, origin, direction,
+        acceptSpiderFurEllipsoid(hit, origin, direction,
             paw + float3(spread, -0.022f, -0.13f),
-            float3(0.055f, 0.065f, 0.09f), 18u);
+            float3(0.055f, 0.065f, 0.09f), 0.022f, 18u);
     }
     if (hit.distance < previousDistance)
         hit.furPosition = origin + direction * hit.distance - paw;
@@ -336,28 +482,34 @@ SpiderHit traceSpider(float3 origin, float3 direction, float3 centre,
     SpiderHit bodyHit = {localMaxDistance,
         float3(0.0f), 0u, float3(0.0f)};
 
-    acceptSpiderEllipsoid(bodyHit, bodyOrigin, bodyDirection,
-        float3(0.0f, -0.02f, 0.29f), float3(0.55f, 0.32f, 0.61f), 5u);
-    acceptSpiderEllipsoid(bodyHit, bodyOrigin, bodyDirection,
-        float3(0.0f, 0.03f, -0.37f), float3(0.41f, 0.29f, 0.40f), 17u);
-    acceptSpiderEllipsoid(bodyHit, bodyOrigin, bodyDirection,
-        float3(0.0f, 0.20f, 0.28f), float3(0.44f, 0.15f, 0.45f), 17u);
+    acceptSpiderFurEllipsoid(bodyHit, bodyOrigin, bodyDirection,
+        float3(0.0f, -0.02f, 0.29f), float3(0.55f, 0.32f, 0.61f),
+        0.075f, 5u);
+    // The head coat stays short so the eyes stand clear of it.
+    acceptSpiderFurEllipsoid(bodyHit, bodyOrigin, bodyDirection,
+        float3(0.0f, 0.03f, -0.37f), float3(0.41f, 0.29f, 0.40f),
+        0.045f, 17u);
+    acceptSpiderFurEllipsoid(bodyHit, bodyOrigin, bodyDirection,
+        float3(0.0f, 0.20f, 0.28f), float3(0.44f, 0.15f, 0.45f),
+        0.06f, 17u);
     for (uint side = 0u; side < 2u; ++side) {
         float signX = side == 0u ? -1.0f : 1.0f;
         for (uint tuft = 0u; tuft < 4u; ++tuft) {
-            acceptSpiderEllipsoid(bodyHit, bodyOrigin, bodyDirection,
+            acceptSpiderFurEllipsoid(bodyHit, bodyOrigin, bodyDirection,
                 float3(signX * 0.44f, 0.10f,
                     -0.05f + float(tuft) * 0.27f),
-                float3(0.16f, 0.14f, 0.15f), 5u);
+                float3(0.16f, 0.14f, 0.15f), 0.06f, 5u);
         }
-        acceptSpiderEllipsoid(bodyHit, bodyOrigin, bodyDirection,
+        acceptSpiderFurEllipsoid(bodyHit, bodyOrigin, bodyDirection,
             float3(signX * 0.32f, -0.02f, -0.50f),
-            float3(0.16f, 0.15f, 0.19f), 17u);
+            float3(0.16f, 0.15f, 0.19f), 0.04f, 17u);
     }
     acceptSpiderEyes(bodyHit, bodyOrigin, bodyDirection, variant);
     if (bodyHit.material != 0u) {
         bodyHit.normal = rotateSpiderPitch(
             bodyHit.normal, sinePitch, cosinePitch);
+        bodyHit.fur.xyz = rotateSpiderPitch(
+            bodyHit.fur.xyz, sinePitch, cosinePitch);
         hit = bodyHit;
     }
     // Tuck the black spider's legs in while resting, then extend them as its
@@ -416,15 +568,15 @@ SpiderHit traceSpider(float3 origin, float3 direction, float3 centre,
                 acceptSpiderSphere(hit, localOrigin, localDirection,
                     knee, 0.165f, 17u);
             } else {
-                acceptSpiderLeg(hit, localOrigin, localDirection,
-                    hip, knee, 0.12f, 15u);
-                acceptSpiderLeg(hit, localOrigin, localDirection,
-                    knee, foot, 0.095f, 15u);
-                acceptSpiderSphere(hit, localOrigin, localDirection,
-                    knee, 0.14f, 17u);
-                acceptSpiderEllipsoid(hit, localOrigin, localDirection,
+                acceptSpiderFurLeg(hit, localOrigin, localDirection,
+                    hip, knee, 0.12f, 0.05f, 15u);
+                acceptSpiderFurLeg(hit, localOrigin, localDirection,
+                    knee, foot, 0.095f, 0.045f, 15u);
+                acceptSpiderFurEllipsoid(hit, localOrigin, localDirection,
+                    knee, float3(0.14f), 0.055f, 17u);
+                acceptSpiderFurEllipsoid(hit, localOrigin, localDirection,
                     mix(knee, foot, 0.38f),
-                    float3(0.14f, 0.14f, 0.16f), 15u);
+                    float3(0.14f, 0.14f, 0.16f), 0.055f, 15u);
                 acceptSpiderPaw(hit, localOrigin, localDirection, foot);
             }
         }
@@ -443,6 +595,9 @@ SpiderHit traceSpider(float3 origin, float3 direction, float3 centre,
     }
     hit.normal = float3(cosine * n.x - sine * n.z, n.y,
         sine * n.x + cosine * n.z);
+    float3 strand = hit.fur.xyz;
+    hit.fur.xyz = float3(cosine * strand.x - sine * strand.z, strand.y,
+        sine * strand.x + cosine * strand.z);
     hit.distance *= traits.scale;
     return hit;
 }
@@ -664,8 +819,27 @@ void advanceBoss(device GameState &game, float dt) {
             game.gait[bossSlot].y, traits));
 }
 
+// Kajiya-Kay strand lighting with two shifted highlights (Scheuermann): a
+// white reflection from the cuticle and a dimmer one tinted by the strand it
+// passed through. Roots get less light through the strands above them.
+float3 spiderFurReflectance(float3 albedo, float4 fur, float3 normal,
+    float3 toLight, float3 toView) {
+    float3 strand = normalize(fur.xyz);
+    float3 halfway = normalize(toLight + toView);
+    float strandLight = dot(strand, toLight);
+    float primary = dot(normalize(strand + normal * 0.1f), halfway);
+    float secondary = dot(normalize(strand - normal * 0.1f), halfway);
+    float3 diffuse = albedo / rangePi
+        * sqrt(max(1.0f - strandLight * strandLight, 0.0f));
+    float3 specular = 0.12f * pow(max(1.0f - primary * primary, 0.0f), 45.0f)
+        + 0.5f * albedo
+            * pow(max(1.0f - secondary * secondary, 0.0f), 11.0f);
+    return (diffuse + specular) * mix(0.35f, 1.0f, fur.w)
+        * saturate(dot(normal, toLight));
+}
+
 SurfaceMaterial spiderSurfaceMaterial(uint material, float3 furPosition,
-    SpiderVariant variant) {
+    float4 fur, SpiderVariant variant) {
     if (material == 16u) return {
         variant != SpiderVariant::brown
             ? float3(0.12f, 0.012f, 0.014f)
@@ -682,9 +856,14 @@ SurfaceMaterial spiderSurfaceMaterial(uint material, float3 furPosition,
     if (material == 5u || material == 15u
         || material == 17u || material == 18u) {
         // Body, legs, joints and paws all use primitive-local fur coordinates,
-        // so the coat follows the spider's turns and articulated gait.
-        float fibers = 0.5f * smoothNoise(
-            furPosition.xy * 68.0f + furPosition.z * 13.0f)
+        // so the coat follows the spider's turns and articulated gait. Strands
+        // brighten from root to tip; their fur positions are strand roots, so
+        // the noise below varies the tint between strands, not along one.
+        // The black spider's smooth leg facets keep the fibre noise.
+        float fibers = dot(fur.xyz, fur.xyz) > 0.0f
+            ? smoothstep(0.0f, 0.9f, fur.w)
+            : 0.5f * smoothNoise(
+                furPosition.xy * 68.0f + furPosition.z * 13.0f)
             + 0.5f * smoothNoise(
                 furPosition.zy * 74.0f + furPosition.x * 17.0f);
         float flecks = hashTile(floor(furPosition.xz * 95.0f)
