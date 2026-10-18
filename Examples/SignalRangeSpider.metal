@@ -5,7 +5,8 @@ constant float spiderChaseSpeed = 1.8f;
 
 enum class SpiderVariant : uint {
     brown = 0u,
-    blackRedEyes = 1u
+    blackRedEyes = 1u,
+    bossBlack = 2u
 };
 
 struct SpiderTraits {
@@ -27,6 +28,9 @@ struct SpiderTraits {
 SpiderTraits spiderTraits(SpiderVariant variant) {
     // Both variants share a walking cycle and jump behavior; proportions and
     // movement amplitudes define their different silhouettes.
+    if (variant == SpiderVariant::bossBlack)
+        return {3.30f, 0.75f, 1.05f, 0.72f, 0.79f, 0.50f,
+            0.84f, 0.30f, 0.18f, false, 0.0f, 0.0f, 0.0f};
     if (variant == SpiderVariant::blackRedEyes)
         return {0.35f, 0.70f, 1.08f, 0.70f, 0.66f, 0.44f,
             0.84f, 0.34f, 0.22f, true, 0.28f, 0.46f, 2.0f};
@@ -40,7 +44,8 @@ float spiderFootprintRadius(SpiderTraits traits) {
 }
 
 SpiderVariant spiderVariantForSlot(uint slot) {
-    return slot == 2u ? SpiderVariant::blackRedEyes : SpiderVariant::brown;
+    return slot == bossSlot ? SpiderVariant::bossBlack
+        : slot == 2u ? SpiderVariant::blackRedEyes : SpiderVariant::brown;
 }
 
 float spiderBodyBob(float phase, float movementBlend,
@@ -58,13 +63,13 @@ float spiderBodyRise(float time, uint slot) {
 }
 
 float3 spawnPosition(uint slot) {
-    float2 initial[3] = {
+    float2 initial[4] = {
         float2(-9.5f, -8.0f), float2(9.0f, -10.0f),
-        float2(0.0f, -14.0f)
+        float2(0.0f, -14.0f), float2(0.0f, -118.0f)
     };
     float2 xz = initial[slot];
     SpiderTraits traits = spiderTraits(spiderVariantForSlot(slot));
-    return float3(xz.x, 0.52f * traits.scale, xz.y);
+    return float3(xz.x, stairHeight(xz) + 0.52f * traits.scale, xz.y);
 }
 
 float spiderJumpLift(SpiderTraits traits, bool pursuing, float dt,
@@ -239,7 +244,7 @@ void acceptSpiderEyes(thread SpiderHit &hit, float3 origin,
     if (bound < 0.0f || (dot(origin - eyeRegion, origin - eyeRegion)
         > 0.3025f && bound >= hit.distance)) return;
 
-    if (variant == SpiderVariant::blackRedEyes) {
+    if (variant != SpiderVariant::brown) {
         // The black variant has only two red corneas, with no extra socket
         // spheres that could read as additional eyes.
         for (uint side = 0u; side < 2u; ++side) {
@@ -399,11 +404,11 @@ SpiderHit traceSpider(float3 origin, float3 direction, float3 centre,
                     - forwardReach * 0.45f);
             float3 foot = float3(signX * (1.19f
                     + legSpread + 0.22f * collapse),
-                mix((variant == SpiderVariant::blackRedEyes
+                mix((variant != SpiderVariant::brown
                     ? -0.52f : -0.45f) - bob, -0.37f, collapse) + lift,
                 z + (float(leg) - 1.0f) * 0.25f + stride
                     + fan - forwardReach);
-            if (variant == SpiderVariant::blackRedEyes) {
+            if (variant != SpiderVariant::brown) {
                 acceptSpiderFacetedLeg(hit, localOrigin, localDirection,
                     hip, knee, 0.10f, 0.17f);
                 acceptSpiderFacetedLeg(hit, localOrigin, localDirection,
@@ -427,7 +432,7 @@ SpiderHit traceSpider(float3 origin, float3 direction, float3 centre,
     float3 n = hit.normal;
     if (hit.material == 5u
         || (hit.material == 15u
-            && variant != SpiderVariant::blackRedEyes)
+            && variant == SpiderVariant::brown)
         || hit.material == 17u || hit.material == 18u) {
         // Stronger normal variation gives the enlarged coat visible depth.
         float3 fibers = float3(
@@ -444,7 +449,8 @@ SpiderHit traceSpider(float3 origin, float3 direction, float3 centre,
 
 bool spiderPositionClear(float2 position, uint self,
     device const GameState &game) {
-    if (!walkable(position)) return false;
+    if (!walkable(position) || (self != bossSlot && position.y < -outerRoomFar))
+        return false;
     float selfRadius = spiderFootprintRadius(
         spiderTraits(spiderVariantForSlot(self)));
     for (uint other = 0u; other < enemyCount; ++other) {
@@ -496,7 +502,7 @@ float2 moveSpider(float2 position, float2 step, uint self,
 }
 
 void advanceSpiders(device GameState &game, float dt) {
-    for (uint i = 0u; i < enemyCount; ++i) {
+    for (uint i = 0u; i < ordinaryEnemyCount; ++i) {
         game.enemyClock[i].x = max(game.enemyClock[i].x - dt, 0.0f);
         game.enemyClock[i].z = max(game.enemyClock[i].z - dt, 0.0f);
         if (game.enemy[i].w <= 0.0f) continue;
@@ -575,18 +581,101 @@ void advanceSpiders(device GameState &game, float dt) {
     }
 }
 
+bool bossPositionClear(float2 position) {
+    // Keep the entire huge footprint inside the arena after the reveal.
+    return abs(position.x) < 12.8f
+        && position.y < bossRoomSouth - 4.5f
+        && position.y > bossRoomNorth + 5.0f;
+}
+
+void advanceBoss(device GameState &game, float dt) {
+    if (game.bossScene.x < 0.0f || game.enemy[bossSlot].w <= 0.0f)
+        return;
+    float time = game.bossScene.x;
+    SpiderTraits traits = spiderTraits(SpiderVariant::bossBlack);
+    game.enemyClock[bossSlot].z = max(game.enemyClock[bossSlot].z - dt, 0.0f);
+    game.enemyClock[bossSlot].x = max(game.enemyClock[bossSlot].x - dt, 0.0f);
+    float2 previous = game.enemy[bossSlot].xz;
+    if (time < 5.0f) {
+        // The rear blast door rises, the boss walks out, then it drops shut.
+        float emerge = smoothstep(1.25f, 4.25f, time);
+        game.enemy[bossSlot].z = mix(-118.0f, -96.0f, emerge);
+        game.enemyClock[bossSlot].w = rangePi;
+        game.gait[bossSlot].y = smoothstep(1.0f, 2.0f, time);
+    } else {
+        game.bossAttack.y = max(game.bossAttack.y - dt, 0.0f);
+        game.bossWeb.x = max(game.bossWeb.x - dt, 0.0f);
+        float2 toPlayer = game.player.xz - game.enemy[bossSlot].xz;
+        float distance = length(toPlayer);
+        if (game.bossAttack.x <= 0.0f && game.bossAttack.y <= 0.0f
+            && distance > 4.0f) {
+            // Snapshot a heading once. The charge never turns to follow a dodge.
+            float2 heading = toPlayer / max(distance, 0.001f);
+            game.bossAttack.zw = heading;
+            game.bossAttack.x = 0.001f;
+            game.bossAttack.y = 2.5f;
+            game.enemyClock[bossSlot].w = atan2(heading.x, -heading.y);
+        }
+        if (game.bossAttack.x > 0.0f) {
+            game.bossAttack.x += dt;
+            float charge = game.bossAttack.x;
+            if (charge > 0.48f && charge < 1.30f) {
+                float2 next = game.enemy[bossSlot].xz
+                    + game.bossAttack.zw * (12.5f * dt);
+                if (bossPositionClear(next)) game.enemy[bossSlot].xz = next;
+                if (length(game.player.xz - game.enemy[bossSlot].xz) < 4.2f
+                    && game.enemyClock[bossSlot].x <= 0.0f) {
+                    game.view.y = max(game.view.y - 23.0f, 0.0f);
+                    game.effects.y = 0.42f;
+                    game.enemyClock[bossSlot].x = 1.4f;
+                }
+            }
+            if (charge >= 1.30f) game.bossAttack.x = 0.0f;
+        } else if (game.bossWeb.x <= 0.0f && distance < 36.0f) {
+            uint slot = uint(game.bossWeb.y) % webCount;
+            float2 landing = clamp(game.player.xz,
+                float2(-18.5f, bossRoomNorth + 4.0f),
+                float2(18.5f, bossRoomSouth - 3.0f));
+            game.webs[slot].startTime = float4(
+                game.enemy[bossSlot].xyz + float3(0.0f, 2.0f, 0.0f),
+                game.effects.x);
+            game.webs[slot].targetExpiry = float4(
+                landing.x, 1.27f, landing.y, game.effects.x + 6.7f);
+            game.bossWeb.y += 1.0f;
+            game.bossWeb.x = 3.0f;
+        }
+        // Deliberately slow reorientation between fixed-heading lunges.
+        if (game.bossAttack.x <= 0.0f && distance > 0.01f) {
+            float desired = atan2(toPlayer.x, -toPlayer.y);
+            float delta = atan2(sin(desired - game.enemyClock[bossSlot].w),
+                cos(desired - game.enemyClock[bossSlot].w));
+            game.enemyClock[bossSlot].w += clamp(delta,
+                -0.8f * dt, 0.8f * dt);
+        }
+        game.gait[bossSlot].y = mix(game.gait[bossSlot].y,
+            game.bossAttack.x > 0.48f ? 1.0f : 0.15f,
+            1.0f - exp(-dt * 5.0f));
+    }
+    float travel = length(game.enemy[bossSlot].xz - previous);
+    game.gait[bossSlot].x = fract(game.gait[bossSlot].x
+        + 0.6f * travel / (traits.strideSpan * traits.scale));
+    game.enemy[bossSlot].y = 1.2f + traits.scale * (0.52f
+        + spiderBodyBob(game.gait[bossSlot].x,
+            game.gait[bossSlot].y, traits));
+}
+
 SurfaceMaterial spiderSurfaceMaterial(uint material, float3 furPosition,
     SpiderVariant variant) {
     if (material == 16u) return {
-        variant == SpiderVariant::blackRedEyes
+        variant != SpiderVariant::brown
             ? float3(0.12f, 0.012f, 0.014f)
             : float3(0.012f, 0.019f, 0.023f),
         0.045f, 0.02f,
-        variant == SpiderVariant::blackRedEyes
+        variant != SpiderVariant::brown
             ? float3(0.42f, 0.012f, 0.008f)
             : float3(0.0f)};
     if (material == 19u) return {
-        variant == SpiderVariant::blackRedEyes
+        variant != SpiderVariant::brown
             ? float3(0.025f, 0.005f, 0.006f)
             : float3(0.035f, 0.018f, 0.012f),
         0.82f, 0.0f, float3(0.0f)};
@@ -614,7 +703,7 @@ SurfaceMaterial spiderSurfaceMaterial(uint material, float3 furPosition,
             root = float3(0.23f, 0.11f, 0.055f);
             tip = float3(0.56f, 0.33f, 0.17f);
         }
-        if (variant == SpiderVariant::blackRedEyes) {
+        if (variant != SpiderVariant::brown) {
             root = float3(0.006f, 0.008f, 0.011f);
             tip = material == 17u
                 ? float3(0.085f, 0.094f, 0.10f)
