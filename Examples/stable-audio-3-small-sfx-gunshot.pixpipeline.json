@@ -1,0 +1,193 @@
+{
+  "schemaVersion": 2,
+  "id": "org.pixeltje.examples.stable-audio-3-small-sfx-gunshot",
+  "name": "Stable Audio 3 Small SFX — Gunshot",
+  "mode": "generic",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "prompt",
+      "kind": "input.prompt",
+      "title": "Gunshot prompt",
+      "parameters": {
+        "value": "A single loud gunshot fired outdoors, sharp crack and short natural echo, no speech or music"
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed",
+      "kind": "input.seed",
+      "title": "Seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 1234
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Audio Diffusion Generate",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 2
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "3c3ead00ddda0cd08c5ee67f140b16ad740d7885c6ab9d0e0950676fc0203abc",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "faf0fcd4028b833f2d1f5e6197b2a0f4b6f396ad8aa58fb9b199fe7e3f14a8b0",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "a393376b99a0c532c4c0f8e4d1e38295e0cd3b53ff5d9ee3eb4f91bb6e850efc",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "bafbe50f630c9e6dd2477e320a974d90ef2a27f734f9b610b19e1d0f1b4b4698",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.audio",
+      "title": "Audio Output",
+      "parameters": {
+        "filenamePrefix": "gunshot"
+      },
+      "resources": {}
+    }
+  ],
+  "connections": [
+    {
+      "id": "prompt.prompt->generate.prompt",
+      "output": {
+        "nodeID": "prompt",
+        "port": "prompt"
+      },
+      "input": {
+        "nodeID": "generate",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed.seed->generate.seed",
+      "output": {
+        "nodeID": "seed",
+        "port": "seed"
+      },
+      "input": {
+        "nodeID": "generate",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate.audio->output.audio",
+      "output": {
+        "nodeID": "generate",
+        "port": "audio"
+      },
+      "input": {
+        "nodeID": "output",
+        "port": "audio"
+      }
+    }
+  ],
+  "exposedParameters": [],
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "prompt": {
+        "x": 0,
+        "y": 80
+      },
+      "seed": {
+        "x": 0,
+        "y": 250
+      },
+      "generate": {
+        "x": 290,
+        "y": 100
+      },
+      "output": {
+        "x": 620,
+        "y": 120
+      }
+    },
+    "nodeSizes": {},
+    "viewportOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "viewportScale": 0.8
+  }
+}

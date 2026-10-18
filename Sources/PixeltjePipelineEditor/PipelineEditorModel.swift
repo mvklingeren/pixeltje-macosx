@@ -6,6 +6,7 @@ import PixeltjePipelineDomain
 import PixeltjePipelineEngine
 import PixeltjePipelineFLUX2Runtime
 import PixeltjePipelineSDXSRuntime
+import PixeltjePipelineStableAudioRuntime
 import PixeltjePipelineBaseTestSetRuntime
 import PixeltjePipelineResourceLinking
 import PixeltjePipelineTextRuntime
@@ -267,6 +268,7 @@ final class PipelineEditorModel: ObservableObject {
       let fluxRunner = FLUX2KleinPipelineRunner()
       let flux9BRunner = FLUX2Klein9BSplitRunner()
       let sdxsRunner = SDXSPipelineRunner()
+      let stableAudioRunner = StableAudio3Runner()
       let textRunner = CoreAITextPipelineRunner()
       let sam31Runner = SAM31PipelineRunner()
       let trainingWorker = ModelTrainingWorker()
@@ -279,6 +281,7 @@ final class PipelineEditorModel: ObservableObject {
           FLUX2KleinPipelineFamily.makeCompositeNodeDescriptor(),
           FLUX2Klein9BSplitFamily.descriptor(),
           SDXSPipelineFamily.descriptor(),
+          StableAudio3Family.descriptor(),
           CoreAITextPipelineFamily.makeCompositeNodeDescriptor(),
           SAM31PipelineFamily.descriptor(),
         ],
@@ -286,6 +289,7 @@ final class PipelineEditorModel: ObservableObject {
           + [FLUX2KleinPipelineFamily.makeNodeExecutor(runner: fluxRunner),
             FLUX2Klein9BSplitFamily.executor(runner: flux9BRunner),
             SDXSPipelineFamily.executor(runner: sdxsRunner),
+            StableAudio3Family.executor(runner: stableAudioRunner),
             CoreAITextPipelineFamily.makeNodeExecutor(runner: textRunner),
             SAM31PipelineFamily.executor(runner: sam31Runner),
             ModelTrainingRuntime.executor(worker: trainingWorker)])
@@ -868,6 +872,9 @@ final class PipelineEditorModel: ObservableObject {
     if document.nodes.contains(where: { $0.kind == SDXSPipelineFamily.nodeKind }) {
       ids.insert(SDXSPipelineFamily.packageID)
     }
+    if document.nodes.contains(where: { $0.kind == StableAudio3Family.nodeKind }) {
+      ids.insert(StableAudio3Family.packageID)
+    }
     if document.nodes.contains(where: { $0.kind == .zImageGenerate }) {
       ids.insert(ZImagePipelineFamily.packageID)
     }
@@ -899,6 +906,8 @@ final class PipelineEditorModel: ObservableObject {
       return FLUX2Klein9BSplitFamily.packageID
     case SDXSPipelineFamily.nodeKind:
       return SDXSPipelineFamily.packageID
+    case StableAudio3Family.nodeKind:
+      return StableAudio3Family.packageID
     case .zImageGenerate:
       return ZImagePipelineFamily.packageID
     case SAM31PipelineFamily.nodeKind:
@@ -925,6 +934,7 @@ final class PipelineEditorModel: ObservableObject {
     case FLUX2KleinPipelineFamily.packageID: "FLUX.2 Klein"
     case FLUX2Klein9BSplitFamily.packageID: "FLUX.2 Klein 9B FP8"
     case SDXSPipelineFamily.packageID: "SDXS 512"
+    case StableAudio3Family.packageID: "Stable Audio 3 Small SFX"
     case ZImagePipelineFamily.packageID: "Z-Image"
     case SAM31PipelineFamily.packageID: "SAM 3.1 Selection"
     case "coreai.text.unlinked": "Core AI Text"
@@ -973,6 +983,8 @@ final class PipelineEditorModel: ObservableObject {
       })
     case SDXSPipelineFamily.packageID:
       SDXSPipelineFamily.defaultPackageURL()
+    case StableAudio3Family.packageID:
+      StableAudio3Family.defaultPackageURL()
     case ZImagePipelineFamily.packageID:
       ZImagePipelineFamily.defaultPackageURL()
     case SAM31PipelineFamily.packageID:
@@ -1598,6 +1610,56 @@ final class PipelineEditorModel: ObservableObject {
     packageLinkTask?.cancel()
     packageLinkTask = nil
     activePackageLinkID = nil
+    if selectedNativePackageID == StableAudio3Family.packageID,
+      document.nodes.contains(where: { $0.kind == StableAudio3Family.nodeKind }) {
+      packageInspectionTask?.cancel()
+      packageInspection = nil
+      let pipeline = document
+      let nodes = pipeline.nodes.filter { $0.kind == StableAudio3Family.nodeKind }
+      if previousURL == selectedURL, nodes.allSatisfy({ node in
+        StableAudio3Package.slots.allSatisfy { node.resources[$0.name]?.linkedReference != nil }
+      }) {
+        inspectModelPackage()
+        return
+      }
+      statusMessage = "Linking Stable Audio 3 node resources…"
+      let linkID = UUID()
+      activePackageLinkID = linkID
+      packageLinkTask = Task { [weak self] in
+        let linking = Task.detached(priority: .userInitiated) {
+          try PipelineCoreAIPackageRelinker.relinkNativeStableAudio3(
+            in: pipeline, toPackageAt: selectedURL)
+        }
+        do {
+          let result = try await withTaskCancellationHandler {
+            try await linking.value
+          } onCancel: { linking.cancel() }
+          try Task.checkCancellation()
+          guard let self, self.activePackageLinkID == linkID,
+            self.modelPackageURL == selectedURL, self.document == pipeline else { return }
+          self.packageLinkTask = nil
+          self.activePackageLinkID = nil
+          if result.document != self.document {
+            self.performGraphMutation(actionName: "Link Stable Audio 3 Package") { state in
+              state.document = result.document
+            }
+          }
+          self.inspectModelPackage()
+        } catch is CancellationError {
+          guard let self, self.activePackageLinkID == linkID else { return }
+          self.packageLinkTask = nil
+          self.activePackageLinkID = nil
+        } catch {
+          guard let self, self.activePackageLinkID == linkID,
+            self.modelPackageURL == selectedURL else { return }
+          self.packageLinkTask = nil
+          self.activePackageLinkID = nil
+          self.packageInspection = nil
+          self.statusMessage = error.localizedDescription
+        }
+      }
+      return
+    }
     if selectedNativePackageID == SDXSPipelineFamily.packageID,
       document.nodes.contains(where: { $0.kind == SDXSPipelineFamily.nodeKind }) {
       packageInspectionTask?.cancel()
@@ -2105,6 +2167,7 @@ final class PipelineEditorModel: ObservableObject {
   func addNode(kind: PipelineNodeKind, at position: PipelinePoint) -> PipelineNodeID? {
     if (kind == FLUX2KleinPipelineFamily.compositeNodeKind
       || kind == SDXSPipelineFamily.nodeKind
+      || kind == StableAudio3Family.nodeKind
       || kind == FLUX2Klein9BSplitFamily.nodeKind || kind == .zImageGenerate
       || kind == CoreAITextPipelineFamily.compositeNodeKind),
       !document.requirements.familyABIs.isEmpty
@@ -2127,6 +2190,8 @@ final class PipelineEditorModel: ObservableObject {
       node = FLUX2KleinPipelineFamily.makeCompositeNode(id: nodeID)
     } else if kind == SDXSPipelineFamily.nodeKind {
       node = SDXSPipelineFamily.makeNode(id: nodeID)
+    } else if kind == StableAudio3Family.nodeKind {
+      node = StableAudio3Family.makeNode(id: nodeID)
     } else if kind == FLUX2Klein9BSplitFamily.nodeKind {
       node = FLUX2Klein9BSplitFamily.makeNode(id: nodeID)
     } else if kind == .zImageGenerate {
@@ -2466,6 +2531,8 @@ final class PipelineEditorModel: ObservableObject {
                   && node.kind == FLUX2Klein9BSplitFamily.nodeKind)
                 || (packageID == SDXSPipelineFamily.packageID
                   && node.kind == SDXSPipelineFamily.nodeKind)
+                || (packageID == StableAudio3Family.packageID
+                  && node.kind == StableAudio3Family.nodeKind)
                 || (packageID == ZImagePipelineFamily.packageID
                   && node.kind == .zImageGenerate)
                 || (packageID == "coreai.text.unlinked"
@@ -2494,6 +2561,10 @@ final class PipelineEditorModel: ObservableObject {
             } else if packageID == SDXSPipelineFamily.packageID {
               let error = SDXSPipelineFamily.inspectPackage(at: packageURL, for: scoped)
               summary = error ?? "SDXS Core AI package is ready."
+              usable = error == nil
+            } else if packageID == StableAudio3Family.packageID {
+              let error = StableAudio3Family.inspectPackage(at: packageURL, for: scoped)
+              summary = error ?? "Stable Audio 3 Core AI package is ready."
               usable = error == nil
             } else if packageID == ZImagePipelineFamily.packageID {
               let result = ZImagePipelineFamily.inspectPackage(at: packageURL, for: scoped)

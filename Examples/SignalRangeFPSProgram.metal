@@ -16,6 +16,7 @@ constant float spiderScale = 0.7f;
 constant float spiderBodyHeight = 0.52f * spiderScale;
 constant float spiderAttackRange = 1.65f * spiderScale;
 constant float spiderChaseSpeed = 1.8f;
+constant float spiderFootprintRadius = 1.5f * spiderScale;
 constant float mainRoomHalfExtent = 18.0f;
 constant float outerRoomNear = 24.0f;
 constant float outerRoomFar = 60.0f;
@@ -584,6 +585,52 @@ bool walkable(float2 point) {
         && abs(z) <= roomLimit;
 }
 
+bool spiderPositionClear(float2 position, uint self,
+    device const GameState &game) {
+    if (!walkable(position)) return false;
+    const float minimumSeparation = 2.0f * spiderFootprintRadius;
+    for (uint other = 0u; other < enemyCount; ++other) {
+        if (other == self || game.enemy[other].w <= 0.0f) continue;
+        float2 offset = position - game.enemy[other].xz;
+        if (dot(offset, offset) < minimumSeparation * minimumSeparation)
+            return false;
+    }
+    return true;
+}
+
+float2 moveSpider(float2 position, float2 step, uint self,
+    device const GameState &game) {
+    float2 next = position + step;
+    if (spiderPositionClear(next, self, game)) return next;
+
+    // The rendered feet extend beyond the chassis. Use a circular ground
+    // footprint and slide around the nearest living spider when blocked.
+    uint blocker = enemyCount;
+    const float minimumSeparation = 2.0f * spiderFootprintRadius;
+    float closest = minimumSeparation * minimumSeparation;
+    for (uint other = 0u; other < enemyCount; ++other) {
+        if (other == self || game.enemy[other].w <= 0.0f) continue;
+        float2 offset = next - game.enemy[other].xz;
+        float distanceSquared = dot(offset, offset);
+        if (distanceSquared < closest) {
+            closest = distanceSquared;
+            blocker = other;
+        }
+    }
+    if (blocker == enemyCount) return position;
+
+    float2 away = position - game.enemy[blocker].xz;
+    float distanceSquared = dot(away, away);
+    away = distanceSquared > 0.000001f
+        ? away * rsqrt(distanceSquared) : float2(1.0f, 0.0f);
+    float2 tangent = float2(-away.y, away.x);
+    float sideways = dot(step, tangent);
+    if (abs(sideways) < length(step) * 0.2f)
+        sideways = (self & 1u) == 0u ? length(step) : -length(step);
+    float2 slide = position + tangent * sideways;
+    return spiderPositionClear(slide, self, game) ? slide : position;
+}
+
 kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     device GameState *states [[buffer(1)]],
     device uint *sceneRequest [[buffer(2)]],
@@ -705,7 +752,8 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
                 + float2(sin(yaw), -cos(yaw))
                     * min(game.gait[i].z * walkBlend * dt,
                         distanceToPlayer - spiderAttackRange);
-            if (walkable(nextEnemy)) game.enemy[i].xz = nextEnemy;
+            game.enemy[i].xz = moveSpider(oldPosition,
+                nextEnemy - oldPosition, i, game);
         } else {
             game.gait[i].z *= exp(-dt * 3.0f);
         }
@@ -1286,19 +1334,56 @@ float3 shadePointLight(SceneHit hit, SurfaceMaterial material,
     return (diffuse + specular) * radiance * nDotL;
 }
 
+void traceScene(thread SceneHit &hit, thread float3 &furPosition,
+    float3 origin, float3 direction, ChromePose chrome,
+    device const GameState &game) {
+    traceEnvironment(hit, origin, direction, chrome);
+    for (uint i = 0u; i < enemyCount; ++i) {
+        if (game.enemy[i].w <= 0.0f) continue;
+        SpiderHit spider = traceSpider(origin, direction, game.enemy[i].xyz,
+            game.enemyClock[i].w, game.gait[i].x, game.gait[i].y,
+            spiderBodyRise(game.effects.x, i), 0.0f,
+            hit.distance);
+        if (spider.material != 0u) {
+            hit = {spider.distance, spider.normal,
+                origin + direction * spider.distance, spider.material, int(i)};
+            furPosition = spider.furPosition;
+        }
+    }
+    for (uint i = 0u; i < min(game.progress.x, targetKills); ++i) {
+        FallenSpider fallen = game.fallen[i];
+        float collapse = smoothstep(0.0f, 0.65f,
+            game.effects.x - fallen.motion.z);
+        float3 centre = fallen.pose.xyz;
+        centre.y = mix(centre.y,
+            stairHeight(centre.xz) + spiderScale * 0.37f, collapse);
+        SpiderHit spider = traceSpider(origin, direction, centre,
+            fallen.pose.w, fallen.motion.x,
+            fallen.motion.y * (1.0f - collapse),
+            fallen.motion.w * (1.0f - collapse), collapse,
+            hit.distance);
+        if (spider.material != 0u) {
+            hit = {spider.distance, spider.normal,
+                origin + direction * spider.distance, spider.material, -1};
+            furPosition = spider.furPosition;
+        }
+    }
+}
+
 float3 chromeReflection(SceneHit hit, float3 incoming,
     texture2d<float> crateA, texture2d<float> crateB,
-    ChromePose chrome) {
+    ChromePose chrome, device const GameState &game) {
     float3 reflectedDirection = reflect(incoming, hit.normal);
     SceneHit reflectedHit = {sceneRayLimit, float3(0.0f),
         float3(0.0f), 0u, -1};
-    traceEnvironment(reflectedHit,
+    float3 reflectedFurPosition = float3(0.0f);
+    traceScene(reflectedHit, reflectedFurPosition,
         hit.position + hit.normal * 0.025f, reflectedDirection,
-        chrome);
+        chrome, game);
     if (reflectedHit.material == 0u || reflectedHit.material == 20u)
         return float3(0.06f, 0.09f, 0.12f);
     SurfaceMaterial reflected = surfaceMaterial(reflectedHit,
-        crateA, crateB, float3(0.0f));
+        crateA, crateB, reflectedFurPosition);
     float3 color = reflected.albedo * 0.32f + reflected.emission;
     for (uint i = 0u; i < 6u; ++i)
         color += shadePointLight(reflectedHit, reflected,
@@ -1504,37 +1589,7 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     float3 furPosition = float3(0.0f);
     SceneHit hit = {sceneRayLimit,
         float3(0.0f), float3(0.0f), 0u, -1};
-    traceEnvironment(hit, origin, direction, chrome);
-    for (uint i = 0u; i < enemyCount; ++i) {
-        if (game.enemy[i].w <= 0.0f) continue;
-        SpiderHit spider = traceSpider(origin, direction, game.enemy[i].xyz,
-            game.enemyClock[i].w, game.gait[i].x, game.gait[i].y,
-            spiderBodyRise(game.effects.x, i), 0.0f,
-            hit.distance);
-        if (spider.material != 0u) {
-            hit = {spider.distance, spider.normal,
-                origin + direction * spider.distance, spider.material, int(i)};
-            furPosition = spider.furPosition;
-        }
-    }
-    for (uint i = 0u; i < min(game.progress.x, targetKills); ++i) {
-        FallenSpider fallen = game.fallen[i];
-        float collapse = smoothstep(0.0f, 0.65f,
-            game.effects.x - fallen.motion.z);
-        float3 centre = fallen.pose.xyz;
-        centre.y = mix(centre.y,
-            stairHeight(centre.xz) + spiderScale * 0.37f, collapse);
-        SpiderHit spider = traceSpider(origin, direction, centre,
-            fallen.pose.w, fallen.motion.x,
-            fallen.motion.y * (1.0f - collapse),
-            fallen.motion.w * (1.0f - collapse), collapse,
-            hit.distance);
-        if (spider.material != 0u) {
-            hit = {spider.distance, spider.normal,
-                origin + direction * spider.distance, spider.material, -1};
-            furPosition = spider.furPosition;
-        }
-    }
+    traceScene(hit, furPosition, origin, direction, chrome, game);
 
     SurfaceMaterial material = surfaceMaterial(hit, crateA, crateB,
         furPosition);
@@ -1549,7 +1604,7 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         float facing = max(dot(hit.normal, -direction), 0.0f);
         float fresnel = 0.91f + 0.09f * pow(1.0f - facing, 5.0f);
         color += chromeReflection(hit, direction, crateA, crateB,
-            chrome)
+            chrome, game)
             * fresnel;
     }
     if (hit.material == 5u || hit.material == 15u

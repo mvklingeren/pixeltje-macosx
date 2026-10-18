@@ -22,6 +22,9 @@ let package = Package(
     .library(
       name: "PixeltjePipelineSDXSRuntime",
       targets: ["PixeltjePipelineSDXSRuntime"]),
+    .library(
+      name: "PixeltjePipelineStableAudioRuntime",
+      targets: ["PixeltjePipelineStableAudioRuntime"]),
     .executable(
       name: "pixeltje-pipeline-benchmark-sdxs",
       targets: ["PixeltjePipelineSDXSBenchmark"]),
@@ -50,6 +53,7 @@ let package = Package(
     .executable(name: "pixeltje-pipeline-run", targets: ["PixeltjePipelineBaseTestSetCLI"]),
     .executable(name: "pixeltje-pipeline-run-base-test-set", targets: ["PixeltjePipelineBaseTestSetCLI"]),
     .executable(name: "pixeltje-pipeline-run-sam31", targets: ["PixeltjePipelineSAM31CLI"]),
+    .executable(name: "pixeltje-pipeline-run-stable-audio-3", targets: ["PixeltjePipelineStableAudioCLI"]),
     .executable(name: "PixeltjeMacApp", targets: ["PixeltjeMacApp"]),
   ],
   dependencies: [
@@ -130,6 +134,25 @@ let package = Package(
       ],
       path: "Sources/PixeltjePipelineSDXSRuntime",
       linkerSettings: [.linkedFramework("CoreAI")]
+    ),
+    .target(
+      name: "PixeltjePipelineStableAudioRuntime",
+      dependencies: [
+        "PixeltjePipelineDomain", "PixeltjePipelineEngine",
+        "PixeltjePipelineResourceLinking",
+        .product(name: "Tokenizers", package: "swift-transformers"),
+        .product(name: "CoreAIDiffusion", package: "coreai-models"),
+      ],
+      path: "Sources/PixeltjePipelineStableAudioRuntime",
+      linkerSettings: [.linkedFramework("CoreAI")]
+    ),
+    .executableTarget(
+      name: "PixeltjePipelineStableAudioCLI",
+      dependencies: [
+        "PixeltjePipelineDomain", "PixeltjePipelineEngine",
+        "PixeltjePipelineBaseTestSetRuntime", "PixeltjePipelineStableAudioRuntime",
+      ],
+      path: "Sources/PixeltjePipelineStableAudioCLI"
     ),
     .executableTarget(
       name: "PixeltjePipelineSDXSBenchmark",
@@ -250,6 +273,7 @@ let package = Package(
         "PixeltjePipelineComfyUIConverter", "PixeltjePipelineDomain",
         "PixeltjePipelineEngine", "PixeltjePipelineFLUX2Runtime",
         "PixeltjePipelineSDXSRuntime",
+        "PixeltjePipelineStableAudioRuntime",
         "PixeltjePipelineTextRuntime", "PixeltjePipelineBaseTestSetRuntime",
         "PixeltjePipelineSegmentationRuntime",
         "PixeltjePipelineResourceLinking",
@@ -280,6 +304,7 @@ let package = Package(
       dependencies: [
         "PixeltjePipelineDomain", "PixeltjePipelineEngine",
         "PixeltjePipelineFLUX2Runtime", "PixeltjePipelineSDXSRuntime",
+        "PixeltjePipelineStableAudioRuntime",
         "PixeltjePipelineTextRuntime",
         "PixeltjePipelineBaseTestSetRuntime",
       ],

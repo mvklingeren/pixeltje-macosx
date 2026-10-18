@@ -57,6 +57,49 @@ public enum PipelineCoreAIPackageRelinker {
   public static let zImagePackageID = "coreai.z-image.z-image-turbo"
   public static let zImageCompositeABI = "z-image-coreai-seq64@1"
 
+  public static func relinkNativeStableAudio3(
+    in document: PipelineDocument, toPackageAt selectedURL: URL
+  ) throws -> PipelineResourceRelinkResult {
+    guard document.requirements.familyABIs.isEmpty else {
+      throw PipelineResourceRelinkError.incompatiblePackage(
+        "workflow-family ABIs were removed; convert this workflow to native nodes")
+    }
+    let package = try StableAudio3Package(at: selectedURL)
+    var linked = document
+    var count = 0
+    for index in linked.nodes.indices where linked.nodes[index].kind == StableAudio3Package.nodeKind {
+      for slot in StableAudio3Package.slots {
+        guard let binding = linked.nodes[index].resources[slot.name] else {
+          throw PipelineResourceRelinkError.incompatiblePackage(
+            "the Stable Audio node is missing its \(slot.name) resource slot")
+        }
+        if let requirement = binding.unresolvedRequirement {
+          guard requirement.familyABI == StableAudio3Package.familyABI else {
+            throw PipelineResourceRelinkError.incompatiblePackage(
+              "the Stable Audio \(slot.name) requirement has an incompatible ABI")
+          }
+        } else if let reference = binding.linkedReference {
+          guard reference.packageID == StableAudio3Package.packageID,
+            reference.familyABI == StableAudio3Package.familyABI else {
+            throw PipelineResourceRelinkError.incompatiblePackage(
+              "the Stable Audio \(slot.name) link has an incompatible ABI")
+          }
+        }
+        linked.nodes[index].resources[slot.name] = .linked(try package.reference(for: slot.name))
+        count += 1
+      }
+    }
+    guard count > 0 else { throw PipelineResourceRelinkError.noCompatibleRequirements }
+    return PipelineResourceRelinkResult(
+      document: linked, packageID: StableAudio3Package.packageID,
+      packageVersion: package.version, linkedResourceCount: count,
+      remainingUnresolvedResourceCount: linked.nodes.reduce(0) { result, node in
+        result + node.resources.values.filter { $0.unresolvedRequirement != nil }.count
+      },
+      notices: [.init(kind: .information,
+        message: "Linked the Stable Audio text, duration, denoiser, decoder, and tokenizer resources.")])
+  }
+
   public static func relinkNativeSDXS(
     in document: PipelineDocument,
     toPackageAt selectedURL: URL

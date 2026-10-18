@@ -4,6 +4,7 @@ import PixeltjePipelineDomain
 import PixeltjePipelineEngine
 import PixeltjePipelineFLUX2Runtime
 import PixeltjePipelineSDXSRuntime
+import PixeltjePipelineStableAudioRuntime
 import PixeltjePipelineBaseTestSetRuntime
 import PixeltjePipelineTextRuntime
 
@@ -729,17 +730,20 @@ actor ACPServer {
     let fluxRunner = FLUX2KleinPipelineRunner()
     let flux9BRunner = FLUX2Klein9BSplitRunner()
     let sdxsRunner = SDXSPipelineRunner()
+    let stableAudioRunner = StableAudio3Runner()
     let created = try PixeltjePipelineEngine.makeDefault(
       additionalNodeDescriptors: [
         FLUX2KleinPipelineFamily.makeCompositeNodeDescriptor(),
         FLUX2Klein9BSplitFamily.descriptor(),
         SDXSPipelineFamily.descriptor(),
+        StableAudio3Family.descriptor(),
         CoreAITextPipelineFamily.makeCompositeNodeDescriptor(),
       ],
       additionalNodeExecutors: BaseTestSetPipelineFamily.makeNodeExecutors()
         + [FLUX2KleinPipelineFamily.makeNodeExecutor(runner: fluxRunner),
           FLUX2Klein9BSplitFamily.executor(runner: flux9BRunner),
           SDXSPipelineFamily.executor(runner: sdxsRunner),
+          StableAudio3Family.executor(runner: stableAudioRunner),
           CoreAITextPipelineFamily.makeNodeExecutor(runner: workflowTextRunner)])
     let workflowExecutor = WorkflowExecutor(
       engine: created, configuration: configuration, traceLog: traceLog)
