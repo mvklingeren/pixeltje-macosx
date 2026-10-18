@@ -7,7 +7,7 @@ using namespace metal;
 // same room and walking spider drones from the camera, then draws the HUD.
 
 constant uint enemyCount = 3u;
-constant uint targetKills = 6u;
+constant uint targetKills = enemyCount;
 constant uint impactCount = 12u;
 constant uint phasePlaying = 0u;
 constant uint phaseWon = 1u;
@@ -51,12 +51,12 @@ struct GameState {
     float4 player;          // position XYZ, yaw
     float4 view;            // pitch, health, shot cooldown, muzzle flash
     float4 enemy[enemyCount]; // chassis centre XYZ, health
-    float4 enemyClock[enemyCount]; // attack cooldown, respawn timer, hit flash, yaw
+    float4 enemyClock[enemyCount]; // attack cooldown, reserved, hit flash, yaw
     float4 gait[enemyCount]; // distance-based cycle, movement blend, speed, turn rate
     float4 effects;         // elapsed, damage flash, last jump count, vertical speed
     float4 chromeRotation;  // local-to-world unit quaternion
     float4 chromeCentre;    // world XYZ, unused
-    float4 sceneTransition; // time of victory in X
+    float4 sceneTransition; // time of victory in X, handoff sent in Y
     uint4 progress;         // kills, shots, last action count, phase
     ShotImpact impacts[impactCount];
     FallenSpider fallen[targetKills];
@@ -155,13 +155,12 @@ float3 forwardVector(float yaw, float pitch) {
         -cos(yaw) * cos(pitch));
 }
 
-float3 spawnPosition(uint slot, uint round) {
+float3 spawnPosition(uint slot) {
     float2 initial[3] = {
         float2(-9.5f, -8.0f), float2(9.0f, -10.0f),
         float2(0.0f, -14.0f)
     };
     float2 xz = initial[slot];
-    if (round > 0u) xz.x *= -1.0f;
     return float3(xz.x, spiderBodyHeight, xz.y);
 }
 
@@ -183,7 +182,7 @@ void resetGame(device GameState &game) {
         game.fallen[i].motion = float4(0.0f);
     }
     for (uint i = 0u; i < enemyCount; ++i) {
-        game.enemy[i] = float4(spawnPosition(i, 0u), 2.0f);
+        game.enemy[i] = float4(spawnPosition(i), 2.0f);
         float2 toPlayer = game.player.xz - game.enemy[i].xz;
         game.enemyClock[i] = float4(0.0f, 0.0f, 0.0f,
             atan2(toPlayer.x, -toPlayer.y));
@@ -601,13 +600,23 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     game.view.z = max(game.view.z - dt, 0.0f);
     game.view.w = max(game.view.w - dt, 0.0f);
     if (game.progress.w != phasePlaying) {
-        if (action > game.progress.z) {
+        if (game.progress.w == phaseLost && action > game.progress.z) {
+            resetGame(game);
+            game.progress.z = action;
+            game.effects.z = float(jumpAction);
+        } else if (game.progress.w == phaseWon
+            && game.sceneTransition.y > 0.5f
+            && action > game.progress.z) {
+            // The triangle scene's click returned here. Keep clicks during
+            // the victory pause from restarting the game before handoff.
             resetGame(game);
             game.progress.z = action;
             game.effects.z = float(jumpAction);
         } else if (game.progress.w == phaseWon
             && game.effects.x - game.sceneTransition.x >= 2.0f) {
             sceneRequest[0] = 1u;
+            game.sceneTransition.y = 1.0f;
+            game.progress.z = action;
         }
         return;
     }
@@ -650,21 +659,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     for (uint i = 0u; i < enemyCount; ++i) {
         game.enemyClock[i].x = max(game.enemyClock[i].x - dt, 0.0f);
         game.enemyClock[i].z = max(game.enemyClock[i].z - dt, 0.0f);
-        if (game.enemy[i].w <= 0.0f) {
-            game.enemyClock[i].y -= dt;
-            if (game.enemyClock[i].y <= 0.0f
-                && game.progress.x < targetKills) {
-                game.enemy[i] = float4(spawnPosition(i,
-                    game.progress.x / enemyCount), 2.0f);
-                float2 facing = game.player.xz - game.enemy[i].xz;
-                game.enemyClock[i] = float4(0.0f, 0.0f, 0.0f,
-                    atan2(facing.x, -facing.y));
-                game.gait[i] = float4(fract(0.07f + float(i) * 0.31f
-                        + float(game.progress.x) * 0.17f),
-                    0.0f, 0.0f, 0.0f);
-            }
-            continue;
-        }
+        if (game.enemy[i].w <= 0.0f) continue;
         float2 toPlayer = game.player.xz - game.enemy[i].xz;
         float distanceToPlayer = length(toPlayer);
         bool pursuing = distanceToPlayer > spiderAttackRange;
@@ -835,7 +830,6 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
                             spiderBodyRise(game.effects.x, uint(target)));
                     }
                     game.progress.x += 1u;
-                    game.enemyClock[target].y = 1.35f;
                 }
             }
         }
@@ -1585,7 +1579,7 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         hit.distance, game);
     color = filmicToneMap(color * 1.6f);
 
-    // Crosshair, health bar, six target pips, and damage/muzzle feedback.
+    // Crosshair, health bar, target pips, and damage/muzzle feedback.
     float2 pixel = in.uv * u.resolutionTime.xy;
     float2 centre = u.resolutionTime.xy * 0.5f;
     float2 d = abs(pixel - centre);
