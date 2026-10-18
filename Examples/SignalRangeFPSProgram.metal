@@ -68,6 +68,13 @@ struct WebCloth {
     float4 targetExpiry;   // landing position XYZ and expiry time
 };
 
+constant uint hudCapacity = 96u;
+
+struct HUDGlyph {
+    float4 geometry;        // glyph index, top-left x/y in pixels, font size
+    float4 ink;             // display-referred sRGB and opacity
+};
+
 struct GameState {
     float4 player;          // position XYZ, yaw
     float4 view;            // pitch, health, shot cooldown, muzzle flash
@@ -94,10 +101,13 @@ struct GameState {
     float4 ambush;          // drop start time (-1 before trigger), fall speed, landed
     float4 senses[enemyCount];   // last known player XZ, awareness, bite clock
     float4 reaction[enemyCount]; // flinch time, knockback XZ, startle time
+    // Rebuilt from the state above by every present pass. It shares this
+    // buffer because the program already uses all twelve resource slots.
+    HUDGlyph hud[hudCapacity];
 };
 
-static_assert(sizeof(GameState) <= 1792,
-    "The GPU Program game buffer must contain player feel and spider senses");
+static_assert(sizeof(GameState) <= 5120,
+    "The GPU Program game buffer must contain game state and the HUD glyphs");
 
 struct SceneHit {
     float distance;
@@ -1261,8 +1271,49 @@ bool crateBlocksLight(float3 origin, float3 direction, float lightDistance,
     return far > max(near, 0.01f) && near < lightDistance - 0.02f;
 }
 
+// Soft sphere occlusion (after Inigo Quilez): 1 is fully lit. Spheres beyond
+// the light or behind the surface never shade it.
+float sphereSoftShadow(float3 origin, float3 direction, float lightDistance,
+    float4 sphere) {
+    float3 offset = origin - sphere.xyz;
+    float b = dot(offset, direction);
+    float c = dot(offset, offset) - sphere.w * sphere.w;
+    if (c <= 0.0f || b >= 0.0f || -b > lightDistance) return 1.0f;
+    float h = b * b - c;
+    float d = sqrt(max(sphere.w * sphere.w - h, 0.0f)) - sphere.w;
+    float t = -b - sqrt(max(h, 0.0f));
+    return t < 0.0f ? 1.0f : smoothstep(0.0f, 1.0f, 2.5f * 8.0f * d / t);
+}
+
+// Each living or fallen spider casts a soft shadow from a sphere around its
+// body. Its legs cast none.
+float spiderShadow(float3 origin, float3 direction, float lightDistance,
+    device const GameState &game) {
+    float lit = 1.0f;
+    for (uint i = 0u; i < enemyCount; ++i) {
+        if (!spiderActive(game, i)) continue;
+        float scale = spiderTraits(spiderVariantForSlot(i)).scale;
+        lit *= sphereSoftShadow(origin, direction, lightDistance,
+            float4(game.enemy[i].xyz + float3(0.0f, 0.05f * scale,
+                0.15f * scale), 0.58f * scale));
+    }
+    for (uint i = 0u; i < min(game.progress.x, targetKills); ++i) {
+        FallenSpider fallen = game.fallen[i];
+        float scale = spiderTraits(SpiderVariant(fallen.appearance.x)).scale;
+        float collapse = smoothstep(0.0f, 0.65f,
+            game.effects.x - fallen.motion.z);
+        float3 centre = fallen.pose.xyz;
+        centre.y = mix(centre.y, stairHeight(centre.xz) + scale * 0.37f,
+            collapse);
+        lit *= sphereSoftShadow(origin, direction, lightDistance,
+            float4(centre, 0.52f * scale));
+    }
+    return lit;
+}
+
 float3 shadePointLight(SceneHit hit, SurfaceMaterial material,
-    float3 viewDirection, PointLight light, ChromePose chrome) {
+    float3 viewDirection, PointLight light, ChromePose chrome,
+    device const GameState &game) {
     // The northern fixture is shaded by its housing above the diffusers.
     // Keep its light inside the room and off the nearby ceiling surface.
     if (light.position.z <= bossRoomSouth
@@ -1288,8 +1339,10 @@ float3 shadePointLight(SceneHit hit, SurfaceMaterial material,
         || chromeBlocksLight(shadowOrigin, l, lightDistance, chrome)) {
         return float3(0.0f);
     }
+    float lit = spiderShadow(shadowOrigin, l, lightDistance, game);
+    if (lit <= 0.0f) return float3(0.0f);
 
-    float3 radiance = light.color * light.power
+    float3 radiance = light.color * light.power * lit
         / (4.0f * rangePi * distanceSquared);
     if (dot(hit.fur.xyz, hit.fur.xyz) > 0.0f)
         return spiderFurReflectance(material.albedo, hit.fur, hit.normal,
@@ -1314,6 +1367,93 @@ float3 shadePointLight(SceneHit hit, SurfaceMaterial material,
     float3 specular = distribution * geometryV * geometryL * fresnel
         / max(4.0f * nDotV * nDotL, 0.001f);
     return (diffuse + specular) * radiance * nDotL;
+}
+
+// The latest shot lights the room twice: from the muzzle while the flash
+// lasts and briefly from the spark where it struck.
+// shortcut: walls cast no shadows, so a shot beside a wall leaks a little
+// light through it; the 9 m reach keeps that leak inside the next room.
+float3 shadeShotLights(SceneHit hit, SurfaceMaterial material,
+    float3 viewDirection, ChromePose chrome, device const GameState &game) {
+    if (game.progress.y == 0u) return float3(0.0f);
+    ShotImpact shot = game.impacts[(game.progress.y - 1u) % impactCount];
+    float age = game.effects.x - shot.muzzleTime.w;
+    float3 color = float3(0.0f);
+    for (uint k = 0u; k < 2u; ++k) {
+        float strength = k == 0u ? game.view.w / 0.11f
+            : (shot.normalMaterial.w > 0.0f
+                ? 1.0f - smoothstep(0.0f, 0.14f, age) : 0.0f);
+        if (strength <= 0.0f || age < 0.0f) continue;
+        float3 position = k == 0u ? shot.muzzleTime.xyz
+            : shot.pointEnemy.xyz + shot.normalMaterial.xyz * 0.12f;
+        float reach = length(position - hit.position) / 9.0f;
+        if (reach >= 1.0f) continue;
+        float window = 1.0f - reach * reach * reach * reach;
+        PointLight light = {position, k == 0u ? float3(1.0f, 0.62f, 0.26f)
+            : float3(1.0f, 0.78f, 0.45f),
+            (k == 0u ? 75.0f : 22.0f) * strength * window * window};
+        color += shadePointLight(hit, material, viewDirection, light, chrome,
+            game);
+    }
+    return color;
+}
+
+// Room interiors are axis-aligned boxes, so the distance to each face gives
+// cheap occlusion where floors meet walls and in corners. Props and spiders
+// darken the floor around their footprints.
+float ambientOcclusion(SceneHit hit, device const GameState &game) {
+    bool roomSurface = hit.material <= 13u || hit.material == 28u
+        || hit.material == 29u;
+    if (hit.enemy >= 0 || hit.material == 0u || hit.material == 5u
+        || !roomSurface) return 1.0f;
+    const float3 lower[9] = {
+        float3(-18.0f, 0.0f, -18.0f), float3(-18.0f, 1.2f, -60.0f),
+        float3(24.0f, 0.9f, -18.0f), float3(-60.0f, 1.5f, -18.0f),
+        float3(-3.5f, 0.0f, -24.0f), float3(18.0f, 0.0f, -3.5f),
+        float3(-24.0f, 0.0f, -3.5f), float3(-5.0f, 1.2f, -70.0f),
+        float3(-22.0f, 1.2f, -110.0f)};
+    const float3 upper[9] = {
+        float3(18.0f, 5.5f, 18.0f), float3(18.0f, 18.0f, -24.0f),
+        float3(60.0f, 6.4f, 18.0f), float3(-24.0f, 7.0f, 18.0f),
+        float3(3.5f, 6.7f, -18.0f), float3(24.0f, 6.4f, 3.5f),
+        float3(-18.0f, 7.0f, 3.5f), float3(5.0f, 9.0f, -60.0f),
+        float3(22.0f, 13.0f, -70.0f)};
+    float occlusion = 1.0f;
+    float3 p = hit.position;
+    for (uint room = 0u; room < 9u; ++room) {
+        if (any(p < lower[room] - 0.05f) || any(p > upper[room] + 0.05f))
+            continue;
+        float3 below = p - lower[room], above = upper[room] - p;
+        float faces[6] = {below.x, above.x, below.y, above.y,
+            below.z, above.z};
+        for (uint face = 0u; face < 6u; ++face) {
+            // Skip the face this point lies on.
+            if (faces[face] < 0.03f) continue;
+            occlusion *= 1.0f - 0.42f * exp(-faces[face] / 0.55f);
+        }
+        break;
+    }
+    if (hit.normal.y > 0.5f) {
+        const float2 propLower[3] = {float2(-4.1f, -3.1f),
+            float2(2.1f, -6.5f), glassBoxLower.xz};
+        const float2 propUpper[3] = {float2(-1.8f, -0.7f),
+            float2(4.5f, -4.1f), glassBoxUpper.xz};
+        for (uint prop = 0u; prop < 3u; ++prop) {
+            float2 outside = max(max(propLower[prop] - p.xz,
+                p.xz - propUpper[prop]), float2(0.0f));
+            occlusion *= 1.0f - 0.45f * exp(-length(outside) / 0.4f);
+        }
+        occlusion *= 1.0f - 0.4f * exp(-max(
+            distance(p.xz, chromeGroundPosition) - 0.6f, 0.0f) / 0.35f);
+        for (uint i = 0u; i < enemyCount; ++i) {
+            if (!spiderActive(game, i)) continue;
+            float scale = spiderTraits(spiderVariantForSlot(i)).scale;
+            float lift = max(game.enemy[i].y - p.y - 0.4f * scale, 0.0f);
+            float2 offset = (p.xz - game.enemy[i].xz) / (1.1f * scale);
+            occlusion *= 1.0f - 0.5f * exp(-dot(offset, offset) - lift * 2.0f);
+        }
+    }
+    return occlusion;
 }
 
 void traceScene(thread SceneHit &hit, thread float3 &furPosition,
@@ -1396,7 +1536,7 @@ float3 chromeReflection(SceneHit hit, float3 incoming,
     float3 color = reflected.albedo * 0.32f + reflected.emission;
     for (uint i = 0u; i < 8u; ++i)
         color += shadePointLight(reflectedHit, reflected,
-            -reflectedDirection, roomLight(i, game.effects.x), chrome);
+            -reflectedDirection, roomLight(i, game.effects.x), chrome, game);
     return color;
 }
 
@@ -1422,7 +1562,7 @@ float3 shadeGlassBox(float3 background, float3 origin, float3 direction,
     float3 highlights = float3(0.0f);
     for (uint i = 0u; i < 8u; ++i)
         highlights += shadePointLight(glass, material,
-            -direction, roomLight(i, game.effects.x), chrome);
+            -direction, roomLight(i, game.effects.x), chrome, game);
     float3 reflection = chromeReflection(glass, direction,
         crateA, crateB, chrome, game);
     // Clear glass transmits the scene without a colored fill or drawn edge.
@@ -1726,14 +1866,15 @@ float3 shadeGun(GunHit gun, GunPose pose, float3 eye, float3 right,
             * (0.05f + 0.07f * saturate(hit.normal.y));
     for (uint i = 0u; i < 8u; ++i)
         color += shadePointLight(hit, material, -direction,
-            roomLight(i, game.effects.x), chrome);
+            roomLight(i, game.effects.x), chrome, game);
     if (game.view.w > 0.0f) {
         float3 muzzle = pose.pivot + pose.basis
             * (gunMuzzle + float3(0.0f, 0.0f, 0.012f));
         PointLight flash = {eye + right * muzzle.x + up * muzzle.y
             + front * muzzle.z, float3(1.0f, 0.62f, 0.26f),
             3.0f * game.view.w / 0.11f};
-        color += shadePointLight(hit, material, -direction, flash, chrome);
+        color += shadePointLight(hit, material, -direction, flash, chrome,
+            game);
     }
     return color;
 }
@@ -1784,8 +1925,10 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
             * float3(0.030f, 0.038f, 0.046f);
     for (uint i = 0u; i < 8u; ++i) {
         color += shadePointLight(hit, material, -direction,
-            roomLight(i, game.effects.x), chrome);
+            roomLight(i, game.effects.x), chrome, game);
     }
+    color += shadeShotLights(hit, material, -direction, chrome, game);
+    color *= mix(1.0f, ambientOcclusion(hit, game), 0.85f);
     if (hit.material == 20u) {
         float facing = max(dot(hit.normal, -direction), 0.0f);
         float fresnel = 0.91f + 0.09f * pow(1.0f - facing, 5.0f);
@@ -1849,13 +1992,10 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
             color = shadeGun(gunHit, gun, eye, viewRight, viewUp, viewFront,
                 direction, chrome, game);
     }
-    color = pixeltje_3d::filmicToneMap(color * 1.6f);
-
-    // Crosshair, health bar, target pips, and damage/muzzle feedback.
-    float2 pixel = in.uv * u.resolutionTime.xy;
-    float2 centre = u.resolutionTime.xy * 0.5f;
-    float2 d = abs(pixel - centre);
     if (holdingGun && game.view.w > 0.0f) {
+        // The flash is drawn in scene light so the bloom pass spreads it.
+        float2 pixel = in.uv * u.resolutionTime.xy;
+        float2 centre = u.resolutionTime.xy * 0.5f;
         float3 muzzle = gun.pivot + gun.basis
             * (gunMuzzle + float3(0.0f, 0.0f, 0.012f));
         float2 muzzlePixel = centre + float2(muzzle.x, -muzzle.y)
@@ -1868,8 +2008,75 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
             + 0.8f * spikes * (1.0f - smoothstep(0.0f, 0.075f, radius))
             + 0.25f * (1.0f - smoothstep(0.0f, 0.12f, radius));
         color += float3(1.0f, 0.62f, 0.24f) * flash
-            * (game.view.w / 0.11f) * 1.6f;
+            * (game.view.w / 0.11f) * 2.5f;
     }
+    // Linear scene light before exposure; the composite pass tone maps it.
+    return float4(color, 1.0f);
+}
+
+constexpr sampler postSampler(coord::normalized, address::clamp_to_edge,
+    filter::linear);
+
+// Horizontal half of a separable Gaussian over the scene's brightest light.
+fragment float4 bloomFragment(ScreenVertex in [[stage_in]],
+    constant ProgramUniforms &u [[buffer(0)]],
+    texture2d<float> scene [[texture(1)]]) {
+    float stride = (u.resolutionTime.y / 220.0f) / u.resolutionTime.x;
+    float3 sum = float3(0.0f);
+    float total = 0.0f;
+    for (int i = -6; i <= 6; ++i) {
+        float weight = exp(-float(i * i) / 12.5f);
+        float3 light = scene.sample(postSampler,
+            in.uv + float2(float(i) * stride, 0.0f)).rgb;
+        sum += max(light - 0.75f, float3(0.0f)) * weight;
+        total += weight;
+    }
+    return float4(sum / total, 1.0f);
+}
+
+float bossReveal(device const GameState &game) {
+    float time = game.bossScene.x;
+    return time >= 0.0f && time < 5.0f
+        ? smoothstep(1.05f, 1.55f, time) * (1.0f - smoothstep(4.35f, 4.95f, time))
+        : 0.0f;
+}
+
+// Bloom, damage fringing, lens vignette and film grain, then the pixel HUD.
+fragment float4 compositeFragment(ScreenVertex in [[stage_in]],
+    constant ProgramUniforms &u [[buffer(0)]],
+    device const GameState *states [[buffer(1)]],
+    texture2d<float> scene [[texture(1)]],
+    texture2d<float> bloom [[texture(2)]]) {
+    device const GameState &game = states[0];
+    float reveal = bossReveal(game);
+    float hurtFlash = saturate(game.effects.y / 0.35f);
+    float lowHealth = game.progress.w == phasePlaying
+        ? saturate(1.0f - game.view.y / 35.0f) : 0.0f;
+    float2 fringe = (in.uv - 0.5f) * (0.007f * hurtFlash + 0.002f * lowHealth);
+    float3 color = float3(scene.sample(postSampler, in.uv + fringe).r,
+        scene.sample(postSampler, in.uv).g,
+        scene.sample(postSampler, in.uv - fringe).b);
+    float stride = (u.resolutionTime.y / 220.0f) / u.resolutionTime.y;
+    float3 glow = float3(0.0f);
+    float total = 0.0f;
+    for (int i = -6; i <= 6; ++i) {
+        float weight = exp(-float(i * i) / 12.5f);
+        glow += bloom.sample(postSampler,
+            in.uv + float2(0.0f, float(i) * stride)).rgb * weight;
+        total += weight;
+    }
+    color = pixeltje_3d::filmicToneMap((color + 0.55f * glow / total) * 1.6f);
+    float2 lens = (in.uv - 0.5f) * float2(u.resolutionTime.x / u.resolutionTime.y, 1.0f);
+    color *= 1.0f - 0.32f * smoothstep(0.35f, 1.0f, length(lens));
+    float2 pixel = in.uv * u.resolutionTime.xy;
+    float frame = float(u.frameSeed.x % 3600u);
+    float grain = hashTile(floor(pixel) + float2(fmod(frame * 37.3f, 911.0f),
+        fmod(frame * 11.7f, 577.0f))) - 0.5f;
+    color *= 1.0f + 0.12f * grain;
+
+    // Crosshair, health bar, target pips, and damage feedback.
+    float2 centre = u.resolutionTime.xy * 0.5f;
+    float2 d = abs(pixel - centre);
     // Damage reddens the screen edges; low health pulses there.
     float hurtTint = min(game.effects.y * 2.4f, 0.8f);
     if (game.view.y < 35.0f && game.progress.w == phasePlaying)
@@ -1959,15 +2166,205 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
                 ? float3(0.13f, 0.58f, 0.40f)
                 : float3(0.67f, 0.16f, 0.12f);
             color = mix(color, banner, 0.82f);
-            float2 mark = abs(pixel - centre);
-            if (game.progress.w == phaseWon
-                ? (mark.x < 70.0f && mark.y < 8.0f)
-                : abs(mark.x - mark.y) < 5.0f && mark.x < 48.0f) {
-                color = float3(1.0f);
-            }
         }
     }
     color = clamp(color, float3(0.0f), float3(1.0f));
     float3 srgb = pixeltje_3d::linearToSRGB(color);
     return float4(clamp(srgb, float3(0.0f), float3(1.0f)), 1.0f);
+}
+
+// Text HUD, after Abyssal Treasure: a compute pass lays out shaped runs from
+// the system-font buffer, and an instanced pass fills each glyph's outline.
+constant uint textHealth = 0u;
+constant uint textSpiders = 1u;
+constant uint textBossName = 2u;
+constant uint textEnraged = 3u;
+constant uint textReloading = 4u;
+constant uint textGateOpen = 5u;
+constant uint textVictory = 6u;
+constant uint textRangeClear = 7u;
+constant uint textDied = 8u;
+constant uint textRestart = 9u;
+constant uint textDigitZero = 10u;
+
+float4 fontRun(device const float4 *font, uint index) {
+    return font[uint(font[0].y) + index];
+}
+
+float runWidth(device const float4 *font, uint index, float size) {
+    return fontRun(font, index).z * size;
+}
+
+void addRun(device HUDGlyph *glyphs, thread uint &count,
+    device const float4 *font, uint runID, float2 origin, float size,
+    float3 ink, float opacity = 1.0f) {
+    float4 run = fontRun(font, runID);
+    uint start = uint(run.x);
+    for (uint i = 0u; i < uint(run.y) && count < hudCapacity; ++i) {
+        float4 placement = font[uint(font[0].z) + start + i];
+        glyphs[count].geometry = float4(placement.x,
+            origin.x + placement.y * size,
+            origin.y + (font[2].x - placement.z) * size, size);
+        glyphs[count].ink = float4(ink, opacity);
+        count += 1u;
+    }
+}
+
+void addCentered(device HUDGlyph *glyphs, thread uint &count,
+    device const float4 *font, uint runID, float centreX, float y,
+    float size, float3 ink, float opacity = 1.0f) {
+    addRun(glyphs, count, font, runID,
+        float2(centreX - runWidth(font, runID, size) * 0.5f, y),
+        size, ink, opacity);
+}
+
+float numberWidth(device const float4 *font, uint value, float size) {
+    float width = 0.0f;
+    do {
+        width += runWidth(font, textDigitZero + value % 10u, size);
+        value /= 10u;
+    } while (value > 0u);
+    return width;
+}
+
+void addNumber(device HUDGlyph *glyphs, thread uint &count,
+    device const float4 *font, uint value, float2 origin,
+    float size, float3 ink) {
+    uint divisor = 1u;
+    while (value / divisor >= 10u && divisor < 1000000000u) divisor *= 10u;
+    while (divisor > 0u) {
+        uint run = textDigitZero + (value / divisor) % 10u;
+        addRun(glyphs, count, font, run, origin, size, ink);
+        origin.x += runWidth(font, run, size);
+        divisor /= 10u;
+    }
+}
+
+kernel void buildRangeHUD(constant ProgramUniforms &u [[buffer(0)]],
+    device GameState *states [[buffer(1)]],
+    device const float4 *font [[buffer(2)]],
+    uint id [[thread_position_in_grid]]) {
+    if (id != 0u) return;
+    device GameState &game = states[0];
+    device HUDGlyph *glyphs = game.hud;
+    for (uint i = 0u; i < hudCapacity; ++i) {
+        glyphs[i].geometry = float4(0.0f);
+        glyphs[i].ink = float4(0.0f);
+    }
+    if (bossReveal(game) > 0.0f) return;
+    float2 size = u.resolutionTime.xy;
+    float centreX = size.x * 0.5f;
+    uint count = 0u;
+    const float3 ink = float3(0.82f, 0.96f, 0.93f);
+    const float3 gold = float3(1.0f, 0.78f, 0.34f);
+    const float3 danger = float3(1.0f, 0.32f, 0.24f);
+    float pulse = 0.65f + 0.35f * sin(game.effects.x * 8.0f);
+    uint health = uint(max(game.view.y, 0.0f) + 0.5f);
+    addNumber(glyphs, count, font, health, float2(234.0f, 19.0f), 15.0f,
+        health < 35u ? danger : ink);
+    addRun(glyphs, count, font, textHealth, float2(24.0f, 42.0f), 11.0f, ink);
+    addRun(glyphs, count, font, textSpiders,
+        float2(size.x - 25.0f - runWidth(font, textSpiders, 11.0f), 45.0f),
+        11.0f, ink);
+    if (game.progress.w == phasePlaying) {
+        if (game.weapon.y > 0.0f) {
+            addRun(glyphs, count, font, textReloading,
+                float2(size.x - 28.0f - runWidth(font, textReloading, 13.0f),
+                    size.y - 70.0f), 13.0f, gold, pulse);
+        } else {
+            uint rounds = uint(game.weapon.x);
+            addNumber(glyphs, count, font, rounds,
+                float2(size.x - 28.0f - numberWidth(font, rounds, 30.0f),
+                    size.y - 86.0f), 30.0f, rounds <= 3u ? danger : gold);
+        }
+        // The north gate prompt follows the third range kill.
+        float sinceGate = game.progress.x >= ordinaryEnemyCount
+            ? game.effects.x - game.fallen[ordinaryEnemyCount - 1u].motion.z
+            : -1.0f;
+        if (sinceGate >= 0.0f && sinceGate < 4.0f && game.bossScene.x < 0.0f)
+            addCentered(glyphs, count, font, textGateOpen, centreX, 118.0f,
+                18.0f, gold, 1.0f - smoothstep(3.2f, 4.0f, sinceGate));
+    }
+    if (game.bossScene.x >= 5.0f && game.enemy[bossSlot].w > 0.0f) {
+        addCentered(glyphs, count, font, textBossName, centreX, 30.0f,
+            14.0f, ink);
+        if (bossEnraged(game))
+            addCentered(glyphs, count, font, textEnraged, centreX, 70.0f,
+                11.0f, danger, pulse);
+    }
+    float centreY = size.y * 0.5f;
+    if (game.progress.w == phaseWon) {
+        addCentered(glyphs, count, font, textVictory, centreX,
+            centreY - 52.0f, 34.0f, float3(1.0f));
+        addCentered(glyphs, count, font, textRangeClear, centreX,
+            centreY + 16.0f, 13.0f, float3(1.0f));
+    } else if (game.progress.w == phaseLost) {
+        addCentered(glyphs, count, font, textDied, centreX,
+            centreY - 52.0f, 34.0f, float3(1.0f));
+        addCentered(glyphs, count, font, textRestart, centreX,
+            centreY + 16.0f, 13.0f, float3(1.0f), pulse);
+    }
+}
+
+struct HUDVertex {
+    float4 position [[position]];
+    float2 local;
+    float4 ink;
+    uint glyphIndex [[flat]];
+    float pixelScale;
+};
+
+vertex HUDVertex rangeHUDVertex(uint vertexID [[vertex_id]],
+    uint instanceID [[instance_id]],
+    constant ProgramUniforms &u [[buffer(0)]],
+    device const float4 *font [[buffer(1)]],
+    device const GameState *states [[buffer(2)]]) {
+    HUDGlyph instance = states[0].hud[instanceID];
+    uint glyph = uint(instance.geometry.x);
+    float4 boundsA = font[uint(font[0].x) + glyph * 2u];
+    float4 boundsB = font[uint(font[0].x) + glyph * 2u + 1u];
+    float pixelScale = max(instance.geometry.w, 1.0f);
+    float pad = 1.0f / pixelScale;
+    const float2 corners[6] = {
+        float2(0, 0), float2(1, 0), float2(0, 1),
+        float2(0, 1), float2(1, 0), float2(1, 1)
+    };
+    float2 local = mix(boundsA.zw - pad, boundsB.xy + pad, corners[vertexID]);
+    float2 pixel = float2(instance.geometry.y + local.x * instance.geometry.w,
+        instance.geometry.z - local.y * instance.geometry.w);
+    HUDVertex result;
+    // Unused slots and glyphs without outlines, such as spaces, are culled.
+    result.position = instance.ink.w > 0.0f && boundsA.y > 0.0f
+        ? float4(pixel.x * 2.0f / u.resolutionTime.x - 1.0f,
+            1.0f - pixel.y * 2.0f / u.resolutionTime.y, 0.0f, 1.0f)
+        : float4(-2.0f, -2.0f, 0.0f, 1.0f);
+    result.local = local;
+    result.ink = instance.ink;
+    result.glyphIndex = glyph;
+    result.pixelScale = pixelScale;
+    return result;
+}
+
+fragment float4 rangeHUDFragment(HUDVertex in [[stage_in]],
+    device const float4 *font [[buffer(1)]]) {
+    float4 record = font[uint(font[0].x) + in.glyphIndex * 2u];
+    uint start = uint(record.x);
+    float nearest = 1000.0f;
+    int winding = 0;
+    for (uint i = 0u; i < uint(record.y); ++i) {
+        float4 segment = font[uint(font[0].w) + start + i];
+        float2 a = segment.xy, b = segment.zw, edge = b - a;
+        float t = clamp(dot(in.local - a, edge)
+            / max(dot(edge, edge), 0.00000001f), 0.0f, 1.0f);
+        nearest = min(nearest, length(in.local - (a + t * edge)));
+        float crossValue = edge.x * (in.local.y - a.y)
+            - edge.y * (in.local.x - a.x);
+        if (a.y <= in.local.y && b.y > in.local.y && crossValue > 0.0f)
+            winding++;
+        else if (b.y <= in.local.y && a.y > in.local.y && crossValue < 0.0f)
+            winding--;
+    }
+    float coverage = clamp(0.5f + (winding != 0 ? nearest : -nearest)
+        * in.pixelScale, 0.0f, 1.0f);
+    return float4(in.ink.rgb, coverage * in.ink.w);
 }
