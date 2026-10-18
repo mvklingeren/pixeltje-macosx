@@ -6,6 +6,7 @@ extension PipelineNodeKind {
   public static let controlStart = PipelineNodeKind(rawValue: "control.start")
   public static let controlLoop = PipelineNodeKind(rawValue: "control.loop")
   public static let controlTimeline = PipelineNodeKind(rawValue: "control.timeline")
+  public static let sceneSwitch = PipelineNodeKind(rawValue: "control.sceneSwitch")
   public static let promptInput = PipelineNodeKind(rawValue: "input.prompt")
   public static let negativePromptInput = PipelineNodeKind(rawValue: "input.negativePrompt")
   public static let seedInput = PipelineNodeKind(rawValue: "input.seed")
@@ -19,6 +20,7 @@ extension PipelineNodeKind {
   public static let primitiveInt = PipelineNodeKind(rawValue: "primitive.int")
   public static let primitiveFloat = PipelineNodeKind(rawValue: "primitive.float")
   public static let trackpad = PipelineNodeKind(rawValue: "input.trackpad")
+  public static let directionPad = PipelineNodeKind(rawValue: "input.directionPad")
   public static let previousScenePlanInput = PipelineNodeKind(rawValue: "input.previousScenePlan")
   public static let stateInput = PipelineNodeKind(rawValue: "input.state")
   public static let previousFrameInput = PipelineNodeKind(rawValue: "input.previousFrame")
@@ -148,6 +150,16 @@ extension PipelineNodeRegistry {
           .init(name: "tracks", valueType: .array, defaultValue: .array([])),
         ]),
       PipelineNodeDescriptor(
+        kind: .sceneSwitch, displayName: "Scene Switch", category: "Control",
+        outputs: [
+          .init(name: "image", type: .image),
+          .init(name: "activeScene", type: .integer),
+        ],
+        parameters: [
+          .init(name: "sceneCount", valueType: .integer, defaultValue: .integer(2)),
+          .init(name: "initialScene", valueType: .integer, defaultValue: .integer(0)),
+        ]),
+      PipelineNodeDescriptor(
         kind: .promptInput,
         displayName: "Prompt",
         category: "Inputs",
@@ -270,12 +282,21 @@ extension PipelineNodeRegistry {
           .init(name: "engaged", type: .boolean),
           .init(name: "engagedAtCall", type: .number),
           .init(name: "actionCount", type: .number),
+          .init(name: "secondaryActionCount", type: .number),
         ],
         parameters: [
           .init(name: "x", valueType: .number, defaultValue: .number(0.5)),
           .init(name: "y", valueType: .number, defaultValue: .number(0.5)),
           .init(name: "engaged", valueType: .boolean, defaultValue: .boolean(false)),
           .init(name: "engagedAtCall", valueType: .integer, defaultValue: .integer(0)),
+          .init(name: "spaceAction", valueType: .string,
+            defaultValue: .string("primary")),
+        ]),
+      PipelineNodeDescriptor(
+        kind: .directionPad, displayName: "WASD Pad", category: "Inputs",
+        outputs: [
+          .init(name: "x", type: .number),
+          .init(name: "y", type: .number),
         ]),
       PipelineNodeDescriptor(
         kind: .maskHitTest,

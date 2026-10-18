@@ -31,6 +31,28 @@ DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer xcrun swift test
 Keep this override local to the command unless the maintainer explicitly wants
 to change the machine-wide `xcode-select` setting.
 
+### Metal shader compiler
+
+The Metal compiler for the macOS 27 Xcode beta is installed in an Apple-managed
+cryptex mount, separate from `XcodeDefault.xctoolchain`. On this machine it is:
+
+```text
+/private/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v27.1.5237.12.FCakB8/Metal.xctoolchain/usr/bin/metal
+```
+
+The versioned mount name may change after a toolchain update. Rediscover it with
+`find /private/var/run/com.apple.security.cryptexd/mnt -path '*/Metal.xctoolchain/usr/bin/metal' -print`.
+`xcrun metal` can report a missing Metal Toolchain even while this compiler is
+mounted. Invoke the mounted compiler directly, and put its Clang module cache
+in a writable location when running inside Codex's sandbox. For example:
+
+```sh
+/private/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v27.1.5237.12.FCakB8/Metal.xctoolchain/usr/bin/metal \
+  -c -std=metal3.2 -target air64-apple-macos27.0 \
+  -fmodules-cache-path=/private/tmp/pixeltje-metal-module-cache \
+  Examples/SignalRangeFPSProgram.metal -o /private/tmp/SignalRangeFPSProgram.air
+```
+
 ### SwiftPM builds in the Codex sandbox
 
 SwiftPM cannot compile the package manifest in Codex's default workspace

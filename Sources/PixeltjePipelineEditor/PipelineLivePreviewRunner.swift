@@ -15,6 +15,12 @@ final class PipelineLiveRunControls: Sendable {
     var engagedAtCall: Int64
     var engagedAtRunIndex: Int?
     var actionCount: Int
+    var secondaryActionCount: Int
+  }
+
+  struct DirectionPad: Equatable, Sendable {
+    var x: Double
+    var y: Double
   }
 
   struct Snapshot: Equatable, Sendable {
@@ -25,6 +31,7 @@ final class PipelineLiveRunControls: Sendable {
     var autoPausedLoopNodeID: PipelineNodeID?
     var fullScreenPreviewNodeID: PipelineNodeID?
     var trackpad: Trackpad?
+    var directionPad: DirectionPad?
     var metalPreviewSize: PipelinePixelSize?
   }
 
@@ -115,6 +122,7 @@ actor PipelineLivePreviewRunner {
     let endAutoPause: @Sendable () async -> Void
     /// Reports the pixel size of the first frame and of any resized frame.
     let frameSizeChanged: @Sendable (CGSize) async -> Void
+    let playAudioEvent: @Sendable (URL) async -> Void
   }
 
   private let configuration: Configuration
@@ -190,6 +198,11 @@ actor PipelineLivePreviewRunner {
         sourceMediaRoot: configuration.sourceMediaRoot,
         packageRootsByID: configuration.packageRoots, invocation: invocation,
         progress: progressHandler(timings: callbackTimings))
+      for url in await configuration.engine.takeLiveMetalAudioEvents(
+        runID: configuration.executionID) {
+        let playAudioEvent = host.playAudioEvent
+        Task { await playAudioEvent(url) }
+      }
       let engineCompletedAt = DispatchTime.now().uptimeNanoseconds
       // A GPU Program completes its surface within the call. Shader-state
       // previews are drawn per display refresh by the render pump instead,
@@ -439,6 +452,12 @@ actor PipelineLivePreviewRunner {
       }
       values[PipelineInvocation.trackpadEngagedAtCallKey] = .integer(cycleEngagedAtCall)
       values[PipelineInvocation.trackpadActionCountKey] = .integer(Int64(trackpad.actionCount))
+      values[PipelineInvocation.trackpadSecondaryActionCountKey] =
+        .integer(Int64(trackpad.secondaryActionCount))
+    }
+    if let directionPad = inputs.directionPad {
+      values[PipelineInvocation.directionPadXKey] = .number(directionPad.x)
+      values[PipelineInvocation.directionPadYKey] = .number(directionPad.y)
     }
     return PipelineInvocation(values: values)
   }

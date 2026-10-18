@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Combine
 import Foundation
 import PixeltjePipelineComfyUIConverter
@@ -6,6 +7,7 @@ import PixeltjePipelineDomain
 import PixeltjePipelineEngine
 import PixeltjePipelineFLUX2Runtime
 import PixeltjePipelineSDXSRuntime
+import PixeltjePipelineStableAudioRuntime
 import PixeltjePipelineBaseTestSetRuntime
 import PixeltjePipelineResourceLinking
 import PixeltjePipelineTextRuntime
@@ -125,6 +127,8 @@ final class PipelineEditorModel: ObservableObject {
   @Published private(set) var nodeImagePreviews: [PipelineNodeID: NSImage] = [:]
   @Published private(set) var cacheAssetImages: [PipelineNodeID: [String: NSImage]] = [:]
   @Published private(set) var cacheAssetAudioURLs: [PipelineNodeID: [String: URL]] = [:]
+  private var liveAudioData: [URL: Data] = [:]
+  private var liveAudioPlayers: [AVAudioPlayer] = []
   @Published private(set) var nodeTextValues: [PipelineNodeID: String] = [:]
   /// Size of the live preview's newest frame, set once a frame exists. The
   /// frames themselves reach preview views through `livePreview`.
@@ -207,6 +211,14 @@ final class PipelineEditorModel: ObservableObject {
   private var trackpadActionCounts: [PipelineNodeID: Int] = [:] {
     didSet { syncLiveRunControls() }
   }
+  private var trackpadSecondaryActionCounts: [PipelineNodeID: Int] = [:] {
+    didSet { syncLiveRunControls() }
+  }
+  /// Full-screen GPU look follows the pointer without editing the workflow.
+  private var previewLookPosition: (nodeID: PipelineNodeID, x: Double, y: Double)?
+  @Published private(set) var directionPadX = 0.0
+  @Published private(set) var directionPadY = 0.0
+  private var directionKeys: Set<String> = []
   private var liveGPUProgramPointerRevision: UInt64 = 0
   private var nodeGlowTasks: [PipelineNodeID: Task<Void, Never>] = [:]
   private var performanceLog: PipelineEditorPerformanceLog?
@@ -259,14 +271,20 @@ final class PipelineEditorModel: ObservableObject {
       let fluxRunner = FLUX2KleinPipelineRunner()
       let flux9BRunner = FLUX2Klein9BSplitRunner()
       let sdxsRunner = SDXSPipelineRunner()
+      let stableAudioRunner = StableAudio3Runner()
       let textRunner = CoreAITextPipelineRunner()
       let sam31Runner = SAM31PipelineRunner()
       let trainingWorker = ModelTrainingWorker()
       engine = try PixeltjePipelineEngine.makeDefault(
+        persistentAssetCacheDirectory: (FileManager.default.urls(
+          for: .applicationSupportDirectory, in: .userDomainMask).first
+          ?? FileManager.default.homeDirectoryForCurrentUser)
+          .appendingPathComponent("Pixeltje/Pipeline Asset Cache", isDirectory: true),
         additionalNodeDescriptors: [
           FLUX2KleinPipelineFamily.makeCompositeNodeDescriptor(),
           FLUX2Klein9BSplitFamily.descriptor(),
           SDXSPipelineFamily.descriptor(),
+          StableAudio3Family.descriptor(),
           CoreAITextPipelineFamily.makeCompositeNodeDescriptor(),
           SAM31PipelineFamily.descriptor(),
         ],
@@ -274,6 +292,7 @@ final class PipelineEditorModel: ObservableObject {
           + [FLUX2KleinPipelineFamily.makeNodeExecutor(runner: fluxRunner),
             FLUX2Klein9BSplitFamily.executor(runner: flux9BRunner),
             SDXSPipelineFamily.executor(runner: sdxsRunner),
+            StableAudio3Family.executor(runner: stableAudioRunner),
             CoreAITextPipelineFamily.makeNodeExecutor(runner: textRunner),
             SAM31PipelineFamily.executor(runner: sam31Runner),
             ModelTrainingRuntime.executor(worker: trainingWorker)])
@@ -551,7 +570,8 @@ final class PipelineEditorModel: ObservableObject {
     })
     return document.connections.contains {
       renderIDs.contains($0.input.nodeID)
-        && ["state", "pointerX", "pointerY", "actionCount"].contains($0.input.port)
+        && ["state", "pointerX", "pointerY", "actionCount",
+          "secondaryActionCount"].contains($0.input.port)
     }
   }
 
@@ -563,19 +583,49 @@ final class PipelineEditorModel: ObservableObject {
     })
     return document.connections.contains {
       $0.output.nodeID == nodeID && programIDs.contains($0.input.nodeID)
-        && ["pointerX", "pointerY", "actionCount"].contains($0.input.port)
+        && ["pointerX", "pointerY", "actionCount",
+          "secondaryActionCount"].contains($0.input.port)
     }
   }
 
   func trackpadNodeID(forGPUProgramPreview nodeID: PipelineNodeID) -> PipelineNodeID? {
-    guard document.nodes.contains(where: { $0.id == nodeID && $0.kind == .gpuProgram })
-    else { return nil }
+    let programIDs = gpuProgramIDs(forPreview: nodeID)
     return document.nodes.first { trackpad in
       trackpad.kind == .trackpad && document.connections.contains { connection in
-        connection.output.nodeID == trackpad.id && connection.input.nodeID == nodeID
+        connection.output.nodeID == trackpad.id
+          && programIDs.contains(connection.input.nodeID)
           && (connection.input.port == "pointerX" || connection.input.port == "pointerY")
       }
     }?.id
+  }
+
+  func hasMovementPad(forGPUProgramPreview nodeID: PipelineNodeID) -> Bool {
+    let programIDs = gpuProgramIDs(forPreview: nodeID)
+    let padIDs = Set(document.nodes.compactMap { node in
+      node.kind == .directionPad && node.executionState == .enabled ? node.id : nil
+    })
+    return document.connections.contains { connection in
+      programIDs.contains(connection.input.nodeID)
+        && ["moveX", "moveY"].contains(connection.input.port)
+        && padIDs.contains(connection.output.nodeID)
+    }
+  }
+
+  private func gpuProgramIDs(forPreview nodeID: PipelineNodeID) -> Set<PipelineNodeID> {
+    if document.nodes.contains(where: { $0.id == nodeID && $0.kind == .gpuProgram }) {
+      return [nodeID]
+    }
+    guard document.nodes.contains(where: { $0.id == nodeID && $0.kind == .sceneSwitch })
+    else { return [] }
+    return Set(document.connections.compactMap { connection in
+      guard connection.input.nodeID == nodeID,
+        connection.input.port.hasPrefix("scene"),
+        connection.output.port == "image",
+        document.nodes.contains(where: {
+          $0.id == connection.output.nodeID && $0.kind == .gpuProgram
+        }) else { return nil }
+      return connection.output.nodeID
+    })
   }
 
   func trackpadPosition(for nodeID: PipelineNodeID) -> (x: Double, y: Double)? {
@@ -825,6 +875,9 @@ final class PipelineEditorModel: ObservableObject {
     if document.nodes.contains(where: { $0.kind == SDXSPipelineFamily.nodeKind }) {
       ids.insert(SDXSPipelineFamily.packageID)
     }
+    if document.nodes.contains(where: { $0.kind == StableAudio3Family.nodeKind }) {
+      ids.insert(StableAudio3Family.packageID)
+    }
     if document.nodes.contains(where: { $0.kind == .zImageGenerate }) {
       ids.insert(ZImagePipelineFamily.packageID)
     }
@@ -856,6 +909,8 @@ final class PipelineEditorModel: ObservableObject {
       return FLUX2Klein9BSplitFamily.packageID
     case SDXSPipelineFamily.nodeKind:
       return SDXSPipelineFamily.packageID
+    case StableAudio3Family.nodeKind:
+      return StableAudio3Family.packageID
     case .zImageGenerate:
       return ZImagePipelineFamily.packageID
     case SAM31PipelineFamily.nodeKind:
@@ -882,6 +937,7 @@ final class PipelineEditorModel: ObservableObject {
     case FLUX2KleinPipelineFamily.packageID: "FLUX.2 Klein"
     case FLUX2Klein9BSplitFamily.packageID: "FLUX.2 Klein 9B FP8"
     case SDXSPipelineFamily.packageID: "SDXS 512"
+    case StableAudio3Family.packageID: "Stable Audio 3 Small SFX"
     case ZImagePipelineFamily.packageID: "Z-Image"
     case SAM31PipelineFamily.packageID: "SAM 3.1 Selection"
     case "coreai.text.unlinked": "Core AI Text"
@@ -930,6 +986,8 @@ final class PipelineEditorModel: ObservableObject {
       })
     case SDXSPipelineFamily.packageID:
       SDXSPipelineFamily.defaultPackageURL()
+    case StableAudio3Family.packageID:
+      StableAudio3Family.defaultPackageURL()
     case ZImagePipelineFamily.packageID:
       ZImagePipelineFamily.defaultPackageURL()
     case SAM31PipelineFamily.packageID:
@@ -1143,6 +1201,8 @@ final class PipelineEditorModel: ObservableObject {
         for: document.nodes[index], registry: .pipelineEditor)?.parameter(named: name),
       Self.isEditable(value, as: descriptor.valueType)
     else { return }
+    if document.nodes[index].kind == .trackpad, name == "spaceAction",
+      value != .string("primary") && value != .string("secondary") { return }
     if document.nodes[index].kind == .assetCache, name == "slotCount" {
       guard case .integer(let count) = value, (1...16).contains(count),
         document.nodes[index].parameters[name] != value else { return }
@@ -1193,6 +1253,10 @@ final class PipelineEditorModel: ObservableObject {
         state.document.nodes[index].parameters[name] = normalizedValue
       }
     }
+    if document.nodes[index].kind == .assetCache, name == "keepBetweenRuns",
+      normalizedValue == .boolean(false) {
+      clearCachedAssets(for: nodeID)
+    }
   }
 
   func clearCachedAssets(for nodeID: PipelineNodeID) {
@@ -1201,10 +1265,11 @@ final class PipelineEditorModel: ObservableObject {
       let engine else { return }
     cacheAssetImages[nodeID] = nil
     cacheAssetAudioURLs[nodeID] = nil
+    let documentID = document.id
     let previous = cacheClearTask
     cacheClearTask = Task {
       await previous?.value
-      await engine.clearCachedAssets(for: nodeID)
+      await engine.clearCachedAssets(for: nodeID, documentID: documentID)
     }
   }
 
@@ -1244,6 +1309,10 @@ final class PipelineEditorModel: ObservableObject {
     guard canEditTrackpad,
       document.nodes.contains(where: { $0.id == nodeID && $0.kind == .trackpad })
     else { return }
+    if previewLookPosition?.nodeID == nodeID {
+      previewLookPosition = nil
+      syncLiveRunControls()
+    }
     let key = trackpadEditKey(for: nodeID)
     if let active = interactiveEdit, active.key != key {
       endInteractiveEdit(key: active.key)
@@ -1376,18 +1445,115 @@ final class PipelineEditorModel: ObservableObject {
     publishLiveGPUProgramPointer(for: nodeID)
   }
 
+  func canTriggerTrackpadSecondaryAction(for nodeID: PipelineNodeID) -> Bool {
+    isRunning && canEditTrackpad && document.connections.contains {
+      $0.output == .init(nodeID: nodeID, port: "secondaryActionCount")
+    }
+  }
+
+  func triggerTrackpadSecondaryAction(for nodeID: PipelineNodeID) {
+    guard canTriggerTrackpadSecondaryAction(for: nodeID) else { return }
+    trackpadSecondaryActionCounts[nodeID] = min(
+      (trackpadSecondaryActionCounts[nodeID] ?? 0) + 1, 16_777_215)
+    publishLiveGPUProgramPointer(for: nodeID)
+  }
+
+  func spaceTriggersTrackpadSecondaryAction(for nodeID: PipelineNodeID) -> Bool {
+    document.nodes.first { $0.id == nodeID && $0.kind == .trackpad }?
+      .parameters["spaceAction"] == .string("secondary")
+  }
+
+  @discardableResult
+  func triggerTrackpadSpaceAction(for nodeID: PipelineNodeID) -> Bool {
+    if spaceTriggersTrackpadSecondaryAction(for: nodeID) {
+      guard canTriggerTrackpadSecondaryAction(for: nodeID) else { return false }
+      triggerTrackpadSecondaryAction(for: nodeID)
+    } else {
+      guard canTriggerTrackpadAction(for: nodeID) else { return false }
+      triggerTrackpadAction(for: nodeID)
+    }
+    return true
+  }
+
+  /// Keyboard state is transient and never changes the saved workflow.
+  @discardableResult
+  func setDirectionKey(_ characters: String?, pressed: Bool) -> Bool {
+    guard let key = characters?.lowercased(), ["w", "a", "s", "d"].contains(key),
+      liveRun != nil,
+      document.nodes.contains(where: { $0.kind == .directionPad
+        && $0.executionState == .enabled }) else { return false }
+    if pressed { directionKeys.insert(key) }
+    else { directionKeys.remove(key) }
+    let x = Double((directionKeys.contains("d") ? 1 : 0)
+      - (directionKeys.contains("a") ? 1 : 0))
+    let y = Double((directionKeys.contains("w") ? 1 : 0)
+      - (directionKeys.contains("s") ? 1 : 0))
+    if directionPadX != x || directionPadY != y {
+      directionPadX = x
+      directionPadY = y
+      syncLiveRunControls()
+    }
+    return true
+  }
+
+  func clearDirectionKeys() {
+    guard !directionKeys.isEmpty else { return }
+    directionKeys.removeAll()
+    directionPadX = 0
+    directionPadY = 0
+    syncLiveRunControls()
+  }
+
+  func setPreviewLookPosition(x: Double, y: Double, for trackpadID: PipelineNodeID) {
+    guard isRunning, canEditTrackpad, x.isFinite, y.isFinite,
+      let programID = fullScreenPreviewNodeID,
+      trackpadNodeID(forGPUProgramPreview: programID) == trackpadID
+    else { return }
+    let x = min(max(x, 0), 1)
+    let y = min(max(y, 0), 1)
+    if let position = previewLookPosition,
+      position.nodeID == trackpadID && position.x == x && position.y == y { return }
+    previewLookPosition = (trackpadID, x, y)
+    publishLiveGPUProgramPointer(for: trackpadID)
+    syncLiveRunControls()
+  }
+
+  func addPreviewLookDelta(x: Double, y: Double, for trackpadID: PipelineNodeID) {
+    guard x.isFinite, y.isFinite,
+      let saved = trackpadPosition(for: trackpadID) else { return }
+    let current: (x: Double, y: Double)
+    if let previewLookPosition, previewLookPosition.nodeID == trackpadID {
+      current = (previewLookPosition.x, previewLookPosition.y)
+    } else {
+      current = saved
+    }
+    // The horizontal axis wraps so a captured mouse can turn indefinitely.
+    let unwrappedX = current.x + x * 0.0006
+    let wrappedX = unwrappedX - floor(unwrappedX)
+    setPreviewLookPosition(x: wrappedX, y: current.y + y * 0.002,
+      for: trackpadID)
+  }
+
   private func publishLiveGPUProgramPointer(for trackpadID: PipelineNodeID) {
     guard let runID = activeExecutionID,
       let programID = liveMetalPreviewNodeID,
       trackpadNodeID(forGPUProgramPreview: programID) == trackpadID,
-      let position = trackpadPosition(for: trackpadID),
+      let savedPosition = trackpadPosition(for: trackpadID),
       let engine else { return }
+    let position: (x: Double, y: Double)
+    if let previewLookPosition, previewLookPosition.nodeID == trackpadID {
+      position = (previewLookPosition.x, previewLookPosition.y)
+    } else {
+      position = savedPosition
+    }
     liveGPUProgramPointerRevision &+= 1
     let revision = liveGPUProgramPointerRevision
     let actionCount = trackpadActionCounts[trackpadID] ?? 0
+    let secondaryActionCount = trackpadSecondaryActionCounts[trackpadID] ?? 0
     Task {
       await engine.updateLiveGPUProgramPointer(runID: runID, nodeID: programID,
-        revision: revision, x: position.x, y: position.y, actionCount: actionCount)
+        revision: revision, x: position.x, y: position.y, actionCount: actionCount,
+        secondaryActionCount: secondaryActionCount)
     }
   }
 
@@ -1447,6 +1613,56 @@ final class PipelineEditorModel: ObservableObject {
     packageLinkTask?.cancel()
     packageLinkTask = nil
     activePackageLinkID = nil
+    if selectedNativePackageID == StableAudio3Family.packageID,
+      document.nodes.contains(where: { $0.kind == StableAudio3Family.nodeKind }) {
+      packageInspectionTask?.cancel()
+      packageInspection = nil
+      let pipeline = document
+      let nodes = pipeline.nodes.filter { $0.kind == StableAudio3Family.nodeKind }
+      if previousURL == selectedURL, nodes.allSatisfy({ node in
+        StableAudio3Package.slots.allSatisfy { node.resources[$0.name]?.linkedReference != nil }
+      }) {
+        inspectModelPackage()
+        return
+      }
+      statusMessage = "Linking Stable Audio 3 node resources…"
+      let linkID = UUID()
+      activePackageLinkID = linkID
+      packageLinkTask = Task { [weak self] in
+        let linking = Task.detached(priority: .userInitiated) {
+          try PipelineCoreAIPackageRelinker.relinkNativeStableAudio3(
+            in: pipeline, toPackageAt: selectedURL)
+        }
+        do {
+          let result = try await withTaskCancellationHandler {
+            try await linking.value
+          } onCancel: { linking.cancel() }
+          try Task.checkCancellation()
+          guard let self, self.activePackageLinkID == linkID,
+            self.modelPackageURL == selectedURL, self.document == pipeline else { return }
+          self.packageLinkTask = nil
+          self.activePackageLinkID = nil
+          if result.document != self.document {
+            self.performGraphMutation(actionName: "Link Stable Audio 3 Package") { state in
+              state.document = result.document
+            }
+          }
+          self.inspectModelPackage()
+        } catch is CancellationError {
+          guard let self, self.activePackageLinkID == linkID else { return }
+          self.packageLinkTask = nil
+          self.activePackageLinkID = nil
+        } catch {
+          guard let self, self.activePackageLinkID == linkID,
+            self.modelPackageURL == selectedURL else { return }
+          self.packageLinkTask = nil
+          self.activePackageLinkID = nil
+          self.packageInspection = nil
+          self.statusMessage = error.localizedDescription
+        }
+      }
+      return
+    }
     if selectedNativePackageID == SDXSPipelineFamily.packageID,
       document.nodes.contains(where: { $0.kind == SDXSPipelineFamily.nodeKind }) {
       packageInspectionTask?.cancel()
@@ -1954,6 +2170,7 @@ final class PipelineEditorModel: ObservableObject {
   func addNode(kind: PipelineNodeKind, at position: PipelinePoint) -> PipelineNodeID? {
     if (kind == FLUX2KleinPipelineFamily.compositeNodeKind
       || kind == SDXSPipelineFamily.nodeKind
+      || kind == StableAudio3Family.nodeKind
       || kind == FLUX2Klein9BSplitFamily.nodeKind || kind == .zImageGenerate
       || kind == CoreAITextPipelineFamily.compositeNodeKind),
       !document.requirements.familyABIs.isEmpty
@@ -1976,6 +2193,8 @@ final class PipelineEditorModel: ObservableObject {
       node = FLUX2KleinPipelineFamily.makeCompositeNode(id: nodeID)
     } else if kind == SDXSPipelineFamily.nodeKind {
       node = SDXSPipelineFamily.makeNode(id: nodeID)
+    } else if kind == StableAudio3Family.nodeKind {
+      node = StableAudio3Family.makeNode(id: nodeID)
     } else if kind == FLUX2Klein9BSplitFamily.nodeKind {
       node = FLUX2Klein9BSplitFamily.makeNode(id: nodeID)
     } else if kind == .zImageGenerate {
@@ -2067,7 +2286,7 @@ final class PipelineEditorModel: ObservableObject {
   func beginNodeResize(_ nodeID: PipelineNodeID) {
     guard let node = document.nodes.first(where: { $0.id == nodeID }),
       node.kind == .imagePreview || node.kind == .videoPreview || node.kind == .renderMetal
-        || node.kind == .gpuProgram
+        || node.kind == .gpuProgram || node.kind == .sceneSwitch
         || node.kind == .assetCache
         || node.kind == .markdownNote || node.kind == .trackpad
         || node.kind == .primitiveString
@@ -2079,6 +2298,7 @@ final class PipelineEditorModel: ObservableObject {
     case .trackpad: actionName = "Resize Trackpad"
     case .renderMetal: actionName = "Resize Metal Render Preview"
     case .gpuProgram: actionName = "Resize GPU Program Preview"
+    case .sceneSwitch: actionName = "Resize Scene Switch Preview"
     case .assetCache: actionName = "Resize Asset Cache"
     case .videoPreview: actionName = "Resize Video Preview"
     default: actionName = "Resize Image Preview"
@@ -2093,6 +2313,7 @@ final class PipelineEditorModel: ObservableObject {
     guard document.nodes.contains(where: {
       $0.id == nodeID && ($0.kind == .imagePreview || $0.kind == .videoPreview
         || $0.kind == .renderMetal || $0.kind == .gpuProgram
+        || $0.kind == .sceneSwitch
         || $0.kind == .assetCache
         || $0.kind == .markdownNote
         || $0.kind == .primitiveString
@@ -2313,6 +2534,8 @@ final class PipelineEditorModel: ObservableObject {
                   && node.kind == FLUX2Klein9BSplitFamily.nodeKind)
                 || (packageID == SDXSPipelineFamily.packageID
                   && node.kind == SDXSPipelineFamily.nodeKind)
+                || (packageID == StableAudio3Family.packageID
+                  && node.kind == StableAudio3Family.nodeKind)
                 || (packageID == ZImagePipelineFamily.packageID
                   && node.kind == .zImageGenerate)
                 || (packageID == "coreai.text.unlinked"
@@ -2341,6 +2564,10 @@ final class PipelineEditorModel: ObservableObject {
             } else if packageID == SDXSPipelineFamily.packageID {
               let error = SDXSPipelineFamily.inspectPackage(at: packageURL, for: scoped)
               summary = error ?? "SDXS Core AI package is ready."
+              usable = error == nil
+            } else if packageID == StableAudio3Family.packageID {
+              let error = StableAudio3Family.inspectPackage(at: packageURL, for: scoped)
+              summary = error ?? "Stable Audio 3 Core AI package is ready."
               usable = error == nil
             } else if packageID == ZImagePipelineFamily.packageID {
               let result = ZImagePipelineFamily.inspectPackage(at: packageURL, for: scoped)
@@ -2437,6 +2664,7 @@ final class PipelineEditorModel: ObservableObject {
       statusMessage = "This graph has no native execution profile. Check its output node and workflow-family ABI requirements."
       return
     }
+    clearDirectionKeys()
     let pipeline = document
     let resumeState = currentStateJSON
     let nativeRoots = nativePackageURLsByID
@@ -2465,11 +2693,28 @@ final class PipelineEditorModel: ObservableObject {
       let inputs = pipeline.connections.filter { $0.input.nodeID == output.id }
       guard inputs.count == 1, inputs[0].input.port == "image",
         inputs[0].output.port == "image" else { return nil }
-      return pipeline.nodes.first {
-        $0.id == inputs[0].output.nodeID
-          && ($0.kind == .renderMetal || $0.kind == .gpuProgram)
-          && $0.executionState == .enabled
+      guard let candidate = pipeline.nodes.first(where: {
+        $0.id == inputs[0].output.nodeID && $0.executionState == .enabled
+      }) else { return nil }
+      if candidate.kind == .renderMetal || candidate.kind == .gpuProgram {
+        return candidate
       }
+      guard candidate.kind == .sceneSwitch else { return nil }
+      let count: Int
+      if case .integer(let saved)? = candidate.parameters["sceneCount"] {
+        count = Int(saved)
+      } else { count = 2 }
+      guard (2...8).contains(count) else { return nil }
+      for index in 0..<count {
+        guard let edge = pipeline.connections.first(where: {
+          $0.input.nodeID == candidate.id
+            && $0.input.port == "scene\(index)"
+        }), edge.output.port == "image",
+          pipeline.nodes.contains(where: {
+            $0.id == edge.output.nodeID && $0.kind == .gpuProgram
+          }) else { return nil }
+      }
+      return candidate
     }
     let metalRender = directMetalRender ?? pipeline.nodes.first { node in
       (node.kind == .renderMetal || node.kind == .gpuProgram)
@@ -2493,10 +2738,18 @@ final class PipelineEditorModel: ObservableObject {
     let directMetalOutput = directMetalRender?.id
     let gpuTrackpad = pipeline.nodes.first { trackpad in
       guard trackpad.kind == .trackpad,
-        directMetalRender?.kind == .gpuProgram else { return false }
+        (directMetalRender?.kind == .gpuProgram
+          || directMetalRender?.kind == .sceneSwitch) else { return false }
+      let programIDs: Set<PipelineNodeID> = Set(pipeline.connections.compactMap { connection in
+        guard connection.input.nodeID == directMetalOutput,
+          connection.input.port.hasPrefix("scene"),
+          connection.output.port == "image" else { return nil }
+        return connection.output.nodeID
+      })
       return pipeline.connections.contains { connection in
         connection.output.nodeID == trackpad.id
-          && connection.input.nodeID == directMetalOutput
+          && (connection.input.nodeID == directMetalOutput
+            || programIDs.contains(connection.input.nodeID))
           && (connection.input.port == "pointerX"
             || connection.input.port == "pointerY")
       }
@@ -2507,7 +2760,8 @@ final class PipelineEditorModel: ObservableObject {
       && settings.feedback == nil && !newWorkflowSettings.debugModeEnabled
       && directMetalOutput != nil
       && (directMetalOutput == shaderMetalRender?.id
-        || metalRender?.kind == .gpuProgram)
+        || metalRender?.kind == .gpuProgram
+        || metalRender?.kind == .sceneSwitch)
     let seedSource: ExecutionSeedSource?
     if let loop, settings.seedStrategy == .increment,
       let seedID = PipelineControlFlow.incrementSeedNodeID(in: pipeline, loop: loop) {
@@ -2575,6 +2829,8 @@ final class PipelineEditorModel: ObservableObject {
     currentCall = 0
     trackpadEngagedAtRunIndex = [:]
     trackpadActionCounts = [:]
+    trackpadSecondaryActionCounts = [:]
+    previewLookPosition = nil
     liveGPUProgramPointerRevision = 0
     autoPausedLoopNodeID = nil
     currentSeed = nil
@@ -2616,6 +2872,7 @@ final class PipelineEditorModel: ObservableObject {
     let pendingCacheClear = cacheClearTask
     if directMetalPreview, let directMetalOutput, let loop, let metalRender {
       let isGPUProgram = metalRender.kind == .gpuProgram
+        || metalRender.kind == .sceneSwitch
       let configuration = PipelineLivePreviewRunner.Configuration(
         engine: engine, pipeline: pipeline, executionID: executionID,
         liveNodeID: directMetalOutput, isGPUProgram: isGPUProgram,
@@ -2779,6 +3036,8 @@ final class PipelineEditorModel: ObservableObject {
             values[PipelineInvocation.trackpadEngagedAtCallKey] = .integer(cycleEngagedAtCall)
             values[PipelineInvocation.trackpadActionCountKey] = .integer(
               Int64(self.trackpadActionCounts[trackpadID] ?? 0))
+            values[PipelineInvocation.trackpadSecondaryActionCountKey] = .integer(
+              Int64(self.trackpadSecondaryActionCounts[trackpadID] ?? 0))
           }
           if cycleCall > 1, let feedback = settings.feedback {
             guard let priorOutput else {
@@ -3168,6 +3427,9 @@ final class PipelineEditorModel: ObservableObject {
         endAutoPause: { [weak self] in await self?.endLiveAutoPause(executionID: executionID) },
         frameSizeChanged: { [weak self] size in
           await self?.liveMetalPreviewSizeChanged(size, nodeID: liveNodeID)
+        },
+        playAudioEvent: { [weak self] url in
+          await self?.playLiveAudioEvent(url, executionID: executionID)
         }),
       controls: liveRun.controls, telemetry: liveRun.telemetry,
       progressBuffer: liveRun.progress, source: liveRun.source,
@@ -3228,8 +3490,31 @@ final class PipelineEditorModel: ObservableObject {
   private func endLiveRun(_ executionID: UUID) {
     livePreview.finish(runID: executionID)
     guard let liveRun, liveRun.executionID == executionID else { return }
+    clearDirectionKeys()
     liveRun.samplerTask?.cancel()
     self.liveRun = nil
+    liveAudioPlayers = []
+    liveAudioData = [:]
+  }
+
+  private func playLiveAudioEvent(_ url: URL, executionID: UUID) {
+    guard activeExecutionID == executionID,
+      FileManager.default.fileExists(atPath: url.path) else { return }
+    do {
+      let data: Data
+      if let cached = liveAudioData[url] { data = cached }
+      else {
+        data = try Data(contentsOf: url)
+        liveAudioData[url] = data
+      }
+      liveAudioPlayers.removeAll { !$0.isPlaying }
+      let player = try AVAudioPlayer(data: data)
+      player.prepareToPlay()
+      guard player.play() else { return }
+      liveAudioPlayers.append(player)
+    } catch {
+      statusMessage = "Could not play sound: \(error.localizedDescription)"
+    }
   }
 
   /// Publishes a live run's progress at a rate SwiftUI can follow, rather
@@ -3272,20 +3557,27 @@ final class PipelineEditorModel: ObservableObject {
     snapshot.autoPause = loopSettings(for: liveRun.loopNodeID)?.autoPause == true
     snapshot.autoPausedLoopNodeID = autoPausedLoopNodeID
     snapshot.fullScreenPreviewNodeID = fullScreenPreviewNodeID
+    if document.nodes.contains(where: { $0.kind == .directionPad
+      && $0.executionState == .enabled }) {
+      snapshot.directionPad = .init(x: directionPadX, y: directionPadY)
+    }
     if let trackpadID = liveRun.trackpadNodeID,
       let trackpad = document.nodes.first(where: { $0.id == trackpadID }) {
+      let previewPosition = previewLookPosition?.nodeID == trackpadID
+        ? previewLookPosition : nil
       let engagedAtCall: Int64 = if case .integer(let value)? = trackpad.parameters["engagedAtCall"] {
         value
       } else {
         0
       }
       snapshot.trackpad = .init(
-        x: Self.trackpadCoordinate("x", in: trackpad),
-        y: Self.trackpadCoordinate("y", in: trackpad),
+        x: previewPosition?.x ?? Self.trackpadCoordinate("x", in: trackpad),
+        y: previewPosition?.y ?? Self.trackpadCoordinate("y", in: trackpad),
         engaged: trackpad.parameters["engaged"] == .boolean(true),
         engagedAtCall: engagedAtCall,
         engagedAtRunIndex: trackpadEngagedAtRunIndex[trackpadID],
-        actionCount: trackpadActionCounts[trackpadID] ?? 0)
+        actionCount: trackpadActionCounts[trackpadID] ?? 0,
+        secondaryActionCount: trackpadSecondaryActionCounts[trackpadID] ?? 0)
     }
     if let renderID = liveRun.shaderMetalRenderID,
       let render = document.nodes.first(where: { $0.id == renderID }) {
@@ -3363,6 +3655,7 @@ final class PipelineEditorModel: ObservableObject {
 
   func cancelExecution() {
     guard isRunning, executionState != .cancelling else { return }
+    clearDirectionKeys()
     executionState = .cancelling
     autoPausedLoopNodeID = nil
     continueRepeating = false
@@ -3743,6 +4036,17 @@ final class PipelineEditorModel: ObservableObject {
         }
       }
       scheduleNodePreview(preview, for: nodeID, executionID: executionID)
+      for edge in document.connections where edge.output.nodeID == nodeID
+        && edge.output.port == "image" && edge.input.port.hasPrefix("scene")
+        && document.nodes.contains(where: {
+          $0.id == edge.input.nodeID && $0.kind == .sceneSwitch
+        }) {
+        scheduleNodePreview(preview, for: edge.input.nodeID,
+          executionID: executionID)
+        if fullScreenPreviewNodeID == edge.input.nodeID {
+          scheduleFullScreenPreview(preview, for: edge.input.nodeID)
+        }
+      }
     }
     for (nodeID, slots) in batch.assetPreviews {
       for (slot, asset) in slots {
@@ -3926,13 +4230,14 @@ final class PipelineEditorModel: ObservableObject {
   }
 
   private func cancelExecutionForDocumentReplacement() {
+    clearDirectionKeys()
     let endingExecution = executionTask
     let previousClear = cacheClearTask
     if let engine {
       cacheClearTask = Task {
         await endingExecution?.value
         await previousClear?.value
-        await engine.clearAllCachedAssets()
+        await engine.discardCachedAssetsInMemory()
       }
     }
     cachedAssetPreviewFingerprints = [:]
@@ -3955,6 +4260,8 @@ final class PipelineEditorModel: ObservableObject {
     currentCall = 0
     trackpadEngagedAtRunIndex = [:]
     trackpadActionCounts = [:]
+    trackpadSecondaryActionCounts = [:]
+    previewLookPosition = nil
     currentSeed = nil
     activeCallLimit = 1
     activeRepeatLength = nil
@@ -3977,7 +4284,9 @@ final class PipelineEditorModel: ObservableObject {
     let previous = cacheClearTask
     cacheClearTask = Task {
       await previous?.value
-      for nodeID in changed { await engine.clearCachedAssets(for: nodeID) }
+      for nodeID in changed {
+        await engine.clearCachedAssets(for: nodeID, documentID: updated.id)
+      }
     }
   }
 

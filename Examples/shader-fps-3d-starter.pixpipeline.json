@@ -1,0 +1,364 @@
+{
+  "schemaVersion": 2,
+  "mode": "generic",
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "id": "org.pixeltje.examples.fps-3d-starter",
+  "name": "First-Person 3D Starter",
+  "exposedParameters": [],
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "start",
+      "kind": "control.start",
+      "parameters": {},
+      "resources": {},
+      "title": "Start / Next Frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "shader-text",
+      "kind": "primitive.filePath",
+      "parameters": {
+        "mode": "relative",
+        "path": "FPS3DStarterProgram.metal"
+      },
+      "resources": {},
+      "title": "Editable 3D starter shader"
+    },
+    {
+      "executionState": "enabled",
+      "id": "render",
+      "kind": "gpu.program",
+      "parameters": {
+        "framesPerSecond": {
+          "$type": "number",
+          "value": 30
+        },
+        "seed": {
+          "$type": "integer",
+          "value": 1
+        }
+      },
+      "resources": {},
+      "title": "First-person GPU simulation and scene"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.image",
+      "parameters": {
+        "filenamePrefix": "fps-3d-starter",
+        "format": "png"
+      },
+      "resources": {},
+      "title": "Starter game frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "loop",
+      "kind": "control.loop",
+      "parameters": {
+        "autoPause": false,
+        "delayMilliseconds": {
+          "$type": "integer",
+          "value": 0
+        },
+        "feedback": "none",
+        "limitHz": {
+          "$type": "integer",
+          "value": 30
+        },
+        "maxCalls": {
+          "$type": "integer",
+          "value": -1
+        },
+        "seedStrategy": "fixed"
+      },
+      "resources": {},
+      "title": "Live game loop · 30 Hz"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 960
+        }
+      },
+      "resources": {},
+      "title": "Output width"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int-2",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 600
+        }
+      },
+      "resources": {},
+      "title": "Output height"
+    },
+    {
+      "executionState": "enabled",
+      "id": "program-text",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": "{\"version\":1,\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":64},{\"name\":\"display\",\"kind\":\"texture\"}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeFPS\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceFPS\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"present\":[{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"fpsFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"}}],\"swaps\":[],\"output\":\"display\"}"
+      },
+      "resources": {},
+      "title": "State buffer and GPU passes"
+    },
+    {
+      "executionState": "enabled",
+      "id": "trackpad",
+      "kind": "input.trackpad",
+      "parameters": {
+        "x": {
+          "$type": "number",
+          "value": 0.5
+        },
+        "y": {
+          "$type": "number",
+          "value": 0.5
+        },
+        "spaceAction": "primary"
+      },
+      "resources": {},
+      "title": "Look around · fire and jump"
+    },
+    {
+      "executionState": "enabled",
+      "id": "direction-pad",
+      "kind": "input.directionPad",
+      "parameters": {},
+      "resources": {},
+      "title": "WASD movement"
+    }
+  ],
+  "connections": [
+    {
+      "id": "render.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "render",
+        "port": "image"
+      }
+    },
+    {
+      "id": "primitive-int.value->render.width",
+      "input": {
+        "nodeID": "render",
+        "port": "width"
+      },
+      "output": {
+        "nodeID": "primitive-int",
+        "port": "value"
+      }
+    },
+    {
+      "id": "primitive-int-2.value->render.height",
+      "input": {
+        "nodeID": "render",
+        "port": "height"
+      },
+      "output": {
+        "nodeID": "primitive-int-2",
+        "port": "value"
+      }
+    },
+    {
+      "id": "program-text.value->render.program",
+      "input": {
+        "nodeID": "render",
+        "port": "program"
+      },
+      "output": {
+        "nodeID": "program-text",
+        "port": "value"
+      }
+    },
+    {
+      "id": "shader-text.value->render.sourceFile",
+      "input": {
+        "nodeID": "render",
+        "port": "sourceFile"
+      },
+      "output": {
+        "nodeID": "shader-text",
+        "port": "value"
+      }
+    },
+    {
+      "id": "trackpad.x->render.pointerX",
+      "input": {
+        "nodeID": "render",
+        "port": "pointerX"
+      },
+      "output": {
+        "nodeID": "trackpad",
+        "port": "x"
+      }
+    },
+    {
+      "id": "trackpad.y->render.pointerY",
+      "input": {
+        "nodeID": "render",
+        "port": "pointerY"
+      },
+      "output": {
+        "nodeID": "trackpad",
+        "port": "y"
+      }
+    },
+    {
+      "id": "trackpad.actionCount->render.actionCount",
+      "input": {
+        "nodeID": "render",
+        "port": "actionCount"
+      },
+      "output": {
+        "nodeID": "trackpad",
+        "port": "actionCount"
+      }
+    },
+    {
+      "id": "trackpad.secondaryActionCount->render.secondaryActionCount",
+      "input": {
+        "nodeID": "render",
+        "port": "secondaryActionCount"
+      },
+      "output": {
+        "nodeID": "trackpad",
+        "port": "secondaryActionCount"
+      }
+    },
+    {
+      "id": "direction-pad.x->render.moveX",
+      "input": {
+        "nodeID": "render",
+        "port": "moveX"
+      },
+      "output": {
+        "nodeID": "direction-pad",
+        "port": "x"
+      }
+    },
+    {
+      "id": "direction-pad.y->render.moveY",
+      "input": {
+        "nodeID": "render",
+        "port": "moveY"
+      },
+      "output": {
+        "nodeID": "direction-pad",
+        "port": "y"
+      }
+    }
+  ],
+  "controlConnections": [
+    {
+      "id": "output.completed->loop.completed",
+      "input": {
+        "nodeID": "loop",
+        "port": "completed"
+      },
+      "output": {
+        "nodeID": "output",
+        "port": "completed"
+      }
+    },
+    {
+      "id": "loop.repeat->start.again",
+      "input": {
+        "nodeID": "start",
+        "port": "again"
+      },
+      "output": {
+        "nodeID": "loop",
+        "port": "repeat"
+      }
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "start": {
+        "x": 50,
+        "y": 100
+      },
+      "program-text": {
+        "x": 50,
+        "y": 330
+      },
+      "shader-text": {
+        "x": 50,
+        "y": 590
+      },
+      "primitive-int": {
+        "x": 450,
+        "y": 100
+      },
+      "primitive-int-2": {
+        "x": 450,
+        "y": 250
+      },
+      "trackpad": {
+        "x": 450,
+        "y": 430
+      },
+      "direction-pad": {
+        "x": 450,
+        "y": 800
+      },
+      "render": {
+        "x": 850,
+        "y": 290
+      },
+      "output": {
+        "x": 1530,
+        "y": 300
+      },
+      "loop": {
+        "x": 1530,
+        "y": 580
+      }
+    },
+    "nodeSizes": {
+      "program-text": {
+        "height": 225,
+        "width": 610
+      },
+      "render": {
+        "height": 575,
+        "width": 660
+      },
+      "shader-text": {
+        "height": 160,
+        "width": 400
+      },
+      "trackpad": {
+        "height": 360,
+        "width": 300
+      }
+    },
+    "viewportOrigin": {
+      "x": 0,
+      "y": 0
+    },
+    "viewportScale": 0.7
+  }
+}
