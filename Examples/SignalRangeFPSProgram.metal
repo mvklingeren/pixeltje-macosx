@@ -34,6 +34,10 @@ constant float bossRoomSouth = -70.0f;
 constant float bossRoomNorth = -110.0f;
 constant float bossDoorNorth = -110.0f;
 constant float bossCeilingY = 13.0f;
+constant uint ambushSlot = 2u;
+constant uint magazineSize = 12u;
+constant float reloadDuration = 1.6f;
+constant float biteWindup = 0.45f;
 
 struct ProgramUniforms {
     float4 resolutionTime;
@@ -82,10 +86,18 @@ struct GameState {
     ShotImpact impacts[impactCount];
     FallenSpider fallen[targetKills];
     WebCloth webs[webCount];
+    float4 motion;          // ground velocity XZ, head-bob phase, head-bob blend
+    float4 look;            // last pointer yaw/pitch, smoothed turn rates
+    float4 recoil;          // camera pitch/yaw kick, weapon kick, camera shake
+    float4 weapon;          // rounds loaded, reload time left, hit marker time/kind
+    float4 hurt;            // attacker XZ, damage indicator, landing dip
+    float4 ambush;          // drop start time (-1 before trigger), fall speed, landed
+    float4 senses[enemyCount];   // last known player XZ, awareness, bite clock
+    float4 reaction[enemyCount]; // flinch time, knockback XZ, startle time
 };
 
 static_assert(sizeof(GameState) <= 1792,
-    "The GPU Program game buffer must contain boss state and webs");
+    "The GPU Program game buffer must contain player feel and spider senses");
 
 struct SceneHit {
     float distance;
@@ -187,6 +199,58 @@ PointLight roomLight(uint index, float time) {
 float stairHeight(float2 point);
 bool walkable(float2 point);
 
+void damagePlayer(device GameState &game, float amount, float2 source,
+    float flash) {
+    game.view.y = max(game.view.y - amount, 0.0f);
+    game.effects.y = flash;
+    game.hurt.xyz = float3(source, 1.0f);
+    game.recoil.w = max(game.recoil.w, 0.6f + amount * 0.015f);
+}
+
+// Head bob and landing dip move the eye, never the collision position.
+float3 eyeOffset(device const GameState &game) {
+    float side = 0.022f * game.motion.w * sin(game.motion.z);
+    return float3(cos(game.player.w) * side,
+        0.034f * game.motion.w * sin(2.0f * game.motion.z) - game.hurt.w,
+        sin(game.player.w) * side);
+}
+
+// The held pistol has its own frame: X right, Y up, Z along the barrel, origin
+// where the grip meets the frame. The pose places it in view space (X right,
+// Y up, Z forward from the eye), so drawing and tracers share one muzzle.
+struct GunPose {
+    float3 pivot;
+    float3x3 basis;
+    float slide;            // slide travel toward the shooter after a shot
+};
+
+constant float3 gunMuzzle = float3(0.0f, 0.032f, 0.168f);
+
+GunPose gunPose(device const GameState &game) {
+    float reload = game.weapon.y > 0.0f
+        ? sin(rangePi * (1.0f - game.weapon.y / reloadDuration)) : 0.0f;
+    float kick = game.recoil.z;
+    float bob = game.motion.w, phase = game.motion.z;
+    float2 sway = game.look.zw;
+    // The gun lags behind turns, bobs with steps, kicks back on each shot
+    // and dips out of view while the magazine is changed.
+    float3 pivot = float3(0.17f, -0.17f, 0.36f) + float3(
+        0.010f * bob * sin(phase) - 0.006f * sway.x,
+        -0.007f * bob * abs(cos(phase)) - 0.006f * sway.y
+            + 0.010f * kick - 0.12f * reload - 0.5f * game.hurt.w,
+        -0.045f * kick);
+    float pitch = 0.17f * kick - 0.5f * reload - 0.02f * sway.y;
+    float yaw = -0.03f * sway.x;
+    float roll = 0.55f * reload;
+    float3 f = float3(sin(yaw) * cos(pitch), sin(pitch),
+        cos(yaw) * cos(pitch));
+    float3 r = normalize(float3(f.z, 0.0f, -f.x));
+    float3 up = cross(f, r);
+    return {pivot, float3x3(r * cos(roll) + up * sin(roll),
+        up * cos(roll) - r * sin(roll), f),
+        0.028f * saturate((kick - 0.55f) / 0.45f)};
+}
+
 #include "SignalRangeSpider.metal"
 
 void resetGame(device GameState &game) {
@@ -200,6 +264,13 @@ void resetGame(device GameState &game) {
     game.roomTriggers = uint4(0u);
     updateChromePose(game);
     game.progress = uint4(0u);
+    game.motion = float4(0.0f);
+    // A yaw outside the pointer range marks the first tick, so it has no sway.
+    game.look = float4(100.0f, 0.0f, 0.0f, 0.0f);
+    game.recoil = float4(0.0f);
+    game.weapon = float4(float(magazineSize), 0.0f, 0.0f, 0.0f);
+    game.hurt = float4(0.0f);
+    game.ambush = float4(-1.0f, 0.0f, 0.0f, 0.0f);
     for (uint i = 0u; i < impactCount; ++i) {
         game.impacts[i].muzzleTime = float4(0.0f, 0.0f, 0.0f, -100.0f);
         game.impacts[i].pointEnemy = float4(0.0f);
@@ -219,7 +290,11 @@ void resetGame(device GameState &game) {
         game.enemy[i] = float4(spawnPosition(i), i == bossSlot ? 14.0f : 2.0f);
         float2 toPlayer = game.player.xz - game.enemy[i].xz;
         game.enemyClock[i] = float4(0.0f, -0.55f, 0.0f,
-            atan2(toPlayer.x, -toPlayer.y));
+            i == bossSlot ? atan2(toPlayer.x, -toPlayer.y) : idleYaw(i));
+        // Range spiders start unaware; the ambush spider is not yet present.
+        game.senses[i] = float4(game.enemy[i].xz,
+            i == bossSlot ? 1.0f : (i == ambushSlot ? -1.0f : 0.0f), -1.0f);
+        game.reaction[i] = float4(0.0f);
         game.gait[i] = float4(0.07f + float(i) * 0.31f,
             0.0f, 0.0f, 0.0f);
     }
@@ -394,6 +469,16 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     game.effects.y = max(game.effects.y - dt, 0.0f);
     game.view.z = max(game.view.z - dt, 0.0f);
     game.view.w = max(game.view.w - dt, 0.0f);
+    game.recoil.xy *= exp(-dt * 9.0f);
+    game.recoil.z *= exp(-dt * 14.0f);
+    game.recoil.w = max(game.recoil.w - dt * 1.8f, 0.0f);
+    game.hurt.z = max(game.hurt.z - dt / 1.2f, 0.0f);
+    game.hurt.w *= exp(-dt * 7.0f);
+    game.weapon.z = max(game.weapon.z - dt, 0.0f);
+    if (game.weapon.y > 0.0f) {
+        game.weapon.y = max(game.weapon.y - dt, 0.0f);
+        if (game.weapon.y <= 0.0f) game.weapon.x = float(magazineSize);
+    }
     if (game.progress.w != phasePlaying) {
         if (game.progress.w == phaseLost && action > game.progress.z) {
             resetGame(game);
@@ -418,9 +503,19 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
 
     // Trackpad selects an orientation; it never changes player position.
     // Keeping it still must also keep the view still.
+    // Recoil is added on top and recovers by itself.
     float2 look = clamp(u.pointer.xy, float2(0.0f), float2(1.0f));
-    game.player.w = (look.x - 0.5f) * 6.2831853f;
-    game.view.x = (0.5f - look.y) * 1.9f;
+    float baseYaw = (look.x - 0.5f) * 6.2831853f;
+    float basePitch = (0.5f - look.y) * 1.9f;
+    if (game.look.x > 50.0f) game.look.xy = float2(baseYaw, basePitch);
+    float2 turn = float2(atan2(sin(baseYaw - game.look.x),
+        cos(baseYaw - game.look.x)), basePitch - game.look.y);
+    game.look.xy = float2(baseYaw, basePitch);
+    game.look.zw = mix(game.look.zw,
+        dt > 0.0f ? clamp(turn / dt, float2(-4.0f), float2(4.0f)) : float2(0.0f),
+        1.0f - exp(-dt * 10.0f));
+    game.player.w = baseYaw + game.recoil.y;
+    game.view.x = basePitch + game.recoil.x;
     float2 move = clamp(u.movement.xy, float2(-1.0f), float2(1.0f));
     if (game.bossScene.x >= 0.0f && game.bossScene.x < 5.0f)
         move = float2(0.0f);
@@ -435,13 +530,20 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
             game.bossScene.y = 1.0f;
     }
     float speed = game.bossScene.y > 0.0f ? 1.75f : 4.6f;
-    float2 next = game.player.xz + (right * move.x + forward * move.y)
-        * speed * dt;
-    // Resolve axes independently so a diagonal approach slides along a wall.
     float2 previousPosition = game.player.xz;
+    bool wasGrounded = game.player.y <= 1.55f + stairHeight(previousPosition)
+        + (onJumpPad(previousPosition) ? jumpPadHeight : 0.0f) + 0.001f;
+    // Feet accelerate and brake quickly; in the air the body keeps momentum.
+    game.motion.xy = mix(game.motion.xy,
+        (right * move.x + forward * move.y) * speed,
+        1.0f - exp(-dt * (wasGrounded ? 11.0f : 2.2f)));
+    float2 next = previousPosition + game.motion.xy * dt;
+    // Resolve axes independently so a diagonal approach slides along a wall.
     float2 position = previousPosition;
     if (walkable(float2(next.x, position.y))) position.x = next.x;
+    else game.motion.x = 0.0f;
     if (walkable(float2(position.x, next.y))) position.y = next.y;
+    else game.motion.y = 0.0f;
     next = position;
     if (game.progress.x < ordinaryEnemyCount
         && previousPosition.y >= -outerRoomFar + 0.3f)
@@ -451,8 +553,15 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
         next.y = min(next.y, bossRoomSouth - 0.35f);
     pushOutOfObstacle(next, float2(-4.1f, -3.1f), float2(-1.8f, -0.7f));
     pushOutOfObstacle(next, float2(2.1f, -6.5f), float2(4.5f, -4.1f));
+    pushOutOfObstacle(next, glassBoxLower.xz, glassBoxUpper.xz);
     pushOutOfChrome(next);
     game.player.xz = next;
+    // Head bob follows the distance actually walked on the ground.
+    float walked = length(next - previousPosition);
+    game.motion.z = fmod(game.motion.z + walked * 1.85f, 2.0f * rangePi);
+    game.motion.w = mix(game.motion.w, wasGrounded
+            ? saturate(walked / max(dt * 4.6f, 0.00001f)) : 0.0f,
+        1.0f - exp(-dt * 8.0f));
     if (game.bossScene.x < 0.0f
         && game.progress.x >= ordinaryEnemyCount
         && next.y < bossRoomSouth - 2.6f) {
@@ -466,6 +575,10 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
                 && next.y < -outerRoomNear))) {
         scareAudioEvent[0] = 1u;
         game.roomTriggers.x = 1u;
+        if (game.roomTriggers.y == 0u) {
+            game.roomTriggers.y = 1u;
+            startAmbush(game);
+        }
     }
     bool overJumpPad = onJumpPad(next);
     float groundY = 1.55f + stairHeight(next)
@@ -485,6 +598,8 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
         game.player.y += game.effects.w * dt;
     }
     if (game.player.y <= groundY) {
+        if (game.effects.w < -3.0f)
+            game.hurt.w = max(game.hurt.w, min(-game.effects.w * 0.012f, 0.16f));
         game.player.y = groundY;
         game.effects.w = 0.0f;
     }
@@ -498,12 +613,17 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
 
     if (action > game.progress.z) {
         game.progress.z = action;
-        if (game.view.z <= 0.0f
+        if (game.view.z <= 0.0f && game.weapon.x >= 1.0f
             && (game.bossScene.x < 0.0f || game.bossScene.x >= 5.0f)) {
             game.view.z = 0.22f;
             game.view.w = 0.11f;
             game.progress.y += 1u;
+            game.weapon.x -= 1.0f;
+            // An empty magazine reloads by itself; there is no reload key.
+            if (game.weapon.x < 1.0f) game.weapon.y = reloadDuration;
             shotAudioEvent[0] = 1u;
+            hearGunshot(game);
+            float3 eye = game.player.xyz + eyeOffset(game);
             float3 shotDirection = pixeltje_3d::forward(
                 game.player.w, game.view.x);
             float3 normal;
@@ -513,7 +633,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
                 game.chromeCentre.xyz};
             SceneHit environment = {sceneRayLimit, float3(0.0f),
                 float3(0.0f), 0u, -1, 0u};
-            traceEnvironment(environment, game.player.xyz,
+            traceEnvironment(environment, eye,
                 shotDirection, chrome, game);
             float block = environment.material != 0u
                 ? environment.distance : sceneRayLimit;
@@ -521,7 +641,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
                 impactNormal = environment.normal;
                 impactMaterial = environment.material;
             }
-            float t = rayBox(game.player.xyz, shotDirection,
+            float t = rayBox(eye, shotDirection,
                 float3(-4.1f, 0.0f, -3.1f),
                 float3(-1.8f, 2.5f, -0.7f), normal);
             if (t > 0.0f && t < block) {
@@ -529,7 +649,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
                 impactNormal = normal;
                 impactMaterial = 14u;
             }
-            t = rayBox(game.player.xyz, shotDirection,
+            t = rayBox(eye, shotDirection,
                 float3(2.1f, 0.0f, -6.5f),
                 float3(4.5f, 2.5f, -4.1f), normal);
             if (t > 0.0f && t < block) {
@@ -537,7 +657,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
                 impactNormal = normal;
                 impactMaterial = 4u;
             }
-            t = rayChrome(game.player.xyz, shotDirection,
+            t = rayChrome(eye, shotDirection,
                 chrome, normal);
             if (t > 0.0f && t < block) {
                 block = t;
@@ -546,12 +666,13 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
             }
             int target = -1;
             for (uint i = 0u; i < enemyCount; ++i) {
-                if (game.enemy[i].w <= 0.0f) continue;
-                SpiderHit spider = traceSpider(game.player.xyz, shotDirection,
+                if (!spiderActive(game, i)) continue;
+                SpiderHit spider = traceSpider(eye, shotDirection,
                     game.enemy[i].xyz, spiderVariantForSlot(i),
                     game.enemyClock[i].w,
                     game.gait[i].x, game.gait[i].y,
-                    spiderBodyRise(game.effects.x, i), 0.0f, block);
+                    spiderBodyRise(game.effects.x, i), 0.0f,
+                    spiderRear(game, i), block);
                 if (spider.material != 0u) {
                     block = spider.distance;
                     target = int(i);
@@ -559,20 +680,22 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
                     impactMaterial = spider.material;
                 }
             }
-            float3 impactPoint = game.player.xyz + shotDirection * block;
+            float3 impactPoint = eye + shotDirection * block;
             if (target < 0) {
                 if (environment.material == 0u) {
-                    impactPoint = game.player.xyz + shotDirection * 28.0f;
+                    impactPoint = eye + shotDirection * 28.0f;
                     impactMaterial = 0u;
                 }
             }
             float3 muzzleRight = normalize(cross(shotDirection,
                 float3(0.0f, 1.0f, 0.0f)));
             float3 muzzleUp = cross(muzzleRight, shotDirection);
+            GunPose gun = gunPose(game);
+            float3 muzzle = gun.pivot + gun.basis * gunMuzzle;
             ShotImpact shot;
-            shot.muzzleTime = float4(game.player.xyz
-                + shotDirection * 0.40f + muzzleRight * 0.20f
-                - muzzleUp * 0.16f, game.effects.x);
+            shot.muzzleTime = float4(eye + muzzleRight * muzzle.x
+                + muzzleUp * muzzle.y + shotDirection * muzzle.z,
+                game.effects.x);
             shot.pointEnemy = float4(impactPoint, float(target + 1));
             shot.normalMaterial = float4(impactNormal,
                 float(impactMaterial));
@@ -588,10 +711,36 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
                     yaw);
             }
             game.impacts[(game.progress.y - 1u) % impactCount] = shot;
+            // The kick lands after the shot, so the first round goes where
+            // the crosshair was; follow-ups climb until the recoil recovers.
+            game.recoil.x += 0.032f;
+            game.recoil.y += 0.024f
+                * (hashTile(float2(float(game.progress.y), 7.3f)) - 0.5f);
+            game.recoil.z = 1.0f;
             if (target >= 0) {
-                game.enemy[target].w -= 1.0f;
-                game.enemyClock[target].z = 0.24f;
+                uint slot = uint(target);
+                SpiderTraits traits = spiderTraits(spiderVariantForSlot(slot));
+                // Head and eyes sit at the front of the chassis (-Z local).
+                float3 head = shot.localPointYaw.xyz / traits.scale
+                    - float3(0.0f, 0.05f, -0.45f);
+                bool headshot = length(head / float3(0.48f, 0.38f, 0.50f))
+                    < 1.0f;
+                game.enemy[slot].w -= headshot ? 2.0f : 1.0f;
+                game.enemyClock[slot].z = 0.24f;
+                game.weapon.zw = headshot ? float2(0.30f, 2.0f)
+                    : float2(0.22f, 1.0f);
+                if (slot == bossSlot) {
+                    game.reaction[slot].x = 0.12f;
+                } else {
+                    float2 push = shotDirection.xz;
+                    game.reaction[slot].xyz = float3(0.32f,
+                        length(push) > 0.01f ? normalize(push) * 2.6f
+                            : float2(0.0f));
+                    game.senses[slot].w = -1.0f;   // a hit interrupts a bite
+                    wakeSpider(game, slot, game.player.xz);
+                }
                 if (game.enemy[target].w <= 0.0f) {
+                    game.weapon.zw = float2(0.40f, 3.0f);
                     uint fallenIndex = game.progress.x;
                     if (fallenIndex < targetKills) {
                         game.fallen[fallenIndex].pose = float4(
@@ -1172,12 +1321,12 @@ void traceScene(thread SceneHit &hit, thread float3 &furPosition,
     device const GameState &game) {
     traceEnvironment(hit, origin, direction, chrome, game);
     for (uint i = 0u; i < enemyCount; ++i) {
-        if (game.enemy[i].w <= 0.0f) continue;
+        if (!spiderActive(game, i)) continue;
         SpiderHit spider = traceSpider(origin, direction, game.enemy[i].xyz,
             spiderVariantForSlot(i), game.enemyClock[i].w,
             game.gait[i].x, game.gait[i].y,
             spiderBodyRise(game.effects.x, i), 0.0f,
-            hit.distance);
+            spiderRear(game, i), hit.distance);
         if (spider.material != 0u) {
             hit = {spider.distance, spider.normal,
                 origin + direction * spider.distance, spider.material,
@@ -1197,7 +1346,7 @@ void traceScene(thread SceneHit &hit, thread float3 &furPosition,
         SpiderHit spider = traceSpider(origin, direction, centre,
             variant, fallen.pose.w, fallen.motion.x,
             fallen.motion.y * (1.0f - collapse),
-            fallen.motion.w * (1.0f - collapse), collapse,
+            fallen.motion.w * (1.0f - collapse), collapse, 0.0f,
             hit.distance);
         if (spider.material != 0u) {
             hit = {spider.distance, spider.normal,
@@ -1460,6 +1609,135 @@ float3 shadeSpiderParticles(float3 color, float3 origin,
     return color;
 }
 
+struct GunHit {
+    float distance;
+    float3 normal;          // gun frame
+    uint part;              // 1 slide, 2 polymer, 3 dark steel, 4 glove, 5 sleeve
+    float3 local;
+};
+
+void gunBox(thread GunHit &hit, float3 origin, float3 direction,
+    float3 lower, float3 upper, uint part) {
+    float3 normal;
+    float t = pixeltje_3d::rayBox(origin, direction, lower, upper,
+        0.001f, normal);
+    if (t > 0.0f && t < hit.distance)
+        hit = {t, normal, part, origin + direction * t};
+}
+
+void gunCapsule(thread GunHit &hit, float3 origin, float3 direction,
+    float3 start, float3 end, float radius, uint part) {
+    SpiderHit capsule = {hit.distance, float3(0.0f), 0u, float3(0.0f)};
+    acceptSpiderLeg(capsule, origin, direction, start, end, radius, part);
+    if (capsule.material != 0u)
+        hit = {capsule.distance, capsule.normal, part,
+            origin + direction * capsule.distance};
+}
+
+GunHit traceGun(float3 origin, float3 direction, float slide) {
+    GunHit hit = {1.0e6f, float3(0.0f), 0u, float3(0.0f)};
+    if (raySphere(origin, direction, float3(0.0f, -0.1f, -0.05f), 0.40f)
+        < 0.0f) return hit;
+    float3 back = float3(0.0f, 0.0f, -slide);
+    gunBox(hit, origin, direction, float3(-0.016f, 0.018f, -0.075f) + back,
+        float3(0.016f, 0.050f, 0.150f) + back, 1u);
+    gunBox(hit, origin, direction, float3(-0.0025f, 0.050f, 0.128f) + back,
+        float3(0.0025f, 0.057f, 0.140f) + back, 3u);
+    for (uint side = 0u; side < 2u; ++side) {
+        float x = side == 0u ? -0.014f : 0.004f;
+        gunBox(hit, origin, direction, float3(x, 0.050f, -0.068f) + back,
+            float3(x + 0.010f, 0.058f, -0.058f) + back, 3u);
+    }
+    gunBox(hit, origin, direction, float3(-0.008f, 0.024f, 0.120f),
+        float3(0.008f, 0.040f, gunMuzzle.z), 3u);
+    gunBox(hit, origin, direction, float3(-0.014f, -0.004f, -0.060f),
+        float3(0.014f, 0.020f, 0.140f), 2u);
+    gunBox(hit, origin, direction, float3(-0.005f, -0.030f, 0.005f),
+        float3(0.005f, -0.024f, 0.075f), 2u);
+    gunBox(hit, origin, direction, float3(-0.005f, -0.030f, 0.068f),
+        float3(0.005f, -0.004f, 0.075f), 2u);
+    // The grip rakes back 17 degrees from where it meets the frame.
+    float c = cos(0.30f), s = sin(0.30f);
+    GunHit grip = {hit.distance, float3(0.0f), 0u, float3(0.0f)};
+    gunBox(grip, rotateSpiderPitch(origin - float3(0.0f, 0.0f, -0.012f), -s, c),
+        rotateSpiderPitch(direction, -s, c),
+        float3(-0.015f, -0.115f, -0.026f), float3(0.015f, 0.0f, 0.018f), 2u);
+    if (grip.part != 0u)
+        hit = {grip.distance, rotateSpiderPitch(grip.normal, s, c), 2u,
+            origin + direction * grip.distance};
+    float3 normal;
+    float t = pixeltje_3d::rayEllipsoid(origin, direction,
+        float3(0.0f, -0.050f, -0.030f), float3(0.036f, 0.048f, 0.042f),
+        0.001f, normal);
+    if (t > 0.0f && t < hit.distance)
+        hit = {t, normal, 4u, origin + direction * t};
+    gunCapsule(hit, origin, direction, float3(-0.024f, -0.010f, -0.045f),
+        float3(-0.021f, 0.006f, 0.020f), 0.0115f, 4u);
+    for (uint finger = 0u; finger < 3u; ++finger) {
+        float y = -0.030f - 0.021f * float(finger);
+        gunCapsule(hit, origin, direction, float3(0.020f, y, 0.006f + y * 0.31f),
+            float3(-0.020f, y, 0.006f + y * 0.31f), 0.0105f, 4u);
+    }
+    gunCapsule(hit, origin, direction, float3(0.002f, -0.080f, -0.055f),
+        float3(0.035f, -0.30f, -0.32f), 0.044f, 5u);
+    return hit;
+}
+
+SurfaceMaterial gunMaterial(GunHit hit) {
+    float3 p = hit.local;
+    if (hit.part == 1u) {
+        // Rear cocking serrations on the slide flanks.
+        float serration = abs(hit.normal.x) > 0.5f && p.z < -0.035f
+            ? step(0.5f, fract(p.z * 230.0f)) : 0.0f;
+        return {float3(0.20f, 0.21f, 0.22f) * (1.0f - 0.55f * serration),
+            0.32f + 0.25f * serration, 0.9f, float3(0.0f)};
+    }
+    if (hit.part == 3u) {
+        bool bore = p.z > gunMuzzle.z - 0.002f
+            && length(p.xy - gunMuzzle.xy) < 0.0045f;
+        return {bore ? float3(0.005f) : float3(0.09f, 0.09f, 0.095f),
+            0.40f, bore ? 0.0f : 0.85f, float3(0.0f)};
+    }
+    if (hit.part == 2u) return {
+        float3(0.035f, 0.037f, 0.040f)
+            * (0.85f + 0.3f * smoothNoise(p.yz * 900.0f)),
+        0.62f, 0.0f, float3(0.0f)};
+    if (hit.part == 4u) return {float3(0.045f, 0.043f, 0.040f),
+        0.85f, 0.0f, float3(0.0f)};
+    return {float3(0.085f, 0.090f, 0.060f)
+        * (0.8f + 0.4f * smoothNoise(p.xy * 260.0f)),
+        0.95f, 0.0f, float3(0.0f)};
+}
+
+// The viewmodel is lit by the same room lights as the scene it moves through.
+float3 shadeGun(GunHit gun, GunPose pose, float3 eye, float3 right,
+    float3 up, float3 front, float3 direction, ChromePose chrome,
+    device const GameState &game) {
+    float3 viewPoint = pose.pivot + pose.basis * gun.local;
+    float3 viewNormal = pose.basis * gun.normal;
+    SceneHit hit = {length(viewPoint), normalize(right * viewNormal.x
+            + up * viewNormal.y + front * viewNormal.z),
+        eye + right * viewPoint.x + up * viewPoint.y + front * viewPoint.z,
+        30u, -1, 0u};
+    SurfaceMaterial material = gunMaterial(gun);
+    float3 color = material.albedo * (1.0f - material.metallic)
+            * float3(0.030f, 0.038f, 0.046f)
+        + material.albedo * material.metallic
+            * (0.05f + 0.07f * saturate(hit.normal.y));
+    for (uint i = 0u; i < 8u; ++i)
+        color += shadePointLight(hit, material, -direction,
+            roomLight(i, game.effects.x), chrome);
+    if (game.view.w > 0.0f) {
+        float3 muzzle = pose.pivot + pose.basis
+            * (gunMuzzle + float3(0.0f, 0.0f, 0.012f));
+        PointLight flash = {eye + right * muzzle.x + up * muzzle.y
+            + front * muzzle.z, float3(1.0f, 0.62f, 0.26f),
+            3.0f * game.view.w / 0.11f};
+        color += shadePointLight(hit, material, -direction, flash, chrome);
+    }
+    return color;
+}
+
 fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     constant ProgramUniforms &u [[buffer(0)]],
     device const GameState *states [[buffer(1)]],
@@ -1467,9 +1745,17 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     texture2d<float> crateB [[texture(2)]],
     texture2d<float> impactTexture [[texture(3)]]) {
     device const GameState &game = states[0];
+    // Shake is visual only: shots keep following the steady crosshair.
+    float shake = game.recoil.w * game.recoil.w * 0.03f;
+    float jitter = game.effects.x * 31.0f;
+    float viewYaw = game.player.w
+        + shake * (sin(jitter) + 0.5f * sin(jitter * 2.3f + 1.0f));
+    float viewPitch = game.view.x
+        + shake * (sin(jitter * 1.7f + 2.0f) + 0.5f * sin(jitter * 3.1f));
     float3 direction = pixeltje_3d::cameraDirection(in.uv,
-        u.resolutionTime.xy, game.player.w, game.view.x, 1.1f);
-    float3 origin = game.player.xyz;
+        u.resolutionTime.xy, viewYaw, viewPitch, 1.1f);
+    float3 eye = game.player.xyz + eyeOffset(game);
+    float3 origin = eye;
     float reveal = 0.0f;
     if (game.bossScene.x >= 0.0f && game.bossScene.x < 5.0f) {
         float time = game.bossScene.x;
@@ -1525,11 +1811,15 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         color += (redEyes ? float3(0.16f, 0.012f, 0.014f)
             : float3(0.055f, 0.075f, 0.082f))
             * fresnel * fresnel * fresnel;
+        // An enraged boss's eyes burn from within.
+        if (hit.enemy == int(bossSlot) && bossEnraged(game))
+            color += float3(0.9f, 0.05f, 0.03f)
+                * (0.6f + 0.4f * sin(game.effects.x * 9.0f));
     }
     if (hit.enemy >= 0) {
         if (game.enemyClock[hit.enemy].z > 0.0f) color += float3(0.9f, 0.5f, 0.2f);
         if (hit.enemy == int(bossSlot) && game.bossAttack.x > 0.0f
-            && game.bossAttack.x < 0.48f)
+            && game.bossAttack.x < bossWindup(game))
             color += float3(0.18f, 0.008f, 0.006f)
                 * (0.6f + 0.4f * sin(game.effects.x * 32.0f));
     }
@@ -1541,17 +1831,99 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     color = shadeShot(color, origin, direction, hit.distance, game);
     color = shadeSpiderParticles(color, origin, direction,
         hit.distance, game);
+
+    // The held pistol is drawn over the world, as in any shooter, so a wall
+    // in front of the face never swallows it.
+    bool holdingGun = reveal <= 0.0f && game.progress.w != phaseLost;
+    GunPose gun = gunPose(game);
+    float3 viewFront = pixeltje_3d::forward(viewYaw, viewPitch);
+    float3 viewRight = normalize(cross(viewFront, float3(0.0f, 1.0f, 0.0f)));
+    float3 viewUp = cross(viewRight, viewFront);
+    if (holdingGun) {
+        float3 viewDirection = float3(dot(direction, viewRight),
+            dot(direction, viewUp), dot(direction, viewFront));
+        float3x3 toGun = transpose(gun.basis);
+        GunHit gunHit = traceGun(toGun * -gun.pivot, toGun * viewDirection,
+            gun.slide);
+        if (gunHit.part != 0u)
+            color = shadeGun(gunHit, gun, eye, viewRight, viewUp, viewFront,
+                direction, chrome, game);
+    }
     color = pixeltje_3d::filmicToneMap(color * 1.6f);
 
     // Crosshair, health bar, target pips, and damage/muzzle feedback.
     float2 pixel = in.uv * u.resolutionTime.xy;
     float2 centre = u.resolutionTime.xy * 0.5f;
     float2 d = abs(pixel - centre);
+    if (holdingGun && game.view.w > 0.0f) {
+        float3 muzzle = gun.pivot + gun.basis
+            * (gunMuzzle + float3(0.0f, 0.0f, 0.012f));
+        float2 muzzlePixel = centre + float2(muzzle.x, -muzzle.y)
+            / muzzle.z * 1.1f * u.resolutionTime.y;
+        float2 offset = pixel - muzzlePixel;
+        float radius = length(offset) / u.resolutionTime.y;
+        float angle = atan2(offset.y, offset.x) + float(game.progress.y) * 1.7f;
+        float spikes = pow(abs(cos(angle * 2.5f)), 6.0f);
+        float flash = (1.0f - smoothstep(0.0f, 0.022f, radius))
+            + 0.8f * spikes * (1.0f - smoothstep(0.0f, 0.075f, radius))
+            + 0.25f * (1.0f - smoothstep(0.0f, 0.12f, radius));
+        color += float3(1.0f, 0.62f, 0.24f) * flash
+            * (game.view.w / 0.11f) * 1.6f;
+    }
+    // Damage reddens the screen edges; low health pulses there.
+    float hurtTint = min(game.effects.y * 2.4f, 0.8f);
+    if (game.view.y < 35.0f && game.progress.w == phasePlaying)
+        hurtTint = max(hurtTint, (1.0f - game.view.y / 35.0f)
+            * (0.28f + 0.17f * sin(game.effects.x * 5.5f)));
+    color = mix(color, float3(0.42f, 0.015f, 0.01f), hurtTint
+        * smoothstep(0.30f, 0.95f, length(pixel - centre)
+            / u.resolutionTime.y));
+    // A red arc around the crosshair points toward the last attacker.
+    if (game.hurt.z > 0.0f) {
+        float2 toSource = game.hurt.xy - game.player.xz;
+        float bearing = atan2(toSource.x, -toSource.y) - game.player.w;
+        float screenAngle = atan2(pixel.x - centre.x, centre.y - pixel.y);
+        float apart = abs(atan2(sin(screenAngle - bearing),
+            cos(screenAngle - bearing)));
+        float ring = abs(length(pixel - centre) / u.resolutionTime.y - 0.15f);
+        color = mix(color, float3(0.95f, 0.12f, 0.08f),
+            0.9f * saturate(game.hurt.z)
+                * (1.0f - smoothstep(0.22f, 0.36f, apart))
+                * (1.0f - smoothstep(0.012f, 0.02f, ring)));
+    }
     bool crosshair = (d.x < 1.4f && d.y > 4.0f && d.y < 12.0f)
         || (d.y < 1.4f && d.x > 4.0f && d.x < 12.0f);
     if (crosshair && (game.bossScene.x < 0.0f
         || game.bossScene.x >= 5.0f))
         color = float3(0.9f, 1.0f, 0.95f);
+    // Hit marker: white for a body hit, orange for the head, red for a kill.
+    float markerRadius = length(d);
+    if (game.weapon.z > 0.0f && abs(d.x - d.y) < 1.3f && markerRadius > 7.0f
+        && markerRadius < (game.weapon.w > 1.5f ? 19.0f : 15.0f)) {
+        color = mix(color, game.weapon.w > 2.5f ? float3(1.0f, 0.18f, 0.12f)
+            : (game.weapon.w > 1.5f ? float3(1.0f, 0.62f, 0.18f)
+                : float3(1.0f)), saturate(game.weapon.z / 0.12f));
+    }
+    // Magazine rounds at the bottom right, with a bar while reloading.
+    if (game.progress.w == phasePlaying) {
+        float2 corner = u.resolutionTime.xy - float2(28.0f, 28.0f);
+        for (uint i = 0u; i < magazineSize; ++i) {
+            float right = corner.x - float(i) * 9.0f;
+            if (pixel.x > right - 5.0f && pixel.x < right
+                && pixel.y > corner.y - 18.0f && pixel.y < corner.y) {
+                color = float(i) < game.weapon.x ? float3(0.95f, 0.82f, 0.45f)
+                    : float3(0.10f, 0.13f, 0.14f);
+            }
+        }
+        float barWidth = float(magazineSize) * 9.0f - 4.0f;
+        if (game.weapon.y > 0.0f && pixel.y > corner.y + 5.0f
+            && pixel.y < corner.y + 8.0f && pixel.x < corner.x
+            && pixel.x > corner.x - barWidth) {
+            color = corner.x - pixel.x > barWidth
+                    * (game.weapon.y / reloadDuration)
+                ? float3(0.95f, 0.82f, 0.45f) : float3(0.10f, 0.13f, 0.14f);
+        }
+    }
     if (pixel.x > 24.0f && pixel.x < 224.0f
         && pixel.y > 23.0f && pixel.y < 36.0f) {
         color = pixel.x < 24.0f + game.view.y * 2.0f
@@ -1573,15 +1945,6 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
             ? float3(0.72f, 0.075f, 0.055f)
             : float3(0.12f, 0.12f, 0.14f);
     }
-    if (game.view.w > 0.0f) {
-        float2 muzzlePixel = centre + u.resolutionTime.y
-            * float2(0.55f, 0.44f);
-        float bloom = 1.0f - smoothstep(0.0f, 80.0f,
-            length(pixel - muzzlePixel));
-        color += float3(1.0f, 0.57f, 0.20f)
-            * bloom * game.view.w * 2.4f;
-    }
-    color += float3(0.45f, 0.025f, 0.015f) * game.effects.y;
     if (game.bossScene.y > 0.0f)
         color = mix(color, float3(0.43f, 0.66f, 0.70f), 0.16f);
     if (reveal > 0.0f) {
