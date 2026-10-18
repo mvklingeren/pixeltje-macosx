@@ -277,3 +277,101 @@ private actor AssetPreviewCollector {
     invocation: .init(), traceRunID: UUID())
   #expect(await counter.count == 12)
 }
+
+@Test func retainedAssetCacheSurvivesEngineRecreationAndClear() async throws {
+  func id(_ value: String) -> PipelineNodeID { .init(rawValue: value) }
+  let directory = FileManager.default.temporaryDirectory
+    .appendingPathComponent("pixeltje-persistent-assets-\(UUID().uuidString)")
+  defer { try? FileManager.default.removeItem(at: directory) }
+  let generatorKind = PipelineNodeKind(rawValue: "test.persistentAssetGenerator")
+  let counter = ImageGenerationCounter()
+  let descriptor = PipelineNodeDescriptor(kind: generatorKind,
+    displayName: "Generator", category: "Test",
+    outputs: [.init(name: "image", type: .image)])
+  let executor = PipelineNodeExecutor(kind: generatorKind) { _, _, _ in
+    let count = await counter.next()
+    let image = try PipelineImageInput(width: 1, height: 1,
+      rgba: [Float(count) / 4, 0, 0, 1])
+    return .init(outputs: ["image": PipelineNodeValue(image, type: .image)])
+  }
+  func makeEngine() -> PixeltjePipelineEngine {
+    PixeltjePipelineEngine(persistentAssetCacheDirectory: directory,
+      additionalNodeDescriptors: [descriptor],
+      additionalNodeExecutors: [executor])
+  }
+  var document = PipelineDocument(id: .init(rawValue: "persistent-assets-test"),
+    name: "Persistent assets", mode: .generic,
+    nodes: [
+      PipelineNode(id: id("generator"), kind: generatorKind),
+      PipelineNode(id: id("cache"), kind: .assetCache,
+        parameters: ["slotCount": .integer(1),
+          "keepBetweenRuns": .boolean(true)]),
+      PipelineNode(id: id("output"), kind: .imageOutput),
+    ], connections: [
+      .init(output: .init(nodeID: id("generator"), port: "image"),
+        input: .init(nodeID: id("cache"), port: "asset0")),
+      .init(output: .init(nodeID: id("cache"), port: "asset0"),
+        input: .init(nodeID: id("output"), port: "image")),
+    ], primaryOutputNodeIDs: [id("output")])
+  let first: PipelineExecutionOutput
+  do {
+    let engine = makeEngine()
+    first = try await engine.execute(document, packageRootsByID: [:],
+      invocation: .init(), traceRunID: UUID())
+  }
+  #expect(await counter.count == 1)
+  let engine = makeEngine()
+  let previews = AssetPreviewCollector()
+  let restored = try await engine.execute(document, packageRootsByID: [:],
+    invocation: .init(), progress: { await previews.record($0) },
+    traceRunID: UUID())
+  #expect(restored.image?.planarRGB == first.image?.planarRGB)
+  #expect(await counter.count == 1)
+  #expect(await previews.previews.contains { $0.slot == "asset0" })
+
+  document.nodes[2].title = "Changed consumer"
+  _ = try await engine.execute(document, packageRootsByID: [:],
+    invocation: .init(), traceRunID: UUID())
+  #expect(await counter.count == 1)
+  await engine.clearCachedAssets(for: id("cache"), documentID: document.id)
+  _ = try await engine.execute(document, packageRootsByID: [:],
+    invocation: .init(), traceRunID: UUID())
+  #expect(await counter.count == 2)
+
+  document.nodes[0].title = "Changed input"
+  _ = try await engine.execute(document, packageRootsByID: [:],
+    invocation: .init(), traceRunID: UUID())
+  #expect(await counter.count == 3)
+}
+
+@Test func persistentAssetStoreKeepsDoubleDigitSlotsAndExtensionlessAudio() throws {
+  let directory = FileManager.default.temporaryDirectory
+    .appendingPathComponent("pixeltje-asset-slots-\(UUID().uuidString)")
+  defer { try? FileManager.default.removeItem(at: directory) }
+  let audio = directory.appendingPathComponent("source")
+  try FileManager.default.createDirectory(at: directory,
+    withIntermediateDirectories: true)
+  try Data("audio bytes".utf8).write(to: audio)
+  let image = try PipelineImageInput(width: 1, height: 1,
+    rgba: [0.25, 0.5, 0.75, 1])
+  var slots: [String: PipelineNodeValue] = [:]
+  for index in 0..<12 {
+    slots["asset\(index)"] = PipelineNodeValue(image, type: .image)
+  }
+  slots["asset12"] = PipelineNodeValue(audio, type: .audio)
+  let store = PipelinePersistentAssetStore(root: directory.appendingPathComponent("cache"))
+  let nodeID = PipelineNodeID(rawValue: "many-slots")
+  store.save(PipelineAssetBundle(values: slots), documentID: "workflow",
+    nodeID: nodeID, fingerprint: "inputs")
+  let restored = try #require(store.load(documentID: "workflow",
+    nodeID: nodeID, fingerprint: "inputs"))
+  #expect(restored.bundle.values.count == 13)
+  #expect(restored.bundle["asset10"]?.value(as: PipelineImageInput.self) == image)
+  let restoredAudio = try #require(restored.bundle["asset12"]?.value(as: URL.self))
+  #expect(try Data(contentsOf: restoredAudio) == Data("audio bytes".utf8))
+  #expect(store.load(documentID: "workflow", nodeID: nodeID,
+    fingerprint: "changed inputs") == nil)
+  store.clear(documentID: "workflow", nodeID: nodeID)
+  #expect(store.load(documentID: "workflow", nodeID: nodeID,
+    fingerprint: "inputs") == nil)
+}

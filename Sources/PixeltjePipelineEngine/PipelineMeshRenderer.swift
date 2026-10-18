@@ -281,7 +281,7 @@ actor PipelineMeshRenderer {
         throw PipelineEngineError.invalidInvocation(
           "Metal Render source must contain 1 to 1,048,576 UTF-8 bytes.")
       }
-      return supplied
+      return PipelineMetalEasing.resolving(supplied)
     }
     guard let fileName, !fileName.isEmpty,
       !fileName.contains("/"), !fileName.contains("\\"),
@@ -309,7 +309,7 @@ actor PipelineMeshRenderer {
       throw PipelineEngineError.invalidInvocation(
         "Metal Render source file must contain 1 to 1,048,576 UTF-8 bytes.")
     }
-    return source
+    return PipelineMetalEasing.resolving(source)
   }
 
   private static func previewSize(from invocation: PipelineInvocation) throws

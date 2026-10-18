@@ -1,9 +1,216 @@
 import Foundation
 import IOSurface
+import Metal
 import PixeltjePipelineBaseTestSetRuntime
 import PixeltjePipelineDomain
 @testable import PixeltjePipelineEngine
+import PixeltjePipelineFLUX2Runtime
 import Testing
+
+@Test func abyssalTreasureSystemFontCompilesAndPreparesOutlines() async throws {
+  let examples = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent().deletingLastPathComponent()
+    .deletingLastPathComponent().appendingPathComponent("Examples", isDirectory: true)
+  let document = try PipelineJSON.decode(Data(contentsOf:
+    examples.appendingPathComponent("shader-abyssal-treasure-3d.pixpipeline.json")))
+  let program = try #require(document.nodes.first { $0.id.rawValue == "program-text" }?
+    .parameters["value"]?.stringValue)
+  let source = try String(contentsOf:
+    examples.appendingPathComponent("AbyssalTreasureProgram.metal"), encoding: .utf8)
+  let device = try #require(MTLCreateSystemDefaultDevice())
+  let queue = try #require(device.makeCommandQueue())
+  let runner = PipelineGPUProgram(commandQueue: queue)
+  try await runner.validateLiteral(programJSON: program, source: source)
+
+  let prepared = try PipelineSystemFont.prepare(design: "monospaced", weight: "medium",
+    strings: ["LEVEL CLEAR", "OXYGEN EMPTY", "0", "8"])
+  #expect(prepared.bytes.count > 100)
+  #expect(prepared.fingerprint.contains(prepared.resolvedName))
+  #expect(prepared.fingerprint == (try PipelineSystemFont.prepare(design: "monospaced",
+    weight: "medium", strings: ["LEVEL CLEAR", "OXYGEN EMPTY", "0", "8"])).fingerprint)
+
+  let image = try PipelineImageInput(width: 1, height: 1,
+    rgba: [0.32, 0.48, 0.54, 1])
+  let pixel = PipelineNodeValue(image, type: .image)
+  let assets = PipelineAssetBundle(values: [
+    "asset0": pixel, "asset1": pixel, "asset2": pixel,
+    "asset3": pixel, "asset4": pixel,
+  ])
+  let inputs: [String: PipelineNodeValue] = [
+    "program": .init(program, type: .string),
+    "sourceFile": .init("AbyssalTreasureProgram.metal", type: .string),
+    "assets": .init(assets, type: .assetBundle),
+    "width": .init(Int64(320), type: .integer),
+    "height": .init(Int64(200), type: .integer),
+  ]
+  let node = try #require(document.nodes.first { $0.id.rawValue == "render" })
+  let savedRunID = UUID()
+  let savedContext = PipelineNodeExecutionContext(semanticSHA256: "font-test",
+    invocation: .init(values: [PipelineInvocation.loopCallIndexKey: .integer(0)]),
+    sourceMediaRoot: examples, packageRootsByID: [:], nodeIndex: 0,
+    nodeCount: 1, progress: { _ in }, runID: savedRunID)
+  let executor = PipelineGPUProgram.executor(runner: runner)
+  let savedOutput = try await executor.execute(node, inputs: inputs, context: savedContext)
+  let saved = try #require(savedOutput.outputs["image"]?.value(as: PipelineImageInput.self))
+  #expect(saved.width == 320 && saved.height == 200)
+
+  let liveRunID = UUID()
+  await runner.beginLivePreview(runID: liveRunID, nodeID: node.id)
+  await runner.setPerformanceCapture(runID: liveRunID)
+  let liveContext = PipelineNodeExecutionContext(semanticSHA256: "font-test",
+    invocation: .init(values: [PipelineInvocation.loopCallIndexKey: .integer(0)]),
+    sourceMediaRoot: examples, packageRootsByID: [:], nodeIndex: 0,
+    nodeCount: 1, progress: { _ in }, runID: liveRunID)
+  try await runner.captureLivePreview(node: node, inputs: inputs,
+    context: liveContext)
+  #expect(await runner.livePreview(runID: liveRunID) != nil)
+  let performance = try #require(runner.takePerformance(runID: liveRunID))
+  #expect(performance.previewCopySeconds == 0)
+  await runner.endLivePreview(runID: liveRunID)
+}
+
+@Test func sceneSwitchRunsOnlyActiveGPUProgramAndCommitsRequests() async throws {
+  func id(_ value: String) -> PipelineNodeID { .init(rawValue: value) }
+  let source = """
+  #include <metal_stdlib>
+  using namespace metal;
+  struct Uniforms {
+    float4 resolutionTime; uint4 frameSeed;
+    float4 parameters0; float4 parameters1; float4 parameters2; float4 parameters3;
+    float4 pointer; float4 movement;
+  };
+  kernel void tick(constant Uniforms &u [[buffer(0)]],
+    device uint *counter [[buffer(1)]], device uint *request [[buffer(2)]],
+    uint index [[thread_position_in_grid]]) {
+    if (index != 0) return;
+    counter[0] += 1;
+    if (counter[0] == 2) request[0] = uint(u.parameters0.x);
+  }
+  vertex float4 fullscreenVertex(uint index [[vertex_id]]) {
+    float2 p = float2((index << 1u) & 2u, index & 2u);
+    return float4(p * 2.0f - 1.0f, 0.0f, 1.0f);
+  }
+  fragment float4 sceneFragment(float4 position [[position]],
+    constant Uniforms &u [[buffer(0)]],
+    device const uint *counter [[buffer(1)]]) {
+    return float4(u.parameters0.y, float(counter[0]) * 0.1f, 0.0f, 1.0f);
+  }
+  """
+  let program = """
+  {"version":1,"resources":[{"name":"counter","kind":"buffer","bytes":4},
+  {"name":"request","kind":"buffer","bytes":4},
+  {"name":"display","kind":"texture"}],"initialize":[],
+  "tick":[{"kind":"compute","function":"tick","threads":[1],
+  "buffers":{"1":"counter","2":"request"}}],
+  "present":[{"kind":"render","vertex":"fullscreenVertex",
+  "fragment":"sceneFragment","target":"display","load":"clear",
+  "vertexCount":3,"fragmentBuffers":{"1":"counter"}}],
+  "swaps":[],"output":"display","sceneRequestBuffer":"request",
+  "parameters":["target","tint"]}
+  """
+  func node(_ name: String, _ kind: PipelineNodeKind,
+    _ parameters: [String: PipelineValue] = [:]) -> PipelineNode {
+    .init(id: id(name), kind: kind, parameters: parameters)
+  }
+  func edge(_ source: String, _ output: String,
+    _ target: String, _ input: String) -> PipelineConnection {
+    .init(output: .init(nodeID: id(source), port: output),
+      input: .init(nodeID: id(target), port: input))
+  }
+  let document = PipelineDocument(id: .init(rawValue: "scene-switch-test"),
+    name: "Scene switch test", mode: .textToImage,
+    nodes: [
+      node("source", .primitiveString, ["value": .string(source)]),
+      node("program", .primitiveString, ["value": .string(program)]),
+      node("params0", .primitiveString,
+        ["value": .string("{\"target\":1,\"tint\":0.8}")]),
+      node("params1", .primitiveString,
+        ["value": .string("{\"target\":0,\"tint\":0.2}")]),
+      node("gpu0", .gpuProgram,
+        ["width": .integer(4), "height": .integer(4)]),
+      node("gpu1", .gpuProgram,
+        ["width": .integer(4), "height": .integer(4)]),
+      node("switch", .sceneSwitch,
+        ["sceneCount": .integer(2), "initialScene": .integer(0)]),
+      node("output", .imageOutput),
+    ],
+    connections: [
+      edge("source", "value", "gpu0", "source"),
+      edge("source", "value", "gpu1", "source"),
+      edge("program", "value", "gpu0", "program"),
+      edge("program", "value", "gpu1", "program"),
+      edge("params0", "value", "gpu0", "parameters"),
+      edge("params1", "value", "gpu1", "parameters"),
+      edge("gpu0", "image", "switch", "scene0"),
+      edge("gpu0", "sceneRequest", "switch", "request0"),
+      edge("gpu1", "image", "switch", "scene1"),
+      edge("gpu1", "sceneRequest", "switch", "request1"),
+      edge("switch", "image", "output", "image"),
+    ])
+  let engine = try PixeltjePipelineEngine.makeDefault(
+    additionalNodeExecutors: BaseTestSetPipelineFamily.makeNodeExecutors())
+  #expect((await engine.validate(document)).isValid)
+
+  let runID = UUID()
+  func frame(_ index: Int64) async throws -> PipelineGeneratedImage {
+    let result = try await engine.execute(document, packageRootsByID: [:],
+      invocation: .init(values: [
+        PipelineInvocation.loopCallIndexKey: .integer(index),
+        PipelineInvocation.gpuProgramDeferredCommitKey: .boolean(true),
+      ]), traceRunID: runID)
+    return try #require(result.image)
+  }
+  let first = try await frame(0)
+  #expect(abs(first.planarRGB[0] - 0.8) < 0.02)
+  await engine.commitGPUProgramFrame(runID: runID)
+  let win = try await frame(1)
+  #expect(abs(win.planarRGB[16] - 0.2) < 0.02)
+  await engine.discardGPUProgramFrame(runID: runID)
+  #expect(try await frame(1) == win)
+  await engine.commitGPUProgramFrame(runID: runID)
+  let secondScene = try await frame(2)
+  #expect(abs(secondScene.planarRGB[0] - 0.2) < 0.02)
+  #expect(abs(secondScene.planarRGB[16] - 0.1) < 0.02)
+  await engine.commitGPUProgramFrame(runID: runID)
+  _ = try await frame(3)
+  await engine.commitGPUProgramFrame(runID: runID)
+  let resumed = try await frame(4)
+  #expect(abs(resumed.planarRGB[0] - 0.8) < 0.02)
+  #expect(abs(resumed.planarRGB[16] - 0.3) < 0.02)
+
+  let liveRunID = UUID()
+  await engine.beginLiveMetalPreview(runID: liveRunID, nodeID: id("switch"))
+  var firstSceneRed: Data?
+  for index in Int64(0)...2 {
+    let output = try await engine.updateLiveMetalPreviewState(document,
+      runID: liveRunID, nodeID: id("switch"), packageRootsByID: [:],
+      invocation: .init(values: [PipelineInvocation.loopCallIndexKey: .integer(index)]))
+    #expect(output.image == nil)
+    let preview = try #require(await engine.liveMetalPreview(runID: liveRunID))
+    #expect(preview.width == 4 && preview.height == 4)
+    #expect(IOSurfaceLock(preview.surface, .readOnly, nil) == 0)
+    let red = Data(bytes: IOSurfaceGetBaseAddress(preview.surface), count: 2)
+    IOSurfaceUnlock(preview.surface, .readOnly, nil)
+    if index == 0 { firstSceneRed = red }
+    if index == 2 { #expect(red != firstSceneRed) }
+  }
+  await engine.endLiveMetalPreview(runID: liveRunID)
+}
+
+@Test func signalRangeSceneSwitchExampleValidatesBothMetalPrograms() async throws {
+  let examples = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent().deletingLastPathComponent()
+    .deletingLastPathComponent().appendingPathComponent("Examples", isDirectory: true)
+  let document = try PipelineJSON.decode(Data(contentsOf:
+    examples.appendingPathComponent("shader-signal-range-fps.pixpipeline.json")))
+  let fluxRunner = FLUX2KleinPipelineRunner()
+  let engine = try PixeltjePipelineEngine.makeDefault(
+    additionalNodeDescriptors: [FLUX2KleinPipelineFamily.makeCompositeNodeDescriptor()],
+    additionalNodeExecutors: BaseTestSetPipelineFamily.makeNodeExecutors()
+      + [FLUX2KleinPipelineFamily.makeNodeExecutor(runner: fluxRunner)])
+  let report = await engine.validate(document, sourceMediaRoot: examples)
+  #expect(report.isValid, "\(report.diagnostics)")
+}
 
 @Test func flurryFilePathValidatesAgainstWorkflowFolder() async throws {
   let examples = URL(fileURLWithPath: #filePath)

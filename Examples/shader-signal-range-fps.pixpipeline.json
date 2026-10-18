@@ -1,0 +1,976 @@
+{
+  "connections": [
+    {
+      "id": "primitive-int.value->render.width",
+      "input": {
+        "nodeID": "render",
+        "port": "width"
+      },
+      "output": {
+        "nodeID": "primitive-int",
+        "port": "value"
+      }
+    },
+    {
+      "id": "primitive-int-2.value->render.height",
+      "input": {
+        "nodeID": "render",
+        "port": "height"
+      },
+      "output": {
+        "nodeID": "primitive-int-2",
+        "port": "value"
+      }
+    },
+    {
+      "id": "program-text.value->render.program",
+      "input": {
+        "nodeID": "render",
+        "port": "program"
+      },
+      "output": {
+        "nodeID": "program-text",
+        "port": "value"
+      }
+    },
+    {
+      "id": "shader-text.value->render.sourceFile",
+      "input": {
+        "nodeID": "render",
+        "port": "sourceFile"
+      },
+      "output": {
+        "nodeID": "shader-text",
+        "port": "value"
+      }
+    },
+    {
+      "id": "trackpad.x->render.pointerX",
+      "input": {
+        "nodeID": "render",
+        "port": "pointerX"
+      },
+      "output": {
+        "nodeID": "trackpad",
+        "port": "x"
+      }
+    },
+    {
+      "id": "trackpad.y->render.pointerY",
+      "input": {
+        "nodeID": "render",
+        "port": "pointerY"
+      },
+      "output": {
+        "nodeID": "trackpad",
+        "port": "y"
+      }
+    },
+    {
+      "id": "trackpad.actionCount->render.actionCount",
+      "input": {
+        "nodeID": "render",
+        "port": "actionCount"
+      },
+      "output": {
+        "nodeID": "trackpad",
+        "port": "actionCount"
+      }
+    },
+    {
+      "id": "trackpad.secondaryActionCount->render.secondaryActionCount",
+      "input": {
+        "nodeID": "render",
+        "port": "secondaryActionCount"
+      },
+      "output": {
+        "nodeID": "trackpad",
+        "port": "secondaryActionCount"
+      }
+    },
+    {
+      "id": "direction-pad.x->render.moveX",
+      "input": {
+        "nodeID": "render",
+        "port": "moveX"
+      },
+      "output": {
+        "nodeID": "direction-pad",
+        "port": "x"
+      }
+    },
+    {
+      "id": "direction-pad.y->render.moveY",
+      "input": {
+        "nodeID": "render",
+        "port": "moveY"
+      },
+      "output": {
+        "nodeID": "direction-pad",
+        "port": "y"
+      }
+    },
+    {
+      "id": "prompt-amber.prompt->generate-amber.prompt",
+      "input": {
+        "nodeID": "generate-amber",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-amber",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-amber.seed->generate-amber.seed",
+      "input": {
+        "nodeID": "generate-amber",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-amber",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-amber.image->texture-cache.asset0",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset0"
+      },
+      "output": {
+        "nodeID": "generate-amber",
+        "port": "image"
+      }
+    },
+    {
+      "id": "prompt-cobalt.prompt->generate-cobalt.prompt",
+      "input": {
+        "nodeID": "generate-cobalt",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-cobalt",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-cobalt.seed->generate-cobalt.seed",
+      "input": {
+        "nodeID": "generate-cobalt",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-cobalt",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-cobalt.image->texture-cache.asset1",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset1"
+      },
+      "output": {
+        "nodeID": "generate-cobalt",
+        "port": "image"
+      }
+    },
+    {
+      "id": "prompt-impact.prompt->generate-impact.prompt",
+      "input": {
+        "nodeID": "generate-impact",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-impact",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-impact.seed->generate-impact.seed",
+      "input": {
+        "nodeID": "generate-impact",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-impact",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-impact.image->texture-cache.asset2",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset2"
+      },
+      "output": {
+        "nodeID": "generate-impact",
+        "port": "image"
+      }
+    },
+    {
+      "id": "texture-cache.assets->render.assets",
+      "input": {
+        "nodeID": "render",
+        "port": "assets"
+      },
+      "output": {
+        "nodeID": "texture-cache",
+        "port": "assets"
+      }
+    },
+    {
+      "id": "render.image->scene-switch.scene0",
+      "input": {
+        "nodeID": "scene-switch",
+        "port": "scene0"
+      },
+      "output": {
+        "nodeID": "render",
+        "port": "image"
+      }
+    },
+    {
+      "id": "render.sceneRequest->scene-switch.request0",
+      "input": {
+        "nodeID": "scene-switch",
+        "port": "request0"
+      },
+      "output": {
+        "nodeID": "render",
+        "port": "sceneRequest"
+      }
+    },
+    {
+      "id": "triangle-render.image->scene-switch.scene1",
+      "input": {
+        "nodeID": "scene-switch",
+        "port": "scene1"
+      },
+      "output": {
+        "nodeID": "triangle-render",
+        "port": "image"
+      }
+    },
+    {
+      "id": "triangle-render.sceneRequest->scene-switch.request1",
+      "input": {
+        "nodeID": "scene-switch",
+        "port": "request1"
+      },
+      "output": {
+        "nodeID": "triangle-render",
+        "port": "sceneRequest"
+      }
+    },
+    {
+      "id": "scene-switch.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "scene-switch",
+        "port": "image"
+      }
+    },
+    {
+      "id": "triangle-source.value->triangle-render.sourceFile",
+      "input": {
+        "nodeID": "triangle-render",
+        "port": "sourceFile"
+      },
+      "output": {
+        "nodeID": "triangle-source",
+        "port": "value"
+      }
+    },
+    {
+      "id": "triangle-program.value->triangle-render.program",
+      "input": {
+        "nodeID": "triangle-render",
+        "port": "program"
+      },
+      "output": {
+        "nodeID": "triangle-program",
+        "port": "value"
+      }
+    },
+    {
+      "id": "primitive-int.value->triangle-render.width",
+      "input": {
+        "nodeID": "triangle-render",
+        "port": "width"
+      },
+      "output": {
+        "nodeID": "primitive-int",
+        "port": "value"
+      }
+    },
+    {
+      "id": "primitive-int-2.value->triangle-render.height",
+      "input": {
+        "nodeID": "triangle-render",
+        "port": "height"
+      },
+      "output": {
+        "nodeID": "primitive-int-2",
+        "port": "value"
+      }
+    },
+    {
+      "id": "trackpad.actionCount->triangle-render.actionCount",
+      "input": {
+        "nodeID": "triangle-render",
+        "port": "actionCount"
+      },
+      "output": {
+        "nodeID": "trackpad",
+        "port": "actionCount"
+      }
+    }
+  ],
+  "controlConnections": [
+    {
+      "id": "output.completed->loop.completed",
+      "input": {
+        "nodeID": "loop",
+        "port": "completed"
+      },
+      "output": {
+        "nodeID": "output",
+        "port": "completed"
+      }
+    },
+    {
+      "id": "loop.repeat->start.again",
+      "input": {
+        "nodeID": "start",
+        "port": "again"
+      },
+      "output": {
+        "nodeID": "loop",
+        "port": "repeat"
+      }
+    }
+  ],
+  "exposedParameters": [],
+  "id": "org.pixeltje.examples.signal-range-fps",
+  "mode": "generic",
+  "name": "Signal Range · First-Person Shooter",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "start",
+      "kind": "control.start",
+      "parameters": {},
+      "resources": {},
+      "title": "Start / Next Frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "shader-text",
+      "kind": "primitive.filePath",
+      "parameters": {
+        "mode": "relative",
+        "path": "SignalRangeFPSProgram.metal"
+      },
+      "resources": {},
+      "title": "Signal Range game shader"
+    },
+    {
+      "executionState": "enabled",
+      "id": "render",
+      "kind": "gpu.program",
+      "parameters": {
+        "framesPerSecond": {
+          "$type": "number",
+          "value": 30
+        },
+        "seed": {
+          "$type": "integer",
+          "value": 7421
+        }
+      },
+      "resources": {},
+      "title": "Signal Range · GPU simulation + 3D scene"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.image",
+      "parameters": {
+        "filenamePrefix": "signal-range-fps",
+        "format": "png"
+      },
+      "resources": {},
+      "title": "Game frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "loop",
+      "kind": "control.loop",
+      "parameters": {
+        "autoPause": false,
+        "delayMilliseconds": {
+          "$type": "integer",
+          "value": 0
+        },
+        "feedback": "none",
+        "limitHz": {
+          "$type": "integer",
+          "value": 30
+        },
+        "maxCalls": {
+          "$type": "integer",
+          "value": -1
+        },
+        "seedStrategy": "fixed"
+      },
+      "resources": {},
+      "title": "Live game loop · 30 Hz"
+    },
+    {
+      "executionState": "enabled",
+      "id": "note",
+      "kind": "edit.markdownNote",
+      "parameters": {
+        "text": "# Signal Range · Four-Room First-Person Shooter\nClear the training range by defeating six mechanical spiders before your health reaches zero. Spiders take two hits. Each kill leaves a collapsed body on the floor, while a new spider eventually respawns until the target is met. Green bar: health. Six squares at the top right: defeated spiders. A green centre banner means victory; two seconds later Scene Switch starts a separate GPU Program with a spinning triangle. A red banner means defeat.\n\n**Map:** The starting slate-and-concrete arena and its three adjoining rooms are each 36 × 36 world units, with taller ceilings and wider six-step stairways. The northern room has terrazzo and brick, the eastern room checker tile and plaster, and the western room timber and ribbed metal. A 1.5-unit mirror-chrome cube rotates with eased turns and a gentle wobble in the starting room; its lowest corner stays on the floor as it reflects the surrounding materials and lights. The two central crates and bullet impacts use separate FLUX.2 Klein 4B Distilled material images; Asset Cache generates them once and reuses them during play. Link the same compatible Distilled Core AI package as the other Klein examples if the graph asks for a model.\n\n**Controls:** Run the workflow with Save generated images to disk turned off, then open the Scene Switch full-screen preview. Focus the preview and hold W/S to walk forward/back, A/D to strafe. Move the pointer into the full-screen preview to capture and hide the cursor. Move the mouse or swipe the trackpad to aim without clicking; left/right keeps turning even at the screen edge, and up/down changes pitch. Escape closes the preview and restores the cursor. You can also drag the Trackpad node to set a saved starting view. Only WASD moves the player. Left click fires. After victory, wait for the triangle scene; click there to return to a fresh Signal Range game. Click after defeat to restart. Press Space, J, or right click to jump. The Trackpad card has an Action 2 button for jumping and its Spacebar setting selects Action 2. Movement releases when the preview loses focus.\n\n**Rendering:** The Metal shader ray traces the four enlarged rooms, three stairways, two generated-texture crates, a reflective chrome cube, and three animated mechanical spiders. They face the direction of travel; six articulated legs use independently phased, eased planted and lifted steps, ending in furry three-toed paws. Each spider keeps moving while pursuing, easing from a slow creep into brief faster rushes at its own pace. Its body shifts height slightly even while resting near the player, and its front lifts and rocks as walking starts. The spiders are scaled to 70% size, stay low to the floor, and have a thick tufted brown coat over their bodies, legs, joints, and paws. Eight glossy dark eyes sit in recessed sockets. The same ray geometry serves drawing and hit detection. Each shot shows a short depth-aware tracer, a small impact flash, and the Klein-generated strike texture at its contact point. Spider hits spray bright yellow-green particles; defeated spiders buckle and remain on the ground. Static surface marks fade over time; moving-spider impacts are brief. Floor and wall materials are distinct procedural patterns in each room. Point lights, GGX reflections, and crate shadows shade the scene. Start at 1440 × 900 and 30 Hz; adjust Width, Height and Loop rate if needed. The game runs in the Pipeline Editor.\n\n**Scene handoff:** Signal Range writes scene index 1 to its dedicated GPU request buffer after the victory pause. Scene Switch displays the completed winning frame, then runs only the triangle program on the next Loop call. The triangle writes index 0 when clicked. Each program keeps its own GPU state while inactive; both use the same Trackpad action counter. A stopped or failed frame does not commit a scene change."
+      },
+      "resources": {},
+      "title": "How to play"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 1440
+        }
+      },
+      "resources": {},
+      "title": "Output width"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int-2",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 900
+        }
+      },
+      "resources": {},
+      "title": "Output height"
+    },
+    {
+      "executionState": "enabled",
+      "id": "program-text",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": "{\"version\":1,\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":1280},{\"name\":\"display\",\"kind\":\"texture\"},{\"name\":\"crateATexture\",\"kind\":\"inputTexture\",\"input\":\"asset0\"},{\"name\":\"crateBTexture\",\"kind\":\"inputTexture\",\"input\":\"asset1\"},{\"name\":\"impactTexture\",\"kind\":\"inputTexture\",\"input\":\"asset2\"},{\"name\":\"route\",\"kind\":\"buffer\",\"bytes\":4}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"2\":\"route\"}}],\"present\":[{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"rangeFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"crateATexture\",\"2\":\"crateBTexture\",\"3\":\"impactTexture\"}}],\"swaps\":[],\"output\":\"display\",\"sceneRequestBuffer\":\"route\"}"
+      },
+      "resources": {},
+      "title": "Game state and render passes"
+    },
+    {
+      "executionState": "enabled",
+      "id": "trackpad",
+      "kind": "input.trackpad",
+      "parameters": {
+        "engaged": true,
+        "engagedAtCall": {
+          "$type": "integer",
+          "value": 340
+        },
+        "spaceAction": "secondary",
+        "x": {
+          "$type": "number",
+          "value": 0.5005309725068307
+        },
+        "y": {
+          "$type": "number",
+          "value": 0.5285082726168792
+        }
+      },
+      "resources": {},
+      "title": "Look around · fire and jump"
+    },
+    {
+      "executionState": "enabled",
+      "id": "direction-pad",
+      "kind": "input.directionPad",
+      "parameters": {},
+      "resources": {},
+      "title": "WASD movement"
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-amber",
+      "kind": "input.prompt",
+      "parameters": {
+        "value": "Flat 2D square albedo swatch of weathered amber painted steel, mottled pigment, small paint chips and fine scratches distributed evenly across the entire surface, orthographic material scan under uniform diffuse light. No crate, box, cube, panel outline, corner, frame, rivets, perspective, lettering or cast shadow."
+      },
+      "resources": {},
+      "title": "Amber cargo crate material prompt"
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-amber",
+      "kind": "input.seed",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 7422
+        }
+      },
+      "resources": {},
+      "title": "Amber cargo crate fixed seed"
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-amber",
+      "kind": "coreai.flux2KleinGenerate",
+      "parameters": {
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        },
+        "height": {
+          "$type": "integer",
+          "value": 1024
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 4
+        },
+        "width": {
+          "$type": "integer",
+          "value": 1024
+        }
+      },
+      "resources": {
+        "denoiser": {
+          "reference": {
+            "componentRole": "denoiser",
+            "contentHash": "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI": "flux2-klein-4b-coreai@2",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion": "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state": "linked"
+        },
+        "textEncoder": {
+          "reference": {
+            "componentRole": "textEncoder",
+            "contentHash": "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI": "flux2-klein-4b-coreai@2",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion": "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state": "linked"
+        },
+        "vaeDecoder": {
+          "reference": {
+            "componentRole": "vae",
+            "contentHash": "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI": "flux2-klein-4b-coreai@2",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion": "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state": "linked"
+        }
+      },
+      "title": "Amber cargo crate · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-cobalt",
+      "kind": "input.prompt",
+      "parameters": {
+        "value": "Flat 2D square albedo swatch of worn cobalt blue painted steel, subtle pale geometric stencil fragments, small scuffs and chips distributed evenly across the entire surface, orthographic material scan under uniform diffuse light. No crate, box, cube, panel outline, corner, frame, rivets, perspective, readable text or cast shadow."
+      },
+      "resources": {},
+      "title": "Cobalt cargo crate material prompt"
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-cobalt",
+      "kind": "input.seed",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 7423
+        }
+      },
+      "resources": {},
+      "title": "Cobalt cargo crate fixed seed"
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-cobalt",
+      "kind": "coreai.flux2KleinGenerate",
+      "parameters": {
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        },
+        "height": {
+          "$type": "integer",
+          "value": 1024
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 4
+        },
+        "width": {
+          "$type": "integer",
+          "value": 1024
+        }
+      },
+      "resources": {
+        "denoiser": {
+          "reference": {
+            "componentRole": "denoiser",
+            "contentHash": "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI": "flux2-klein-4b-coreai@2",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion": "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state": "linked"
+        },
+        "textEncoder": {
+          "reference": {
+            "componentRole": "textEncoder",
+            "contentHash": "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI": "flux2-klein-4b-coreai@2",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion": "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state": "linked"
+        },
+        "vaeDecoder": {
+          "reference": {
+            "componentRole": "vae",
+            "contentHash": "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI": "flux2-klein-4b-coreai@2",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion": "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state": "linked"
+        }
+      },
+      "title": "Cobalt cargo crate · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-impact",
+      "kind": "input.prompt",
+      "parameters": {
+        "value": "Square front-facing material texture of one small realistic ballistic impact, centered dark charred puncture with irregular chipped paint and stone rim, fine radial hairline cracks, subtle soot and metallic flecks, high-frequency surface detail, neutral gray tones with a wide plain neutral margin, flat evenly lit orthographic view, no perspective, no object, no border, no text, no cast shadow"
+      },
+      "resources": {},
+      "title": "Detailed bullet impact material prompt"
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-impact",
+      "kind": "input.seed",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 7424
+        }
+      },
+      "resources": {},
+      "title": "Bullet impact fixed seed"
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-impact",
+      "kind": "coreai.flux2KleinGenerate",
+      "parameters": {
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        },
+        "height": {
+          "$type": "integer",
+          "value": 1024
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 4
+        },
+        "width": {
+          "$type": "integer",
+          "value": 1024
+        }
+      },
+      "resources": {
+        "denoiser": {
+          "reference": {
+            "componentRole": "denoiser",
+            "contentHash": "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI": "flux2-klein-4b-coreai@2",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion": "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state": "linked"
+        },
+        "textEncoder": {
+          "reference": {
+            "componentRole": "textEncoder",
+            "contentHash": "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI": "flux2-klein-4b-coreai@2",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion": "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state": "linked"
+        },
+        "vaeDecoder": {
+          "reference": {
+            "componentRole": "vae",
+            "contentHash": "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI": "flux2-klein-4b-coreai@2",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion": "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state": "linked"
+        }
+      },
+      "title": "Bullet impact · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState": "enabled",
+      "id": "texture-cache",
+      "kind": "cache.assets",
+      "parameters": {
+        "keepBetweenRuns": true,
+        "slotCount": {
+          "$type": "integer",
+          "value": 3
+        }
+      },
+      "resources": {},
+      "title": "Klein crate and impact materials · asset cache"
+    },
+    {
+      "id": "triangle-source",
+      "kind": "primitive.filePath",
+      "title": "Spinning triangle Metal source",
+      "parameters": {
+        "mode": "relative",
+        "path": "SpinningTriangleProgram.metal"
+      }
+    },
+    {
+      "id": "triangle-program",
+      "kind": "primitive.string",
+      "title": "Triangle state and render passes",
+      "parameters": {
+        "value": "{\"version\":1,\"resources\":[{\"name\":\"state\",\"kind\":\"buffer\",\"bytes\":16},{\"name\":\"route\",\"kind\":\"buffer\",\"bytes\":4},{\"name\":\"display\",\"kind\":\"texture\"}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeTriangle\",\"threads\":[1],\"buffers\":{\"1\":\"state\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceTriangle\",\"threads\":[1],\"buffers\":{\"1\":\"state\",\"2\":\"route\"}}],\"present\":[{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"triangleFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"state\"}}],\"swaps\":[],\"output\":\"display\",\"sceneRequestBuffer\":\"route\"}"
+      }
+    },
+    {
+      "id": "triangle-render",
+      "kind": "gpu.program",
+      "title": "Spinning triangle · GPU program",
+      "parameters": {
+        "framesPerSecond": {
+          "$type": "number",
+          "value": 30
+        },
+        "seed": {
+          "$type": "integer",
+          "value": 7421
+        }
+      }
+    },
+    {
+      "id": "scene-switch",
+      "kind": "control.sceneSwitch",
+      "title": "Signal Range → Triangle",
+      "parameters": {
+        "sceneCount": {
+          "$type": "integer",
+          "value": 2
+        },
+        "initialScene": {
+          "$type": "integer",
+          "value": 0
+        }
+      }
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "direction-pad": {
+        "x": 798,
+        "y": 885
+      },
+      "loop": {
+        "x": 2180,
+        "y": 540
+      },
+      "note": {
+        "x": 80,
+        "y": 610
+      },
+      "output": {
+        "x": 2180,
+        "y": 210
+      },
+      "primitive-int": {
+        "x": 730,
+        "y": 130
+      },
+      "primitive-int-2": {
+        "x": 730,
+        "y": 280
+      },
+      "program-text": {
+        "x": 80,
+        "y": 30
+      },
+      "render": {
+        "x": 1085,
+        "y": 100
+      },
+      "shader-text": {
+        "x": 82,
+        "y": 325
+      },
+      "start": {
+        "x": 2180,
+        "y": 410
+      },
+      "trackpad": {
+        "x": 740,
+        "y": 470
+      },
+      "prompt-amber": {
+        "x": 100,
+        "y": 1110
+      },
+      "seed-amber": {
+        "x": 100,
+        "y": 1320
+      },
+      "generate-amber": {
+        "x": 400,
+        "y": 1110
+      },
+      "prompt-cobalt": {
+        "x": 860,
+        "y": 1110
+      },
+      "seed-cobalt": {
+        "x": 860,
+        "y": 1320
+      },
+      "generate-cobalt": {
+        "x": 1160,
+        "y": 1110
+      },
+      "texture-cache": {
+        "x": 1690,
+        "y": 1150
+      },
+      "prompt-impact": {
+        "x": 100,
+        "y": 1590
+      },
+      "seed-impact": {
+        "x": 100,
+        "y": 1800
+      },
+      "generate-impact": {
+        "x": 400,
+        "y": 1590
+      },
+      "triangle-source": {
+        "x": 100,
+        "y": 900
+      },
+      "triangle-program": {
+        "x": 100,
+        "y": 1040
+      },
+      "triangle-render": {
+        "x": 1085,
+        "y": 800
+      },
+      "scene-switch": {
+        "x": 1820,
+        "y": 220
+      }
+    },
+    "nodeSizes": {
+      "note": {
+        "height": 440,
+        "width": 500
+      },
+      "program-text": {
+        "height": 225,
+        "width": 610
+      },
+      "render": {
+        "height": 575,
+        "width": 660
+      },
+      "shader-text": {
+        "height": 160,
+        "width": 400
+      },
+      "trackpad": {
+        "height": 360,
+        "width": 300
+      },
+      "triangle-render": {
+        "width": 620,
+        "height": 520
+      },
+      "triangle-program": {
+        "width": 610,
+        "height": 225
+      }
+    },
+    "viewportOrigin": {
+      "x": 259.07641861736033,
+      "y": 61.42721964153789
+    },
+    "viewportScale": 0.603094482421875
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

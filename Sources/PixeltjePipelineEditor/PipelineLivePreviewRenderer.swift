@@ -59,7 +59,7 @@ final class PipelineLivePreviewPresentation: @unchecked Sendable {
       let descriptor = MTLRenderPipelineDescriptor()
       descriptor.vertexFunction = vertex
       descriptor.fragmentFunction = fragment
-      descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+      descriptor.colorAttachments[0].pixelFormat = .rgba16Float
       return try? device.makeRenderPipelineState(descriptor: descriptor)
     }
   }
@@ -134,8 +134,8 @@ final class PipelineLivePreviewLayerRenderer: NSObject, CAMetalDisplayLinkDelega
     self.layer = layer
     super.init()
     layer.device = presentation.device
-    layer.pixelFormat = .bgra8Unorm
-    layer.colorspace = CGColorSpace(name: CGColorSpace.sRGB)
+    layer.pixelFormat = .rgba16Float
+    layer.colorspace = CGColorSpace(name: CGColorSpace.extendedSRGB)
     layer.framebufferOnly = true
     layer.maximumDrawableCount = 3
     layer.isOpaque = true

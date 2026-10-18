@@ -50,6 +50,17 @@ public enum PipelineGraphEditing {
     guard var descriptor = registry.descriptor(for: node.kind) ?? node.importedDescriptor else {
       return nil
     }
+    if node.kind.rawValue == "control.sceneSwitch" {
+      let savedCount: Int64 = if case .integer(let value)? = node.parameters["sceneCount"] {
+        value
+      } else { 2 }
+      for index in 0..<Int(min(max(savedCount, 2), 8)) {
+        descriptor.inputs.append(.init(name: "scene\(index)", type: .image))
+        descriptor.inputs.append(.init(name: "request\(index)", type: .integer,
+          isRequired: false))
+      }
+      return descriptor
+    }
     guard node.kind.rawValue == "cache.assets" else { return descriptor }
     let savedCount: Int64 = if case .integer(let value)? = node.parameters["slotCount"] {
       value

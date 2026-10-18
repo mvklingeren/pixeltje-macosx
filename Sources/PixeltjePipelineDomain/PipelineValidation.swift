@@ -227,6 +227,19 @@ public enum PipelineGraphValidator {
             nodeID: node.id)
         }
       }
+      if node.kind.rawValue == "control.sceneSwitch" {
+        let count: Int64 = if case .integer(let value)? = node.parameters["sceneCount"] {
+          value
+        } else { 2 }
+        let initial: Int64 = if case .integer(let value)? = node.parameters["initialScene"] {
+          value
+        } else { 0 }
+        if !(2...8).contains(count) || !(0..<count).contains(initial) {
+          add(.error, .invalidParameter,
+            "Scene Switch needs 2–8 scenes and an initial scene in that range.",
+            nodeID: node.id)
+        }
+      }
     }
 
     var incomingConnections: [PipelinePortReference: Int] = [:]

@@ -84,11 +84,17 @@ extension PipelineNodeRegistry {
           .init(name: "pointerX", type: .number, isRequired: false),
           .init(name: "pointerY", type: .number, isRequired: false),
           .init(name: "actionCount", type: .number, isRequired: false),
+          .init(name: "secondaryActionCount", type: .number, isRequired: false),
+          .init(name: "moveX", type: .number, isRequired: false),
+          .init(name: "moveY", type: .number, isRequired: false),
           .init(name: "assets", type: .assetBundle, isRequired: false),
           .init(name: "seed", type: .seed, isRequired: false),
           .init(name: "framesPerSecond", type: .number, isRequired: false),
         ] + dimensions,
-        outputs: [.init(name: "image", type: .image)],
+        outputs: [
+          .init(name: "image", type: .image),
+          .init(name: "sceneRequest", type: .integer),
+        ],
         parameters: sizeParameters + [
           .init(name: "framesPerSecond", valueType: .number, defaultValue: .number(60)),
           .init(name: "seed", valueType: .integer, defaultValue: .integer(1)),

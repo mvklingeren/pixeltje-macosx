@@ -34,36 +34,25 @@
       }
     },
     {
-      "id" : "loop.callIndex->spin.a",
+      "id" : "angle.value->timeline.value",
       "input" : {
-        "nodeID" : "spin",
-        "port" : "a"
+        "nodeID" : "timeline",
+        "port" : "value"
       },
       "output" : {
-        "nodeID" : "loop",
-        "port" : "callIndex"
+        "nodeID" : "angle",
+        "port" : "value"
       }
     },
     {
-      "id" : "spin.number->offset.a",
-      "input" : {
-        "nodeID" : "offset",
-        "port" : "a"
-      },
-      "output" : {
-        "nodeID" : "spin",
-        "port" : "number"
-      }
-    },
-    {
-      "id" : "offset.number->world.rotationY",
+      "id" : "timeline.value->world.rotationY",
       "input" : {
         "nodeID" : "world",
         "port" : "rotationY"
       },
       "output" : {
-        "nodeID" : "offset",
-        "port" : "number"
+        "nodeID" : "timeline",
+        "port" : "value"
       }
     },
     {
@@ -250,27 +239,53 @@
     },
     {
       "executionState" : "enabled",
-      "id" : "spin",
-      "kind" : "math.expression",
+      "id" : "angle",
+      "kind" : "primitive.float",
       "parameters" : {
-        "expression" : "a*5"
-      },
-      "resources" : {
-
-      },
-      "title" : "Spin: 5 degrees per frame"
-    },
-    {
-      "executionState" : "enabled",
-      "id" : "offset",
-      "kind" : "math.expression",
-      "parameters" : {
-        "expression" : "a+35"
+        "value" : {
+          "$type" : "number",
+          "value" : 35
+        }
       },
       "resources" : {
 
       },
       "title" : "Starting Y angle: 35 degrees"
+    },
+    {
+      "executionState" : "enabled",
+      "id" : "timeline",
+      "kind" : "control.timeline",
+      "parameters" : {
+        "frameCount" : {
+          "$type" : "integer",
+          "value" : 72
+        },
+        "framesPerSecond" : {
+          "$type" : "number",
+          "value" : 30
+        },
+        "tracks" : [
+          {
+            "path" : "",
+            "interpolation" : "easeInOut",
+            "keyframes" : [
+              {
+                "frame" : { "$type" : "integer", "value" : 0 },
+                "value" : { "$type" : "number", "value" : 35 }
+              },
+              {
+                "frame" : { "$type" : "integer", "value" : 71 },
+                "value" : { "$type" : "number", "value" : 395 }
+              }
+            ]
+          }
+        ]
+      },
+      "resources" : {
+
+      },
+      "title" : "Ease one revolution"
     },
     {
       "executionState" : "enabled",
@@ -402,21 +417,22 @@
         "feedback" : "none",
         "maxCalls" : {
           "$type" : "integer",
-          "value" : -1
+          "value" : 72
         },
+        "autoRepeat" : true,
         "seedStrategy" : "fixed"
       },
       "resources" : {
 
       },
-      "title" : "Spin until Cancel"
+      "title" : "Repeat eased revolutions"
     },
     {
       "executionState" : "enabled",
       "id" : "note",
       "kind" : "edit.markdownNote",
       "parameters" : {
-        "text" : "# Spinning cube\nRun Pipeline (Command-Return) to spin; Cancel stops the loop. Eight XYZ vertices and twelve counterclockwise triangles define a unit cube. Mesh from Vertices computes flat face normals. Each frame uses rotation Y = 35 + callIndex * 5 degrees with a fixed 25-degree X tilt. Camera Matrices looks from (0,0,4) toward the origin. Metal Render uses projection × view × world and outputs a transparent, antialiased sRGB image plus a separate coverage mask. Image Preview updates each frame; Image Output saves PNG frames. The 33 ms delay starts after rendering and saving, so this is workflow animation, not guaranteed 30 fps playback. Loop is Infinite by default; set Max calls to 72 for one revolution."
+        "text" : "# Spinning cube\nRun Pipeline (Command-Return) to spin; Cancel stops the loop. Eight XYZ vertices and twelve counterclockwise triangles define a unit cube. Mesh from Vertices computes flat face normals. Timeline eases Y rotation from 35 to 395 degrees over 72 frames; Loop auto-repeats that cycle. A fixed 25-degree X tilt remains. Camera Matrices looks from (0,0,4) toward the origin. Metal Render uses projection × view × world and outputs a transparent, antialiased sRGB image plus a separate coverage mask. Image Preview updates each frame; Image Output saves PNG frames. The 33 ms delay starts after rendering and saving, so this is workflow animation, not guaranteed 30 fps playback. Turn off Auto repeat to stop after one revolution."
       },
       "resources" : {
 
@@ -453,7 +469,7 @@
         "x" : 0,
         "y" : 1230
       },
-      "offset" : {
+      "timeline" : {
         "x" : 320,
         "y" : 600
       },
@@ -469,7 +485,7 @@
         "x" : 970,
         "y" : 220
       },
-      "spin" : {
+      "angle" : {
         "x" : 320,
         "y" : 440
       },
