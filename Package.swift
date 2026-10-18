@@ -281,6 +281,7 @@ let package = Package(
       path: "Sources/PixeltjePipelineEditor",
       linkerSettings: [
         .linkedFramework("AppKit"),
+        .linkedFramework("AVFoundation"),
         .linkedFramework("AVKit"),
         .linkedFramework("Combine"),
         .linkedFramework("SwiftUI"),
@@ -387,6 +388,7 @@ let package = Package(
       dependencies: [
         "PixeltjePipelineComfyUIConverter", "PixeltjePipelineDomain", "PixeltjePipelineEngine",
         "PixeltjePipelineBaseTestSetRuntime", "PixeltjePipelineFLUX2Runtime",
+        "PixeltjePipelineStableAudioRuntime",
         "PixeltjePipelineResourceLinking", "PixeltjePipelineSegmentationRuntime",
         "PixeltjePipelineSDXSRuntime", "PixeltjePipelineTextRuntime",
         "PixeltjePipelineTrainingRuntime",

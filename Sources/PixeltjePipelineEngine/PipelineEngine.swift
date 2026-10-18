@@ -305,6 +305,11 @@ public actor PixeltjePipelineEngine {
     await assetCache.end(runID: runID)
   }
 
+  /// Audio requested by the last successfully committed live GPU frame.
+  public func takeLiveMetalAudioEvents(runID: UUID) async -> [URL] {
+    await gpuProgram?.takeLiveAudioEvents(runID: runID) ?? []
+  }
+
   public func clearCachedAssets(for nodeID: PipelineNodeID,
     documentID: PipelineID? = nil) async {
     await assetCache.clear(nodeID, documentID: documentID?.rawValue)

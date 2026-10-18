@@ -49,6 +49,10 @@ actor PipelineGPUProgram {
       let vertexTextures: [String: String]?
       let fragmentTextures: [String: String]?
     }
+    struct AudioEvent: Decodable {
+      let buffer: String
+      let asset: String
+    }
     let version: Int
     let resources: [Resource]
     let initialize: [Pass]
@@ -57,6 +61,7 @@ actor PipelineGPUProgram {
     let swaps: [[String]]
     let output: String
     let sceneRequestBuffer: String?
+    let audioEvents: [AudioEvent]?
     let parameters: [String]?
   }
 
@@ -113,6 +118,8 @@ actor PipelineGPUProgram {
   private let queue: any MTLCommandQueue
   private var committed: [PipelineNodeID: Session] = [:]
   private var pending: [PipelineNodeID: Session] = [:]
+  private var pendingAudioEvents: [PipelineNodeID: (runID: UUID?, urls: [URL])] = [:]
+  private var committedAudioEvents: [URL] = []
   private var cachedLibrary: (source: String, library: any MTLLibrary)?
   private var computePipelines: [String: any MTLComputePipelineState] = [:]
   private var renderPipelines: [String: any MTLRenderPipelineState] = [:]
@@ -186,6 +193,10 @@ actor PipelineGPUProgram {
     for (nodeID, session) in matching {
       committed[nodeID] = session
       pending[nodeID] = nil
+      if let event = pendingAudioEvents.removeValue(forKey: nodeID),
+        event.runID == runID, liveRunID == runID {
+        committedAudioEvents.append(contentsOf: event.urls)
+      }
     }
     if !matching.isEmpty, liveRunID == runID, let pendingLiveTickNanoseconds {
       lastLiveTickNanoseconds = pendingLiveTickNanoseconds
@@ -195,6 +206,7 @@ actor PipelineGPUProgram {
 
   func discard(runID: UUID?) {
     pending = pending.filter { $0.value.identity.runID != runID }
+    pendingAudioEvents = pendingAudioEvents.filter { $0.value.runID != runID }
     pendingLiveTickNanoseconds = nil
   }
 
@@ -205,6 +217,7 @@ actor PipelineGPUProgram {
     livePointer = nil
     lastLiveTickNanoseconds = nil
     pendingLiveTickNanoseconds = nil
+    committedAudioEvents = []
   }
 
   func updateLivePointer(runID: UUID, nodeID: PipelineNodeID,
@@ -227,6 +240,13 @@ actor PipelineGPUProgram {
     livePointer = nil
     lastLiveTickNanoseconds = nil
     pendingLiveTickNanoseconds = nil
+    committedAudioEvents = []
+  }
+
+  func takeLiveAudioEvents(runID: UUID) -> [URL] {
+    guard liveRunID == runID else { return [] }
+    defer { committedAudioEvents = [] }
+    return committedAudioEvents
   }
 
   func livePreview(runID: UUID) -> PipelineMetalPreviewFrame? {
@@ -334,6 +354,16 @@ actor PipelineGPUProgram {
     var inputImages: [String: PipelineImageInput] = [:]
     var inputImageHashes: [String: String] = [:]
     let assets = inputs["assets"]?.value(as: PipelineAssetBundle.self)
+    var audioAssets: [String: URL] = [:]
+    for event in definition.audioEvents ?? [] {
+      guard let value = assets?[event.asset], value.type == .audio,
+        let url = value.value(as: URL.self)
+          ?? value.value(as: PipelineGeneratedAudio.self)?.fileURL else {
+        throw PipelineEngineError.invalidInvocation(
+          "GPU Program needs audio asset \(event.asset).")
+      }
+      audioAssets[event.asset] = url
+    }
     if let assets, let cachedAssetHashes, cachedAssetHashes.bundleID == assets.id {
       inputImageHashes = cachedAssetHashes.hashes
     }
@@ -479,6 +509,11 @@ actor PipelineGPUProgram {
         case .buffer(let buffer)? = working.resources[name] {
         buffer.contents().storeBytes(of: UInt32.max, as: UInt32.self)
       }
+      for event in definition.audioEvents ?? [] {
+        if case .buffer(let buffer)? = working.resources[event.buffer] {
+          buffer.contents().storeBytes(of: UInt32.zero, as: UInt32.self)
+        }
+      }
       let includesPresent = definition.swaps.isEmpty && index == frame
       try await encode(includesPresent ? definition.tick + definition.present : definition.tick,
         library: library,
@@ -508,6 +543,17 @@ actor PipelineGPUProgram {
     } else {
       sceneRequest = -1
     }
+    var audioEventURLs: [URL] = []
+    for event in definition.audioEvents ?? [] {
+      guard case .buffer(let buffer)? = working.resources[event.buffer],
+        let url = audioAssets[event.asset] else { continue }
+      let count = buffer.contents().load(as: UInt32.self)
+      guard count <= 8 else {
+        throw PipelineEngineError.invalidInvocation(
+          "GPU Program audio event count must be at most 8 per frame.")
+      }
+      audioEventURLs.append(contentsOf: repeatElement(url, count: Int(count)))
+    }
     guard case .texture(let output)? = working.resources[definition.output] else {
       throw PipelineEngineError.invalidInvocation("GPU Program output is not a texture.")
     }
@@ -531,6 +577,7 @@ actor PipelineGPUProgram {
     }
     try Task.checkCancellation()
     pending[node.id] = working
+    pendingAudioEvents[node.id] = (context.runID, audioEventURLs)
     pendingLiveTickNanoseconds = liveTickNanoseconds
     if var sample = currentPerformance, let runID = context.runID {
       sample.renderSeconds = Self.seconds(since: renderStartedAt)
@@ -724,6 +771,16 @@ actor PipelineGPUProgram {
         resource.kind == "buffer", resource.bytes == 4 else {
         throw fail("sceneRequestBuffer must name a dedicated 4-byte buffer.")
       }
+    }
+    let audioEvents = program.audioEvents ?? []
+    guard audioEvents.count <= 8,
+      Set(audioEvents.map(\.buffer)).count == audioEvents.count,
+      audioEvents.allSatisfy({ event in
+        identifier(event.asset) && kinds[event.buffer] == "buffer"
+          && program.resources.first(where: { $0.name == event.buffer })?.bytes == 4
+          && event.buffer != program.sceneRequestBuffer
+      }) else {
+      throw fail("audio events need distinct dedicated 4-byte buffers and asset names.")
     }
     guard program.present.contains(where: {
       $0.kind == "render" && $0.target == program.output

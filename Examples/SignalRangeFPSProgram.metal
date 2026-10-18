@@ -634,6 +634,7 @@ float2 moveSpider(float2 position, float2 step, uint self,
 kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     device GameState *states [[buffer(1)]],
     device uint *sceneRequest [[buffer(2)]],
+    device uint *shotAudioEvent [[buffer(3)]],
     uint id [[thread_position_in_grid]]) {
     if (id != 0u) return;
     device GameState &game = states[0];
@@ -780,6 +781,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
             game.view.z = 0.22f;
             game.view.w = 0.11f;
             game.progress.y += 1u;
+            shotAudioEvent[0] = 1u;
             float3 shotDirection = forwardVector(game.player.w, game.view.x);
             float3 normal;
             float3 impactNormal = -shotDirection;

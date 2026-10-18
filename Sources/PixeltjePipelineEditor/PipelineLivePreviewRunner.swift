@@ -122,6 +122,7 @@ actor PipelineLivePreviewRunner {
     let endAutoPause: @Sendable () async -> Void
     /// Reports the pixel size of the first frame and of any resized frame.
     let frameSizeChanged: @Sendable (CGSize) async -> Void
+    let playAudioEvent: @Sendable (URL) async -> Void
   }
 
   private let configuration: Configuration
@@ -197,6 +198,11 @@ actor PipelineLivePreviewRunner {
         sourceMediaRoot: configuration.sourceMediaRoot,
         packageRootsByID: configuration.packageRoots, invocation: invocation,
         progress: progressHandler(timings: callbackTimings))
+      for url in await configuration.engine.takeLiveMetalAudioEvents(
+        runID: configuration.executionID) {
+        let playAudioEvent = host.playAudioEvent
+        Task { await playAudioEvent(url) }
+      }
       let engineCompletedAt = DispatchTime.now().uptimeNanoseconds
       // A GPU Program completes its surface within the call. Shader-state
       // previews are drawn per display refresh by the render pump instead,

@@ -5,6 +5,7 @@ import PixeltjePipelineBaseTestSetRuntime
 import PixeltjePipelineDomain
 @testable import PixeltjePipelineEngine
 import PixeltjePipelineFLUX2Runtime
+import PixeltjePipelineStableAudioRuntime
 import Testing
 
 @Test func abyssalTreasureSystemFontCompilesAndPreparesOutlines() async throws {
@@ -204,10 +205,13 @@ import Testing
   let document = try PipelineJSON.decode(Data(contentsOf:
     examples.appendingPathComponent("shader-signal-range-fps.pixpipeline.json")))
   let fluxRunner = FLUX2KleinPipelineRunner()
+  let audioRunner = StableAudio3Runner()
   let engine = try PixeltjePipelineEngine.makeDefault(
-    additionalNodeDescriptors: [FLUX2KleinPipelineFamily.makeCompositeNodeDescriptor()],
+    additionalNodeDescriptors: [FLUX2KleinPipelineFamily.makeCompositeNodeDescriptor(),
+      StableAudio3Family.descriptor()],
     additionalNodeExecutors: BaseTestSetPipelineFamily.makeNodeExecutors()
-      + [FLUX2KleinPipelineFamily.makeNodeExecutor(runner: fluxRunner)])
+      + [FLUX2KleinPipelineFamily.makeNodeExecutor(runner: fluxRunner),
+        StableAudio3Family.executor(runner: audioRunner)])
   let report = await engine.validate(document, sourceMediaRoot: examples)
   #expect(report.isValid, "\(report.diagnostics)")
 }

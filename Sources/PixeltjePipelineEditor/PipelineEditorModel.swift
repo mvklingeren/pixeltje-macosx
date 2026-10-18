@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Combine
 import Foundation
 import PixeltjePipelineComfyUIConverter
@@ -126,6 +127,8 @@ final class PipelineEditorModel: ObservableObject {
   @Published private(set) var nodeImagePreviews: [PipelineNodeID: NSImage] = [:]
   @Published private(set) var cacheAssetImages: [PipelineNodeID: [String: NSImage]] = [:]
   @Published private(set) var cacheAssetAudioURLs: [PipelineNodeID: [String: URL]] = [:]
+  private var liveAudioData: [URL: Data] = [:]
+  private var liveAudioPlayers: [AVAudioPlayer] = []
   @Published private(set) var nodeTextValues: [PipelineNodeID: String] = [:]
   /// Size of the live preview's newest frame, set once a frame exists. The
   /// frames themselves reach preview views through `livePreview`.
@@ -3424,6 +3427,9 @@ final class PipelineEditorModel: ObservableObject {
         endAutoPause: { [weak self] in await self?.endLiveAutoPause(executionID: executionID) },
         frameSizeChanged: { [weak self] size in
           await self?.liveMetalPreviewSizeChanged(size, nodeID: liveNodeID)
+        },
+        playAudioEvent: { [weak self] url in
+          await self?.playLiveAudioEvent(url, executionID: executionID)
         }),
       controls: liveRun.controls, telemetry: liveRun.telemetry,
       progressBuffer: liveRun.progress, source: liveRun.source,
@@ -3487,6 +3493,28 @@ final class PipelineEditorModel: ObservableObject {
     clearDirectionKeys()
     liveRun.samplerTask?.cancel()
     self.liveRun = nil
+    liveAudioPlayers = []
+    liveAudioData = [:]
+  }
+
+  private func playLiveAudioEvent(_ url: URL, executionID: UUID) {
+    guard activeExecutionID == executionID,
+      FileManager.default.fileExists(atPath: url.path) else { return }
+    do {
+      let data: Data
+      if let cached = liveAudioData[url] { data = cached }
+      else {
+        data = try Data(contentsOf: url)
+        liveAudioData[url] = data
+      }
+      liveAudioPlayers.removeAll { !$0.isPlaying }
+      let player = try AVAudioPlayer(data: data)
+      player.prepareToPlay()
+      guard player.play() else { return }
+      liveAudioPlayers.append(player)
+    } catch {
+      statusMessage = "Could not play sound: \(error.localizedDescription)"
+    }
   }
 
   /// Publishes a live run's progress at a rate SwiftUI can follow, rather
