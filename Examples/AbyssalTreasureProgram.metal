@@ -1,3 +1,4 @@
+// pixeltje:3d-v1
 #include <metal_stdlib>
 using namespace metal;
 
@@ -102,13 +103,8 @@ float3 cachePosition(uint level, uint index) {
     return float3(xz.x, floorHeight(xz, level) + 1.4f, xz.y);
 }
 
-float3 headingVector(float yaw, float pitch) {
-    return float3(sin(yaw) * cos(pitch), sin(pitch),
-        -cos(yaw) * cos(pitch));
-}
-
 float3 submarineLampMount(device const VoyageState &game, float side) {
-    float3 forward = headingVector(game.positionYaw.w,
+    float3 forward = pixeltje_3d::forward(game.positionYaw.w,
         game.velocityPitch.w);
     float3 right = normalize(cross(forward, float3(0.0f, 1.0f, 0.0f)));
     float3 up = normalize(cross(right, forward));
@@ -117,7 +113,7 @@ float3 submarineLampMount(device const VoyageState &game, float side) {
 }
 
 float3 submarineLampDirection(device const VoyageState &game, float side) {
-    float3 forward = headingVector(game.positionYaw.w,
+    float3 forward = pixeltje_3d::forward(game.positionYaw.w,
         game.velocityPitch.w);
     float3 right = normalize(cross(forward, float3(0.0f, 1.0f, 0.0f)));
     float3 up = normalize(cross(right, forward));
@@ -204,7 +200,8 @@ kernel void advanceVoyage(constant ProgramUniforms &u [[buffer(0)]],
         - stick.y * 0.76f * steering * dt,
         game.progress.w == 0u ? -1.32f : -0.82f,
         game.progress.w == 0u ? 1.32f : 0.72f);
-    float3 forward = headingVector(game.positionYaw.w, game.velocityPitch.w);
+    float3 forward = pixeltje_3d::forward(
+        game.positionYaw.w, game.velocityPitch.w);
     float3 desired = forward * clamp(u.parameters0.x, 2.0f, 10.0f);
     game.velocityPitch.xyz = mix(game.velocityPitch.xyz, desired,
         min(1.0f, dt * 2.3f));
@@ -337,13 +334,9 @@ struct Hit {
 };
 
 Ray cameraRay(float2 uv, float2 resolution, device const VoyageState &game) {
-    float3 forward = headingVector(game.positionYaw.w, game.velocityPitch.w);
-    float3 right = normalize(cross(forward, float3(0.0f, 1.0f, 0.0f)));
-    float3 up = cross(right, forward);
-    float2 screen = (uv - 0.5f) * resolution / resolution.y;
-    float focal = 1.02f;
     Ray ray = {game.positionYaw.xyz,
-        normalize(forward * focal + right * screen.x - up * screen.y)};
+        pixeltje_3d::cameraDirection(uv, resolution,
+            game.positionYaw.w, game.velocityPitch.w, 1.02f)};
     return ray;
 }
 
@@ -380,46 +373,21 @@ void addFloor(thread Hit &hit, Ray ray, uint level) {
 
 void addSphere(thread Hit &hit, Ray ray, float3 center, float3 radius,
     float3 albedo, float emission, uint material) {
-    float3 o = (ray.origin - center) / radius;
-    float3 d = ray.direction / radius;
-    float a = dot(d, d);
-    float b = dot(o, d);
-    float c = dot(o, o) - 1.0f;
-    float disc = b * b - a * c;
-    if (disc < 0.0f) return;
-    float root = sqrt(disc);
-    float t = (-b - root) / a;
-    if (t < 0.02f) t = (-b + root) / a;
+    float3 normal;
+    float t = pixeltje_3d::rayEllipsoid(ray.origin, ray.direction,
+        center, radius, 0.02f, normal);
     if (t > 0.02f && t < hit.t) {
-        float3 p = ray.origin + ray.direction * t;
-        float3 n = normalize((p - center) / (radius * radius));
-        hit = {t, n, albedo, emission, material};
+        hit = {t, normal, albedo, emission, material};
     }
 }
 
 void addBox(thread Hit &hit, Ray ray, float3 lower, float3 upper,
     float3 albedo, float emission, uint material) {
-    float3 safe = select(ray.direction, float3(0.00001f),
-        abs(ray.direction) < float3(0.00001f));
-    float3 a = (lower - ray.origin) / safe;
-    float3 b = (upper - ray.origin) / safe;
-    float3 entry = min(a, b);
-    float3 exit = max(a, b);
-    float near = max(entry.x, max(entry.y, entry.z));
-    float far = min(exit.x, min(exit.y, exit.z));
-    if (far < max(near, 0.02f)) return;
-    float t = near > 0.02f ? near : far;
-    if (t >= hit.t) return;
-    float3 p = ray.origin + t * ray.direction;
-    float3 mid = (lower + upper) * 0.5f;
-    float3 edge = abs((p - mid) / max((upper - lower) * 0.5f,
-        float3(0.001f)));
-    float3 n = edge.x > edge.y && edge.x > edge.z
-        ? float3(sign(p.x - mid.x), 0.0f, 0.0f)
-        : edge.y > edge.z
-            ? float3(0.0f, sign(p.y - mid.y), 0.0f)
-            : float3(0.0f, 0.0f, sign(p.z - mid.z));
-    hit = {t, n, albedo, emission, material};
+    float3 normal;
+    float t = pixeltje_3d::rayBox(ray.origin, ray.direction,
+        lower, upper, 0.02f, normal);
+    if (t > 0.0f && t < hit.t)
+        hit = {t, normal, albedo, emission, material};
 }
 
 void addCylinder(thread Hit &hit, Ray ray, float2 xz, float bottom,
@@ -672,8 +640,7 @@ float3 textureAlbedo(texture2d<float> image, float2 uv) {
     float4 sample = image.sample(materialSampler, uv);
     float3 srgb = clamp(sample.rgb / max(sample.a, 0.001f),
         float3(0.0f), float3(1.0f));
-    return select(pow((srgb + 0.055f) / 1.055f,
-        float3(2.4f)), srgb / 12.92f, srgb <= 0.04045f);
+    return pixeltje_3d::srgbToLinear(srgb);
 }
 
 void addSurface(thread Hit &hit, Ray ray, float time) {
@@ -1039,7 +1006,7 @@ void addWorldObjects(thread Hit &hit, Ray ray, device const VoyageState &game,
 
     {
         // The two forward-facing searchlights stay attached to the hull.
-        float3 forward = headingVector(game.positionYaw.w,
+        float3 forward = pixeltje_3d::forward(game.positionYaw.w,
             game.velocityPitch.w);
         float3 right = normalize(cross(forward, float3(0.0f, 1.0f, 0.0f)));
         float3 up = normalize(cross(right, forward));
@@ -1111,8 +1078,7 @@ float3 evaluateBRDF(float3 baseColor, float roughness, float metallic,
         / (nDotL + sqrt(alpha2 + (1.0f - alpha2) * nDotL * nDotL));
     float geometry = maskingV * maskingL;
     float3 f0 = mix(float3(0.04f), baseColor, metallic);
-    float fresnelFactor = pow(1.0f - vDotH, 5.0f);
-    float3 fresnel = f0 + (float3(1.0f) - f0) * fresnelFactor;
+    float3 fresnel = pixeltje_3d::fresnelSchlick(vDotH, f0);
     float3 specular = distribution * geometry * fresnel
         / max(4.0f * nDotV * nDotL, 0.0001f);
     float3 diffuse = (float3(1.0f) - fresnel)
@@ -1771,10 +1737,7 @@ fragment float4 voyageFragment(ScreenVertex in [[stage_in]],
     // Filmic mapping keeps bright point-light highlights while preserving
     // the much darker water in the deep map.
     float3 hdr = max(color, float3(0.0f)) * 1.15f;
-    float3 mapped = clamp((hdr * (2.51f * hdr + 0.03f))
-        / (hdr * (2.43f * hdr + 0.59f) + 0.14f),
-        float3(0.0f), float3(1.0f));
-    float3 srgb = select(1.055f * pow(mapped, float3(1.0f / 2.4f))
-        - 0.055f, 12.92f * mapped, mapped <= 0.0031308f);
+    float3 mapped = pixeltje_3d::filmicToneMap(hdr);
+    float3 srgb = pixeltje_3d::linearToSRGB(mapped);
     return float4(clamp(srgb, float3(0.0f), float3(1.0f)), 1.0f);
 }

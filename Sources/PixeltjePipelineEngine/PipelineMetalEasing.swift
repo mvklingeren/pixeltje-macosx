@@ -1,18 +1,14 @@
 import Foundation
 
-/// Versioned Metal helpers included only when a shader opts in on its first line.
-/// The resolved source is used for validation, compilation, and cache identity.
+/// Cubic easing functions for the opt-in Metal source library.
 enum PipelineMetalEasing {
   static let marker = "// pixeltje:easing-v1"
 
   static func resolving(_ source: String) -> String {
-    guard source.hasPrefix(marker + "\n") || source.hasPrefix(marker + "\r\n") else {
-      return source
-    }
-    return library + "\n" + source
+    PipelineMetalLibraries.resolving(source)
   }
 
-  private static let library = """
+  static let library = """
     #include <metal_stdlib>
     namespace pixeltje_easing {
       inline float unit(float t) {

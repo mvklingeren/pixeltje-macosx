@@ -25,3 +25,30 @@ import Testing
   let library = try device.makeLibrary(source: resolved, options: nil)
   #expect(library.makeFunction(name: "sampleEasing") != nil)
 }
+
+@Test func stackedMetalLibrariesCompileAndKeepOptInLocal() throws {
+  let source = """
+    // pixeltje:3d-v1
+    // pixeltje:easing-v1
+    #include <metal_stdlib>
+    kernel void sample3D(device float4 *results [[buffer(0)]],
+                         uint index [[thread_position_in_grid]]) {
+      float3 forward = pixeltje_3d::forward(0.0f, 0.0f);
+      float3 ray = pixeltje_3d::cameraDirection(float2(0.5f),
+        float2(160.0f, 90.0f), 0.0f, 0.0f, 1.0f);
+      float3 normal;
+      float hit = pixeltje_3d::rayBox(float3(0.0f, 0.0f, 2.0f), ray,
+        float3(-1.0f), float3(1.0f), 0.01f, normal);
+      results[index] = float4(forward.z, hit, normal.z,
+        pixeltje_easing::easeInOut(0.5f));
+    }
+    """
+  let resolved = PipelineMetalLibraries.resolving(source)
+  #expect(resolved.contains("namespace pixeltje_3d"))
+  #expect(resolved.contains("namespace pixeltje_easing"))
+  #expect(PipelineMetalLibraries.resolving("#include <metal_stdlib>\n")
+    == "#include <metal_stdlib>\n")
+  let device = try #require(MTLCreateSystemDefaultDevice())
+  let library = try device.makeLibrary(source: resolved, options: nil)
+  #expect(library.makeFunction(name: "sample3D") != nil)
+}

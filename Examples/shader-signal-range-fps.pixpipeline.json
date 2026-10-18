@@ -362,6 +362,72 @@
         "nodeID": "generate-gunshot",
         "port": "audio"
       }
+    },
+    {
+      "id": "prompt-scare.prompt->generate-scare.prompt",
+      "input": {
+        "nodeID": "generate-scare",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-scare",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-scare.seed->generate-scare.seed",
+      "input": {
+        "nodeID": "generate-scare",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-scare",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-scare.audio->texture-cache.asset4",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset4"
+      },
+      "output": {
+        "nodeID": "generate-scare",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-launch.prompt->generate-launch.prompt",
+      "input": {
+        "nodeID": "generate-launch",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-launch",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-launch.seed->generate-launch.seed",
+      "input": {
+        "nodeID": "generate-launch",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-launch",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-launch.audio->texture-cache.asset5",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset5"
+      },
+      "output": {
+        "nodeID": "generate-launch",
+        "port": "audio"
+      }
     }
   ],
   "controlConnections": [
@@ -469,7 +535,7 @@
       "id": "note",
       "kind": "edit.markdownNote",
       "parameters": {
-        "text": "# Signal Range · Four-Room First-Person Shooter\nClear the training range by defeating the three mechanical spiders before your health reaches zero. Spiders take two hits. Each kill leaves a collapsed body on the floor; the spiders do not respawn. Green bar: health. Three squares at the top right: defeated spiders. A green centre banner means victory; two seconds later Scene Switch starts a separate GPU Program with a spinning triangle. A red banner means defeat.\n\n**Map:** The starting slate-and-concrete arena and its three adjoining rooms are each 36 × 36 world units, with taller ceilings and wider six-step stairways. The northern room has terrazzo and brick, the eastern room checker tile and plaster, and the western room timber and ribbed metal. A 1.5-unit mirror-chrome cube rotates with eased turns and a gentle wobble in the starting room; its lowest corner stays on the floor as it reflects the surrounding materials and lights. The two central crates and bullet impacts use separate FLUX.2 Klein 4B Distilled material images. Stable Audio 3 Small SFX generates a gunshot. Asset Cache holds all four assets between runs and launches. Link the compatible Klein and Stable Audio 3 Core AI packages if the graph asks for models.\n\n**Controls:** Run the workflow with Save generated images to disk turned off, then open the Scene Switch full-screen preview. Focus the preview and hold W/S to walk forward/back, A/D to strafe. Move the pointer into the full-screen preview to capture and hide the cursor. Move the mouse or swipe the trackpad to aim without clicking; left/right keeps turning even at the screen edge, and up/down changes pitch. Escape closes the preview and restores the cursor. You can also drag the Trackpad node to set a saved starting view. Only WASD moves the player. Left click fires and plays the cached gunshot when a shot passes the fire cooldown. After victory, wait for the triangle scene; clicks during the victory pause do not restart the range. Click the triangle scene to return to a fresh Signal Range game. Click after defeat to restart. Press Space, J, or right click to jump. The Trackpad card has an Action 2 button for jumping and its Spacebar setting selects Action 2. Movement releases when the preview loses focus.\n\n**Rendering:** The Metal shader ray traces the four enlarged rooms, three stairways, two generated-texture crates, a reflective chrome cube, and three animated mechanical spiders. They face the direction of travel; six articulated legs use independently phased, eased planted and lifted steps, ending in furry three-toed paws. Each spider keeps moving while pursuing, easing from a slow creep into brief faster rushes at its own pace. Its body shifts height slightly even while resting near the player, and its front lifts and rocks as walking starts. The spiders are scaled to 70% size, stay low to the floor, and have a thick tufted brown coat over their bodies, legs, joints, and paws. Eight glossy dark eyes sit in recessed sockets. The same ray geometry serves drawing and hit detection. Each shot shows a short depth-aware tracer, a small impact flash, and the Klein-generated strike texture at its contact point. Spider hits spray bright yellow-green particles; defeated spiders buckle and remain on the ground. Static surface marks fade over time; moving-spider impacts are brief. Floor and wall materials are distinct procedural patterns in each room. Point lights, GGX reflections, and crate shadows shade the scene. Start at 1440 × 900 and 30 Hz; adjust Width, Height and Loop rate if needed. The game runs in the Pipeline Editor.\n\n**Scene handoff:** Signal Range writes scene index 1 to its dedicated GPU request buffer after the victory pause. Scene Switch displays the completed winning frame, then runs only the triangle program on the next Loop call. The triangle writes index 0 when clicked. Each program keeps its own GPU state while inactive; both use the same Trackpad action counter. A stopped or failed frame does not commit a scene change."
+        "text": "# Signal Range · Four-Room First-Person Shooter\nClear the training range by defeating the three mechanical spiders before your health reaches zero. Spiders take two hits. Each kill leaves a collapsed body on the floor; the spiders do not respawn. Green bar: health. Three squares at the top right: defeated spiders. A green centre banner means victory; two seconds later Scene Switch starts a separate GPU Program with a spinning triangle. A red banner means defeat.\n\n**Map:** The starting slate-and-concrete arena and its three adjoining rooms are each 36 × 36 world units, with taller ceilings and wider six-step stairways. The northern room has terrazzo, brick, an 18-unit ceiling with a flickering TL light box, and two low-profile circular steel jump pads set into its floor; the eastern room checker tile and plaster, and the western room timber and ribbed metal. A 1.5-unit mirror-chrome cube rotates with eased turns and a gentle wobble in the starting room; its lowest corner stays on the floor as it reflects the surrounding materials and lights. A clear, glossy glass box stands to the right of the chrome cube in the starting room; the room and enemies remain visible through it. The two central crates and bullet impacts use separate FLUX.2 Klein 4B Distilled material images. Stable Audio 3 Small SFX generates the gunshot, room scare, and jump-pad launch sounds. Asset Cache holds all six assets between runs and launches. An invisible trigger spans the full width of the northern room entrance and plays the scare once per visit; returning to the corridor rearms it. Link the compatible Klein and Stable Audio 3 Core AI packages if the graph asks for models.\n\n**Controls:** Run the workflow with Save generated images to disk turned off, then open the Scene Switch full-screen preview. Focus the preview and hold W/S to walk forward/back, A/D to strafe. Move the pointer into the full-screen preview to capture and hide the cursor. Move the mouse or swipe the trackpad to aim without clicking; left/right keeps turning even at the screen edge, and up/down changes pitch. Escape closes the preview and restores the cursor. You can also drag the Trackpad node to set a saved starting view. Only WASD moves the player. Left click fires and plays the cached gunshot when a shot passes the fire cooldown. After victory, wait for the triangle scene; clicks during the victory pause do not restart the range. Click the triangle scene to return to a fresh Signal Range game. Click after defeat to restart. Press Space, J, or right click to jump. Step onto either jump pad in the northern room for a high automatic launch and its cached sound effect; landing on one launches you and plays the sound again. The Trackpad card has an Action 2 button for jumping and its Spacebar setting selects Action 2. Movement releases when the preview loses focus.\n\n**Rendering:** The Metal shader ray traces the four enlarged rooms, three stairways, two circular steel jump pads, two generated-texture crates, a reflective chrome cube, and three animated mechanical spiders: two brown and one black with red eyes. SignalRangeSpider.metal contains their shared geometry, materials, gait, and pursuit, while SignalRangeTLBox.metal defines the reusable ceiling fixture and its flicker. Both are included by SignalRangeFPSProgram.metal. They face the direction of travel; six articulated legs alternate supporting tripods. Planted legs press rearward as the body advances, while lifted legs reach forward for the next step. The brown spiders have furry three-toed paws. Each spider keeps moving while pursuing, easing from a slow creep into brief faster rushes at its own pace. Brown spiders shift height and lift their fronts as walking starts; the black variant keeps its body steadier. The brown spiders are scaled to 70% size and stay low to the floor with thick tufted coats. The black spider is half their size, has longer legs fanned around its body with round knee joints raised above its body, tapered triangular segments and pointed tips without paws. Its legs tuck closer while resting and extend into a wider walking stance, with extra forward reach in front. It makes small jumps while pursuing; jumping is a shared spider capability enabled only for this variant. The brown spiders have eight glossy dark eyes in recessed sockets; the black spider has only two red eyes. The same ray geometry serves drawing and hit detection. Each shot shows a short depth-aware tracer, a small impact flash, and the Klein-generated strike texture at its contact point. Spider hits spray bright yellow-green particles; defeated spiders buckle and remain on the ground. Static surface marks fade over time; moving-spider impacts are brief. Floor and wall materials are distinct procedural patterns in each room. Point lights, GGX reflections, and crate shadows shade the scene. Start at 1440 × 900 and 30 Hz; adjust Width, Height and Loop rate if needed. The game runs in the Pipeline Editor.\n\n**Scene handoff:** Signal Range writes scene index 1 to its dedicated GPU request buffer after the victory pause. Scene Switch displays the completed winning frame, then runs only the triangle program on the next Loop call. The triangle writes index 0 when clicked. Each program keeps its own GPU state while inactive; both use the same Trackpad action counter. A stopped or failed frame does not commit a scene change."
       },
       "resources": {},
       "title": "How to play"
@@ -505,7 +571,7 @@
       "id": "program-text",
       "kind": "primitive.string",
       "parameters": {
-        "value": "{\"version\":1,\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":1280},{\"name\":\"display\",\"kind\":\"texture\"},{\"name\":\"crateATexture\",\"kind\":\"inputTexture\",\"input\":\"asset0\"},{\"name\":\"crateBTexture\",\"kind\":\"inputTexture\",\"input\":\"asset1\"},{\"name\":\"impactTexture\",\"kind\":\"inputTexture\",\"input\":\"asset2\"},{\"name\":\"route\",\"kind\":\"buffer\",\"bytes\":4},{\"name\":\"shotAudio\",\"kind\":\"buffer\",\"bytes\":4}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"2\":\"route\",\"3\":\"shotAudio\"}}],\"present\":[{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"rangeFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"crateATexture\",\"2\":\"crateBTexture\",\"3\":\"impactTexture\"}}],\"swaps\":[],\"output\":\"display\",\"sceneRequestBuffer\":\"route\",\"audioEvents\":[{\"buffer\":\"shotAudio\",\"asset\":\"asset3\"}]}"
+        "value": "{\"version\":1,\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":1280},{\"name\":\"display\",\"kind\":\"texture\"},{\"name\":\"crateATexture\",\"kind\":\"inputTexture\",\"input\":\"asset0\"},{\"name\":\"crateBTexture\",\"kind\":\"inputTexture\",\"input\":\"asset1\"},{\"name\":\"impactTexture\",\"kind\":\"inputTexture\",\"input\":\"asset2\"},{\"name\":\"route\",\"kind\":\"buffer\",\"bytes\":4},{\"name\":\"shotAudio\",\"kind\":\"buffer\",\"bytes\":4},{\"name\":\"scareAudio\",\"kind\":\"buffer\",\"bytes\":4},{\"name\":\"launchAudio\",\"kind\":\"buffer\",\"bytes\":4}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"2\":\"route\",\"3\":\"shotAudio\",\"4\":\"scareAudio\",\"5\":\"launchAudio\"}}],\"present\":[{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"rangeFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"crateATexture\",\"2\":\"crateBTexture\",\"3\":\"impactTexture\"}}],\"swaps\":[],\"output\":\"display\",\"sceneRequestBuffer\":\"route\",\"audioEvents\":[{\"buffer\":\"shotAudio\",\"asset\":\"asset3\"},{\"buffer\":\"scareAudio\",\"asset\":\"asset4\"},{\"buffer\":\"launchAudio\",\"asset\":\"asset5\"}]}"
       },
       "resources": {},
       "title": "Game state and render passes"
@@ -804,11 +870,11 @@
         "keepBetweenRuns": true,
         "slotCount": {
           "$type": "integer",
-          "value": 4
+          "value": 6
         }
       },
       "resources": {},
-      "title": "Klein materials and gunshot sound · asset cache"
+      "title": "Klein materials and three sounds · asset cache"
     },
     {
       "id": "triangle-source",
@@ -890,6 +956,216 @@
         "duration": {
           "$type": "number",
           "value": 2
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "3c3ead00ddda0cd08c5ee67f140b16ad740d7885c6ab9d0e0950676fc0203abc",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "faf0fcd4028b833f2d1f5e6197b2a0f4b6f396ad8aa58fb9b199fe7e3f14a8b0",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "a393376b99a0c532c4c0f8e4d1e38295e0cd3b53ff5d9ee3eb4f91bb6e850efc",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "bafbe50f630c9e6dd2477e320a974d90ef2a27f734f9b610b19e1d0f1b4b4698",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-scare",
+      "kind": "input.prompt",
+      "title": "Northern room scare sound prompt",
+      "parameters": {
+        "value": "A sudden frightening horror sound effect in an empty concrete room: a sharp metallic shriek over a deep impact boom, brief rattling echo, abrupt start and quick decay, no voices or music"
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-scare",
+      "kind": "input.seed",
+      "title": "Scare sound fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 5678
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-scare",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Scare sound · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 2
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "3c3ead00ddda0cd08c5ee67f140b16ad740d7885c6ab9d0e0950676fc0203abc",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "faf0fcd4028b833f2d1f5e6197b2a0f4b6f396ad8aa58fb9b199fe7e3f14a8b0",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "a393376b99a0c532c4c0f8e4d1e38295e0cd3b53ff5d9ee3eb4f91bb6e850efc",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "bafbe50f630c9e6dd2477e320a974d90ef2a27f734f9b610b19e1d0f1b4b4698",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-launch",
+      "kind": "input.prompt",
+      "title": "Jump pad launch sound prompt",
+      "parameters": {
+        "value": "A single short science-fiction jump pad launch sound effect: springy mechanical thump followed by a bright rising electronic whoosh and quick airy tail, no voices or music"
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-launch",
+      "kind": "input.seed",
+      "title": "Jump pad launch fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 9012
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-launch",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Jump pad launch sound · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 1
         },
         "steps": {
           "$type": "integer",
@@ -1077,6 +1353,30 @@
       "generate-gunshot": {
         "x": 1160,
         "y": 1590
+      },
+      "prompt-scare": {
+        "x": 860,
+        "y": 2050
+      },
+      "seed-scare": {
+        "x": 860,
+        "y": 2260
+      },
+      "generate-scare": {
+        "x": 1160,
+        "y": 2050
+      },
+      "prompt-launch": {
+        "x": 860,
+        "y": 2510
+      },
+      "seed-launch": {
+        "x": 860,
+        "y": 2720
+      },
+      "generate-launch": {
+        "x": 1160,
+        "y": 2510
       }
     },
     "nodeSizes": {

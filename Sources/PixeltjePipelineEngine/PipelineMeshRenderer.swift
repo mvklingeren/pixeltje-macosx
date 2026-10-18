@@ -281,7 +281,7 @@ actor PipelineMeshRenderer {
         throw PipelineEngineError.invalidInvocation(
           "Metal Render source must contain 1 to 1,048,576 UTF-8 bytes.")
       }
-      return PipelineMetalEasing.resolving(supplied)
+      return PipelineMetalLibraries.resolving(supplied)
     }
     guard let fileName, !fileName.isEmpty,
       !fileName.contains("/"), !fileName.contains("\\"),
@@ -289,6 +289,17 @@ actor PipelineMeshRenderer {
       let root = sourceMediaRoot else {
       throw PipelineEngineError.invalidInvocation(
         "Metal Render Source File must be a .metal filename beside the workflow.")
+    }
+    let source = try siblingMetalSource(named: fileName, in: root)
+    let expanded = try expandSiblingMetalIncludes(in: source, root: root)
+    return PipelineMetalLibraries.resolving(expanded)
+  }
+
+  private static func siblingMetalSource(named fileName: String, in root: URL) throws -> String {
+    guard !fileName.isEmpty, !fileName.contains("/"), !fileName.contains("\\"),
+      fileName != ".", fileName != "..", fileName.hasSuffix(".metal") else {
+      throw PipelineEngineError.invalidInvocation(
+        "Metal Render includes must name a .metal file beside the workflow.")
     }
     let resolvedRoot = root.resolvingSymlinksInPath().standardizedFileURL
     let url = root.appendingPathComponent(fileName).resolvingSymlinksInPath()
@@ -309,7 +320,37 @@ actor PipelineMeshRenderer {
       throw PipelineEngineError.invalidInvocation(
         "Metal Render source file must contain 1 to 1,048,576 UTF-8 bytes.")
     }
-    return PipelineMetalEasing.resolving(source)
+    return source
+  }
+
+  private static func expandSiblingMetalIncludes(in source: String, root: URL) throws -> String {
+    var lines: [String] = []
+    for line in source.split(separator: "\n", omittingEmptySubsequences: false) {
+      let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard trimmed.hasPrefix("#include \"") else {
+        lines.append(String(line))
+        continue
+      }
+      guard trimmed.hasSuffix("\"") else {
+        throw PipelineEngineError.invalidInvocation(
+          "Metal Render has a malformed local include.")
+      }
+      let fileName = String(trimmed.dropFirst(10).dropLast())
+      let included = try siblingMetalSource(named: fileName, in: root)
+      guard !included.split(separator: "\n").contains(where: {
+        $0.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("#include \"")
+      }) else {
+        throw PipelineEngineError.invalidInvocation(
+          "Metal Render local includes cannot include another file.")
+      }
+      lines.append(included)
+    }
+    let expanded = lines.joined(separator: "\n")
+    guard expanded.utf8.count <= 1_048_576 else {
+      throw PipelineEngineError.invalidInvocation(
+        "Metal Render source and includes exceed 1,048,576 UTF-8 bytes.")
+    }
+    return expanded
   }
 
   private static func previewSize(from invocation: PipelineInvocation) throws

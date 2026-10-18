@@ -1,4 +1,5 @@
 // pixeltje:easing-v1
+// pixeltje:3d-v1
 #include <metal_stdlib>
 using namespace metal;
 
@@ -12,11 +13,6 @@ constant uint impactCount = 12u;
 constant uint phasePlaying = 0u;
 constant uint phaseWon = 1u;
 constant uint phaseLost = 2u;
-constant float spiderScale = 0.7f;
-constant float spiderBodyHeight = 0.52f * spiderScale;
-constant float spiderAttackRange = 1.65f * spiderScale;
-constant float spiderChaseSpeed = 1.8f;
-constant float spiderFootprintRadius = 1.5f * spiderScale;
 constant float mainRoomHalfExtent = 18.0f;
 constant float outerRoomNear = 24.0f;
 constant float outerRoomFar = 60.0f;
@@ -24,6 +20,13 @@ constant float passageHalfWidth = 3.5f;
 constant float sceneRayLimit = 160.0f;
 constant float chromeHalfSize = 0.75f;
 constant float2 chromeGroundPosition = float2(0.0f, 3.5f);
+constant uint jumpPadCount = 2u;
+constant float jumpPadRadius = 1.65f;
+constant float northernCeilingY = 18.0f;
+constant float jumpPadHeight = 0.035f;
+constant float jumpPadLaunchSpeed = 18.5f;
+constant float3 glassBoxLower = float3(2.4f, 0.0f, 1.9f);
+constant float3 glassBoxUpper = float3(4.8f, 2.4f, 4.3f);
 
 struct ProgramUniforms {
     float4 resolutionTime;
@@ -46,18 +49,20 @@ struct ShotImpact {
 struct FallenSpider {
     float4 pose;           // chassis centre XYZ and yaw at the killing hit
     float4 motion;         // gait phase, movement blend, death time, body rise
+    uint4 appearance;      // spider variant, reserved
 };
 
 struct GameState {
     float4 player;          // position XYZ, yaw
     float4 view;            // pitch, health, shot cooldown, muzzle flash
     float4 enemy[enemyCount]; // chassis centre XYZ, health
-    float4 enemyClock[enemyCount]; // attack cooldown, reserved, hit flash, yaw
+    float4 enemyClock[enemyCount]; // attack cooldown, jump clock, hit flash, yaw
     float4 gait[enemyCount]; // distance-based cycle, movement blend, speed, turn rate
     float4 effects;         // elapsed, damage flash, last jump count, vertical speed
     float4 chromeRotation;  // local-to-world unit quaternion
     float4 chromeCentre;    // world XYZ, unused
     float4 sceneTransition; // time of victory in X, handoff sent in Y
+    uint4 roomTriggers;     // northern room scare latched in X
     uint4 progress;         // kills, shots, last action count, phase
     ShotImpact impacts[impactCount];
     FallenSpider fallen[targetKills];
@@ -72,6 +77,7 @@ struct SceneHit {
     float3 position;
     uint material;
     int enemy;
+    uint variant;            // spider appearance or fixture placement index
 };
 
 struct ChromePose {
@@ -83,6 +89,19 @@ void traceEnvironment(thread SceneHit &hit, float3 origin,
     float3 direction, ChromePose chrome);
 
 constant float rangePi = 3.14159265f;
+
+struct SurfaceMaterial {
+    float3 albedo;
+    float roughness;
+    float metallic;
+    float3 emission;
+};
+
+float rayBox(float3 origin, float3 direction, float3 lower, float3 upper,
+    thread float3 &normal);
+float hashTile(float2 p);
+
+#include "SignalRangeTLBox.metal"
 
 float4 multiplyQuaternions(float4 a, float4 b) {
     return float4(a.w * b.xyz + b.w * a.xyz + cross(a.xyz, b.xyz),
@@ -120,56 +139,41 @@ void updateChromePose(device GameState &game) {
         chromeGroundPosition.y, 0.0f);
 }
 
-float spiderBodyBob(float phase, float movementBlend) {
-    return movementBlend * (0.048f * sin(phase * 4.0f * rangePi)
-        + 0.012f * sin(phase * 2.0f * rangePi + 1.1f));
-}
-
-float spiderBodyRise(float time, uint slot) {
-    return 0.014f * (float(slot) - 1.0f)
-        + 0.013f * sin(time * 1.9f + float(slot) * 2.2f);
-}
-
 struct PointLight {
     float3 position;
     float3 color;
     float power;
 };
 
-PointLight roomLight(uint index) {
+PointLight roomLight(uint index, float time) {
     if (index == 0u) return {
         float3(-9.0f, 5.05f, -8.0f), float3(1.0f, 0.79f, 0.58f), 420.0f};
     if (index == 1u) return {
         float3(9.0f, 5.05f, -8.0f), float3(0.48f, 0.78f, 1.0f), 390.0f};
     if (index == 2u) return {float3(0.0f, 5.05f, 10.0f),
         float3(1.0f, 0.53f, 0.35f), 320.0f};
-    if (index == 3u) return {float3(0.0f, 6.25f, -42.0f),
-        float3(0.57f, 0.82f, 1.0f), 560.0f};
+    if (index == 3u) {
+        CeilingTLBox fixture = ceilingTLBox(0u);
+        return {fixture.centre - float3(0.0f, 0.36f, 0.0f),
+            fixture.tint, 1800.0f * tlBoxFlicker(time, fixture.phase)};
+    }
     if (index == 4u) return {float3(42.0f, 5.95f, 0.0f),
         float3(1.0f, 0.75f, 0.45f), 540.0f};
     return {float3(-42.0f, 6.55f, 0.0f),
         float3(0.65f, 1.0f, 0.75f), 550.0f};
 }
 
-float3 forwardVector(float yaw, float pitch) {
-    return float3(sin(yaw) * cos(pitch), sin(pitch),
-        -cos(yaw) * cos(pitch));
-}
+float stairHeight(float2 point);
+bool walkable(float2 point);
 
-float3 spawnPosition(uint slot) {
-    float2 initial[3] = {
-        float2(-9.5f, -8.0f), float2(9.0f, -10.0f),
-        float2(0.0f, -14.0f)
-    };
-    float2 xz = initial[slot];
-    return float3(xz.x, spiderBodyHeight, xz.y);
-}
+#include "SignalRangeSpider.metal"
 
 void resetGame(device GameState &game) {
     game.player = float4(0.0f, 1.55f, 12.0f, 0.0f);
     game.view = float4(0.0f, 100.0f, 0.0f, 0.0f);
     game.effects = float4(0.0f);
     game.sceneTransition = float4(0.0f);
+    game.roomTriggers = uint4(0u);
     updateChromePose(game);
     game.progress = uint4(0u);
     for (uint i = 0u; i < impactCount; ++i) {
@@ -181,11 +185,12 @@ void resetGame(device GameState &game) {
     for (uint i = 0u; i < targetKills; ++i) {
         game.fallen[i].pose = float4(0.0f);
         game.fallen[i].motion = float4(0.0f);
+        game.fallen[i].appearance = uint4(0u);
     }
     for (uint i = 0u; i < enemyCount; ++i) {
         game.enemy[i] = float4(spawnPosition(i), 2.0f);
         float2 toPlayer = game.player.xz - game.enemy[i].xz;
-        game.enemyClock[i] = float4(0.0f, 0.0f, 0.0f,
+        game.enemyClock[i] = float4(0.0f, -0.55f, 0.0f,
             atan2(toPlayer.x, -toPlayer.y));
         game.gait[i] = float4(0.07f + float(i) * 0.31f,
             0.0f, 0.0f, 0.0f);
@@ -197,291 +202,10 @@ kernel void initializeRange(device GameState *states [[buffer(1)]],
     if (id == 0u) resetGame(states[0]);
 }
 
-float raySphere(float3 origin, float3 direction, float3 center, float radius) {
-    float3 offset = origin - center;
-    float b = dot(offset, direction);
-    float c = dot(offset, offset) - radius * radius;
-    float discriminant = b * b - c;
-    if (discriminant < 0.0f) return -1.0f;
-    float root = sqrt(discriminant);
-    float near = -b - root;
-    float far = -b + root;
-    return near > 0.01f ? near : (far > 0.01f ? far : -1.0f);
-}
-
-struct SpiderHit {
-    float distance;
-    float3 normal;
-    uint material;
-    float3 furPosition;
-};
-
-float smoothNoise(float2 p);
-
-void acceptSpiderSphere(thread SpiderHit &hit, float3 origin,
-    float3 direction, float3 centre, float radius, uint material) {
-    float t = raySphere(origin, direction, centre, radius);
-    if (t > 0.0f && t < hit.distance) {
-        hit = {t, normalize(origin + direction * t - centre),
-            material, origin + direction * t - centre};
-    }
-}
-
-void acceptSpiderEllipsoid(thread SpiderHit &hit, float3 origin,
-    float3 direction, float3 centre, float3 radii, uint material) {
-    float3 o = (origin - centre) / radii;
-    float3 d = direction / radii;
-    float a = dot(d, d);
-    float b = dot(o, d);
-    float discriminant = b * b - a * (dot(o, o) - 1.0f);
-    if (discriminant < 0.0f) return;
-    float root = sqrt(discriminant);
-    float near = (-b - root) / a;
-    float far = (-b + root) / a;
-    float t = near > 0.01f ? near : far;
-    if (t > 0.01f && t < hit.distance) {
-        float3 point = o + d * t;
-        hit = {t, normalize(point / radii),
-            material, origin + direction * t - centre};
-    }
-}
-
-void acceptSpiderLeg(thread SpiderHit &hit, float3 origin,
-    float3 direction, float3 start, float3 end, float radius,
-    uint material) {
-    float3 axis = end - start;
-    float3 offset = origin - start;
-    float axisSquared = dot(axis, axis);
-    float axisDirection = dot(axis, direction);
-    float axisOffset = dot(axis, offset);
-    float a = axisSquared - axisDirection * axisDirection;
-    float b = axisSquared * dot(offset, direction)
-        - axisOffset * axisDirection;
-    float c = axisSquared * (dot(offset, offset) - radius * radius)
-        - axisOffset * axisOffset;
-    float discriminant = b * b - a * c;
-    if (a > 0.00001f && discriminant >= 0.0f) {
-        float t = (-b - sqrt(discriminant)) / a;
-        float along = axisOffset + t * axisDirection;
-        if (t > 0.01f && t < hit.distance
-            && along > 0.0f && along < axisSquared) {
-            float3 closest = start + axis * (along / axisSquared);
-            hit = {t, normalize(origin + direction * t - closest),
-                material, origin + direction * t - start};
-        }
-    }
-    acceptSpiderSphere(hit, origin, direction, start, radius, material);
-    acceptSpiderSphere(hit, origin, direction, end, radius, material);
-}
-
-void acceptSpiderPaw(thread SpiderHit &hit, float3 origin,
-    float3 direction, float3 foot) {
-    // Test the small paw volume before tracing its separate furry toe lobes.
-    float3 paw = foot + float3(0.0f, 0.045f, -0.035f);
-    float bound = raySphere(origin, direction, paw, 0.34f);
-    if (bound < 0.0f || (dot(origin - paw, origin - paw) > 0.1156f
-        && bound >= hit.distance)) return;
-
-    float previousDistance = hit.distance;
-    acceptSpiderEllipsoid(hit, origin, direction, paw,
-        float3(0.19f, 0.12f, 0.20f), 18u);
-    for (uint toe = 0u; toe < 3u; ++toe) {
-        float spread = (float(toe) - 1.0f) * 0.09f;
-        acceptSpiderEllipsoid(hit, origin, direction,
-            paw + float3(spread, -0.022f, -0.13f),
-            float3(0.055f, 0.065f, 0.09f), 18u);
-    }
-    if (hit.distance < previousDistance)
-        hit.furPosition = origin + direction * hit.distance - paw;
-}
-
-void acceptSpiderEyes(thread SpiderHit &hit, float3 origin,
-    float3 direction) {
-    float3 eyeRegion = float3(0.0f, 0.16f, -0.62f);
-    float bound = raySphere(origin, direction, eyeRegion, 0.55f);
-    if (bound < 0.0f || (dot(origin - eyeRegion, origin - eyeRegion)
-        > 0.3025f && bound >= hit.distance)) return;
-
-    // Eight differently sized corneas sit in recessed dark sockets.
-    for (uint side = 0u; side < 2u; ++side) {
-        float signX = side == 0u ? -1.0f : 1.0f;
-        for (uint eye = 0u; eye < 4u; ++eye) {
-            float3 centre;
-            float radius;
-            if (eye == 0u) {
-                centre = float3(signX * 0.14f, 0.085f, -0.75f);
-                radius = 0.082f;
-            } else if (eye == 1u) {
-                centre = float3(signX * 0.28f, 0.105f, -0.665f);
-                radius = 0.055f;
-            } else if (eye == 2u) {
-                centre = float3(signX * 0.085f, 0.255f, -0.67f);
-                radius = 0.047f;
-            } else {
-                centre = float3(signX * 0.245f, 0.225f, -0.605f);
-                radius = 0.044f;
-            }
-            acceptSpiderSphere(hit, origin, direction,
-                centre + float3(0.0f, 0.0f, radius * 0.85f),
-                radius * 1.28f, 19u);
-            acceptSpiderSphere(hit, origin, direction,
-                centre, radius, 16u);
-        }
-    }
-}
-
-float3 rotateSpiderPitch(float3 point, float sine, float cosine) {
-    return float3(point.x,
-        cosine * point.y - sine * point.z,
-        sine * point.y + cosine * point.z);
-}
-
-// A single articulated ray test serves both the camera and the gun. Local -Z
-// is forward; the stored yaw turns the chassis toward the player.
-SpiderHit traceSpider(float3 origin, float3 direction, float3 centre,
-    float yaw, float gaitPhase, float movementBlend, float bodyRise,
-    float collapse, float maxDistance) {
-    float cosine = cos(yaw), sine = sin(yaw);
-    // Keep the authored geometry in one local scale for both gun hits and
-    // drawing; converting the final distance preserves world-space depth.
-    float3 offset = (origin - centre) / spiderScale;
-    float3 localOrigin = float3(cosine * offset.x + sine * offset.z,
-        offset.y, -sine * offset.x + cosine * offset.z);
-    float3 localDirection = float3(
-        cosine * direction.x + sine * direction.z, direction.y,
-        -sine * direction.x + cosine * direction.z);
-    float localMaxDistance = maxDistance / spiderScale;
-    SpiderHit hit = {localMaxDistance, float3(0.0f), 0u, float3(0.0f)};
-    float bound = raySphere(localOrigin, localDirection,
-        float3(0.0f), 2.15f);
-    if (bound < 0.0f || (dot(localOrigin, localOrigin) > 4.6225f
-        && bound >= localMaxDistance)) {
-        hit.distance = maxDistance;
-        return hit;
-    }
-
-    // The front lifts as a walk starts, then rocks gently with the steps.
-    // Trace the pitched body separately so all six feet remain grounded.
-    float startLift = sin(rangePi * clamp(movementBlend, 0.0f, 1.0f));
-    float pitch = (0.23f * startLift + 0.12f * movementBlend
-        * sin(gaitPhase * 2.0f * rangePi - 0.5f))
-        * (1.0f - collapse) - 0.32f * collapse;
-    float sinePitch = sin(pitch), cosinePitch = cos(pitch);
-    float3 bodyOrigin = rotateSpiderPitch(
-        localOrigin - float3(0.0f, bodyRise, 0.0f),
-        -sinePitch, cosinePitch);
-    float3 bodyDirection = rotateSpiderPitch(
-        localDirection, -sinePitch, cosinePitch);
-    SpiderHit bodyHit = {localMaxDistance,
-        float3(0.0f), 0u, float3(0.0f)};
-
-    acceptSpiderEllipsoid(bodyHit, bodyOrigin, bodyDirection,
-        float3(0.0f, -0.02f, 0.29f), float3(0.55f, 0.32f, 0.61f), 5u);
-    acceptSpiderEllipsoid(bodyHit, bodyOrigin, bodyDirection,
-        float3(0.0f, 0.03f, -0.37f), float3(0.41f, 0.29f, 0.40f), 17u);
-    acceptSpiderEllipsoid(bodyHit, bodyOrigin, bodyDirection,
-        float3(0.0f, 0.20f, 0.28f), float3(0.44f, 0.15f, 0.45f), 17u);
-    for (uint side = 0u; side < 2u; ++side) {
-        float signX = side == 0u ? -1.0f : 1.0f;
-        for (uint tuft = 0u; tuft < 4u; ++tuft) {
-            acceptSpiderEllipsoid(bodyHit, bodyOrigin, bodyDirection,
-                float3(signX * 0.44f, 0.10f,
-                    -0.05f + float(tuft) * 0.27f),
-                float3(0.16f, 0.14f, 0.15f), 5u);
-        }
-        acceptSpiderEllipsoid(bodyHit, bodyOrigin, bodyDirection,
-            float3(signX * 0.32f, -0.02f, -0.50f),
-            float3(0.16f, 0.15f, 0.19f), 17u);
-    }
-    acceptSpiderEyes(bodyHit, bodyOrigin, bodyDirection);
-    if (bodyHit.material != 0u) {
-        bodyHit.normal = rotateSpiderPitch(
-            bodyHit.normal, sinePitch, cosinePitch);
-        hit = bodyHit;
-    }
-    for (uint side = 0u; side < 2u; ++side) {
-        float signX = side == 0u ? -1.0f : 1.0f;
-        for (uint leg = 0u; leg < 3u; ++leg) {
-            float z = -0.42f + float(leg) * 0.42f;
-            // Alternating groups plant for 60% of a cycle. Both the planted
-            // stroke and the lifted return stroke ease at their endpoints.
-            float phase = fract(gaitPhase
-                + (((leg + side) & 1u) != 0u ? 0.5f : 0.0f)
-                + (float(leg) - 1.0f) * 0.055f
-                + signX * 0.012f);
-            float stride, lift = 0.0f;
-            if (phase < 0.6f) {
-                stride = -0.24f + 0.48f
-                    * smoothstep(0.0f, 1.0f, phase / 0.6f);
-            } else {
-                float swing = (phase - 0.6f) / 0.4f;
-                float eased = smoothstep(0.0f, 1.0f, swing);
-                stride = 0.24f - 0.48f * eased;
-                lift = 0.23f * sin(rangePi * eased);
-            }
-            stride *= movementBlend;
-            lift *= movementBlend;
-            float bob = spiderBodyBob(gaitPhase, movementBlend);
-            float3 hip = rotateSpiderPitch(
-                float3(signX * 0.33f, -0.08f, z),
-                sinePitch, cosinePitch)
-                + float3(0.0f, bodyRise, 0.0f);
-            float3 knee = float3(signX * (0.83f + 0.15f * collapse),
-                mix(0.11f, -0.10f, collapse) + lift * 0.35f,
-                z + (float(leg) - 1.0f) * 0.13f + stride * 0.5f);
-            float3 foot = float3(signX * (1.19f + 0.22f * collapse),
-                mix(-0.45f - bob, -0.37f, collapse) + lift,
-                z + (float(leg) - 1.0f) * 0.25f + stride);
-            acceptSpiderLeg(hit, localOrigin, localDirection,
-                hip, knee, 0.12f, 15u);
-            acceptSpiderLeg(hit, localOrigin, localDirection,
-                knee, foot, 0.095f, 15u);
-            acceptSpiderSphere(hit, localOrigin, localDirection,
-                knee, 0.14f, 17u);
-            acceptSpiderEllipsoid(hit, localOrigin, localDirection,
-                mix(knee, foot, 0.38f),
-                float3(0.14f, 0.14f, 0.16f), 15u);
-            acceptSpiderPaw(hit, localOrigin, localDirection, foot);
-        }
-    }
-    float3 n = hit.normal;
-    if (hit.material == 5u || hit.material == 15u
-        || hit.material == 17u || hit.material == 18u) {
-        // Stronger normal variation gives the enlarged coat visible depth.
-        float3 fibers = float3(
-            smoothNoise(hit.furPosition.yz * 79.0f),
-            smoothNoise(hit.furPosition.xz * 73.0f),
-            smoothNoise(hit.furPosition.xy * 83.0f)) - 0.5f;
-        n = normalize(n + fibers * 0.34f);
-    }
-    hit.normal = float3(cosine * n.x - sine * n.z, n.y,
-        sine * n.x + cosine * n.z);
-    hit.distance *= spiderScale;
-    return hit;
-}
-
 float rayBox(float3 origin, float3 direction, float3 lower, float3 upper,
     thread float3 &normal) {
-    float3 safe = select(direction, float3(0.00001f),
-        abs(direction) < float3(0.00001f));
-    float3 a = (lower - origin) / safe;
-    float3 b = (upper - origin) / safe;
-    float3 entry = min(a, b);
-    float3 exit = max(a, b);
-    float near = max(entry.x, max(entry.y, entry.z));
-    float far = min(exit.x, min(exit.y, exit.z));
-    if (far < max(near, 0.01f)) return -1.0f;
-    float t = near > 0.01f ? near : far;
-    float3 p = origin + direction * t;
-    float3 centre = (lower + upper) * 0.5f;
-    float3 edge = abs((p - centre) / max((upper - lower) * 0.5f,
-        float3(0.001f)));
-    normal = edge.x > edge.y && edge.x > edge.z
-        ? float3(sign(p.x - centre.x), 0.0f, 0.0f)
-        : edge.y > edge.z
-          ? float3(0.0f, sign(p.y - centre.y), 0.0f)
-          : float3(0.0f, 0.0f, sign(p.z - centre.z));
-    return t;
+    return pixeltje_3d::rayBox(origin, direction, lower, upper,
+        0.01f, normal);
 }
 
 float rayChrome(float3 origin, float3 direction, ChromePose chrome,
@@ -585,56 +309,33 @@ bool walkable(float2 point) {
         && abs(z) <= roomLimit;
 }
 
-bool spiderPositionClear(float2 position, uint self,
-    device const GameState &game) {
-    if (!walkable(position)) return false;
-    const float minimumSeparation = 2.0f * spiderFootprintRadius;
-    for (uint other = 0u; other < enemyCount; ++other) {
-        if (other == self || game.enemy[other].w <= 0.0f) continue;
-        float2 offset = position - game.enemy[other].xz;
-        if (dot(offset, offset) < minimumSeparation * minimumSeparation)
-            return false;
-    }
-    return true;
+bool insideNorthernEntryTrigger(float2 position) {
+    // An invisible strip spans the entire room width, including the doorway.
+    // Position.y is the player's world Z coordinate.
+    return abs(position.x) <= mainRoomHalfExtent
+        && position.y <= -outerRoomNear
+        && position.y >= -outerRoomNear - 3.0f;
 }
 
-float2 moveSpider(float2 position, float2 step, uint self,
-    device const GameState &game) {
-    float2 next = position + step;
-    if (spiderPositionClear(next, self, game)) return next;
+float2 jumpPadCentre(uint index) {
+    return float2(index == 0u ? -8.0f : 8.0f, -43.0f);
+}
 
-    // The rendered feet extend beyond the chassis. Use a circular ground
-    // footprint and slide around the nearest living spider when blocked.
-    uint blocker = enemyCount;
-    const float minimumSeparation = 2.0f * spiderFootprintRadius;
-    float closest = minimumSeparation * minimumSeparation;
-    for (uint other = 0u; other < enemyCount; ++other) {
-        if (other == self || game.enemy[other].w <= 0.0f) continue;
-        float2 offset = next - game.enemy[other].xz;
-        float distanceSquared = dot(offset, offset);
-        if (distanceSquared < closest) {
-            closest = distanceSquared;
-            blocker = other;
-        }
+bool onJumpPad(float2 position) {
+    for (uint i = 0u; i < jumpPadCount; ++i) {
+        float2 offset = position - jumpPadCentre(i);
+        if (dot(offset, offset) <= jumpPadRadius * jumpPadRadius)
+            return true;
     }
-    if (blocker == enemyCount) return position;
-
-    float2 away = position - game.enemy[blocker].xz;
-    float distanceSquared = dot(away, away);
-    away = distanceSquared > 0.000001f
-        ? away * rsqrt(distanceSquared) : float2(1.0f, 0.0f);
-    float2 tangent = float2(-away.y, away.x);
-    float sideways = dot(step, tangent);
-    if (abs(sideways) < length(step) * 0.2f)
-        sideways = (self & 1u) == 0u ? length(step) : -length(step);
-    float2 slide = position + tangent * sideways;
-    return spiderPositionClear(slide, self, game) ? slide : position;
+    return false;
 }
 
 kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     device GameState *states [[buffer(1)]],
     device uint *sceneRequest [[buffer(2)]],
     device uint *shotAudioEvent [[buffer(3)]],
+    device uint *scareAudioEvent [[buffer(4)]],
+    device uint *launchAudioEvent [[buffer(5)]],
     uint id [[thread_position_in_grid]]) {
     if (id != 0u) return;
     device GameState &game = states[0];
@@ -681,7 +382,8 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     float2 next = game.player.xz + (right * move.x + forward * move.y)
         * 4.6f * dt;
     // Resolve axes independently so a diagonal approach slides along a wall.
-    float2 position = game.player.xz;
+    float2 previousPosition = game.player.xz;
+    float2 position = previousPosition;
     if (walkable(float2(next.x, position.y))) position.x = next.x;
     if (walkable(float2(position.x, next.y))) position.y = next.y;
     next = position;
@@ -689,11 +391,26 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     pushOutOfObstacle(next, float2(2.1f, -6.5f), float2(4.5f, -4.1f));
     pushOutOfChrome(next);
     game.player.xz = next;
-    float groundY = 1.55f + stairHeight(next);
+    if (next.y >= -outerRoomNear + 0.5f) {
+        game.roomTriggers.x = 0u;
+    } else if (game.roomTriggers.x == 0u
+        && (insideNorthernEntryTrigger(next)
+            || (previousPosition.y >= -outerRoomNear
+                && next.y < -outerRoomNear))) {
+        scareAudioEvent[0] = 1u;
+        game.roomTriggers.x = 1u;
+    }
+    bool overJumpPad = onJumpPad(next);
+    float groundY = 1.55f + stairHeight(next)
+        + (overJumpPad ? jumpPadHeight : 0.0f);
     bool grounded = game.player.y <= groundY + 0.001f;
     if (jumpAction > uint(game.effects.z)) {
         game.effects.z = float(jumpAction);
         if (grounded) game.effects.w = 5.2f;
+    }
+    if (grounded && overJumpPad) {
+        game.effects.w = jumpPadLaunchSpeed;
+        launchAudioEvent[0] = 1u;
     }
     if (!grounded || game.effects.w > 0.0f) {
         game.effects.w -= 13.0f * dt;
@@ -703,77 +420,12 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
         game.player.y = groundY;
         game.effects.w = 0.0f;
     }
-
-    for (uint i = 0u; i < enemyCount; ++i) {
-        game.enemyClock[i].x = max(game.enemyClock[i].x - dt, 0.0f);
-        game.enemyClock[i].z = max(game.enemyClock[i].z - dt, 0.0f);
-        if (game.enemy[i].w <= 0.0f) continue;
-        float2 toPlayer = game.player.xz - game.enemy[i].xz;
-        float distanceToPlayer = length(toPlayer);
-        bool pursuing = distanceToPlayer > spiderAttackRange;
-        if (pursuing) {
-            float desiredYaw = atan2(toPlayer.x, -toPlayer.y);
-            float delta = desiredYaw - game.enemyClock[i].w;
-            float shortestTurn = atan2(sin(delta), cos(delta));
-            float desiredTurnRate = clamp(shortestTurn * 4.0f,
-                -2.4f, 2.4f);
-            game.gait[i].w = mix(game.gait[i].w, desiredTurnRate,
-                1.0f - exp(-dt * 6.0f));
-            float turn = game.gait[i].w * dt;
-            if (abs(turn) >= abs(shortestTurn)) {
-                game.enemyClock[i].w = desiredYaw;
-                game.gait[i].w = 0.0f;
-            } else {
-                game.enemyClock[i].w += turn;
-            }
-        } else {
-            game.gait[i].w = 0.0f;
-        }
-        float2 oldPosition = game.enemy[i].xz;
-        float walkBlend = mix(game.gait[i].y, pursuing ? 1.0f : 0.0f,
-            1.0f - exp(-dt * 7.0f));
-        if (pursuing) {
-            // Two smooth, differently timed rhythms give each spider slow
-            // approaches and brief rushes without a walk/pause switch.
-            float slot = float(i);
-            float slowPace = smoothNoise(float2(
-                game.effects.x * 0.37f + slot * 2.17f,
-                slot * 5.31f + 0.73f));
-            float quickPace = smoothNoise(float2(
-                game.effects.x * 1.07f + slot * 3.41f,
-                slot * 7.19f + 2.13f));
-            float targetSpeed = spiderChaseSpeed
-                * (0.38f + 0.95f * slowPace + 0.22f * quickPace);
-            float speedResponse = targetSpeed > game.gait[i].z
-                ? 1.8f : 2.8f;
-            game.gait[i].z = mix(game.gait[i].z, targetSpeed,
-                1.0f - exp(-dt * speedResponse));
-            float yaw = game.enemyClock[i].w;
-            float2 nextEnemy = oldPosition
-                + float2(sin(yaw), -cos(yaw))
-                    * min(game.gait[i].z * walkBlend * dt,
-                        distanceToPlayer - spiderAttackRange);
-            game.enemy[i].xz = moveSpider(oldPosition,
-                nextEnemy - oldPosition, i, game);
-        } else {
-            game.gait[i].z *= exp(-dt * 3.0f);
-        }
-        if (distanceToPlayer <= spiderAttackRange
-            && game.enemyClock[i].x <= 0.0f) {
-            game.view.y = max(game.view.y - 12.0f, 0.0f);
-            game.effects.y = 0.35f;
-            game.enemyClock[i].x = 1.2f;
-        }
-        float travel = length(game.enemy[i].xz - oldPosition);
-        game.gait[i].x = fract(game.gait[i].x
-            + travel / (0.8f * spiderScale));
-        game.gait[i].y = pursuing && travel > 0.0001f
-            ? walkBlend
-            : mix(game.gait[i].y, 0.0f, 1.0f - exp(-dt * 7.0f));
-        game.enemy[i].y = stairHeight(game.enemy[i].xz) + spiderBodyHeight
-            + spiderScale * spiderBodyBob(
-                game.gait[i].x, game.gait[i].y);
+    if (next.y < -outerRoomNear && game.player.y > northernCeilingY - 0.35f) {
+        game.player.y = northernCeilingY - 0.35f;
+        game.effects.w = min(game.effects.w, 0.0f);
     }
+
+    advanceSpiders(game, dt);
 
     if (action > game.progress.z) {
         game.progress.z = action;
@@ -782,7 +434,8 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
             game.view.w = 0.11f;
             game.progress.y += 1u;
             shotAudioEvent[0] = 1u;
-            float3 shotDirection = forwardVector(game.player.w, game.view.x);
+            float3 shotDirection = pixeltje_3d::forward(
+                game.player.w, game.view.x);
             float3 normal;
             float3 impactNormal = -shotDirection;
             uint impactMaterial = 0u;
@@ -816,7 +469,8 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
             for (uint i = 0u; i < enemyCount; ++i) {
                 if (game.enemy[i].w <= 0.0f) continue;
                 SpiderHit spider = traceSpider(game.player.xyz, shotDirection,
-                    game.enemy[i].xyz, game.enemyClock[i].w,
+                    game.enemy[i].xyz, spiderVariantForSlot(i),
+                    game.enemyClock[i].w,
                     game.gait[i].x, game.gait[i].y,
                     spiderBodyRise(game.effects.x, i), 0.0f, block);
                 if (spider.material != 0u) {
@@ -831,7 +485,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
                 // Static scene lookup supplies a visible endpoint only. The
                 // crate/spider ray above remains the gameplay hit test.
                 SceneHit scene = {sceneRayLimit, float3(0.0f),
-                    float3(0.0f), 0u, -1};
+                    float3(0.0f), 0u, -1, 0u};
                 traceEnvironment(scene, game.player.xyz,
                     shotDirection, chrome);
                 if (scene.material != 0u) {
@@ -878,6 +532,8 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
                             game.gait[target].x, game.gait[target].y,
                             game.effects.x,
                             spiderBodyRise(game.effects.x, uint(target)));
+                        game.fallen[fallenIndex].appearance = uint4(
+                            uint(spiderVariantForSlot(uint(target))), 0u, 0u, 0u);
                     }
                     game.progress.x += 1u;
                 }
@@ -914,7 +570,7 @@ void acceptPlane(thread SceneHit &hit, float3 origin, float3 direction,
     float3 tolerance = float3(0.0001f);
     if (any(p < lower - tolerance) || any(p > upper + tolerance)) return;
     p = clamp(p, lower, upper);
-    hit = {t, normal, p, material, -1};
+    hit = {t, normal, p, material, -1, 0u};
 }
 
 bool doorway(uint room, uint wall, float3 point) {
@@ -972,7 +628,7 @@ void traceStair(thread SceneHit &hit, float3 origin, float3 direction,
     float3 normal;
     float t = rayBox(origin, direction, lower, upper, normal);
     if (t > 0.0f && t < hit.distance)
-        hit = {t, normal, origin + direction * t, 12u, -1};
+        hit = {t, normal, origin + direction * t, 12u, -1, 0u};
 }
 
 void traceConnector(thread SceneHit &hit, float3 origin, float3 direction,
@@ -1024,6 +680,40 @@ void traceConnector(thread SceneHit &hit, float3 origin, float3 direction,
     }
 }
 
+void traceJumpPad(thread SceneHit &hit, float3 origin, float3 direction,
+    uint index) {
+    float2 centre = jumpPadCentre(index);
+    float2 offset = origin.xz - centre;
+    float top = 1.2f + jumpPadHeight;
+    float radiusSquared = jumpPadRadius * jumpPadRadius;
+    if (direction.y < -0.0001f) {
+        float t = (top - origin.y) / direction.y;
+        float2 point = offset + direction.xz * t;
+        if (t > 0.01f && t < hit.distance
+            && dot(point, point) <= radiusSquared)
+            hit = {t, float3(0.0f, 1.0f, 0.0f),
+                origin + direction * t, 25u, -1, index};
+    }
+
+    // The shallow cylindrical edge is visible at grazing angles without
+    // making the pad stand proud of the floor.
+    float a = dot(direction.xz, direction.xz);
+    if (a < 0.000001f) return;
+    float b = dot(offset, direction.xz);
+    float discriminant = b * b - a * (dot(offset, offset) - radiusSquared);
+    if (discriminant < 0.0f) return;
+    float root = sqrt(discriminant);
+    float t = (-b - root) / a;
+    if (t <= 0.01f) t = (-b + root) / a;
+    float y = origin.y + direction.y * t;
+    if (t > 0.01f && t < hit.distance
+        && y >= 1.2f && y <= top) {
+        float3 position = origin + direction * t;
+        hit = {t, normalize(float3(position.x - centre.x, 0.0f,
+            position.z - centre.y)), position, 25u, -1, index};
+    }
+}
+
 void traceEnvironment(thread SceneHit &hit, float3 origin,
     float3 direction, ChromePose chrome) {
     traceRoom(hit, origin, direction, 0u,
@@ -1031,7 +721,7 @@ void traceEnvironment(thread SceneHit &hit, float3 origin,
         float3(mainRoomHalfExtent, 5.5f, mainRoomHalfExtent), 1u, 2u);
     traceRoom(hit, origin, direction, 1u,
         float3(-mainRoomHalfExtent, 1.2f, -outerRoomFar),
-        float3(mainRoomHalfExtent, 6.7f, -outerRoomNear), 6u, 7u);
+        float3(mainRoomHalfExtent, northernCeilingY, -outerRoomNear), 6u, 7u);
     traceRoom(hit, origin, direction, 2u,
         float3(outerRoomNear, 0.9f, -mainRoomHalfExtent),
         float3(outerRoomFar, 6.4f, mainRoomHalfExtent), 8u, 9u);
@@ -1048,28 +738,26 @@ void traceEnvironment(thread SceneHit &hit, float3 origin,
         float3(-outerRoomNear, 0.0f, -passageHalfWidth),
         float3(-mainRoomHalfExtent, 7.0f, passageHalfWidth), 2u, 1.5f);
 
+    for (uint i = 0u; i < jumpPadCount; ++i)
+        traceJumpPad(hit, origin, direction, i);
+
     float3 normal;
     float t = rayBox(origin, direction,
         float3(-4.1f, 0.0f, -3.1f),
         float3(-1.8f, 2.5f, -0.7f), normal);
     if (t > 0.0f && t < hit.distance)
-        hit = {t, normal, origin + direction * t, 14u, -1};
+        hit = {t, normal, origin + direction * t, 14u, -1, 0u};
     t = rayBox(origin, direction,
         float3(2.1f, 0.0f, -6.5f),
         float3(4.5f, 2.5f, -4.1f), normal);
     if (t > 0.0f && t < hit.distance)
-        hit = {t, normal, origin + direction * t, 4u, -1};
+        hit = {t, normal, origin + direction * t, 4u, -1, 0u};
     t = rayChrome(origin, direction, chrome, normal);
     if (t > 0.0f && t < hit.distance)
-        hit = {t, normal, origin + direction * t, 20u, -1};
+        hit = {t, normal, origin + direction * t, 20u, -1, 0u};
+    for (uint i = 0u; i < ceilingTLBoxCount; ++i)
+        traceCeilingTLBox(hit, origin, direction, ceilingTLBox(i), i);
 }
-
-struct SurfaceMaterial {
-    float3 albedo;
-    float roughness;
-    float metallic;
-    float3 emission;
-};
 
 float hashTile(float2 p) {
     return fract(sin(dot(p, float2(127.1f, 311.7f))) * 43758.5453f);
@@ -1129,7 +817,7 @@ float3 crateTexture(texture2d<float> image, SceneHit hit) {
 
 SurfaceMaterial surfaceMaterial(SceneHit hit,
     texture2d<float> crateA, texture2d<float> crateB,
-    float3 furPosition) {
+    float3 furPosition, float time) {
     if (hit.material == 1u) {
         float2 tile = hit.position.xz * 0.7f;
         float2 seam = abs(fract(tile) - 0.5f);
@@ -1152,7 +840,7 @@ SurfaceMaterial surfaceMaterial(SceneHit hit,
     if (hit.material == 3u) {
         float3 emission = float3(0.0f);
         for (uint i = 0u; i < 6u; ++i) {
-            PointLight light = roomLight(i);
+            PointLight light = roomLight(i, time);
             float radius = length(hit.position.xz - light.position.xz);
             float core = 1.0f - smoothstep(0.27f, 0.38f, radius);
             float halo = 1.0f - smoothstep(0.38f, 0.70f, radius);
@@ -1167,6 +855,28 @@ SurfaceMaterial surfaceMaterial(SceneHit hit,
     if (hit.material == 20u) return {
         float3(0.91f, 0.94f, 0.97f), 0.085f, 1.0f,
         float3(0.0f)};
+    if (hit.material == 22u || hit.material == 23u)
+        return tlBoxSurfaceMaterial(hit.material,
+            ceilingTLBox(hit.variant), time);
+    if (hit.material == 25u) {
+        if (hit.normal.y < 0.5f) return {
+            float3(0.21f, 0.24f, 0.26f), 0.38f, 0.86f,
+            float3(0.0f)};
+        float2 local = hit.position.xz - jumpPadCentre(hit.variant);
+        float radius = length(local);
+        float brushed = 0.92f + 0.08f * smoothNoise(local * 14.0f);
+        float groove = 1.0f - smoothstep(0.018f, 0.055f,
+            abs(radius - 1.33f));
+        float rim = smoothstep(1.47f, 1.62f, radius);
+        float chevron = abs(abs(local.x) - (0.28f + abs(local.y) * 0.55f));
+        float arrow = (1.0f - smoothstep(0.07f, 0.16f, chevron))
+            * step(-0.92f, local.y) * step(local.y, 0.92f);
+        float3 steel = float3(0.37f, 0.40f, 0.42f) * brushed;
+        steel = mix(steel, float3(0.12f, 0.15f, 0.17f), groove);
+        steel = mix(steel, float3(0.61f, 0.64f, 0.65f), arrow * 0.76f);
+        steel = mix(steel, float3(0.52f, 0.55f, 0.57f), rim);
+        return {steel, 0.29f, 0.84f, float3(0.0f)};
+    }
     if (hit.material == 6u) {
         // Cool terrazzo with stable, cell-sized colored stone chips.
         float2 uv = hit.position.xz * 2.4f;
@@ -1242,41 +952,11 @@ SurfaceMaterial surfaceMaterial(SceneHit hit,
         float3(0.16f, 0.19f, 0.21f)
             * (0.75f + 0.3f * smoothNoise(hit.position.xz * 0.7f)),
         0.88f, 0.0f, float3(0.0f)};
-    if (hit.material == 16u) return {
-        float3(0.012f, 0.019f, 0.023f), 0.045f, 0.02f,
-        float3(0.0f)};
-    if (hit.material == 19u) return {
-        float3(0.035f, 0.018f, 0.012f), 0.82f, 0.0f,
-        float3(0.0f)};
     if (hit.material == 5u || hit.material == 15u
-        || hit.material == 17u || hit.material == 18u) {
-        // Body, legs, joints and paws all use primitive-local fur coordinates,
-        // so the coat follows the spider's turns and articulated gait.
-        float fibers = 0.5f * smoothNoise(
-            furPosition.xy * 68.0f + furPosition.z * 13.0f)
-            + 0.5f * smoothNoise(
-                furPosition.zy * 74.0f + furPosition.x * 17.0f);
-        float flecks = hashTile(floor(furPosition.xz * 95.0f)
-            + floor(furPosition.y * 37.0f));
-        float mottling = smoothNoise(
-            furPosition.xy * 8.0f + furPosition.z * 2.0f);
-        float3 root = float3(0.18f, 0.09f, 0.045f);
-        float3 tip = float3(0.43f, 0.26f, 0.13f);
-        if (hit.material == 5u) {
-            root = float3(0.12f, 0.075f, 0.05f);
-            tip = float3(0.34f, 0.23f, 0.15f);
-        } else if (hit.material == 17u) {
-            root = float3(0.24f, 0.12f, 0.055f);
-            tip = float3(0.58f, 0.36f, 0.18f);
-        } else if (hit.material == 18u) {
-            root = float3(0.23f, 0.11f, 0.055f);
-            tip = float3(0.56f, 0.33f, 0.17f);
-        }
-        float3 coat = mix(root, tip, fibers)
-            * (0.84f + 0.25f * flecks)
-            * (0.83f + 0.28f * mottling);
-        return {coat, 0.94f, 0.0f, float3(0.0f)};
-    }
+        || hit.material == 16u || hit.material == 17u
+        || hit.material == 18u || hit.material == 19u)
+        return spiderSurfaceMaterial(hit.material, furPosition,
+            SpiderVariant(hit.variant));
     return {float3(0.0f),
         1.0f, 0.0f, float3(0.0f)};
 }
@@ -1296,6 +976,13 @@ bool crateBlocksLight(float3 origin, float3 direction, float lightDistance,
 
 float3 shadePointLight(SceneHit hit, SurfaceMaterial material,
     float3 viewDirection, PointLight light, ChromePose chrome) {
+    // The northern fixture is shaded by its housing above the diffusers.
+    // Keep its light inside the room and off the nearby ceiling surface.
+    if (light.position.z < -outerRoomNear
+        && (hit.position.z > -mainRoomHalfExtent
+            || abs(hit.position.x) > mainRoomHalfExtent
+            || (hit.material == 3u && hit.position.z < -outerRoomNear)))
+        return float3(0.0f);
     float3 toLight = light.position - hit.position;
     float distanceSquared = max(dot(toLight, toLight), 0.04f);
     float lightDistance = sqrt(distanceSquared);
@@ -1326,7 +1013,7 @@ float3 shadePointLight(SceneHit hit, SurfaceMaterial material,
     float geometryV = nDotV / (nDotV * (1.0f - k) + k);
     float geometryL = nDotL / (nDotL * (1.0f - k) + k);
     float3 f0 = mix(float3(0.04f), material.albedo, material.metallic);
-    float3 fresnel = f0 + (1.0f - f0) * pow(1.0f - vDotH, 5.0f);
+    float3 fresnel = pixeltje_3d::fresnelSchlick(vDotH, f0);
     float3 diffuse = (1.0f - fresnel) * (1.0f - material.metallic)
         * material.albedo / rangePi;
     float3 specular = distribution * geometryV * geometryL * fresnel
@@ -1343,30 +1030,35 @@ void traceScene(thread SceneHit &hit, thread float3 &furPosition,
     for (uint i = 0u; i < enemyCount; ++i) {
         if (game.enemy[i].w <= 0.0f) continue;
         SpiderHit spider = traceSpider(origin, direction, game.enemy[i].xyz,
-            game.enemyClock[i].w, game.gait[i].x, game.gait[i].y,
+            spiderVariantForSlot(i), game.enemyClock[i].w,
+            game.gait[i].x, game.gait[i].y,
             spiderBodyRise(game.effects.x, i), 0.0f,
             hit.distance);
         if (spider.material != 0u) {
             hit = {spider.distance, spider.normal,
-                origin + direction * spider.distance, spider.material, int(i)};
+                origin + direction * spider.distance, spider.material,
+                int(i), uint(spiderVariantForSlot(i))};
             furPosition = spider.furPosition;
         }
     }
     for (uint i = 0u; i < min(game.progress.x, targetKills); ++i) {
         FallenSpider fallen = game.fallen[i];
+        SpiderVariant variant = SpiderVariant(fallen.appearance.x);
+        SpiderTraits traits = spiderTraits(variant);
         float collapse = smoothstep(0.0f, 0.65f,
             game.effects.x - fallen.motion.z);
         float3 centre = fallen.pose.xyz;
         centre.y = mix(centre.y,
-            stairHeight(centre.xz) + spiderScale * 0.37f, collapse);
+            stairHeight(centre.xz) + traits.scale * 0.37f, collapse);
         SpiderHit spider = traceSpider(origin, direction, centre,
-            fallen.pose.w, fallen.motion.x,
+            variant, fallen.pose.w, fallen.motion.x,
             fallen.motion.y * (1.0f - collapse),
             fallen.motion.w * (1.0f - collapse), collapse,
             hit.distance);
         if (spider.material != 0u) {
             hit = {spider.distance, spider.normal,
-                origin + direction * spider.distance, spider.material, -1};
+                origin + direction * spider.distance, spider.material,
+                -1, fallen.appearance.x};
             furPosition = spider.furPosition;
         }
     }
@@ -1377,7 +1069,7 @@ float3 chromeReflection(SceneHit hit, float3 incoming,
     ChromePose chrome, device const GameState &game) {
     float3 reflectedDirection = reflect(incoming, hit.normal);
     SceneHit reflectedHit = {sceneRayLimit, float3(0.0f),
-        float3(0.0f), 0u, -1};
+        float3(0.0f), 0u, -1, 0u};
     float3 reflectedFurPosition = float3(0.0f);
     traceScene(reflectedHit, reflectedFurPosition,
         hit.position + hit.normal * 0.025f, reflectedDirection,
@@ -1385,18 +1077,49 @@ float3 chromeReflection(SceneHit hit, float3 incoming,
     if (reflectedHit.material == 0u || reflectedHit.material == 20u)
         return float3(0.06f, 0.09f, 0.12f);
     SurfaceMaterial reflected = surfaceMaterial(reflectedHit,
-        crateA, crateB, reflectedFurPosition);
+        crateA, crateB, reflectedFurPosition, game.effects.x);
     float3 color = reflected.albedo * 0.32f + reflected.emission;
     for (uint i = 0u; i < 6u; ++i)
         color += shadePointLight(reflectedHit, reflected,
-            -reflectedDirection, roomLight(i), chrome);
+            -reflectedDirection, roomLight(i, game.effects.x), chrome);
     return color;
 }
 
-float3 filmicToneMap(float3 color) {
-    return clamp((color * (2.51f * color + 0.03f))
-        / (color * (2.43f * color + 0.59f) + 0.14f),
-        float3(0.0f), float3(1.0f));
+float3 shadeGlassBox(float3 background, float3 origin, float3 direction,
+    float opaqueDistance, texture2d<float> crateA,
+    texture2d<float> crateB, ChromePose chrome,
+    device const GameState &game) {
+    float3 normal;
+    float distance = rayBox(origin, direction,
+        glassBoxLower, glassBoxUpper, normal);
+    if (distance <= 0.0f || distance >= opaqueDistance)
+        return background;
+
+    // Trace the opaque room first, then layer this glass surface over it so
+    // the floor, enemies, and other objects remain visible through the box.
+    SceneHit glass = {distance, normal,
+        origin + direction * distance, 21u, -1, 0u};
+    float facing = max(dot(normal, -direction), 0.0f);
+    float grazing = pow(1.0f - facing, 5.0f);
+
+    SurfaceMaterial material = {float3(0.04f),
+        0.075f, 0.0f, float3(0.0f)};
+    float3 highlights = float3(0.0f);
+    for (uint i = 0u; i < 6u; ++i)
+        highlights += shadePointLight(glass, material,
+            -direction, roomLight(i, game.effects.x), chrome);
+    float3 reflection = chromeReflection(glass, direction,
+        crateA, crateB, chrome, game);
+    // Clear glass transmits the scene without a colored fill or drawn edge.
+    // Neutral reflections and light glints provide the glossy appearance.
+    float reflectionLight = dot(reflection,
+        float3(0.2126f, 0.7152f, 0.0722f));
+    float highlightLight = dot(highlights,
+        float3(0.2126f, 0.7152f, 0.0722f));
+    float transmission = 0.88f - 0.18f * grazing;
+    return background * transmission
+        + float3(reflectionLight) * (0.08f + 0.24f * grazing)
+        + float3(highlightLight) * 0.55f;
 }
 
 void resolvedImpact(device const GameState &game, ShotImpact shot,
@@ -1462,9 +1185,7 @@ float3 shadeImpacts(float3 color, SceneHit hit,
         float4 texel = impactTexture.sample(impactSampler, uv);
         float3 srgb = clamp(texel.rgb / max(texel.a, 0.001f),
             float3(0.0f), float3(1.0f));
-        float3 linear = select(pow((srgb + 0.055f) / 1.055f,
-            float3(2.4f)), srgb / 12.92f,
-            srgb <= 0.04045f);
+        float3 linear = pixeltje_3d::srgbToLinear(srgb);
         float edge = 1.0f - smoothstep(0.67f, 1.0f, radial);
         float fade = movingSurface ? 1.0f - smoothstep(0.12f, 0.28f, age)
             : 1.0f - smoothstep(5.5f, 8.0f, age);
@@ -1580,27 +1301,23 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     texture2d<float> crateB [[texture(2)]],
     texture2d<float> impactTexture [[texture(3)]]) {
     device const GameState &game = states[0];
-    float2 screen = (in.uv - 0.5f) * u.resolutionTime.xy / u.resolutionTime.y;
-    float3 forward = forwardVector(game.player.w, game.view.x);
-    float3 right = normalize(cross(forward, float3(0.0f, 1.0f, 0.0f)));
-    float3 up = cross(right, forward);
-    float3 direction = normalize(forward * 1.1f
-        + right * screen.x - up * screen.y);
+    float3 direction = pixeltje_3d::cameraDirection(in.uv,
+        u.resolutionTime.xy, game.player.w, game.view.x, 1.1f);
     float3 origin = game.player.xyz;
     ChromePose chrome = {game.chromeRotation, game.chromeCentre.xyz};
     float3 furPosition = float3(0.0f);
     SceneHit hit = {sceneRayLimit,
-        float3(0.0f), float3(0.0f), 0u, -1};
+        float3(0.0f), float3(0.0f), 0u, -1, 0u};
     traceScene(hit, furPosition, origin, direction, chrome, game);
 
     SurfaceMaterial material = surfaceMaterial(hit, crateA, crateB,
-        furPosition);
+        furPosition, game.effects.x);
     float3 color = material.emission
         + material.albedo * (1.0f - material.metallic)
             * float3(0.030f, 0.038f, 0.046f);
     for (uint i = 0u; i < 6u; ++i) {
         color += shadePointLight(hit, material, -direction,
-            roomLight(i), chrome);
+            roomLight(i, game.effects.x), chrome);
     }
     if (hit.material == 20u) {
         float facing = max(dot(hit.normal, -direction), 0.0f);
@@ -1617,12 +1334,15 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     if (hit.material == 16u) {
         // A soft reflected ceiling light follows the curved cornea as the
         // spider turns, rather than glowing from inside the eye.
+        bool redEyes = hit.variant == uint(SpiderVariant::blackRedEyes);
         float3 reflected = reflect(direction, hit.normal);
         float glint = pow(max(dot(reflected,
             normalize(float3(-0.3f, 0.85f, -0.4f))), 0.0f), 56.0f);
-        color += float3(0.65f, 0.78f, 0.84f) * glint;
+        color += (redEyes ? float3(1.0f, 0.13f, 0.09f)
+            : float3(0.65f, 0.78f, 0.84f)) * glint;
         float fresnel = 1.0f - max(dot(hit.normal, -direction), 0.0f);
-        color += float3(0.055f, 0.075f, 0.082f)
+        color += (redEyes ? float3(0.16f, 0.012f, 0.014f)
+            : float3(0.055f, 0.075f, 0.082f))
             * fresnel * fresnel * fresnel;
     }
     if (hit.enemy >= 0) {
@@ -1631,10 +1351,12 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     color = shadeImpacts(color, hit, game, impactTexture);
     color = mix(color, float3(0.0f),
         1.0f - exp(-hit.distance * 0.008f));
+    color = shadeGlassBox(color, origin, direction, hit.distance,
+        crateA, crateB, chrome, game);
     color = shadeShot(color, origin, direction, hit.distance, game);
     color = shadeSpiderParticles(color, origin, direction,
         hit.distance, game);
-    color = filmicToneMap(color * 1.6f);
+    color = pixeltje_3d::filmicToneMap(color * 1.6f);
 
     // Crosshair, health bar, target pips, and damage/muzzle feedback.
     float2 pixel = in.uv * u.resolutionTime.xy;
@@ -1682,7 +1404,6 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         }
     }
     color = clamp(color, float3(0.0f), float3(1.0f));
-    float3 srgb = select(1.055f * pow(color, float3(1.0f / 2.4f))
-        - 0.055f, 12.92f * color, color <= 0.0031308f);
+    float3 srgb = pixeltje_3d::linearToSRGB(color);
     return float4(clamp(srgb, float3(0.0f), float3(1.0f)), 1.0f);
 }

@@ -77,13 +77,19 @@ import Testing
   let device = try #require(MTLCreateSystemDefaultDevice())
   let queue = try #require(device.makeCommandQueue())
   let runner = PipelineGPUProgram(commandQueue: queue)
-  let source = try String(contentsOf:
-    examples.appendingPathComponent("SignalRangeFPSProgram.metal"), encoding: .utf8)
+  let source = try PipelineMeshRenderer.shaderSource(supplied: nil,
+    fileName: "SignalRangeFPSProgram.metal", sourceMediaRoot: examples)
   try await runner.validateLiteral(programJSON: program, source: source)
   let pixel = PipelineNodeValue(try PipelineImageInput(width: 1, height: 1,
     rgba: [0.5, 0.4, 0.3, 1]), type: .image)
   let assets = PipelineAssetBundle(values: [
     "asset0": pixel, "asset1": pixel, "asset2": pixel,
+    "asset3": PipelineNodeValue(examples.appendingPathComponent(
+      "BaseTestSet/two-tone.wav"), type: .audio),
+    "asset4": PipelineNodeValue(examples.appendingPathComponent(
+      "BaseTestSet/two-tone.wav"), type: .audio),
+    "asset5": PipelineNodeValue(examples.appendingPathComponent(
+      "BaseTestSet/two-tone.wav"), type: .audio),
   ])
   let executor = PipelineGPUProgram.executor(runner: runner)
 

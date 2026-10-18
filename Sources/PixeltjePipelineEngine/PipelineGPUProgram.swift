@@ -273,7 +273,7 @@ actor PipelineGPUProgram {
     let size = try PipelineMetalRenderSize(width: 512, height: 512)
     try Self.validate(program, size: size, parameters: [:])
     let library = try await queue.device.makeLibrary(
-      source: PipelineMetalEasing.resolving(source), options: nil)
+      source: PipelineMetalLibraries.resolving(source), options: nil)
     for pass in program.initialize + program.tick + program.present {
       let names = pass.kind == "compute" ? [pass.function!] : [pass.vertex!, pass.fragment!]
       for name in names where library.makeFunction(name: name) == nil {
