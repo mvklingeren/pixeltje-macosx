@@ -131,6 +131,7 @@ float rayBox(float3 origin, float3 direction, float3 lower, float3 upper,
 float hashTile(float2 p);
 
 #include "SignalRangeTLBox.metal"
+#include "SignalRangeCeilingLamps.metal"
 
 float4 multiplyQuaternions(float4 a, float4 b) {
     return float4(a.w * b.xyz + b.w * a.xyz + cross(a.xyz, b.xyz),
@@ -172,19 +173,19 @@ struct PointLight {
     float3 position;
     float3 color;
     float power;
+    bool shadedAbove;   // an opaque dome shade keeps this light below it
 };
 
 PointLight roomLight(uint index, float time) {
-    if (index == 0u) return {
-        float3(-9.0f, 5.05f, -8.0f), float3(1.0f, 0.79f, 0.58f), 420.0f};
-    if (index == 1u) return {
-        float3(9.0f, 5.05f, -8.0f), float3(0.48f, 0.78f, 1.0f), 390.0f};
-    if (index == 2u) return {float3(0.0f, 5.05f, 10.0f),
-        float3(1.0f, 0.53f, 0.35f), 320.0f};
+    if (index < ceilingLampCount) {
+        CeilingLamp lamp = ceilingLamps[index];
+        return {ceilingLampEmitter(lamp), lamp.tint, lamp.power,
+            lamp.type == CeilingLampType::pendant};
+    }
     if (index == 3u) {
         CeilingTLBox fixture = ceilingTLBox(0u);
         return {fixture.centre - float3(0.0f, 0.36f, 0.0f),
-            fixture.tint, 1800.0f * tlBoxFlicker(time, fixture.phase)};
+            fixture.tint, 600.0f * tlBoxFlicker(time, fixture.phase)};
     }
     if (index == 4u) return {float3(42.0f, 5.95f, 0.0f),
         float3(1.0f, 0.75f, 0.45f), 540.0f};
@@ -1016,6 +1017,8 @@ void traceEnvironment(thread SceneHit &hit, float3 origin,
         hit = {t, normal, origin + direction * t, 20u, -1, 0u};
     for (uint i = 0u; i < ceilingTLBoxCount; ++i)
         traceCeilingTLBox(hit, origin, direction, ceilingTLBox(i), i);
+    for (uint i = 0u; i < ceilingLampCount; ++i)
+        traceCeilingLamp(hit, origin, direction, ceilingLamps[i], i);
 }
 
 float hashTile(float2 p) {
@@ -1097,8 +1100,9 @@ SurfaceMaterial surfaceMaterial(SceneHit hit,
             0.85f, 0.0f, float3(0.0f)};
     }
     if (hit.material == 3u) {
+        // The arena lamps show their own armatures instead of a glow spot.
         float3 emission = float3(0.0f);
-        for (uint i = 0u; i < 8u; ++i) {
+        for (uint i = ceilingLampCount; i < 8u; ++i) {
             PointLight light = roomLight(i, time);
             float radius = length(hit.position.xz - light.position.xz);
             float core = 1.0f - smoothstep(0.27f, 0.38f, radius);
@@ -1117,6 +1121,9 @@ SurfaceMaterial surfaceMaterial(SceneHit hit,
     if (hit.material == 22u || hit.material == 23u)
         return tlBoxSurfaceMaterial(hit.material,
             ceilingTLBox(hit.variant), time);
+    if (hit.material >= 31u && hit.material <= 33u)
+        return ceilingLampSurfaceMaterial(hit.material,
+            ceilingLamps[hit.variant]);
     if (hit.material == 25u) {
         if (hit.normal.y < 0.5f) return {
             float3(0.21f, 0.24f, 0.26f), 0.38f, 0.86f,
@@ -1278,7 +1285,8 @@ float3 shadePointLight(SceneHit hit, SurfaceMaterial material,
     float lightDistance = sqrt(distanceSquared);
     float3 l = toLight / lightDistance;
     float nDotL = max(dot(hit.normal, l), 0.0f);
-    if (nDotL <= 0.0f) return float3(0.0f);
+    float shade = light.shadedAbove ? smoothstep(-0.04f, 0.08f, l.y) : 1.0f;
+    if (nDotL <= 0.0f || shade <= 0.0f) return float3(0.0f);
 
     float3 shadowOrigin = hit.position + hit.normal * 0.012f;
     if (crateBlocksLight(shadowOrigin, l, lightDistance,
@@ -1289,7 +1297,7 @@ float3 shadePointLight(SceneHit hit, SurfaceMaterial material,
         return float3(0.0f);
     }
 
-    float3 radiance = light.color * light.power
+    float3 radiance = light.color * light.power * shade
         / (4.0f * rangePi * distanceSquared);
     if (dot(hit.fur.xyz, hit.fur.xyz) > 0.0f)
         return spiderFurReflectance(material.albedo, hit.fur, hit.normal,
