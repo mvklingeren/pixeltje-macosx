@@ -418,8 +418,9 @@ actor PipelineGPUProgram {
       total + (resource.kind == "buffer" ? resource.bytes ?? 0
         : resource.kind == "texture" ? size.pixels * 8 : 0)
     }
+    // A full mip chain adds at most a third to each input texture.
     let inputBytes = inputImages.values.reduce(0) {
-      $0 + $1.width * $1.height * 8
+      $0 + $1.width * $1.height * 8 * 4 / 3
     }
     let fontBytes = fonts.values.reduce(0) { $0 + $1.bytes.count }
     guard declaredBytes + inputBytes + fontBytes <= 134_217_728 else {
@@ -465,7 +466,7 @@ actor PipelineGPUProgram {
           fonts: fonts,
           excluding: directPreview ? definition.output : nil),
         nextFrame: 0)
-      try await clearTextures(working.resources)
+      try await prepareTextures(working.resources)
     }
     // Live controls may have moved while upstream assets were evaluated. Read
     // them immediately before advancing the GPU state for this frame.
@@ -898,7 +899,7 @@ actor PipelineGPUProgram {
         }
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
           pixelFormat: .rgba16Float, width: image.width,
-          height: image.height, mipmapped: false)
+          height: image.height, mipmapped: true)
         descriptor.storageMode = .shared
         descriptor.usage = [.shaderRead]
         guard let texture = queue.device.makeTexture(descriptor: descriptor) else {
@@ -979,7 +980,7 @@ actor PipelineGPUProgram {
     return copies
   }
 
-  private func clearTextures(_ resources: [String: Resource]) async throws {
+  private func prepareTextures(_ resources: [String: Resource]) async throws {
     guard let command = queue.makeCommandBuffer() else {
       throw PipelineEngineError.invalidInvocation("GPU Program texture initialization failed.")
     }
@@ -994,6 +995,18 @@ actor PipelineGPUProgram {
         throw PipelineEngineError.invalidInvocation("GPU Program texture initialization failed.")
       }
       encoder.endEncoding()
+    }
+    // Input textures carry a full mip chain so shaders may filter them
+    // trilinearly or anisotropically; a sampler without mip_filter reads level 0.
+    let inputs = resources.values.compactMap { resource -> (any MTLTexture)? in
+      if case .inputTexture(let texture) = resource { texture } else { nil }
+    }
+    if !inputs.isEmpty {
+      guard let blit = command.makeBlitCommandEncoder() else {
+        throw PipelineEngineError.invalidInvocation("GPU Program texture initialization failed.")
+      }
+      inputs.forEach { blit.generateMipmaps(for: $0) }
+      blit.endEncoding()
     }
     try await finish(command)
   }

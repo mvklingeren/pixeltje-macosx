@@ -1203,7 +1203,37 @@ float smoothNoise(float2 p) {
             hashTile(cell + float2(1.0f, 1.0f)), f.x), f.y);
 }
 
-float3 crateTexture(texture2d<float> image, SceneHit hit) {
+// One pixel's footprint on a surface, as world-space axes across and along
+// the view direction. Sampling with gradients from these keeps mip level and
+// anisotropy right at silhouettes and in reflections, where screen-space
+// derivatives of ray-cast coordinates are meaningless.
+struct PixelFootprint {
+    float3 across;
+    float3 along;
+};
+
+PixelFootprint pixelFootprint(float3 direction, float3 normal, float width) {
+    float3 across = cross(direction, normal);
+    float sine = length(across);
+    across = sine > 1.0e-4f ? across / sine
+        : normalize(cross(normal, abs(normal.y) < 0.9f
+            ? float3(0.0f, 1.0f, 0.0f) : float3(1.0f, 0.0f, 0.0f)));
+    float facing = max(abs(dot(direction, normal)), 0.05f);
+    return {across * width, cross(normal, across) * (width / facing)};
+}
+
+float2 crateFaceUV(float3 local, float3 normal) {
+    if (abs(normal.x) > 0.5f)
+        return float2(normal.x > 0.0f ? 1.0f - local.z : local.z,
+            1.0f - local.y);
+    if (abs(normal.z) > 0.5f)
+        return float2(normal.z > 0.0f ? local.x : 1.0f - local.x,
+            1.0f - local.y);
+    return float2(local.x, normal.y > 0.0f ? local.z : 1.0f - local.z);
+}
+
+float3 crateTexture(texture2d<float> image, SceneHit hit, float3 direction,
+    float pixelWidth) {
     // Each generated image is a flat material panel, not a cube atlas. Map it
     // once onto each face in crate-local space so paint stays aligned to its
     // face and no face wraps partway into the next repetition.
@@ -1213,25 +1243,20 @@ float3 crateTexture(texture2d<float> image, SceneHit hit) {
     float3 upper = hit.material == 4u
         ? float3(4.5f, 2.5f, -4.1f)
         : float3(-1.8f, 2.5f, -0.7f);
-    float3 local = clamp((hit.position - lower) / (upper - lower),
+    float3 size = upper - lower;
+    float3 local = clamp((hit.position - lower) / size,
         float3(0.0f), float3(1.0f));
-    float2 uv;
-    if (abs(hit.normal.x) > 0.5f) {
-        uv = float2(hit.normal.x > 0.0f ? 1.0f - local.z : local.z,
-            1.0f - local.y);
-    } else if (abs(hit.normal.z) > 0.5f) {
-        uv = float2(hit.normal.z > 0.0f ? local.x : 1.0f - local.x,
-            1.0f - local.y);
-    } else {
-        uv = float2(local.x,
-            hit.normal.y > 0.0f ? local.z : 1.0f - local.z);
-    }
+    float2 uv = crateFaceUV(local, hit.normal);
+    PixelFootprint footprint = pixelFootprint(direction, hit.normal, pixelWidth);
     constexpr sampler materialSampler(coord::normalized,
-        address::clamp_to_edge, filter::linear);
+        address::clamp_to_edge, filter::linear, mip_filter::linear,
+        max_anisotropy(16));
     // Crop away the source image's uncertain outer edge. The frame below is
     // built from exact face coordinates rather than asking the model to draw it.
     float4 texel = image.sample(materialSampler,
-        float2(0.06f) + uv * 0.88f);
+        float2(0.06f) + uv * 0.88f, gradient2d(
+            (crateFaceUV(local + footprint.across / size, hit.normal) - uv) * 0.88f,
+            (crateFaceUV(local + footprint.along / size, hit.normal) - uv) * 0.88f));
     float3 srgb = clamp(texel.rgb / max(texel.a, 0.001f),
         float3(0.0f), float3(1.0f));
     float3 paint = select(pow((srgb + 0.055f) / 1.055f, float3(2.4f)),
@@ -1249,7 +1274,7 @@ float3 crateTexture(texture2d<float> image, SceneHit hit) {
 
 SurfaceMaterial surfaceMaterial(SceneHit hit,
     texture2d<float> crateA, texture2d<float> crateB,
-    float3 furPosition, float time) {
+    float3 furPosition, float time, float3 direction, float pixelWidth) {
     if (hit.material == 1u) {
         float2 tile = hit.position.xz * 0.7f;
         float2 seam = abs(fract(tile) - 0.5f);
@@ -1283,7 +1308,8 @@ SurfaceMaterial surfaceMaterial(SceneHit hit,
             0.83f, 0.0f, emission};
     }
     if (hit.material == 4u || hit.material == 14u) return {
-        crateTexture(hit.material == 4u ? crateA : crateB, hit),
+        crateTexture(hit.material == 4u ? crateA : crateB, hit, direction,
+            pixelWidth),
         0.5f, 0.12f, float3(0.0f)};
     if (hit.material == 20u) return {
         float3(0.91f, 0.94f, 0.97f), 0.085f, 1.0f,
@@ -1755,7 +1781,7 @@ void traceScene(thread SceneHit &hit, thread float3 &furPosition,
 
 float3 chromeReflection(SceneHit hit, float3 incoming,
     texture2d<float> crateA, texture2d<float> crateB,
-    ChromePose chrome, device const GameState &game) {
+    ChromePose chrome, device const GameState &game, float pixelSpread) {
     float3 reflectedDirection = reflect(incoming, hit.normal);
     SceneHit reflectedHit = {sceneRayLimit, float3(0.0f),
         float3(0.0f), 0u, -1, 0u};
@@ -1766,7 +1792,9 @@ float3 chromeReflection(SceneHit hit, float3 incoming,
     if (reflectedHit.material == 0u || reflectedHit.material == 20u)
         return float3(0.06f, 0.09f, 0.12f);
     SurfaceMaterial reflected = surfaceMaterial(reflectedHit,
-        crateA, crateB, reflectedFurPosition, game.effects.x);
+        crateA, crateB, reflectedFurPosition, game.effects.x,
+        reflectedDirection,
+        pixelSpread * (hit.distance + reflectedHit.distance));
     float3 color = reflected.albedo * 0.32f + reflected.emission;
     for (uint i = 0u; i < 8u; ++i)
         color += shadePointLight(reflectedHit, reflected,
@@ -1777,7 +1805,7 @@ float3 chromeReflection(SceneHit hit, float3 incoming,
 float3 shadeGlassBox(float3 background, float3 origin, float3 direction,
     float opaqueDistance, texture2d<float> crateA,
     texture2d<float> crateB, ChromePose chrome,
-    device const GameState &game) {
+    device const GameState &game, float pixelSpread) {
     float3 normal;
     float distance = rayBox(origin, direction,
         glassBoxLower, glassBoxUpper, normal);
@@ -1798,7 +1826,7 @@ float3 shadeGlassBox(float3 background, float3 origin, float3 direction,
         highlights += shadePointLight(glass, material,
             -direction, roomLight(i, game.effects.x), chrome, game);
     float3 reflection = chromeReflection(glass, direction,
-        crateA, crateB, chrome, game);
+        crateA, crateB, chrome, game, pixelSpread);
     // Clear glass transmits the scene without a colored fill or drawn edge.
     // Neutral reflections and light glints provide the glossy appearance.
     float reflectionLight = dot(reflection,
@@ -1831,10 +1859,13 @@ void resolvedImpact(device const GameState &game, ShotImpact shot,
 }
 
 float3 shadeImpacts(float3 color, SceneHit hit,
-    device const GameState &game, texture2d<float> impactTexture) {
+    device const GameState &game, texture2d<float> impactTexture,
+    float3 direction, float pixelWidth) {
     if (hit.material == 0u) return color;
     constexpr sampler impactSampler(coord::normalized,
-        address::clamp_to_edge, filter::linear);
+        address::clamp_to_edge, filter::linear, mip_filter::linear,
+        max_anisotropy(16));
+    PixelFootprint footprint = pixelFootprint(direction, hit.normal, pixelWidth);
     for (uint i = 0u; i < impactCount; ++i) {
         ShotImpact shot = game.impacts[i];
         float age = game.effects.x - shot.muzzleTime.w;
@@ -1871,7 +1902,13 @@ float3 shadeImpacts(float3 color, SceneHit hit,
         float2 rotated = float2(cosine * local.x - sine * local.y,
             sine * local.x + cosine * local.y);
         float2 uv = rotated / (radius * 2.0f) + 0.5f;
-        float4 texel = impactTexture.sample(impactSampler, uv);
+        float2x2 turn = float2x2(float2(cosine, sine), float2(-sine, cosine))
+            / (radius * 2.0f);
+        float4 texel = impactTexture.sample(impactSampler, uv, gradient2d(
+            turn * float2(dot(footprint.across, tangent),
+                dot(footprint.across, bitangent)),
+            turn * float2(dot(footprint.along, tangent),
+                dot(footprint.along, bitangent))));
         float3 srgb = clamp(texel.rgb / max(texel.a, 0.001f),
             float3(0.0f), float3(1.0f));
         float3 linear = pixeltje_3d::srgbToLinear(srgb);
@@ -2146,6 +2183,8 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         origin = mix(origin, closeOrigin, reveal);
         direction = normalize(mix(direction, closeDirection, reveal));
     }
+    // World width of one pixel per unit of ray distance, for texture filtering.
+    float pixelSpread = 1.0f / (u.resolutionTime.y * mix(1.1f, 1.45f, reveal));
     ChromePose chrome = {game.chromeRotation, game.chromeCentre.xyz};
     float3 furPosition = float3(0.0f);
     SceneHit hit = {sceneRayLimit,
@@ -2153,7 +2192,7 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     traceScene(hit, furPosition, origin, direction, chrome, game);
 
     SurfaceMaterial material = surfaceMaterial(hit, crateA, crateB,
-        furPosition, game.effects.x);
+        furPosition, game.effects.x, direction, pixelSpread * hit.distance);
     float3 color = material.emission
         + material.albedo * (1.0f - material.metallic)
             * float3(0.030f, 0.038f, 0.046f);
@@ -2172,7 +2211,7 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         float facing = max(dot(hit.normal, -direction), 0.0f);
         float fresnel = 0.91f + 0.09f * pow(1.0f - facing, 5.0f);
         color += chromeReflection(hit, direction, crateA, crateB,
-            chrome, game)
+            chrome, game, pixelSpread)
             * fresnel;
     }
     if (hit.material == 5u || hit.material == 15u
@@ -2205,12 +2244,13 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
             color += float3(0.18f, 0.008f, 0.006f)
                 * (0.6f + 0.4f * sin(game.effects.x * 32.0f));
     }
-    color = shadeImpacts(color, hit, game, impactTexture);
+    color = shadeImpacts(color, hit, game, impactTexture, direction,
+        pixelSpread * hit.distance);
     // There is no haze in vacuum.
     if (!exterior && hit.material != 0u)
         color = mix(color, float3(0.0f), 1.0f - exp(-hit.distance * 0.008f));
     color = shadeGlassBox(color, origin, direction, hit.distance,
-        crateA, crateB, chrome, game);
+        crateA, crateB, chrome, game, pixelSpread);
     color = shadeShot(color, origin, direction, hit.distance, game);
     color = shadeSpiderParticles(color, origin, direction,
         hit.distance, game);
@@ -2272,6 +2312,93 @@ fragment float4 bloomFragment(ScreenVertex in [[stage_in]],
         total += weight;
     }
     return float4(sum / total, 1.0f);
+}
+
+// Edge luma on a soft roll-off of linear light, so edge detection follows
+// what the tone-mapped image will show rather than raw HDR brightness.
+float antialiasLuma(texture2d<float> scene, float2 uv) {
+    float light = dot(scene.sample(postSampler, uv).rgb,
+        float3(0.2126f, 0.7152f, 0.0722f));
+    return sqrt(light / (1.0f + light));
+}
+
+// FXAA-style edge smoothing. The scene is ray-cast once per pixel, so
+// geometry edges alias; this finds each edge, walks along it to estimate
+// where the pixel sits on the stair step, and resamples across it.
+fragment float4 antialiasFragment(ScreenVertex in [[stage_in]],
+    constant ProgramUniforms &u [[buffer(0)]],
+    texture2d<float> scene [[texture(1)]]) {
+    float2 texel = 1.0f / u.resolutionTime.xy;
+    float4 centre = scene.sample(postSampler, in.uv);
+    float lumaM = antialiasLuma(scene, in.uv);
+    float lumaN = antialiasLuma(scene, in.uv + float2(0.0f, -texel.y));
+    float lumaS = antialiasLuma(scene, in.uv + float2(0.0f, texel.y));
+    float lumaW = antialiasLuma(scene, in.uv + float2(-texel.x, 0.0f));
+    float lumaE = antialiasLuma(scene, in.uv + float2(texel.x, 0.0f));
+    float lumaMax = max(lumaM, max(max(lumaN, lumaS), max(lumaW, lumaE)));
+    float range = lumaMax - min(lumaM, min(min(lumaN, lumaS), min(lumaW, lumaE)));
+    if (range < max(0.0312f, lumaMax * 0.125f)) return centre;
+
+    float lumaNW = antialiasLuma(scene, in.uv + float2(-texel.x, -texel.y));
+    float lumaNE = antialiasLuma(scene, in.uv + float2(texel.x, -texel.y));
+    float lumaSW = antialiasLuma(scene, in.uv + float2(-texel.x, texel.y));
+    float lumaSE = antialiasLuma(scene, in.uv + float2(texel.x, texel.y));
+    bool horizontal = abs(lumaNW + lumaSW - 2.0f * lumaW)
+            + 2.0f * abs(lumaN + lumaS - 2.0f * lumaM)
+            + abs(lumaNE + lumaSE - 2.0f * lumaE)
+        >= abs(lumaNW + lumaNE - 2.0f * lumaN)
+            + 2.0f * abs(lumaW + lumaE - 2.0f * lumaM)
+            + abs(lumaSW + lumaSE - 2.0f * lumaS);
+
+    // Step toward the neighbour across the edge with the steeper gradient.
+    float lumaNegative = horizontal ? lumaN : lumaW;
+    float lumaPositive = horizontal ? lumaS : lumaE;
+    bool negativeSteeper = abs(lumaNegative - lumaM) >= abs(lumaPositive - lumaM);
+    float threshold = 0.25f * max(abs(lumaNegative - lumaM),
+        abs(lumaPositive - lumaM));
+    float stepLength = horizontal ? texel.y : texel.x;
+    float edgeLuma = 0.5f * (lumaM + (negativeSteeper ? lumaNegative : lumaPositive));
+    if (negativeSteeper) stepLength = -stepLength;
+
+    // Walk both ways along the edge until its luma departs from the average.
+    float2 edgeUV = in.uv + (horizontal ? float2(0.0f, 0.5f * stepLength)
+        : float2(0.5f * stepLength, 0.0f));
+    float2 along = horizontal ? float2(texel.x, 0.0f) : float2(0.0f, texel.y);
+    constexpr float strides[8] = {1.0f, 1.5f, 2.0f, 2.0f, 2.0f, 2.0f, 4.0f, 8.0f};
+    float2 uvBack = edgeUV, uvForward = edgeUV;
+    float endBack = 0.0f, endForward = 0.0f;
+    bool doneBack = false, doneForward = false;
+    for (int i = 0; i < 8 && !(doneBack && doneForward); ++i) {
+        if (!doneBack) {
+            uvBack -= along * strides[i];
+            endBack = antialiasLuma(scene, uvBack) - edgeLuma;
+            doneBack = abs(endBack) >= threshold;
+        }
+        if (!doneForward) {
+            uvForward += along * strides[i];
+            endForward = antialiasLuma(scene, uvForward) - edgeLuma;
+            doneForward = abs(endForward) >= threshold;
+        }
+    }
+    float distanceBack = horizontal ? in.uv.x - uvBack.x : in.uv.y - uvBack.y;
+    float distanceForward = horizontal ? uvForward.x - in.uv.x
+        : uvForward.y - in.uv.y;
+    bool backNearer = distanceBack < distanceForward;
+    // Only blend when the nearer end turns the same way as this pixel.
+    bool matches = ((backNearer ? endBack : endForward) < 0.0f)
+        != (lumaM < edgeLuma);
+    float edgeOffset = matches ? 0.5f - min(distanceBack, distanceForward)
+        / (distanceBack + distanceForward) : 0.0f;
+
+    // Thin features shorter than the walk still get a sub-pixel blend.
+    float average = (2.0f * (lumaN + lumaS + lumaW + lumaE)
+        + lumaNW + lumaNE + lumaSW + lumaSE) / 12.0f;
+    float subpixel = saturate(abs(average - lumaM) / range);
+    subpixel = (-2.0f * subpixel + 3.0f) * subpixel * subpixel;
+    float offset = max(edgeOffset, 0.75f * subpixel * subpixel);
+    float2 resolved = in.uv + (horizontal ? float2(0.0f, offset * stepLength)
+        : float2(offset * stepLength, 0.0f));
+    return float4(scene.sample(postSampler, resolved).rgb, centre.a);
 }
 
 float bossReveal(device const GameState &game) {
