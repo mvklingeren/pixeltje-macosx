@@ -1,11 +1,13 @@
 // pixeltje:easing-v1
 // pixeltje:3d-v1
+// pixeltje:terrain-v1
 #include <metal_stdlib>
 using namespace metal;
 
 // Signal Range: a five-room first-person arena shooter for gpu.program.
 // The compute pass owns all mutable game state. The fragment pass traces the
 // same room and walking spider drones from the camera, then draws the HUD.
+// An exit door in the starting arena's south wall leads onto the moon.
 
 constant uint enemyCount = 4u;
 constant uint ordinaryEnemyCount = 3u;
@@ -20,7 +22,7 @@ constant float mainRoomHalfExtent = 18.0f;
 constant float outerRoomNear = 24.0f;
 constant float outerRoomFar = 60.0f;
 constant float passageHalfWidth = 3.5f;
-constant float sceneRayLimit = 160.0f;
+constant float sceneRayLimit = 1800.0f;   // reaches the lunar horizon
 constant float chromeHalfSize = 0.75f;
 constant float2 chromeGroundPosition = float2(0.0f, 3.5f);
 constant uint jumpPadCount = 2u;
@@ -38,6 +40,24 @@ constant uint ambushSlot = 2u;
 constant uint magazineSize = 12u;
 constant float reloadDuration = 1.6f;
 constant float biteWindup = 0.45f;
+constant float exitHalfWidth = 2.5f;
+constant float exitDoorTop = 3.5f;
+constant float exitDoorZ = 18.15f;
+// The base's exterior shell. Its footprint separates the rooms from the moon.
+constant float hullHalfWidth = 60.3f;
+constant float hullSouth = 18.3f;
+constant float hullNorth = -130.3f;
+constant float3 hullFrontLower = float3(-60.3f, -2.0f, -24.0f);
+constant float3 hullFrontUpper = float3(60.3f, 7.3f, 18.3f);
+constant float3 hullRearLower = float3(-60.3f, -2.0f, -130.3f);
+constant float3 hullRearUpper = float3(60.3f, 18.6f, -23.9f);
+constant float moonCeiling = 110.0f;      // above the highest lunar terrain
+constant float moonWalkRadius = 1500.0f;
+constant int moonTraceDetail = 4;         // ray, shadow and footing octaves
+constant int moonShadeDetail = 7;         // normal octaves
+// A low sun in the south-west throws long shadows across the craters.
+constant float3 sunDirection = float3(-0.8494f, 0.2199f, 0.4797f);
+constant float sunPower = 1.13e10f;       // irradiance 9 from 10 km away
 
 struct ProgramUniforms {
     float4 resolutionTime;
@@ -379,9 +399,41 @@ void pushOutOfChrome(thread float2 &point) {
                 * safeRadius;
 }
 
+// True outside the base footprint grown by pad. Position.y is world Z.
+bool outdoors(float2 point, float pad) {
+    return point.x <= -hullHalfWidth - pad || point.x >= hullHalfWidth + pad
+        || point.y <= hullNorth - pad || point.y >= hullSouth + pad;
+}
+
+// Lunar surface around the base: rolling regolith, three crater sizes and a
+// ring of distant highlands. It is level ground beside the base walls.
+float moonHeight(float2 p, int detail) {
+    float2 wall = clamp(p, float2(-hullHalfWidth, hullNorth),
+        float2(hullHalfWidth, hullSouth));
+    float h = 7.0f * pixeltje_terrain::fbm(p / 160.0f, detail, 11.0f)
+        + pixeltje_terrain::craters(p, 260.0f, 0.55f, 21.0f)
+        + pixeltje_terrain::craters(p, 70.0f, 0.6f, 31.0f)
+        + pixeltje_terrain::craters(p, 17.0f, 0.5f, 41.0f);
+    if (detail > moonTraceDetail)
+        h += pixeltje_terrain::craters(p, 4.5f, 0.5f, 51.0f);
+    h *= smoothstep(6.0f, 60.0f, distance(p, wall));
+    float radius = length(p);
+    if (radius > 500.0f)
+        h += 95.0f * smoothstep(500.0f, 1300.0f, radius)
+            * (0.6f + 0.4f * pixeltje_terrain::fbm(p / 500.0f, 3, 61.0f));
+    return h;
+}
+
+struct MoonSurface {
+    int detail;
+    float operator()(float2 p) const { return moonHeight(p, detail); }
+};
+
 // The three stair connectors have six real steps. The same height function
-// positions the camera and the collision surface, so stairs are walkable.
+// positions the camera and the collision surface, so stairs and the moon
+// are walkable.
 float stairHeight(float2 point) {
+    if (outdoors(point, 0.0f)) return moonHeight(point, moonTraceDetail);
     if (abs(point.x) < passageHalfWidth
         && point.y < -mainRoomHalfExtent && point.y > -outerRoomNear)
         return (floor(clamp(-point.y - mainRoomHalfExtent,
@@ -409,6 +461,10 @@ bool walkable(float2 point) {
     const float outerLimit = outerRoomFar - 0.45f;
     const float passageLimit = passageHalfWidth - 0.42f;
     if (abs(x) <= roomLimit && abs(z) <= roomLimit) return true;
+    if (abs(x) <= exitHalfWidth - 0.42f && z >= roomLimit
+        && z <= hullSouth + 0.45f) return true;
+    if (outdoors(point, 0.45f))
+        return dot(point, point) < moonWalkRadius * moonWalkRadius;
     if (abs(x) <= passageLimit
         && z >= -outerRoomNear && z <= -roomLimit) return true;
     if (abs(x) <= roomLimit
@@ -430,6 +486,17 @@ bool walkable(float2 point) {
 float entranceDoorBottom(device const GameState &game) {
     return game.bossScene.x < 0.0f ? 9.0f
         : mix(9.0f, 1.2f, smoothstep(0.0f, 0.85f, game.bossScene.x));
+}
+
+// The exit door rises while the player or a spider is near, so it needs no
+// state and is fully open before anyone reaches it.
+float exitDoorBottom(device const GameState &game) {
+    float2 door = float2(0.0f, exitDoorZ);
+    float nearest = distance(game.player.xz, door);
+    for (uint i = 0u; i < enemyCount; ++i)
+        if (spiderActive(game, i))
+            nearest = min(nearest, distance(game.enemy[i].xz, door));
+    return exitDoorTop * (1.0f - smoothstep(3.0f, 6.0f, nearest));
 }
 
 float rearDoorBottom(device const GameState &game) {
@@ -556,7 +623,9 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     if (walkable(float2(position.x, next.y))) position.y = next.y;
     else game.motion.y = 0.0f;
     next = position;
-    if (game.progress.x < ordinaryEnemyCount
+    // Walking around the outside of the base must not trip the room rules.
+    bool outside = outdoors(next, 0.0f);
+    if (game.progress.x < ordinaryEnemyCount && !outside
         && previousPosition.y >= -outerRoomFar + 0.3f)
         next.y = max(next.y, -outerRoomFar + 0.3f);
     if (game.bossScene.x >= 0.0f
@@ -573,12 +642,12 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     game.motion.w = mix(game.motion.w, wasGrounded
             ? saturate(walked / max(dt * 4.6f, 0.00001f)) : 0.0f,
         1.0f - exp(-dt * 8.0f));
-    if (game.bossScene.x < 0.0f
+    if (game.bossScene.x < 0.0f && !outside
         && game.progress.x >= ordinaryEnemyCount
         && next.y < bossRoomSouth - 2.6f) {
         game.bossScene.x = 0.0f;
     }
-    if (next.y >= -outerRoomNear + 0.5f) {
+    if (next.y >= -outerRoomNear + 0.5f || outside) {
         game.roomTriggers.x = 0u;
     } else if (game.roomTriggers.x == 0u
         && (insideNorthernEntryTrigger(next)
@@ -594,6 +663,9 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     bool overJumpPad = onJumpPad(next);
     float groundY = 1.55f + stairHeight(next)
         + (overJumpPad ? jumpPadHeight : 0.0f);
+    // On the moon, feet follow the ground downhill instead of skipping off it.
+    if (outside && wasGrounded && game.effects.w <= 0.0f
+        && game.player.y - groundY < 0.35f) game.player.y = groundY;
     bool grounded = game.player.y <= groundY + 0.001f;
     if (jumpAction > uint(game.effects.z)) {
         game.effects.z = float(jumpAction);
@@ -614,7 +686,8 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
         game.player.y = groundY;
         game.effects.w = 0.0f;
     }
-    if (next.y < -outerRoomNear && game.player.y > northernCeilingY - 0.35f) {
+    if (next.y < -outerRoomNear && !outside
+        && game.player.y > northernCeilingY - 0.35f) {
         game.player.y = northernCeilingY - 0.35f;
         game.effects.w = min(game.effects.w, 0.0f);
     }
@@ -809,6 +882,7 @@ bool doorway(uint room, uint wall, float3 point) {
     if (point.y > height) return false;
     if (room == 0u) {
         return (wall == 0u && abs(point.x) < passageHalfWidth)
+            || (wall == 3u && abs(point.x) < exitHalfWidth)
             || ((wall == 1u || wall == 2u)
                 && abs(point.z) < passageHalfWidth);
     }
@@ -965,6 +1039,77 @@ void traceSlidingDoor(thread SceneHit &hit, float3 origin,
         hit = {t, normal, origin + direction * t, 27u, -1, variant};
 }
 
+void traceBox(thread SceneHit &hit, float3 origin, float3 direction,
+    float3 lower, float3 upper, uint material) {
+    float3 normal;
+    float t = rayBox(origin, direction, lower, upper, normal);
+    if (t > 0.0f && t < hit.distance)
+        hit = {t, normal, origin + direction * t, material, -1, 0u};
+}
+
+// Jambs, lintel and a raised sill line the exit opening through the shell,
+// with a green exit light above it inside the arena.
+void traceExit(thread SceneHit &hit, float3 origin, float3 direction,
+    device const GameState &game) {
+    float3 normal;
+    if (rayBox(origin, direction, float3(-2.9f, -0.3f, 17.9f),
+        float3(2.9f, 4.4f, 18.5f), normal) < 0.0f) return;
+    traceBox(hit, origin, direction, float3(-2.9f, -0.3f, 17.98f),
+        float3(-exitHalfWidth, 3.9f, 18.5f), 41u);
+    traceBox(hit, origin, direction, float3(exitHalfWidth, -0.3f, 17.98f),
+        float3(2.9f, 3.9f, 18.5f), 41u);
+    traceBox(hit, origin, direction, float3(-2.9f, exitDoorTop, 17.98f),
+        float3(2.9f, 3.9f, 18.5f), 41u);
+    traceBox(hit, origin, direction, float3(-exitHalfWidth, -0.3f, 17.98f),
+        float3(exitHalfWidth, 0.02f, 18.5f), 41u);
+    traceBox(hit, origin, direction, float3(-1.0f, 4.0f, 17.9f),
+        float3(1.0f, 4.4f, 17.98f), 42u);
+    traceSlidingDoor(hit, origin, direction, exitHalfWidth, exitDoorZ,
+        exitDoorBottom(game), exitDoorTop, 3u);
+}
+
+// Ray distances where a ray enters and leaves the base footprint; entry
+// beyond exit means it misses.
+float2 footprintSpan(float3 origin, float3 direction) {
+    float2 safe = select(direction.xz, float2(0.00001f),
+        abs(direction.xz) < float2(0.00001f));
+    float2 a = (float2(-hullHalfWidth, hullNorth) - origin.xz) / safe;
+    float2 b = (float2(hullHalfWidth, hullSouth) - origin.xz) / safe;
+    float2 entry = min(a, b), exit = max(a, b);
+    return float2(max(entry.x, entry.y), min(exit.x, exit.y));
+}
+
+// From outside, the shell hides the rooms except through the exit opening,
+// and the moon is traced up to the shell. From inside, a ray reaches the
+// moon only through the exit, so the terrain march starts where it leaves.
+void traceOutside(thread SceneHit &hit, float3 origin, float3 direction) {
+    bool inside = !outdoors(origin.xz, 0.0f);
+    float2 span = footprintSpan(origin, direction);
+    if (!inside) {
+        for (uint block = 0u; block < 2u; ++block) {
+            float3 normal;
+            float t = rayBox(origin, direction,
+                block == 0u ? hullFrontLower : hullRearLower,
+                block == 0u ? hullFrontUpper : hullRearUpper, normal);
+            if (t <= 0.0f || t >= hit.distance) continue;
+            float3 p = origin + direction * t;
+            if (normal.z > 0.5f && abs(p.x) < exitHalfWidth
+                && p.y < exitDoorTop) continue;
+            hit = {t, normal, p, 41u, -1, 0u};
+        }
+    }
+    float near = inside ? span.y : 0.0f;
+    float far = !inside && span.x > 0.0f && span.x <= span.y
+        ? min(hit.distance, span.x) : hit.distance;
+    if (near >= far) return;
+    float t = pixeltje_terrain::trace(MoonSurface{moonTraceDetail}, origin,
+        direction, near, far, moonCeiling, 160);
+    if (t < 0.0f) return;
+    float3 p = origin + direction * t;
+    hit = {t, pixeltje_terrain::normal(MoonSurface{moonShadeDetail}, p.xz,
+        0.02f + 0.002f * t), p, 40u, -1, 0u};
+}
+
 void traceEnvironment(thread SceneHit &hit, float3 origin,
     float3 direction, ChromePose chrome, device const GameState &game) {
     traceRoom(hit, origin, direction, 0u,
@@ -1029,6 +1174,9 @@ void traceEnvironment(thread SceneHit &hit, float3 origin,
         traceCeilingTLBox(hit, origin, direction, ceilingTLBox(i), i);
     for (uint i = 0u; i < ceilingLampCount; ++i)
         traceCeilingLamp(hit, origin, direction, ceilingLamps[i], i);
+    traceExit(hit, origin, direction, game);
+    // Last, so the terrain march stops at the nearest other surface.
+    traceOutside(hit, origin, direction);
 }
 
 float hashTile(float2 p) {
@@ -1156,11 +1304,14 @@ SurfaceMaterial surfaceMaterial(SceneHit hit,
     if (hit.material == 27u) {
         float rib = 1.0f - smoothstep(0.04f, 0.12f,
             abs(fract(hit.position.y * 0.8f) - 0.5f));
+        bool exit = hit.variant == 3u;
         float warning = 1.0f - smoothstep(0.0f, 0.35f,
-            abs(hit.position.x) / (hit.variant == 2u ? 10.5f : 5.0f));
+            abs(hit.position.x) / (hit.variant == 2u ? 10.5f
+                : (exit ? exitHalfWidth : 5.0f)));
         return {mix(float3(0.09f, 0.11f, 0.13f),
             float3(0.34f, 0.37f, 0.39f), rib * 0.55f)
-            + float3(0.20f, 0.018f, 0.012f) * warning,
+            + (exit ? float3(0.02f, 0.16f, 0.06f)
+                : float3(0.20f, 0.018f, 0.012f)) * warning,
             0.34f, 0.74f, float3(0.0f)};
     }
     if (hit.material == 28u) {
@@ -1256,6 +1407,29 @@ SurfaceMaterial surfaceMaterial(SceneHit hit,
         float3(0.16f, 0.19f, 0.21f)
             * (0.75f + 0.3f * smoothNoise(hit.position.xz * 0.7f)),
         0.88f, 0.0f, float3(0.0f)};
+    if (hit.material == 40u) {
+        // Grey regolith: dark maria patches, paler dust and fine grit.
+        float2 p = hit.position.xz;
+        float maria = pixeltje_terrain::valueNoise(p / 220.0f, 81.0f);
+        float grit = pixeltje_terrain::valueNoise(p * 2.3f, 82.0f);
+        return {mix(float3(0.085f, 0.083f, 0.08f),
+            float3(0.20f, 0.195f, 0.185f), smoothstep(0.25f, 0.75f, maria))
+            * (0.85f + 0.3f * grit), 0.97f, 0.0f, float3(0.0f)};
+    }
+    if (hit.material == 41u) {
+        // Pale shell panels, dusted with regolith near the ground.
+        float2 uv = abs(hit.normal.x) > 0.5f ? hit.position.zy
+            : (abs(hit.normal.z) > 0.5f ? hit.position.xy : hit.position.xz);
+        float2 seam = abs(fract(uv * float2(0.25f, 0.4f)) - 0.5f);
+        float panel = 1.0f - 0.55f * smoothstep(0.47f, 0.49f,
+            max(seam.x, seam.y));
+        float dust = 1.0f - smoothstep(0.0f, 1.4f, hit.position.y);
+        return {mix(float3(0.50f, 0.51f, 0.52f) * panel,
+            float3(0.16f, 0.155f, 0.15f), dust * 0.7f),
+            0.55f, 0.15f, float3(0.0f)};
+    }
+    if (hit.material == 42u) return {
+        float3(0.05f), 0.4f, 0.0f, float3(0.10f, 1.6f, 0.45f)};
     if (hit.material == 5u || hit.material == 15u
         || hit.material == 16u || hit.material == 17u
         || hit.material == 18u || hit.material == 19u)
@@ -1375,6 +1549,46 @@ float3 shadePointLight(SceneHit hit, SurfaceMaterial material,
     float3 specular = distribution * geometryV * geometryL * fresnel
         / max(4.0f * nDotV * nDotL, 0.001f);
     return (diffuse + specular) * radiance * nDotL;
+}
+
+// The sun is a point light 10 km away, so room-light shading serves it. The
+// shell and the terrain cast its shadows.
+float3 shadeSunlight(SceneHit hit, SurfaceMaterial material,
+    float3 viewDirection, ChromePose chrome, device const GameState &game) {
+    if (dot(hit.normal, sunDirection) <= 0.0f) return float3(0.0f);
+    float3 origin = hit.position + hit.normal * 0.05f;
+    if (crateBlocksLight(origin, sunDirection, 1.0e4f,
+            hullFrontLower, hullFrontUpper)
+        || crateBlocksLight(origin, sunDirection, 1.0e4f,
+            hullRearLower, hullRearUpper)) return float3(0.0f);
+    float lit = pixeltje_terrain::softShadow(MoonSurface{moonTraceDetail},
+        origin, sunDirection, 0.1f, 600.0f, moonCeiling, 10.0f, 48);
+    if (lit <= 0.0f) return float3(0.0f);
+    PointLight sun = {hit.position + sunDirection * 1.0e4f,
+        float3(1.0f, 0.97f, 0.92f), sunPower, false};
+    return lit * shadePointLight(hit, material, viewDirection, sun, chrome,
+        game);
+}
+
+// An airless black sky with the sun's disc and fixed stars.
+float3 spaceSky(float3 direction) {
+    float facing = dot(direction, sunDirection);
+    float3 color = float3(1.0f, 0.97f, 0.92f)
+        * (60.0f * smoothstep(0.99990f, 0.99993f, facing)
+            + 0.6f * pow(saturate(facing), 600.0f));
+    // The longitude seam faces north, behind the base for anyone outside.
+    float2 angles = float2(atan2(direction.x, direction.z), direction.y)
+        * 380.0f;
+    float2 cell = floor(angles);
+    float star = pixeltje_terrain::hash(cell, 71.0f);
+    if (star > 0.9965f) {
+        float2 offset = angles - cell - 0.5f
+            - 0.3f * (float2(pixeltje_terrain::hash(cell, 72.0f),
+                pixeltje_terrain::hash(cell, 73.0f)) - 0.5f);
+        color += float3(0.75f, 0.82f, 1.0f) * 1.4f
+            * exp(-dot(offset, offset) * 6.0f) * (star - 0.9965f) / 0.0035f;
+    }
+    return color;
 }
 
 // The latest shot lights the room twice: from the muzzle while the flash
@@ -1931,10 +2145,15 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     float3 color = material.emission
         + material.albedo * (1.0f - material.metallic)
             * float3(0.030f, 0.038f, 0.046f);
-    for (uint i = 0u; i < 8u; ++i) {
+    // Room lights stay indoors; the sun lights the shell and the moon.
+    bool exterior = hit.material == 40u || hit.material == 41u;
+    if (exterior)
+        color += shadeSunlight(hit, material, -direction, chrome, game);
+    else for (uint i = 0u; i < 8u; ++i) {
         color += shadePointLight(hit, material, -direction,
             roomLight(i, game.effects.x), chrome, game);
     }
+    if (hit.material == 0u) color = spaceSky(direction);
     color += shadeShotLights(hit, material, -direction, chrome, game);
     color *= mix(1.0f, ambientOcclusion(hit, game), 0.85f);
     if (hit.material == 20u) {
@@ -1975,8 +2194,9 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
                 * (0.6f + 0.4f * sin(game.effects.x * 32.0f));
     }
     color = shadeImpacts(color, hit, game, impactTexture);
-    color = mix(color, float3(0.0f),
-        1.0f - exp(-hit.distance * 0.008f));
+    // There is no haze in vacuum.
+    if (!exterior && hit.material != 0u)
+        color = mix(color, float3(0.0f), 1.0f - exp(-hit.distance * 0.008f));
     color = shadeGlassBox(color, origin, direction, hit.distance,
         crateA, crateB, chrome, game);
     color = shadeShot(color, origin, direction, hit.distance, game);

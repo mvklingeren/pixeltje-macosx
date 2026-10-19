@@ -16,6 +16,12 @@ color helpers. Replace the room, crate, target, collision, and rules with your
 own game while retaining the documented GPU Program uniform layout and the
 compute-owned state flow.
 
+For outdoor ground, add `// pixeltje:terrain-v1` to the leading marker lines.
+It supplies seeded `pixeltje_terrain::valueNoise`, `fbm` and `craters` to
+compose a height field, and `trace`, `normal` and `softShadow`, which accept
+any struct with `float operator()(float2 xz) const` as that field. Use the
+same field for collision height so the player walks on what is drawn.
+
 Signal Range shows a larger FPS built on the same pattern, with enemy AI,
-generated assets, audio, and a scene handoff. Abyssal Treasure shows the 3D
-helpers in a different first-person game.
+generated assets, audio, a scene handoff, and an exit onto a terrain-library
+moon. Abyssal Treasure shows the 3D helpers in a different first-person game.
