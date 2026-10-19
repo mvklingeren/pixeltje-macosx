@@ -16,6 +16,12 @@ color helpers. Replace the room, crate, target, collision, and rules with your
 own game while retaining the documented GPU Program uniform layout and the
 compute-owned state flow.
 
+Keep each compute kernel modest. Metal's cold compile time grows much faster
+than kernel size: Signal Range's tick took over two minutes to compile until
+shooting moved into its own tick pass, after which each pass compiles in
+seconds. Tick passes run in order over the same buffers, so splitting a large
+tick at a natural seam keeps its behaviour.
+
 For outdoor ground, add `// pixeltje:terrain-v1` to the leading marker lines.
 It supplies seeded `pixeltje_terrain::valueNoise`, `fbm` and `craters` to
 compose a height field, and `trace`, `normal` and `softShadow`, which accept

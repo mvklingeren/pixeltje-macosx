@@ -530,7 +530,6 @@ bool onJumpPad(float2 position) {
 kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     device GameState *states [[buffer(1)]],
     device uint *sceneRequest [[buffer(2)]],
-    device uint *shotAudioEvent [[buffer(3)]],
     device uint *scareAudioEvent [[buffer(4)]],
     device uint *launchAudioEvent [[buffer(5)]],
     uint id [[thread_position_in_grid]]) {
@@ -694,7 +693,20 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
 
     advanceSpiders(game, dt);
     advanceBoss(game, dt);
+}
 
+// Shooting is a separate tick pass that runs after advanceRange. A shot traces
+// the scene and the furred spiders; in one kernel with the spider AI, Metal
+// took minutes to compile the tick cold, while each pass alone compiles in
+// seconds.
+kernel void fireRange(constant ProgramUniforms &u [[buffer(0)]],
+    device GameState *states [[buffer(1)]],
+    device uint *shotAudioEvent [[buffer(3)]],
+    uint id [[thread_position_in_grid]]) {
+    if (id != 0u) return;
+    device GameState &game = states[0];
+    if (game.progress.w != phasePlaying) return;
+    uint action = uint(u.pointer.z);
     if (action > game.progress.z) {
         game.progress.z = action;
         if (game.view.z <= 0.0f && game.weapon.x >= 1.0f
