@@ -203,9 +203,16 @@ enum BuiltInPipelineNodeExecutors {
         }
         return value
       }
+      let keys = try context.invocation.number(
+        for: PipelineInvocation.directionPadKeysKey, default: 0)
+      guard PipelineDirectionPadKeys.isValidMask(keys) else {
+        throw PipelineEngineError.invalidInvocation(
+          "WASD Pad keys must be an integer bitmask from 0 to \(PipelineDirectionPadKeys.allMask).")
+      }
       return PipelineNodeResult(outputs: [
         "x": PipelineNodeValue(try axis(PipelineInvocation.directionPadXKey), type: .number),
         "y": PipelineNodeValue(try axis(PipelineInvocation.directionPadYKey), type: .number),
+        "keys": PipelineNodeValue(keys, type: .number),
       ])
     },
     PipelineNodeExecutor(kind: .textSplit) { node, inputs, _ in

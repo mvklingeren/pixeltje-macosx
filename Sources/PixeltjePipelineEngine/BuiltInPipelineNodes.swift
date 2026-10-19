@@ -297,6 +297,7 @@ extension PipelineNodeRegistry {
         outputs: [
           .init(name: "x", type: .number),
           .init(name: "y", type: .number),
+          .init(name: "keys", type: .number),
         ]),
       PipelineNodeDescriptor(
         kind: .maskHitTest,

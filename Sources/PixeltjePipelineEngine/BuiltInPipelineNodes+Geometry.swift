@@ -87,6 +87,7 @@ extension PipelineNodeRegistry {
           .init(name: "secondaryActionCount", type: .number, isRequired: false),
           .init(name: "moveX", type: .number, isRequired: false),
           .init(name: "moveY", type: .number, isRequired: false),
+          .init(name: "keys", type: .number, isRequired: false),
           .init(name: "assets", type: .assetBundle, isRequired: false),
           .init(name: "seed", type: .seed, isRequired: false),
           .init(name: "framesPerSecond", type: .number, isRequired: false),

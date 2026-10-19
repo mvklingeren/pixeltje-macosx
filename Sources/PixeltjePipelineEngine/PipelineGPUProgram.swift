@@ -391,7 +391,13 @@ actor PipelineGPUProgram {
     }
     let moveX = try Self.movementCoordinate("moveX", inputs: inputs)
     let moveY = try Self.movementCoordinate("moveY", inputs: inputs)
-    let movement = SIMD4(Float(moveX), Float(moveY), Float(secondaryActionCount), 0)
+    let keys = inputs["keys"]?.value(as: Double.self) ?? 0
+    guard PipelineDirectionPadKeys.isValidMask(keys) else {
+      throw PipelineEngineError.invalidInvocation(
+        "GPU Program keys must be an integer bitmask from 0 to \(PipelineDirectionPadKeys.allMask).")
+    }
+    let movement = SIMD4(Float(moveX), Float(moveY), Float(secondaryActionCount),
+      Float(keys))
     let source = try PipelineMeshRenderer.shaderSource(
       supplied: inputs["source"]?.value(as: String.self),
       fileName: inputs["sourceFile"]?.value(as: String.self),

@@ -4,6 +4,7 @@
 
 constant float heldPistol = 0.0f;
 constant float heldShotgun = 1.0f;
+constant float heldLauncher = 2.0f;
 constant float shotgunShells = 2.0f;
 constant float shotgunReloadDuration = 2.3f;
 constant uint shotgunPellets = 8u;
@@ -17,7 +18,11 @@ void resetArms(device GameState &game) {
 }
 
 bool holdingShotgun(device const GameState &game) {
-    return game.arms.x > 0.5f;
+    return game.arms.x > 0.5f && game.arms.x < 1.5f;
+}
+
+bool holdingLauncher(device const GameState &game) {
+    return game.arms.x > 1.5f;
 }
 
 // Fully raised; a weapon being lowered or raised cannot fire.
@@ -28,12 +33,12 @@ bool armsReady(device const GameState &game) {
 // Stepping out onto the moon swaps the pistol for the shotgun, and stepping
 // back inside swaps it back. The thresholds sit half a metre either side of
 // the shell wall, so standing in the doorway never flickers between them.
-// The held weapon is lowered out of view, swapped, then raised.
+// The launcher, once chosen, stays in hand anywhere. The held weapon is
+// lowered out of view, swapped, then raised.
 void advanceArms(device GameState &game, float dt) {
-    bool shotgun = holdingShotgun(game);
-    float wanted = game.arms.x;
-    if (!shotgun && outdoors(game.player.xz, 0.5f)) wanted = heldShotgun;
-    if (shotgun && !outdoors(game.player.xz, -0.5f)) wanted = heldPistol;
+    bool outside = outdoors(game.player.xz, holdingShotgun(game) ? -0.5f : 0.5f);
+    float wanted = game.arsenal.x > 0.5f ? heldLauncher
+        : (outside ? heldShotgun : heldPistol);
     if (wanted != game.arms.x) {
         game.arms.y = max(game.arms.y - dt / weaponLowerTime, 0.0f);
         if (game.arms.y <= 0.0f) game.arms.x = wanted;
@@ -93,13 +98,14 @@ GunPose shotgunPose(device const GameState &game) {
 
 // The pose and muzzle of whichever weapon is in hand, in view space.
 GunPose heldPose(device const GameState &game) {
+    if (holdingLauncher(game)) return launcherPose(game);
     return holdingShotgun(game) ? shotgunPose(game) : gunPose(game);
 }
 
 float3 heldMuzzle(device const GameState &game) {
     GunPose pose = heldPose(game);
-    return pose.pivot + pose.basis * (holdingShotgun(game)
-        ? shotgunLastMuzzle(game) : gunMuzzle);
+    return pose.pivot + pose.basis * (holdingLauncher(game) ? launcherMuzzle
+        : (holdingShotgun(game) ? shotgunLastMuzzle(game) : gunMuzzle));
 }
 
 // Parts: 3 dark steel, 4 glove, 5 sleeve, 6 blued barrels, 7 walnut.

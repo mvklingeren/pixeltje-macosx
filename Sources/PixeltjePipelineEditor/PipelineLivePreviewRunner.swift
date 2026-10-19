@@ -21,6 +21,7 @@ final class PipelineLiveRunControls: Sendable {
   struct DirectionPad: Equatable, Sendable {
     var x: Double
     var y: Double
+    var keys = 0
   }
 
   struct Snapshot: Equatable, Sendable {
@@ -470,6 +471,7 @@ actor PipelineLivePreviewRunner {
     if let directionPad = inputs.directionPad {
       values[PipelineInvocation.directionPadXKey] = .number(directionPad.x)
       values[PipelineInvocation.directionPadYKey] = .number(directionPad.y)
+      values[PipelineInvocation.directionPadKeysKey] = .integer(Int64(directionPad.keys))
     }
     return PipelineInvocation(values: values)
   }

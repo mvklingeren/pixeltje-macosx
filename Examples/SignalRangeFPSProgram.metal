@@ -63,6 +63,55 @@ constant float sunPower = 1.13e10f;       // irradiance 9 from 10 km away
 constant uint droneCount = 3u;
 constant uint laserCount = 6u;
 
+// A Javelin-style launcher joins the pistol and the shotgun: 2 raises it,
+// 1 returns to the gun for where you stand, X swaps between them.
+constant float launcherReloadDuration = 2.4f;
+constant float rocketReserveStart = 4.0f;
+constant uint rocketLimit = 7u;            // loaded plus reserve
+constant float lockDuration = 1.0f;
+constant float blastRadius = 4.5f;
+constant uint trailCount = 12u;
+constant float trailInterval = 0.15f;
+constant float dodgeSpeed = 11.0f;
+constant float dodgeCooldown = 0.85f;
+// Held action keys from the WASD Pad arrive as a bitmask in movement.w.
+constant uint keyQ = 1u;
+constant uint keyE = 2u;
+constant uint keyR = 4u;
+constant uint keyV = 16u;
+constant uint keyX = 32u;
+constant uint keyDigit1 = 128u;
+constant uint keyDigit2 = 256u;
+// Sentry turrets guard the east, west and north rooms and the moon outside
+// the exit. Each stands on a tripod and first watches its room's entrance.
+constant uint sentryCount = 4u;
+constant float sentryHealth = 6.0f;
+constant float sentryCharge = 0.75f;
+constant float sentryBoltSpeed = 21.0f;
+constant float sentryBoltDamage = 9.0f;
+constant uint boltCount = 6u;
+constant float2 sentryGround[sentryCount] = {
+    float2(50.0f, -9.0f), float2(-50.0f, 9.0f),
+    float2(13.0f, -55.0f), float2(9.0f, 38.0f)};
+constant float2 sentryWatch[sentryCount] = {
+    float2(24.0f, 0.0f), float2(-24.0f, 0.0f),
+    float2(0.0f, -24.0f), float2(0.0f, 18.3f)};
+// Two rocket caches (east room, boss corridor) and two medkits (west room,
+// north room). Positions are on the floor.
+constant uint pickupCount = 4u;
+constant uint pickupMedkitStart = 2u;
+constant float3 pickupGround[pickupCount] = {
+    float3(52.0f, 0.9f, 10.0f), float3(3.2f, 1.2f, -66.0f),
+    float3(-52.0f, 1.5f, -10.0f), float3(-14.0f, 1.2f, -56.0f)};
+constant float3 pickupHalfSize = float3(0.34f, 0.2f, 0.24f);
+// Scene materials of the sentries, pickups and missile.
+constant uint sentryArmourMaterial = 60u;
+constant uint sentryMetalMaterial = 61u;
+constant uint sentrySensorMaterial = 62u;
+constant uint sentryWreckMaterial = 63u;
+constant uint pickupMaterialID = 64u;
+constant uint missileMaterial = 65u;
+
 #include "NPCPathNetwork.metal"
 
 struct ProgramUniforms {
@@ -73,7 +122,7 @@ struct ProgramUniforms {
     float4 parameters2;
     float4 parameters3;
     float4 pointer;   // Trackpad X/Y, Space action count, live time step
-    float4 movement;  // WASD Pad X/Y, secondary action count, unused
+    float4 movement;  // WASD Pad X/Y, secondary action count, held keys
 };
 
 struct ShotImpact {
@@ -170,9 +219,25 @@ struct GameState {
     float4 arms;            // held weapon (0 pistol, 1 shotgun), raised 0–1,
                             // shells loaded, shell reload left
     uint4 burst;            // pellets in the latest discharge, bolts fired
+    // The launcher, dodge and sentries follow too.
+    float4 arsenal;         // launcher chosen, unused, reserve rockets, rocket loaded
+    float4 launcher;        // lock target ID, lock progress, reload time left, launch kick
+    float4 controls;        // previous action keys, flight cam on, dodge cooldown, unused
+    float4 dodge;           // dodge velocity XZ, pickup notice time, unused
+    float4 missile;         // nose XYZ, launch time; W < 0 while none flies
+    float4 missileVelocity; // velocity XYZ, locked target ID (0 flies straight)
+    float4 missileAim;      // last known target point XYZ, diving
+    float4 blast;           // detonation XYZ, time
+    float4 trail[trailCount];          // smoke puffs: XYZ, emission time
+    float sentryFloor[sentryCount];    // ground height under each sentry
+    float4 sentryAim[sentryCount];     // yaw, pitch, alert, charge clock (-1 idle)
+    float4 sentryState[sentryCount];   // health, hit flash, death time, cooldown
+    float4 boltPosition[boltCount];    // XYZ, fire time (-100 unused)
+    float4 boltVelocity[boltCount];    // velocity XYZ, burst time (-1 in flight)
+    uint4 pickups;          // taken bits, last pickup kind, sentries destroyed, bolts fired
 };
 
-static_assert(sizeof(GameState) <= 8192,
+static_assert(sizeof(GameState) <= 12288,
     "The GPU Program game buffer must contain game state and the HUD glyphs");
 
 struct SceneHit {
@@ -333,6 +398,36 @@ GunPose gunPose(device const GameState &game) {
         0.028f * saturate((kick - 0.55f) / 0.45f)};
 }
 
+// The launcher's frame: origin on the tube axis at the grip, Z forward.
+constant float3 launcherMuzzle = float3(0.0f, 0.0f, 0.86f);
+
+// The launcher rides on the right shoulder. It sways and bobs like the
+// pistol, shoves back on launch and tips down to take a new round.
+GunPose launcherPose(device const GameState &game) {
+    float reload = game.launcher.z > 0.0f
+        ? sin(rangePi * (1.0f - game.launcher.z / launcherReloadDuration))
+        : 0.0f;
+    float kick = game.launcher.w;
+    float bob = game.motion.w, phase = game.motion.z;
+    float2 sway = game.look.zw;
+    float lowered = 1.0f - smoothstep(0.0f, 1.0f, game.arms.y);
+    float3 pivot = float3(0.23f, -0.15f, 0.12f) + float3(
+        0.012f * bob * sin(phase) - 0.008f * sway.x,
+        -0.010f * bob * abs(cos(phase)) - 0.008f * sway.y
+            - 0.10f * reload - 0.5f * game.hurt.w - 0.34f * lowered,
+        -0.09f * kick);
+    float pitch = 0.07f * kick - 0.3f * reload - 0.02f * sway.y
+        - 0.9f * lowered;
+    float yaw = -0.04f * sway.x;
+    float roll = 0.25f * reload;
+    float3 f = float3(sin(yaw) * cos(pitch), sin(pitch),
+        cos(yaw) * cos(pitch));
+    float3 r = normalize(float3(f.z, 0.0f, -f.x));
+    float3 up = cross(f, r);
+    return {pivot, float3x3(r * cos(roll) + up * sin(roll),
+        up * cos(roll) - r * sin(roll), f), 0.0f};
+}
+
 // The spiders' path network: the four rooms and the moon outside, joined by
 // a portal node in each doorway. Jitter stays within 2.5 m, so the nodes
 // facing each doorway keep a straight walk to its portal. Moon grid points
@@ -366,7 +461,8 @@ struct GunHit {
     float distance;
     float3 normal;          // gun frame
     uint part;              // 1 slide, 2 polymer, 3 dark steel, 4 glove,
-                            // 5 sleeve, 6 blued barrel, 7 walnut
+                            // 5 sleeve, 6 blued barrel, 7 walnut,
+                            // 10 launch tube, 11 composite, 12 display
     float3 local;
 };
 
@@ -379,6 +475,7 @@ void gunCapsule(thread GunHit &hit, float3 origin, float3 direction,
 #include "SignalRangeDoppler.metal"
 #include "SignalRangeShotgun.metal"
 #include "SignalRangeDrone.metal"
+#include "SignalRangeArsenal.metal"
 
 void resetGame(device GameState &game, uint seed) {
     game.player = float4(0.0f, 1.55f, 12.0f, 0.0f);
@@ -432,6 +529,27 @@ void resetGame(device GameState &game, uint seed) {
         rangePathJoins, pathJoinCount, npcPathHash(seed));
     resetArms(game);
     resetDrones(game);
+    // The previous keys and the flight-cam option survive a restart.
+    game.arsenal = float4(0.0f, 0.0f, rocketReserveStart, 1.0f);
+    game.launcher = float4(0.0f);
+    game.controls.zw = float2(0.0f);
+    game.dodge = float4(0.0f, 0.0f, -100.0f, 0.0f);
+    game.missile = float4(0.0f, 0.0f, 0.0f, -1.0f);
+    game.missileVelocity = float4(0.0f, 0.0f, -1.0f, 0.0f);
+    game.missileAim = float4(0.0f);
+    game.blast = float4(0.0f, 0.0f, 0.0f, -100.0f);
+    for (uint i = 0u; i < trailCount; ++i)
+        game.trail[i] = float4(0.0f, 0.0f, 0.0f, -100.0f);
+    for (uint i = 0u; i < sentryCount; ++i) {
+        game.sentryFloor[i] = stairHeight(sentryGround[i]);
+        game.sentryAim[i] = float4(sentryRestYaw(i), 0.0f, 0.0f, -1.0f);
+        game.sentryState[i] = float4(sentryHealth, 0.0f, -100.0f, 0.0f);
+    }
+    for (uint i = 0u; i < boltCount; ++i) {
+        game.boltPosition[i] = float4(0.0f, 0.0f, 0.0f, -100.0f);
+        game.boltVelocity[i] = float4(0.0f, 0.0f, 0.0f, -100.0f);
+    }
+    game.pickups = uint4(0u);
 }
 
 kernel void initializeRange(constant ProgramUniforms &u [[buffer(0)]],
@@ -439,6 +557,8 @@ kernel void initializeRange(constant ProgramUniforms &u [[buffer(0)]],
     device RangeAudio *audio [[buffer(3)]],
     uint id [[thread_position_in_grid]]) {
     if (id != 0u) return;
+    // The missile flight cam starts on; V toggles it.
+    states[0].controls = float4(0.0f, 1.0f, 0.0f, 0.0f);
     resetGame(states[0], u.frameSeed.y ^ u.frameSeed.z);
     // Voice words persist between frames; start every hover sound silent.
     for (uint i = 0u; i < droneCount; ++i) audio[0].droneVoice[i] = float4(0.0f);
@@ -492,6 +612,19 @@ void pushOutOfObstacle(thread float2 &point, float2 lower, float2 upper) {
         point.x = fromLower.x < fromUpper.x ? paddedLower.x : paddedUpper.x;
     } else {
         point.y = fromLower.y < fromUpper.y ? paddedLower.y : paddedUpper.y;
+    }
+}
+
+// Each sentry's tripod is a solid circle; wrecks stay solid too.
+void pushOutOfSentries(thread float2 &point) {
+    for (uint i = 0u; i < sentryCount; ++i) {
+        float2 offset = point - sentryGround[i];
+        float distance = length(offset);
+        const float safeRadius = 1.05f;
+        if (distance < safeRadius)
+            point = sentryGround[i]
+                + (distance > 0.0001f ? offset / distance : float2(0.0f, 1.0f))
+                    * safeRadius;
     }
 }
 
@@ -675,6 +808,12 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
         0.0f, 0.10f);
     uint action = uint(u.pointer.z);
     uint jumpAction = uint(u.movement.z);
+    // Action keys act on the tick they go down.
+    uint keys = uint(u.movement.w);
+    uint pressed = keys & ~uint(game.controls.x);
+    game.controls.x = float(keys);
+    if ((pressed & keyV) != 0u)
+        game.controls.y = game.controls.y > 0.5f ? 0.0f : 1.0f;
     game.effects.x += dt;
     if (game.bossScene.x >= 0.0f) game.bossScene.x += dt;
     game.bossScene.y = max(game.bossScene.y - dt, 0.0f);
@@ -691,6 +830,16 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     if (game.weapon.y > 0.0f) {
         game.weapon.y = max(game.weapon.y - dt, 0.0f);
         if (game.weapon.y <= 0.0f) game.weapon.x = float(magazineSize);
+    }
+    game.controls.z = max(game.controls.z - dt, 0.0f);
+    game.launcher.w *= exp(-dt * 6.0f);
+    game.dodge.xy *= exp(-dt * 6.5f);
+    if (game.launcher.z > 0.0f) {
+        game.launcher.z = max(game.launcher.z - dt, 0.0f);
+        if (game.launcher.z <= 0.0f && game.arsenal.z >= 1.0f) {
+            game.arsenal.z -= 1.0f;
+            game.arsenal.w = 1.0f;
+        }
     }
     if (game.progress.w != phasePlaying) {
         // A click after defeat restarts. After victory, the triangle scene's
@@ -727,9 +876,31 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
         1.0f - exp(-dt * 10.0f));
     game.player.w = baseYaw + game.recoil.y;
     game.view.x = basePitch + game.recoil.x;
+    bool cutscene = bossCutscene(game);
+
+    // 2 picks the launcher, 1 the gun for where you stand, X swaps them;
+    // advanceArms lowers one weapon and raises the other.
+    if ((pressed & keyDigit1) != 0u) game.arsenal.x = 0.0f;
+    if ((pressed & keyDigit2) != 0u) game.arsenal.x = 1.0f;
+    if ((pressed & keyX) != 0u)
+        game.arsenal.x = game.arsenal.x > 0.5f ? 0.0f : 1.0f;
+    // R reloads the weapon in hand early.
+    if ((pressed & keyR) != 0u && armsReady(game)) {
+        if (holdingLauncher(game)) {
+            if (game.arsenal.w < 0.5f && game.launcher.z <= 0.0f
+                && game.arsenal.z >= 1.0f)
+                game.launcher.z = launcherReloadDuration;
+        } else if (holdingShotgun(game)) {
+            if (game.arms.w <= 0.0f && game.arms.z < shotgunShells)
+                game.arms.w = shotgunReloadDuration;
+        } else if (game.weapon.y <= 0.0f
+            && game.weapon.x < float(magazineSize)) {
+            game.weapon.y = reloadDuration;
+        }
+    }
+
     float2 move = clamp(u.movement.xy, float2(-1.0f), float2(1.0f));
-    if (game.bossScene.x >= 0.0f && game.bossScene.x < 5.0f)
-        move = float2(0.0f);
+    if (cutscene) move = float2(0.0f);
     if (length(move) > 1.0f) move = normalize(move);
     float2 forward = float2(sin(game.player.w), -cos(game.player.w));
     float2 right = float2(cos(game.player.w), sin(game.player.w));
@@ -744,17 +915,33 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     float2 previousPosition = game.player.xz;
     bool wasGrounded = game.player.y <= 1.55f + stairHeight(previousPosition)
         + (onJumpPad(previousPosition) ? jumpPadHeight : 0.0f) + 0.001f;
+    // Q and E dodge sideways in a quick burst on top of walking.
+    uint dodgeKeys = pressed & (keyQ | keyE);
+    if ((dodgeKeys == keyQ || dodgeKeys == keyE) && wasGrounded && !cutscene
+        && game.controls.z <= 0.0f) {
+        game.dodge.xy = right * (dodgeKeys == keyE ? dodgeSpeed : -dodgeSpeed);
+        game.controls.z = dodgeCooldown;
+        game.hurt.w = max(game.hurt.w, 0.045f);
+    }
     // Feet accelerate and brake quickly; in the air the body keeps momentum.
     game.motion.xy = mix(game.motion.xy,
         (right * move.x + forward * move.y) * speed,
         1.0f - exp(-dt * (wasGrounded ? 11.0f : 2.2f)));
-    float2 next = previousPosition + game.motion.xy * dt;
+    float2 next = previousPosition + (game.motion.xy + game.dodge.xy) * dt;
     // Resolve axes independently so a diagonal approach slides along a wall.
     float2 position = previousPosition;
-    if (walkable(float2(next.x, position.y))) position.x = next.x;
-    else game.motion.x = 0.0f;
-    if (walkable(float2(position.x, next.y))) position.y = next.y;
-    else game.motion.y = 0.0f;
+    if (walkable(float2(next.x, position.y))) {
+        position.x = next.x;
+    } else {
+        game.motion.x = 0.0f;
+        game.dodge.x = 0.0f;
+    }
+    if (walkable(float2(position.x, next.y))) {
+        position.y = next.y;
+    } else {
+        game.motion.y = 0.0f;
+        game.dodge.y = 0.0f;
+    }
     next = position;
     // Walking around the outside of the base must not trip the room rules.
     bool outside = outdoors(next, 0.0f);
@@ -768,6 +955,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     pushOutOfObstacle(next, float2(2.1f, -6.5f), float2(4.5f, -4.1f));
     pushOutOfObstacle(next, glassBoxLower.xz, glassBoxUpper.xz);
     pushOutOfChrome(next);
+    pushOutOfSentries(next);
     game.player.xz = next;
     // Head bob follows the distance actually walked on the ground.
     float walked = length(next - previousPosition);
@@ -802,8 +990,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     bool grounded = game.player.y <= groundY + 0.001f;
     if (jumpAction > uint(game.effects.z)) {
         game.effects.z = float(jumpAction);
-        if (grounded && (game.bossScene.x < 0.0f
-            || game.bossScene.x >= 5.0f)) game.effects.w = 5.2f;
+        if (grounded && !cutscene) game.effects.w = 5.2f;
     }
     if (grounded && overJumpPad) {
         game.effects.w = jumpPadLaunchSpeed;
@@ -824,6 +1011,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
         game.player.y = northernCeilingY - 0.35f;
         game.effects.w = min(game.effects.w, 0.0f);
     }
+    collectPickups(game);
 
     advanceArms(game, dt);
     advanceSpiders(game, dt);
@@ -838,12 +1026,13 @@ struct ShotTrace {
     uint material;
     int spider;
     int drone;
+    int sentry;
     bool surface;           // the environment stopped the ray
 };
 
 ShotTrace traceShot(device const GameState &game, float3 eye,
     float3 shotDirection) {
-    ShotTrace shot = {sceneRayLimit, -shotDirection, 0u, -1, -1, false};
+    ShotTrace shot = {sceneRayLimit, -shotDirection, 0u, -1, -1, -1, false};
     ChromePose chrome = {game.chromeRotation, game.chromeCentre.xyz};
     SceneHit environment = {sceneRayLimit, float3(0.0f),
         float3(0.0f), 0u, -1, 0u};
@@ -881,6 +1070,17 @@ ShotTrace traceShot(device const GameState &game, float3 eye,
         shot.spider = -1;
         shot.drone = drone;
     }
+    for (uint i = 0u; i < sentryCount; ++i) {
+        SpiderHit sentry = traceSentry(eye, shotDirection, game, i,
+            shot.distance);
+        if (sentry.material == 0u) continue;
+        shot.distance = sentry.distance;
+        shot.normal = sentry.normal;
+        shot.material = sentry.material;
+        shot.spider = -1;
+        shot.drone = -1;
+        shot.sentry = int(i);
+    }
     return shot;
 }
 
@@ -892,7 +1092,7 @@ void fireRound(device GameState &game, float3 eye, float3 shotDirection,
     int target = trace.spider;
     float3 impactPoint = eye + shotDirection * trace.distance;
     uint impactMaterial = trace.material;
-    if (target < 0 && trace.drone < 0 && !trace.surface) {
+    if (target < 0 && trace.drone < 0 && trace.sentry < 0 && !trace.surface) {
         impactPoint = eye + shotDirection * 28.0f;
         impactMaterial = 0u;
     }
@@ -915,6 +1115,14 @@ void fireRound(device GameState &game, float3 eye, float3 shotDirection,
     game.impacts[(game.progress.y - 1u) % impactCount] = shot;
     if (trace.drone >= 0)
         damageDrone(game, uint(trace.drone), shotDirection, audio);
+    if (trace.sentry >= 0) {
+        // Armour takes one point; the sensor eye takes three.
+        bool sensor = trace.material == sentrySensorMaterial;
+        bool destroyed = damageSentry(game, uint(trace.sentry),
+            sensor ? 3.0f : 1.0f);
+        game.weapon.zw = destroyed ? float2(0.40f, 3.0f)
+            : (sensor ? float2(0.30f, 2.0f) : float2(0.22f, 1.0f));
+    }
     if (target < 0) return;
     uint slot = uint(target);
     SpiderTraits traits = spiderTraits(spiderVariantForSlot(slot));
@@ -922,32 +1130,11 @@ void fireRound(device GameState &game, float3 eye, float3 shotDirection,
     float3 head = shot.localPointYaw.xyz / traits.scale
         - float3(0.0f, 0.05f, -0.45f);
     bool headshot = length(head / float3(0.48f, 0.38f, 0.50f)) < 1.0f;
-    game.enemy[slot].w -= headshot ? 2.0f : 1.0f;
-    game.enemyClock[slot].z = 0.24f;
-    game.weapon.zw = headshot ? float2(0.30f, 2.0f) : float2(0.22f, 1.0f);
-    if (slot == bossSlot) {
-        game.reaction[slot].x = 0.12f;
-    } else {
-        float2 push = shotDirection.xz;
-        game.reaction[slot].xyz = float3(0.32f,
-            length(push) > 0.01f ? normalize(push) * 2.6f : float2(0.0f));
-        game.senses[slot].w = -1.0f;   // a hit interrupts a bite
-        wakeSpider(game, slot, game.player.xz);
-    }
-    if (game.enemy[target].w <= 0.0f) {
-        game.weapon.zw = float2(0.40f, 3.0f);
-        uint fallenIndex = game.progress.x;
-        if (fallenIndex < targetKills) {
-            game.fallen[fallenIndex].pose = float4(
-                game.enemy[target].xyz, game.enemyClock[target].w);
-            game.fallen[fallenIndex].motion = float4(
-                game.gait[target].x, game.gait[target].y, game.effects.x,
-                spiderBodyRise(game.effects.x, uint(target)));
-            game.fallen[fallenIndex].appearance = uint4(
-                uint(spiderVariantForSlot(uint(target))), 0u, 0u, 0u);
-        }
-        game.progress.x += 1u;
-    }
+    float2 push = shotDirection.xz;
+    bool killed = damageSpider(game, slot, headshot ? 2.0f : 1.0f,
+        length(push) > 0.01f ? normalize(push) * 2.6f : float2(0.0f));
+    game.weapon.zw = killed ? float2(0.40f, 3.0f)
+        : (headshot ? float2(0.30f, 2.0f) : float2(0.22f, 1.0f));
 }
 
 // Shooting is a separate tick pass that runs after advanceRange. A shot traces
@@ -968,8 +1155,22 @@ kernel void fireRange(constant ProgramUniforms &u [[buffer(0)]],
         bool shotgun = holdingShotgun(game);
         bool loaded = shotgun
             ? game.arms.z >= 1.0f && game.arms.w <= 0.0f
-            : game.weapon.x >= 1.0f;
-        if (game.view.z <= 0.0f && loaded && armsReady(game)
+            : game.weapon.x >= 1.0f && game.weapon.y <= 0.0f;
+        if (holdingLauncher(game)) {
+            // One missile flies at a time; the launch uses the jump-pad whoosh.
+            if (armsReady(game) && !bossCutscene(game)
+                && game.arsenal.w > 0.5f && game.missile.w < 0.0f) {
+                float3 eye = game.player.xyz + eyeOffset(game);
+                float3 aim = pixeltje_3d::forward(game.player.w, game.view.x);
+                float3 aimRight = normalize(cross(aim,
+                    float3(0.0f, 1.0f, 0.0f)));
+                float3 aimUp = cross(aimRight, aim);
+                float3 muzzle = heldMuzzle(game);
+                launchMissile(game, eye + aimRight * muzzle.x
+                    + aimUp * muzzle.y + aim * muzzle.z, aim);
+                audio[0].launch = 1u;
+            }
+        } else if (game.view.z <= 0.0f && loaded && armsReady(game)
             && (game.bossScene.x < 0.0f || game.bossScene.x >= 5.0f)) {
             uint pellets = 1u;
             if (shotgun) {
@@ -984,7 +1185,7 @@ kernel void fireRange(constant ProgramUniforms &u [[buffer(0)]],
                 game.view.z = 0.22f;
                 game.view.w = 0.11f;
                 game.weapon.x -= 1.0f;
-                // An empty magazine reloads by itself; there is no reload key.
+                // An empty magazine reloads by itself; R reloads early.
                 if (game.weapon.x < 1.0f) game.weapon.y = reloadDuration;
                 audio[0].shot = 1u;
             }
@@ -1028,6 +1229,40 @@ kernel void fireRange(constant ProgramUniforms &u [[buffer(0)]],
         game.sceneTransition.x = game.effects.x;
     }
     else if (game.view.y <= 0.0f) game.progress.w = phaseLost;
+}
+
+// The seeker and the missile run in their own tick pass after shooting, for
+// the same compile-time reason as fireRange. A blast uses the shotgun's boom.
+kernel void advanceOrdnance(constant ProgramUniforms &u [[buffer(0)]],
+    device GameState *states [[buffer(1)]],
+    device RangeAudio *audio [[buffer(3)]],
+    uint id [[thread_position_in_grid]]) {
+    if (id != 0u) return;
+    device GameState &game = states[0];
+    if (game.progress.w != phasePlaying) return;
+    float dt = tickStep(u);
+    updateSeeker(game, dt);
+    if (game.missile.w >= 0.0f) {
+        ChromePose chrome = {game.chromeRotation, game.chromeCentre.xyz};
+        if (flyMissile(game, dt, chrome, audio[0])) audio[0].shotgun += 1u;
+    }
+}
+
+// Sentries aim and fire, then their bolts fly. A sentry shot uses the
+// drones' laser sound.
+kernel void advanceSentries(constant ProgramUniforms &u [[buffer(0)]],
+    device GameState *states [[buffer(1)]],
+    device RangeAudio *audio [[buffer(3)]],
+    uint id [[thread_position_in_grid]]) {
+    if (id != 0u) return;
+    device GameState &game = states[0];
+    if (game.progress.w != phasePlaying) return;
+    float dt = tickStep(u);
+    for (uint i = 0u; i < sentryCount; ++i)
+        if (advanceSentry(game, i, dt)) audio[0].laser = 1u;
+    ChromePose chrome = {game.chromeRotation, game.chromeCentre.xyz};
+    for (uint b = 0u; b < boltCount; ++b)
+        advanceBolt(game, b, dt, chrome);
 }
 
 struct ScreenVertex {
@@ -1774,6 +2009,24 @@ SurfaceMaterial surfaceMaterial(SceneHit hit,
     if (hit.material == 41u) return shellMaterial(hit, pixelWidth);
     if (hit.material == 42u) return {
         float3(0.05f), 0.4f, 0.0f, float3(0.10f, 1.6f, 0.45f)};
+    if (hit.material == sentryArmourMaterial
+        || hit.material == sentryWreckMaterial) {
+        // Sand-painted armour, mottled; wrecks are scorched.
+        float3 paint = float3(0.30f, 0.27f, 0.19f)
+            * (0.85f + 0.3f * smoothNoise(hit.position.xz * 9.0f
+                + hit.position.y * 5.0f));
+        if (hit.material == sentryWreckMaterial)
+            paint = mix(float3(0.03f, 0.028f, 0.026f), paint * 0.4f,
+                smoothNoise(hit.position.xz * 14.0f));
+        return {paint, 0.55f, 0.25f, float3(0.0f)};
+    }
+    if (hit.material == sentryMetalMaterial) return {
+        float3(0.10f, 0.105f, 0.11f), 0.38f, 0.6f, float3(0.0f)};
+    if (hit.material == sentrySensorMaterial) return {
+        float3(0.12f, 0.01f, 0.01f), 0.08f, 0.0f, float3(0.5f, 0.02f, 0.012f)};
+    if (hit.material == pickupMaterialID) return pickupMaterial(hit, time);
+    if (hit.material == missileMaterial) return {
+        float3(0.11f, 0.13f, 0.07f), 0.6f, 0.1f, float3(0.0f)};
     if (hit.material == 5u || hit.material == 15u
         || hit.material == 16u || hit.material == 17u
         || hit.material == 18u || hit.material == 19u)
@@ -1838,6 +2091,16 @@ float spiderShadow(float3 origin, float3 direction, float lightDistance,
     return lit;
 }
 
+// Sentry heads cast a soft shadow; tripods and barrels cast none.
+float sentryShadow(float3 origin, float3 direction, float lightDistance,
+    device const GameState &game) {
+    float lit = 1.0f;
+    for (uint i = 0u; i < sentryCount; ++i)
+        lit *= sphereSoftShadow(origin, direction, lightDistance,
+            float4(sentryBase(game, i) + float3(0.0f, 1.3f, 0.0f), 0.4f));
+    return lit;
+}
+
 float3 shadePointLight(SceneHit hit, SurfaceMaterial material,
     float3 viewDirection, PointLight light, ChromePose chrome,
     device const GameState &game) {
@@ -1867,7 +2130,8 @@ float3 shadePointLight(SceneHit hit, SurfaceMaterial material,
         || chromeBlocksLight(shadowOrigin, l, lightDistance, chrome)) {
         return float3(0.0f);
     }
-    float lit = spiderShadow(shadowOrigin, l, lightDistance, game);
+    float lit = spiderShadow(shadowOrigin, l, lightDistance, game)
+        * sentryShadow(shadowOrigin, l, lightDistance, game);
     if (lit <= 0.0f) return float3(0.0f);
 
     float3 radiance = light.color * light.power * shade * lit
@@ -2026,6 +2290,39 @@ float3 shadeShotLights(SceneHit hit, SurfaceMaterial material,
     return color;
 }
 
+// A blast floods its surroundings with orange light for a moment, and a lit
+// motor lights what the missile passes.
+float3 shadeOrdnanceLights(SceneHit hit, SurfaceMaterial material,
+    float3 viewDirection, ChromePose chrome, device const GameState &game) {
+    float3 color = float3(0.0f);
+    float age = game.effects.x - game.blast.w;
+    if (game.blast.w >= 0.0f && age >= 0.0f && age < 0.6f) {
+        float3 position = game.blast.xyz + float3(0.0f, 0.6f, 0.0f);
+        float reach = length(position - hit.position) / 16.0f;
+        if (reach < 1.0f) {
+            float window = 1.0f - reach * reach * reach * reach;
+            PointLight light = {position, float3(1.0f, 0.55f, 0.2f),
+                900.0f * (1.0f - smoothstep(0.0f, 0.6f, age))
+                    * window * window};
+            color += shadePointLight(hit, material, viewDirection, light,
+                chrome, game);
+        }
+    }
+    if (game.missile.w >= 0.0f && game.effects.x - game.missile.w > 0.2f) {
+        float3 flame = game.missile.xyz
+            - normalize(game.missileVelocity.xyz) * 1.15f;
+        float reach = length(flame - hit.position) / 9.0f;
+        if (reach < 1.0f) {
+            float window = 1.0f - reach * reach * reach * reach;
+            PointLight light = {flame, float3(1.0f, 0.6f, 0.25f),
+                60.0f * window * window};
+            color += shadePointLight(hit, material, viewDirection, light,
+                chrome, game);
+        }
+    }
+    return color;
+}
+
 // Room interiors are axis-aligned boxes, so the distance to each face gives
 // cheap occlusion where floors meet walls and in corners. Props and spiders
 // darken the floor around their footprints.
@@ -2073,6 +2370,9 @@ float ambientOcclusion(SceneHit hit, device const GameState &game) {
         }
         occlusion *= 1.0f - 0.4f * exp(-max(
             distance(p.xz, chromeGroundPosition) - 0.6f, 0.0f) / 0.35f);
+        for (uint i = 0u; i < sentryCount; ++i)
+            occlusion *= 1.0f - 0.35f * exp(-max(
+                distance(p.xz, sentryGround[i]) - 0.3f, 0.0f) / 0.45f);
         for (uint i = 0u; i < enemyCount; ++i) {
             if (!spiderActive(game, i)) continue;
             float scale = spiderTraits(spiderVariantForSlot(i)).scale;
@@ -2146,6 +2446,15 @@ void traceScene(thread SceneHit &hit, thread float3 &furPosition,
             0.0f), origin + direction * t, 26u, -1, i};
     }
     traceDrones(hit, origin, direction, game);
+    for (uint i = 0u; i < sentryCount; ++i) {
+        SpiderHit sentry = traceSentry(origin, direction, game, i,
+            hit.distance);
+        if (sentry.material != 0u)
+            hit = {sentry.distance, sentry.normal,
+                origin + direction * sentry.distance, sentry.material, -1, i};
+    }
+    tracePickups(hit, origin, direction, game);
+    traceMissile(hit, origin, direction, game);
 }
 
 float3 chromeReflection(SceneHit hit, float3 incoming,
@@ -2240,7 +2549,8 @@ float3 shadeImpacts(float3 color, SceneHit hit,
         float age = game.effects.x - shot.muzzleTime.w;
         bool spider = shot.pointEnemy.w > 0.0f;
         bool movingSurface = spider || uint(shot.normalMaterial.w) == 20u
-            || droneMaterial(uint(shot.normalMaterial.w));
+            || droneMaterial(uint(shot.normalMaterial.w))
+            || sentryMaterial(uint(shot.normalMaterial.w));
         if (age < 0.0f || age >= (movingSurface ? 0.28f : 8.0f))
             continue;
         if (spider) {
@@ -2462,6 +2772,56 @@ GunHit traceGun(float3 origin, float3 direction, float slide) {
     return hit;
 }
 
+// The launcher in its own frame: the tube runs along Z past the shoulder to
+// the muzzle; the command unit sits on its left with its display facing the
+// eye, and the battery, grip and glove hang below.
+GunHit traceLauncher(float3 origin, float3 direction) {
+    GunHit hit = {1.0e6f, float3(0.0f), 0u, float3(0.0f)};
+    if (raySphere(origin, direction, float3(-0.03f, -0.08f, 0.2f), 0.8f)
+        < 0.0f) return hit;
+    gunCapsule(hit, origin, direction, float3(0.0f, 0.0f, -0.45f),
+        float3(0.0f, 0.0f, 0.78f), 0.068f, 10u);
+    gunCapsule(hit, origin, direction, float3(0.0f, 0.0f, 0.78f),
+        float3(0.0f, 0.0f, 0.84f), 0.078f, 11u);
+    gunCapsule(hit, origin, direction, float3(0.0f, 0.0f, -0.5f),
+        float3(0.0f, 0.0f, -0.42f), 0.078f, 11u);
+    gunBox(hit, origin, direction, float3(-0.045f, -0.12f, 0.02f),
+        float3(0.045f, -0.06f, 0.16f), 11u);
+    gunBox(hit, origin, direction, float3(-0.022f, -0.21f, 0.06f),
+        float3(0.022f, -0.11f, 0.11f), 11u);
+    gunBox(hit, origin, direction, float3(-0.13f, -0.035f, 0.46f),
+        float3(-0.072f, 0.04f, 0.64f), 11u);
+    gunBox(hit, origin, direction, float3(-0.12f, -0.024f, 0.452f),
+        float3(-0.082f, 0.03f, 0.46f), 12u);
+    gunBox(hit, origin, direction, float3(-0.075f, -0.015f, 0.50f),
+        float3(-0.03f, 0.015f, 0.60f), 11u);
+    float3 normal;
+    float t = pixeltje_3d::rayEllipsoid(origin, direction,
+        float3(0.0f, -0.17f, 0.085f), float3(0.04f, 0.052f, 0.046f),
+        0.001f, normal);
+    if (t > 0.0f && t < hit.distance)
+        hit = {t, normal, 4u, origin + direction * t};
+    gunCapsule(hit, origin, direction, float3(0.01f, -0.2f, 0.06f),
+        float3(0.06f, -0.42f, -0.22f), 0.046f, 5u);
+    return hit;
+}
+
+SurfaceMaterial launcherMaterial(GunHit hit) {
+    float3 p = hit.local;
+    if (hit.part == 10u) {
+        // Olive drab tube with a yellow band near the muzzle.
+        float band = 1.0f - step(0.02f, abs(p.z - 0.64f));
+        return {mix(float3(0.075f, 0.085f, 0.05f)
+                * (0.85f + 0.3f * smoothNoise(p.xz * 140.0f)),
+            float3(0.36f, 0.30f, 0.07f), band), 0.72f, 0.0f, float3(0.0f)};
+    }
+    if (hit.part == 11u) return {
+        float3(0.035f, 0.038f, 0.04f)
+            * (0.85f + 0.3f * smoothNoise(p.xy * 500.0f)),
+        0.55f, 0.1f, float3(0.0f)};
+    return {float3(0.01f, 0.015f, 0.015f), 0.1f, 0.0f, float3(0.0f)};
+}
+
 SurfaceMaterial gunMaterial(GunHit hit) {
     float3 p = hit.local;
     if (hit.part == 1u) {
@@ -2499,8 +2859,8 @@ float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
             + up * viewNormal.y + front * viewNormal.z),
         eye + right * viewPoint.x + up * viewPoint.y + front * viewPoint.z,
         30u, -1, 0u};
-    SurfaceMaterial material = gun.part >= 6u ? shotgunMaterial(gun)
-        : gunMaterial(gun);
+    SurfaceMaterial material = gun.part >= 10u ? launcherMaterial(gun)
+        : (gun.part >= 6u ? shotgunMaterial(gun) : gunMaterial(gun));
     float3 color = material.albedo * (1.0f - material.metallic)
             * float3(0.030f, 0.038f, 0.046f)
         + material.albedo * material.metallic
@@ -2514,6 +2874,11 @@ float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
         color += shadePointLight(hit, material, -direction,
             roomLight(i, game.effects.x), chrome, game);
     }
+    // The command unit's display glows green while locking and red when
+    // the lock is complete.
+    if (gun.part == 12u && game.arsenal.w > 0.5f)
+        color += seekerLocked(game) ? float3(0.7f, 0.06f, 0.035f)
+            : float3(0.05f, 0.32f, 0.08f) * (0.35f + 0.65f * game.launcher.y);
     if (game.view.w > 0.0f) {
         float3 muzzle = pose.pivot + pose.basis
             * (muzzleLocal + float3(0.0f, 0.0f, 0.012f));
@@ -2560,8 +2925,18 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         origin = mix(origin, closeOrigin, reveal);
         direction = normalize(mix(direction, closeDirection, reveal));
     }
+    // The missile's seeker feed cuts in with a narrower lens.
+    bool flightCam = flightCamActive(game);
+    float lensFocal = flightCam ? 1.6f : mix(focal, 1.45f, reveal);
+    if (flightCam) {
+        float3 camFront;
+        flightCamera(game, origin, camFront);
+        direction = pixeltje_3d::cameraDirection(in.uv, u.resolutionTime.xy,
+            atan2(camFront.x, -camFront.z),
+            asin(clamp(camFront.y, -1.0f, 1.0f)), lensFocal);
+    }
     // World width of one pixel per unit of ray distance, for texture filtering.
-    float pixelSpread = 1.0f / (u.resolutionTime.y * mix(1.1f, 1.45f, reveal));
+    float pixelSpread = 1.0f / (u.resolutionTime.y * lensFocal);
     ChromePose chrome = {game.chromeRotation, game.chromeCentre.xyz};
     float3 furPosition = float3(0.0f);
     SceneHit hit = {sceneRayLimit,
@@ -2593,8 +2968,9 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
             roomLight(i, game.effects.x), chrome, game);
     }
     if (hit.material == 0u)
-        color = spaceSky(direction, 1.0f / (focal * u.resolutionTime.y));
+        color = spaceSky(direction, 1.0f / (lensFocal * u.resolutionTime.y));
     color += shadeShotLights(hit, material, -direction, chrome, game);
+    color += shadeOrdnanceLights(hit, material, -direction, chrome, game);
     color *= mix(1.0f, ambientOcclusion(hit, game), 0.85f);
     if (hit.material == 20u) {
         float facing = max(dot(hit.normal, -direction), 0.0f);
@@ -2633,8 +3009,26 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
             color += float3(0.18f, 0.008f, 0.006f)
                 * (0.6f + 0.4f * sin(game.effects.x * 32.0f));
     }
+    if (sentryMaterial(hit.material)) {
+        uint sentry = hit.variant;
+        color += float3(0.9f, 0.5f, 0.2f)
+            * saturate(game.sentryState[sentry].y / 0.2f);
+        // An alert sensor burns brighter and pulses while it charges a shot.
+        if (hit.material == sentrySensorMaterial)
+            color += float3(1.4f, 0.05f, 0.03f)
+                * (game.sentryAim[sentry].z > 0.5f ? 1.0f : 0.2f)
+                * (game.sentryAim[sentry].w >= 0.0f
+                    ? 1.6f + sin(game.effects.x * 40.0f) : 1.0f);
+    }
     color = shadeImpacts(color, hit, game, impactTexture, direction,
         pixelSpread * hit.distance);
+    color = shadeScorch(color, hit, game);
+    // In the white-hot seeker feed, living spiders, active sentries and
+    // flying drones glow.
+    if (flightCam && (hit.enemy >= 0 || hit.material == sentryArmourMaterial
+        || hit.material == sentrySensorMaterial
+        || (drone && droneFlying(game, hit.variant))))
+        color += float3(0.6f) * max(dot(hit.normal, -direction), 0.25f);
     // There is no haze in vacuum.
     if (!exterior && hit.material != 0u)
         color = mix(color, float3(0.0f), 1.0f - exp(-hit.distance * 0.008f));
@@ -2643,7 +3037,9 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     color = shadeShot(color, origin, direction, hit.distance, game);
     color = shadeSpiderParticles(color, origin, direction,
         hit.distance, game);
-    float pixelAngle = 1.0f / (focal * u.resolutionTime.y);
+    color = shadeSentryEffects(color, origin, direction, hit.distance, game);
+    color = shadeOrdnance(color, origin, direction, hit.distance, game);
+    float pixelAngle = 1.0f / (lensFocal * u.resolutionTime.y);
     color = shadeDroneRotors(color, origin, direction, hit.distance, game);
     color = shadeLasers(color, origin, direction, hit.distance, pixelAngle,
         game);
@@ -2653,10 +3049,13 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
 
     // The held weapon is drawn over the world, as in any shooter, so a wall
     // in front of the face never swallows it. Outside it is the shotgun.
-    bool holdingGun = reveal <= 0.0f && game.progress.w != phaseLost;
+    bool holdingGun = reveal <= 0.0f && game.progress.w != phaseLost
+        && !flightCam;
     bool shotgun = holdingShotgun(game);
+    bool launcher = holdingLauncher(game);
     GunPose gun = heldPose(game);
-    float3 muzzleLocal = shotgun ? shotgunLastMuzzle(game) : gunMuzzle;
+    float3 muzzleLocal = launcher ? launcherMuzzle
+        : (shotgun ? shotgunLastMuzzle(game) : gunMuzzle);
     float3 viewFront = pixeltje_3d::forward(viewYaw, viewPitch);
     float3 viewRight = normalize(cross(viewFront, float3(0.0f, 1.0f, 0.0f)));
     float3 viewUp = cross(viewRight, viewFront);
@@ -2664,14 +3063,17 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         float3 viewDirection = float3(dot(direction, viewRight),
             dot(direction, viewUp), dot(direction, viewFront));
         float3x3 toGun = transpose(gun.basis);
-        GunHit gunHit = shotgun
-            ? traceShotgun(toGun * -gun.pivot, toGun * viewDirection)
-            : traceGun(toGun * -gun.pivot, toGun * viewDirection, gun.slide);
+        GunHit gunHit = launcher
+            ? traceLauncher(toGun * -gun.pivot, toGun * viewDirection)
+            : (shotgun
+                ? traceShotgun(toGun * -gun.pivot, toGun * viewDirection)
+                : traceGun(toGun * -gun.pivot, toGun * viewDirection,
+                    gun.slide));
         if (gunHit.part != 0u)
             color = shadeGun(gunHit, gun, muzzleLocal, eye, viewRight, viewUp,
                 viewFront, direction, chrome, game);
     }
-    if (holdingGun && game.view.w > 0.0f) {
+    if (holdingGun && !launcher && game.view.w > 0.0f) {
         // The flash is drawn in scene light so the bloom pass spreads it.
         float2 pixel = in.uv * u.resolutionTime.xy;
         float2 centre = u.resolutionTime.xy * 0.5f;
@@ -2809,6 +3211,20 @@ float bossReveal(device const GameState &game) {
         : 0.0f;
 }
 
+// Screen pixel of a world point in the player's steady view; Z is its depth
+// along the view and is negative behind the eye.
+float3 projectToScreen(device const GameState &game, float2 resolution,
+    float3 point) {
+    float3 front = pixeltje_3d::forward(game.player.w, game.view.x);
+    float3 right = normalize(cross(front, float3(0.0f, 1.0f, 0.0f)));
+    float3 up = cross(right, front);
+    float3 offset = point - (game.player.xyz + eyeOffset(game));
+    float depth = dot(offset, front);
+    float2 screen = float2(dot(offset, right), -dot(offset, up))
+        / max(depth, 0.001f) * 1.1f * resolution.y;
+    return float3(resolution * 0.5f + screen, depth);
+}
+
 // Bloom, damage fringing, lens vignette and film grain, then the pixel HUD.
 fragment float4 compositeFragment(ScreenVertex in [[stage_in]],
     constant ProgramUniforms &u [[buffer(0)]],
@@ -2817,6 +3233,7 @@ fragment float4 compositeFragment(ScreenVertex in [[stage_in]],
     texture2d<float> bloom [[texture(2)]]) {
     device const GameState &game = states[0];
     float reveal = bossReveal(game);
+    bool flightCam = flightCamActive(game);
     float hurtFlash = saturate(game.effects.y / 0.35f);
     float lowHealth = game.progress.w == phasePlaying
         ? saturate(1.0f - game.view.y / 35.0f) : 0.0f;
@@ -2845,6 +3262,21 @@ fragment float4 compositeFragment(ScreenVertex in [[stage_in]],
     // Crosshair, health bar, target pips, and damage feedback.
     float2 centre = u.resolutionTime.xy * 0.5f;
     float2 d = abs(pixel - centre);
+    if (flightCam) {
+        // White-hot seeker video with scan lines, a centre cross and a
+        // track gate.
+        float heat = dot(color, float3(0.2126f, 0.7152f, 0.0722f));
+        float scan = 0.86f + 0.14f * step(0.5f, fract(pixel.y * 0.5f));
+        color = float3(0.80f, 1.0f, 0.84f) * 0.9f * pow(heat, 1.2f) * scan;
+        float gate = 0.09f * u.resolutionTime.y;
+        bool centreCross = (d.x < 1.0f && d.y > 10.0f && d.y < 34.0f)
+            || (d.y < 1.0f && d.x > 10.0f && d.x < 34.0f);
+        bool gateLine = (abs(d.x - gate) < 1.2f && d.y > gate * 0.6f
+                && d.y < gate + 1.2f)
+            || (abs(d.y - gate) < 1.2f && d.x > gate * 0.6f
+                && d.x < gate + 1.2f);
+        if (centreCross || gateLine) color = float3(0.92f, 1.0f, 0.94f);
+    }
     // Damage reddens the screen edges; low health pulses there.
     float hurtTint = min(game.effects.y * 2.4f, 0.8f);
     if (game.view.y < 35.0f && game.progress.w == phasePlaying)
@@ -2868,9 +3300,39 @@ fragment float4 compositeFragment(ScreenVertex in [[stage_in]],
     }
     bool crosshair = (d.x < 1.4f && d.y > 4.0f && d.y < 12.0f)
         || (d.y < 1.4f && d.x > 4.0f && d.x < 12.0f);
-    if (crosshair && (game.bossScene.x < 0.0f
-        || game.bossScene.x >= 5.0f))
+    if (crosshair && !bossCutscene(game) && !flightCam)
         color = float3(0.9f, 1.0f, 0.95f);
+    // With the launcher raised: the seeker's field as corner marks, and
+    // brackets that close on the tracked target until the lock completes.
+    if (holdingLauncher(game) && armsReady(game) && !flightCam
+        && reveal <= 0.0f && game.progress.w == phasePlaying) {
+        float field = 0.116f * u.resolutionTime.y;
+        bool fieldMark = (abs(d.x - field) < 1.0f && d.y > field * 0.6f
+                && d.y < field + 1.0f)
+            || (abs(d.y - field) < 1.0f && d.x > field * 0.6f
+                && d.x < field + 1.0f);
+        if (fieldMark) color = mix(color, float3(0.75f, 0.95f, 0.8f), 0.5f);
+        uint target = uint(game.launcher.x);
+        if (target != 0u && targetAlive(game, target)) {
+            float3 projected = projectToScreen(game, u.resolutionTime.xy,
+                targetPoint(game, target));
+            if (projected.z > 0.1f) {
+                float apparent = targetRadius(game, target) / projected.z
+                    * 1.1f * u.resolutionTime.y;
+                float size = max(apparent * 1.3f, 16.0f)
+                    + 44.0f * (1.0f - game.launcher.y);
+                float2 q = abs(pixel - projected.xy);
+                float arm = size * 0.45f;
+                bool bracket = (abs(q.x - size) < 1.3f && q.y > size - arm
+                        && q.y < size + 1.3f)
+                    || (abs(q.y - size) < 1.3f && q.x > size - arm
+                        && q.x < size + 1.3f);
+                if (bracket)
+                    color = seekerLocked(game) ? float3(1.0f, 0.2f, 0.12f)
+                        : float3(0.9f, 1.0f, 0.92f);
+            }
+        }
+    }
     // Hit marker: white for a body hit, orange for the head, red for a kill.
     float markerRadius = length(d);
     if (game.weapon.z > 0.0f && abs(d.x - d.y) < 1.3f && markerRadius > 7.0f
@@ -2879,9 +3341,30 @@ fragment float4 compositeFragment(ScreenVertex in [[stage_in]],
             : (game.weapon.w > 1.5f ? float3(1.0f, 0.62f, 0.18f)
                 : float3(1.0f)), saturate(game.weapon.z / 0.12f));
     }
-    // Magazine rounds or shotgun shells at the bottom right, with a bar
-    // while reloading.
-    if (game.progress.w == phasePlaying && holdingShotgun(game)) {
+    // Magazine rounds, shotgun shells or rockets at the bottom right, with a
+    // bar while reloading.
+    if (game.progress.w == phasePlaying && holdingLauncher(game)) {
+        float2 corner = u.resolutionTime.xy - float2(28.0f, 28.0f);
+        uint rockets = uint(game.arsenal.w + game.arsenal.z + 0.5f);
+        for (uint i = 0u; i < rocketLimit; ++i) {
+            float right = corner.x - float(i) * 13.0f;
+            if (pixel.x > right - 8.0f && pixel.x < right
+                && pixel.y > corner.y - 22.0f && pixel.y < corner.y) {
+                color = i >= rockets ? float3(0.10f, 0.13f, 0.14f)
+                    : (i == 0u && game.arsenal.w > 0.5f
+                        ? float3(1.0f, 0.55f, 0.15f)
+                        : float3(0.62f, 0.52f, 0.32f));
+            }
+        }
+        float barWidth = float(rocketLimit) * 13.0f - 5.0f;
+        if (game.launcher.z > 0.0f && pixel.y > corner.y + 5.0f
+            && pixel.y < corner.y + 8.0f && pixel.x < corner.x
+            && pixel.x > corner.x - barWidth) {
+            color = corner.x - pixel.x > barWidth
+                    * (game.launcher.z / launcherReloadDuration)
+                ? float3(1.0f, 0.55f, 0.15f) : float3(0.10f, 0.13f, 0.14f);
+        }
+    } else if (game.progress.w == phasePlaying && holdingShotgun(game)) {
         float2 corner = u.resolutionTime.xy - float2(28.0f, 28.0f);
         for (uint i = 0u; i < 2u; ++i) {
             float right = corner.x - float(i) * 16.0f;
@@ -2934,6 +3417,14 @@ fragment float4 compositeFragment(ScreenVertex in [[stage_in]],
                 : float3(0.10f, 0.20f, 0.22f);
         }
     }
+    for (uint i = 0u; i < sentryCount; ++i) {
+        float left = u.resolutionTime.x - 25.0f - float(sentryCount - i) * 23.0f;
+        if (pixel.x > left + 2.0f && pixel.x < left + 14.0f
+            && pixel.y > 68.0f && pixel.y < 80.0f) {
+            color = i < game.pickups.z ? float3(0.98f, 0.71f, 0.19f)
+                : float3(0.10f, 0.20f, 0.22f);
+        }
+    }
     if (game.bossScene.x >= 5.0f && game.enemy[bossSlot].w > 0.0f
         && pixel.y > 53.0f && pixel.y < 63.0f
         && abs(pixel.x - centre.x) < 230.0f) {
@@ -2978,6 +3469,15 @@ constant uint textRestart = 9u;
 constant uint textDigitZero = 10u;
 constant uint textPistol = 20u;
 constant uint textShotgun = 21u;
+constant uint textJavelin = 22u;
+constant uint textLocking = 23u;
+constant uint textLocked = 24u;
+constant uint textFlightCam = 25u;
+constant uint textTopAttack = 26u;
+constant uint textDirect = 27u;
+constant uint textSentries = 28u;
+constant uint textMedkit = 29u;
+constant uint textRockets = 30u;
 
 float4 fontRun(device const float4 *font, uint index) {
     return font[uint(font[0].y) + index];
@@ -3058,23 +3558,61 @@ kernel void buildRangeHUD(constant ProgramUniforms &u [[buffer(0)]],
     addRun(glyphs, count, font, textSpiders,
         float2(size.x - 25.0f - runWidth(font, textSpiders, 11.0f), 45.0f),
         11.0f, ink);
+    addRun(glyphs, count, font, textSentries,
+        float2(size.x - 25.0f - runWidth(font, textSentries, 11.0f), 86.0f),
+        11.0f, ink);
+    float centreY = size.y * 0.5f;
+    bool flightCam = flightCamActive(game);
     if (game.progress.w == phasePlaying) {
         bool shotgun = holdingShotgun(game);
-        uint weaponName = shotgun ? textShotgun : textPistol;
+        bool launcher = holdingLauncher(game);
+        uint weaponName = launcher ? textJavelin
+            : (shotgun ? textShotgun : textPistol);
         addRun(glyphs, count, font, weaponName,
             float2(size.x - 28.0f - runWidth(font, weaponName, 11.0f),
                 size.y - 104.0f), 11.0f, ink, 0.4f + 0.6f * game.arms.y);
-        if (shotgun ? game.arms.w > 0.0f : game.weapon.y > 0.0f) {
+        bool reloading = launcher ? game.launcher.z > 0.0f
+            : (shotgun ? game.arms.w > 0.0f : game.weapon.y > 0.0f);
+        if (reloading) {
             addRun(glyphs, count, font, textReloading,
                 float2(size.x - 28.0f - runWidth(font, textReloading, 13.0f),
                     size.y - 70.0f), 13.0f, gold, pulse);
         } else {
-            uint rounds = uint(shotgun ? game.arms.z : game.weapon.x);
+            uint rounds = launcher
+                ? uint(game.arsenal.w + game.arsenal.z + 0.5f)
+                : uint(shotgun ? game.arms.z : game.weapon.x);
             addNumber(glyphs, count, font, rounds,
                 float2(size.x - 28.0f - numberWidth(font, rounds, 30.0f),
                     size.y - 86.0f), 30.0f,
-                rounds <= (shotgun ? 1u : 3u) ? danger : gold);
+                rounds <= (launcher || shotgun ? 1u : 3u) ? danger : gold);
         }
+        if (launcher) {
+            // The flight-cam option, dimmed while it is off.
+            addRun(glyphs, count, font, textFlightCam,
+                float2(size.x - 28.0f - runWidth(font, textFlightCam, 10.0f),
+                    size.y - 120.0f), 10.0f, ink,
+                game.controls.y > 0.5f ? 0.85f : 0.3f);
+            if (game.launcher.x > 0.5f && !flightCam)
+                addCentered(glyphs, count, font,
+                    seekerLocked(game) ? textLocked : textLocking, centreX,
+                    centreY + 0.13f * size.y, 12.0f,
+                    seekerLocked(game) ? danger : ink,
+                    seekerLocked(game) ? 1.0f : pulse);
+        }
+        if (flightCam) {
+            addCentered(glyphs, count, font, textFlightCam, centreX, 70.0f,
+                14.0f, float3(0.9f, 1.0f, 0.92f));
+            addCentered(glyphs, count, font,
+                game.missileVelocity.w > 0.5f ? textTopAttack : textDirect,
+                centreX, 92.0f, 11.0f, float3(0.9f, 1.0f, 0.92f), 0.8f);
+        }
+        float sincePickup = game.effects.x - game.dodge.z;
+        if (sincePickup >= 0.0f && sincePickup < 1.6f && game.pickups.y > 0u)
+            addCentered(glyphs, count, font,
+                game.pickups.y == 2u ? textMedkit : textRockets, centreX,
+                centreY + 0.2f * size.y, 15.0f,
+                game.pickups.y == 2u ? float3(0.5f, 1.0f, 0.6f) : gold,
+                1.0f - smoothstep(1.0f, 1.6f, sincePickup));
         // The north gate prompt follows the third range kill.
         float sinceGate = game.progress.x >= ordinaryEnemyCount
             ? game.effects.x - game.fallen[ordinaryEnemyCount - 1u].motion.z
@@ -3090,7 +3628,6 @@ kernel void buildRangeHUD(constant ProgramUniforms &u [[buffer(0)]],
             addCentered(glyphs, count, font, textEnraged, centreX, 70.0f,
                 11.0f, danger, pulse);
     }
-    float centreY = size.y * 0.5f;
     if (game.progress.w == phaseWon) {
         addCentered(glyphs, count, font, textVictory, centreX,
             centreY - 52.0f, 34.0f, float3(1.0f));

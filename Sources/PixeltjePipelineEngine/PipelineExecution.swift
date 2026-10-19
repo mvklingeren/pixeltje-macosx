@@ -123,6 +123,8 @@ public struct PipelineInvocation: Equatable, Sendable {
   public static let trackpadSecondaryActionCountKey = "trackpadSecondaryActionCount"
   public static let directionPadXKey = "directionPadX"
   public static let directionPadYKey = "directionPadY"
+  /// Bitmask of held WASD Pad action keys; see `PipelineDirectionPadKeys`.
+  public static let directionPadKeysKey = "directionPadKeys"
   public static let stateKey = "state"
   public static let interactionMasksKey = "interactionMasks"
   public static let loopCallIndexKey = "loopCallIndex"

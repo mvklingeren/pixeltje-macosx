@@ -222,6 +222,7 @@ final class PipelineEditorModel: ObservableObject {
   private var previewLookPosition: (nodeID: PipelineNodeID, x: Double, y: Double)?
   @Published private(set) var directionPadX = 0.0
   @Published private(set) var directionPadY = 0.0
+  @Published private(set) var directionPadKeys = 0
   private var directionKeys: Set<String> = []
   private var liveGPUProgramPointerRevision: UInt64 = 0
   private var nodeGlowTasks: [PipelineNodeID: Task<Void, Never>] = [:]
@@ -1482,7 +1483,8 @@ final class PipelineEditorModel: ObservableObject {
   /// Keyboard state is transient and never changes the saved workflow.
   @discardableResult
   func setDirectionKey(_ characters: String?, pressed: Bool) -> Bool {
-    guard let key = characters?.lowercased(), ["w", "a", "s", "d"].contains(key),
+    guard let key = characters?.lowercased(),
+      ["w", "a", "s", "d"].contains(key) || PipelineDirectionPadKeys.bit(for: key) != nil,
       liveRun != nil,
       document.nodes.contains(where: { $0.kind == .directionPad
         && $0.executionState == .enabled }) else { return false }
@@ -1492,9 +1494,11 @@ final class PipelineEditorModel: ObservableObject {
       - (directionKeys.contains("a") ? 1 : 0))
     let y = Double((directionKeys.contains("w") ? 1 : 0)
       - (directionKeys.contains("s") ? 1 : 0))
-    if directionPadX != x || directionPadY != y {
+    let keys = directionKeys.reduce(0) { $0 | (PipelineDirectionPadKeys.bit(for: $1) ?? 0) }
+    if directionPadX != x || directionPadY != y || directionPadKeys != keys {
       directionPadX = x
       directionPadY = y
+      directionPadKeys = keys
       syncLiveRunControls()
     }
     return true
@@ -1505,6 +1509,7 @@ final class PipelineEditorModel: ObservableObject {
     directionKeys.removeAll()
     directionPadX = 0
     directionPadY = 0
+    directionPadKeys = 0
     syncLiveRunControls()
   }
 
@@ -3582,7 +3587,8 @@ final class PipelineEditorModel: ObservableObject {
     snapshot.fullScreenPreviewNodeID = fullScreenPreviewNodeID
     if document.nodes.contains(where: { $0.kind == .directionPad
       && $0.executionState == .enabled }) {
-      snapshot.directionPad = .init(x: directionPadX, y: directionPadY)
+      snapshot.directionPad = .init(x: directionPadX, y: directionPadY,
+        keys: directionPadKeys)
     }
     if let trackpadID = liveRun.trackpadNodeID,
       let trackpad = document.nodes.first(where: { $0.id == trackpadID }) {

@@ -1617,6 +1617,7 @@ private struct PipelineGraphView: View {
           },
           directionPadX: model.directionPadX,
           directionPadY: model.directionPadY,
+          directionPadKeys: model.directionPadKeys,
           setLoopAutoPause: { model.setLoopAutoPause($0, for: node.id) },
           proceedLoop: { model.proceedLoop(node.id) },
           stopLoop: model.stopLoopAfterCurrentCall,
@@ -2064,6 +2065,7 @@ private struct PipelineNodeCard: View {
   let setTrackpadSpaceAction: (Bool) -> Void
   let directionPadX: Double
   let directionPadY: Double
+  let directionPadKeys: Int
   let setLoopAutoPause: @MainActor @Sendable (Bool) -> Void
   let proceedLoop: () -> Void
   let stopLoop: () -> Void
@@ -2527,7 +2529,8 @@ private struct PipelineNodeCard: View {
           directionKey("S", active: directionPadY < 0)
           directionKey("D", active: directionPadX > 0)
         }
-        Text("Focus preview to move")
+        Text(directionPadKeys == 0 ? "Focus preview to move"
+          : "Keys " + heldDirectionPadKeys)
           .font(.caption2)
           .foregroundStyle(.secondary)
       }
@@ -2698,6 +2701,13 @@ private struct PipelineNodeCard: View {
     default: value = 0.5
     }
     return value.isFinite ? min(max(value, 0), 1) : 0.5
+  }
+
+  private var heldDirectionPadKeys: String {
+    (PipelineDirectionPadKeys.letters + PipelineDirectionPadKeys.digits)
+      .filter { directionPadKeys & (PipelineDirectionPadKeys.bit(for: $0) ?? 0) != 0 }
+      .map { $0.uppercased() }
+      .joined(separator: " ")
   }
 
   private func directionKey(_ label: String, active: Bool) -> some View {

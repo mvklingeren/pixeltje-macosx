@@ -11,7 +11,7 @@
 //     "textures": { "<asset port>": "image.png" },    optional; grey if absent
 //     "views": [ { "name": "start",
 //       "frames": 1,               ticks before present; 0 = initialize only
-//       "pointer": [x, y, actionCount, dt], "movement": [x, y, secondary, 0],
+//       "pointer": [x, y, actionCount, dt], "movement": [x, y, secondary, keys],
 //       "parameters": { "name": 1.0 },       overrides the workflow's values
 //       "writes": [ { "buffer": "game", "offset": 0, "floats": [ ... ] },
 //                   { "buffer": "game", "offset": 32, "uints": [ ... ] } ]

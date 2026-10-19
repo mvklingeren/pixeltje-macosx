@@ -692,9 +692,12 @@ SpiderHit traceSpider(float3 origin, float3 direction, float3 centre,
     return hit;
 }
 
-// Bodies keep clear of the crates, the glass box and the chrome cube; the
-// pad is a fraction of the leg footprint, so feet may still overlap them.
+// Bodies keep clear of the crates, the glass box, the chrome cube and the
+// sentry tripods; the pad is a fraction of the leg footprint, so feet may
+// still overlap them.
 bool insideProp(float2 p, float pad) {
+    for (uint i = 0u; i < sentryCount; ++i)
+        if (distance(p, sentryGround[i]) < 0.8f + pad) return true;
     return (all(p > float2(-4.1f, -3.1f) - pad)
             && all(p < float2(-1.8f, -0.7f) + pad))
         || (all(p > float2(2.1f, -6.5f) - pad)
