@@ -1626,6 +1626,26 @@ float3 shadePointLight(SceneHit hit, SurfaceMaterial material,
     return (diffuse + specular) * radiance * nDotL;
 }
 
+// Regolith is a dark, porous powder that scatters light back toward the sun:
+// Hapke's single-scattering term with a backward Henyey–Greenstein lobe and
+// the shadow-hiding opposition surge. Unlike glossy Lambert it never sheens
+// when you look into the sun, and it does not darken toward grazing view, so
+// the plain reads as lit dust. Its single-scattering albedo exceeds the
+// diffuse albedo; 1.6 times keeps a side-lit plain about as bright as before.
+float3 regolithReflectance(float3 normal, float3 viewDirection,
+    float3 albedo) {
+    float mu0 = max(dot(normal, sunDirection), 0.0f);
+    float mu = max(dot(normal, viewDirection), 0.0f);
+    float cosPhase = clamp(dot(sunDirection, viewDirection), -1.0f, 1.0f);
+    const float asymmetry = 0.3f;
+    float lobe = (1.0f - asymmetry * asymmetry) / pow(1.0f
+        + asymmetry * asymmetry - 2.0f * asymmetry * cosPhase, 1.5f);
+    float halfTangent = sqrt((1.0f - cosPhase) / (1.0f + cosPhase + 1.0e-4f));
+    float surge = 1.0f / (1.0f + halfTangent / 0.06f);
+    return albedo * 1.6f / (4.0f * rangePi) * mu0 / max(mu0 + mu, 1.0e-4f)
+        * lobe * (1.0f + surge);
+}
+
 // The sun is a point light 10 km away, so room-light shading serves it. The
 // shell and the terrain cast its shadows.
 float3 shadeSunlight(SceneHit hit, SurfaceMaterial material,
@@ -1641,6 +1661,11 @@ float3 shadeSunlight(SceneHit hit, SurfaceMaterial material,
     if (lit <= 0.0f) return float3(0.0f);
     PointLight sun = {hit.position + sunDirection * 1.0e4f,
         float3(1.0f, 0.97f, 0.92f), sunPower, false};
+    if (hit.material == 40u) {
+        float3 irradiance = sun.color * sunPower / (4.0f * rangePi * 1.0e8f);
+        return lit * irradiance
+            * regolithReflectance(hit.normal, viewDirection, material.albedo);
+    }
     return lit * shadePointLight(hit, material, viewDirection, sun, chrome,
         game);
 }
@@ -2265,11 +2290,15 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
 
     SurfaceMaterial material = surfaceMaterial(hit, crateA, crateB,
         furPosition, game.effects.x, direction, pixelSpread * hit.distance);
-    float3 color = material.emission
-        + material.albedo * (1.0f - material.metallic)
-            * float3(0.030f, 0.038f, 0.046f);
     // Room lights stay indoors; the sun lights the shell and the moon.
     bool exterior = hit.material == 40u || hit.material == 41u;
+    // The moon has no sky light, only sunlight bounced off the plain, which
+    // reaches slopes and boulder sides more than ground facing the sky.
+    float3 ambient = hit.material == 40u
+        ? float3(1.0f, 0.97f, 0.92f) * (0.006f + 0.05f * (1.0f - hit.normal.y))
+        : float3(0.030f, 0.038f, 0.046f);
+    float3 color = material.emission
+        + material.albedo * (1.0f - material.metallic) * ambient;
     if (exterior)
         color += shadeSunlight(hit, material, -direction, chrome, game);
     else for (uint i = 0u; i < 8u; ++i) {
