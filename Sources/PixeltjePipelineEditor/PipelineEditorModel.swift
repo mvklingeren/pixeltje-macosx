@@ -129,6 +129,10 @@ final class PipelineEditorModel: ObservableObject {
   @Published private(set) var cacheAssetAudioURLs: [PipelineNodeID: [String: URL]] = [:]
   private var liveAudioData: [URL: Data] = [:]
   private var liveAudioPlayers: [AVAudioPlayer] = []
+  private var liveAudioVoices: PipelineLiveAudioVoices?
+  /// Set when looping sound failed once in this run, so it is not retried
+  /// on every frame.
+  private var liveAudioVoicesFailed = false
   @Published private(set) var nodeTextValues: [PipelineNodeID: String] = [:]
   /// Size of the live preview's newest frame, set once a frame exists. The
   /// frames themselves reach preview views through `livePreview`.
@@ -3430,6 +3434,9 @@ final class PipelineEditorModel: ObservableObject {
         },
         playAudioEvent: { [weak self] url in
           await self?.playLiveAudioEvent(url, executionID: executionID)
+        },
+        updateAudioVoices: { [weak self] call, voices in
+          await self?.updateLiveAudioVoices(voices, call: call, executionID: executionID)
         }),
       controls: liveRun.controls, telemetry: liveRun.telemetry,
       progressBuffer: liveRun.progress, source: liveRun.source,
@@ -3495,6 +3502,9 @@ final class PipelineEditorModel: ObservableObject {
     self.liveRun = nil
     liveAudioPlayers = []
     liveAudioData = [:]
+    liveAudioVoices?.stop()
+    liveAudioVoices = nil
+    liveAudioVoicesFailed = false
   }
 
   private func playLiveAudioEvent(_ url: URL, executionID: UUID) {
@@ -3514,6 +3524,19 @@ final class PipelineEditorModel: ObservableObject {
       liveAudioPlayers.append(player)
     } catch {
       statusMessage = "Could not play sound: \(error.localizedDescription)"
+    }
+  }
+
+  private func updateLiveAudioVoices(_ voices: [PipelineGPUAudioVoice], call: Int,
+    executionID: UUID) {
+    guard activeExecutionID == executionID, liveRun?.executionID == executionID,
+      executionState == .running, !liveAudioVoicesFailed else { return }
+    let player = liveAudioVoices ?? PipelineLiveAudioVoices()
+    liveAudioVoices = player
+    do { try player.apply(call: call, voices: voices) } catch {
+      player.stop()
+      liveAudioVoicesFailed = true
+      statusMessage = "Could not play looping sound: \(error.localizedDescription)"
     }
   }
 
@@ -4185,6 +4208,7 @@ final class PipelineEditorModel: ObservableObject {
   private func markPaused(executionID: UUID) {
     guard activeExecutionID == executionID, executionState == .pausing else { return }
     executionState = .paused
+    liveAudioVoices?.stop()
     statusMessage = autoPausedLoopNodeID == nil
       ? "Pipeline paused." : "Loop paused. Click Proceed or Resume to start the next call."
   }

@@ -58,7 +58,7 @@ struct Program: Decodable {
     let vertexTextures: [String: String]?
     let fragmentTextures: [String: String]?
   }
-  struct AudioEvent: Decodable { let buffer: String }
+  struct AudioEvent: Decodable { let buffer: String; let word: Int? }
   let resources: [Resource]
   let initialize: [Pass]
   let tick: [Pass]
@@ -407,7 +407,8 @@ final class Renderer {
       }
       for event in program.audioEvents ?? [] {
         if case .buffer(let buffer)? = resources[event.buffer] {
-          buffer.contents().storeBytes(of: UInt32.zero, as: UInt32.self)
+          buffer.contents().storeBytes(of: UInt32.zero,
+            toByteOffset: (event.word ?? 0) * 4, as: UInt32.self)
         }
       }
       try encode(program.tick, resources: resources, uniforms: uniforms(frame: index, view: view))

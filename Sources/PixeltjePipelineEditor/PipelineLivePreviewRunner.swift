@@ -123,6 +123,9 @@ actor PipelineLivePreviewRunner {
     /// Reports the pixel size of the first frame and of any resized frame.
     let frameSizeChanged: @Sendable (CGSize) async -> Void
     let playAudioEvent: @Sendable (URL) async -> Void
+    /// The looping voices one call left; calls arrive in order but their
+    /// updates may not, so the receiver keeps the newest.
+    let updateAudioVoices: @Sendable (_ call: Int, [PipelineGPUAudioVoice]) async -> Void
   }
 
   private let configuration: Configuration
@@ -165,6 +168,7 @@ actor PipelineLivePreviewRunner {
     var previousActualWaitSeconds: Double?
     var previousReadyAt: UInt64?
     var call = 1
+    var hadAudioVoices = false
     while true {
       try controls.checkFailure()
       try await checkpoint()
@@ -203,6 +207,14 @@ actor PipelineLivePreviewRunner {
         let playAudioEvent = host.playAudioEvent
         Task { await playAudioEvent(url) }
       }
+      let audioVoices = await configuration.engine.takeLiveMetalAudioVoices(
+        runID: configuration.executionID)
+      if hadAudioVoices || !audioVoices.isEmpty {
+        let updateAudioVoices = host.updateAudioVoices
+        let voiceCall = call
+        Task { await updateAudioVoices(voiceCall, audioVoices) }
+      }
+      hadAudioVoices = !audioVoices.isEmpty
       let engineCompletedAt = DispatchTime.now().uptimeNanoseconds
       // A GPU Program completes its surface within the call. Shader-state
       // previews are drawn per display refresh by the render pump instead,

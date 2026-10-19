@@ -216,7 +216,7 @@ Scripts/ShaderPreview/render-preview.sh Examples/shader-fps-3d-starter.pixpipeli
 - A shader compile error surfaces here and doubles as the shader's build
   check.
 - Generated image inputs render as mid grey unless the views file maps their
-  asset port to an image. Audio events are ignored.
+  asset port to an image. Audio events and looping audio voices are ignored.
 - Use `--node` when a workflow has more than one GPU Program.
 
 Choose views that exercise the change: the default start, a close-up, the angle

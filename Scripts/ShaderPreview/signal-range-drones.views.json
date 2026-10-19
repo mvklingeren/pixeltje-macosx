@@ -1,0 +1,65 @@
+{
+  "width": 960,
+  "height": 540,
+  "views": [
+    {
+      "name": "drones-on-station",
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 22, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.12] },
+        { "buffer": "game", "offset": 7760, "floats": [1, 1, 2, 0] }
+      ]
+    },
+    {
+      "name": "drone-closeup-charging",
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 22, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.1] },
+        { "buffer": "game", "offset": 7328, "floats": [
+          0.5, 2.3, 24.6, 3,
+          0, 0, 0, 0,
+          0.12, -0.05, 0, 1,
+          1, 0.1, 0, -1] },
+        { "buffer": "game", "offset": 7760, "floats": [1, 1, 2, 0] }
+      ]
+    },
+    {
+      "name": "laser-incoming",
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 22, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.15] },
+        { "buffer": "game", "offset": 224, "floats": [10] },
+        { "buffer": "game", "offset": 7328, "floats": [
+          0, 7, 40, 3,
+          0, 0, 0, 0,
+          0, 0, 0, 1,
+          1, 1, 0, -1] },
+        { "buffer": "game", "offset": 7568, "floats": [
+          0, 6.9, 39.7, 9.8,
+          0.2, 1.2, 22, 0] },
+        { "buffer": "game", "offset": 7760, "floats": [1, 1, 2, 0] }
+      ]
+    },
+    {
+      "name": "shotgun-flash",
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 22, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.05, 100, 0.2, 0.12] },
+        { "buffer": "game", "offset": 7760, "floats": [1, 1, 1, 0] }
+      ]
+    },
+    {
+      "name": "drone-wreck",
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 22, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [-0.35] },
+        { "buffer": "game", "offset": 7328, "floats": [
+          0.4, 0.13, 25, 0,
+          0, 0, 0, 0.8,
+          1.2, 0.4, 0, 1,
+          1, 0, 0, -100] },
+        { "buffer": "game", "offset": 7760, "floats": [1, 1, 2, 0] }
+      ]
+    }
+  ]
+}

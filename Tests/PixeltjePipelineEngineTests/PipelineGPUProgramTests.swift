@@ -216,6 +216,97 @@ import Testing
   #expect(report.isValid, "\(report.diagnostics)")
 }
 
+private let audioVoiceTestSource = """
+  #include <metal_stdlib>
+  using namespace metal;
+  struct Uniforms {
+    float4 resolutionTime; uint4 frameSeed;
+    float4 parameters0; float4 parameters1; float4 parameters2; float4 parameters3;
+    float4 pointer; float4 movement;
+  };
+  kernel void tick(constant Uniforms &u [[buffer(0)]],
+    device uint *audio [[buffer(1)]], uint index [[thread_position_in_grid]]) {
+    if (index != 0) return;
+    audio[0] = 2u;
+    device float *voice = (device float *)(audio + 4);
+    voice[0] = 2.0f;
+    voice[1] = 1.5f;
+    voice[2] = -0.5f;
+  }
+  vertex float4 fullscreenVertex(uint index [[vertex_id]]) {
+    float2 p = float2((index << 1u) & 2u, index & 2u);
+    return float4(p * 2.0f - 1.0f, 0.0f, 1.0f);
+  }
+  fragment float4 audioFragment(float4 position [[position]]) {
+    return float4(0.2f, 0.3f, 0.4f, 1.0f);
+  }
+  """
+
+private func audioVoiceTestProgram(bytes: Int = 32, eventWord: Int = 0,
+  voiceWord: Int = 4) -> String {
+  """
+  {"version":1,"resources":[{"name":"audio","kind":"buffer","bytes":\(bytes)},
+  {"name":"display","kind":"texture"}],"initialize":[],
+  "tick":[{"kind":"compute","function":"tick","threads":[1],
+  "buffers":{"1":"audio"}}],
+  "present":[{"kind":"render","vertex":"fullscreenVertex",
+  "fragment":"audioFragment","target":"display","load":"clear","vertexCount":3}],
+  "swaps":[],"output":"display",
+  "audioEvents":[{"buffer":"audio","word":\(eventWord),"asset":"sfx"}],
+  "audioVoices":[{"buffer":"audio","word":\(voiceWord),"asset":"sfx"}]}
+  """
+}
+
+@Test func gpuProgramAudioEventsAndVoicesShareWordsWithoutOverlap() async throws {
+  let device = try #require(MTLCreateSystemDefaultDevice())
+  let runner = PipelineGPUProgram(commandQueue: try #require(device.makeCommandQueue()))
+  try await runner.validateLiteral(programJSON: audioVoiceTestProgram(),
+    source: audioVoiceTestSource)
+  // A voice needs four words of its own, inside a small buffer.
+  for program in [audioVoiceTestProgram(voiceWord: 0),
+    audioVoiceTestProgram(voiceWord: 5), audioVoiceTestProgram(bytes: 30),
+    audioVoiceTestProgram(bytes: 512)] {
+    await #expect(throws: PipelineEngineError.self) {
+      try await runner.validateLiteral(programJSON: program,
+        source: audioVoiceTestSource)
+    }
+  }
+}
+
+@Test func liveGPUProgramReportsCommittedAudioVoices() async throws {
+  let examples = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent().deletingLastPathComponent()
+    .deletingLastPathComponent().appendingPathComponent("Examples", isDirectory: true)
+  let sound = examples.appendingPathComponent("BaseTestSet/two-tone.wav")
+  let device = try #require(MTLCreateSystemDefaultDevice())
+  let runner = PipelineGPUProgram(commandQueue: try #require(device.makeCommandQueue()))
+  let node = PipelineNode(id: .init(rawValue: "voices"), kind: .gpuProgram)
+  let inputs: [String: PipelineNodeValue] = [
+    "program": .init(audioVoiceTestProgram(), type: .string),
+    "source": .init(audioVoiceTestSource, type: .string),
+    "assets": .init(PipelineAssetBundle(values: [
+      "sfx": PipelineNodeValue(sound, type: .audio),
+    ]), type: .assetBundle),
+    "width": .init(Int64(4), type: .integer),
+    "height": .init(Int64(4), type: .integer),
+  ]
+  let runID = UUID()
+  let context = PipelineNodeExecutionContext(semanticSHA256: "audio-voice-test",
+    invocation: .init(values: [PipelineInvocation.loopCallIndexKey: .integer(0)]),
+    sourceMediaRoot: examples, packageRootsByID: [:], nodeIndex: 0,
+    nodeCount: 1, progress: { _ in }, runID: runID)
+  await runner.beginLivePreview(runID: runID, nodeID: node.id)
+  _ = try await runner.captureLivePreview(node: node, inputs: inputs, context: context)
+  #expect(await runner.takeLiveAudioVoices(runID: runID).isEmpty)
+  await runner.commit(runID: runID)
+  #expect(await runner.takeLiveAudioEvents(runID: runID) == [sound, sound])
+  let voices = await runner.takeLiveAudioVoices(runID: runID)
+  #expect(voices == [PipelineGPUAudioVoice(nodeID: node.id, slot: 0, url: sound,
+    gain: 1, rate: 1.5, pan: -0.5)])
+  #expect(await runner.takeLiveAudioVoices(runID: runID).isEmpty)
+  await runner.endLivePreview(runID: runID)
+}
+
 @Test func flurryFilePathValidatesAgainstWorkflowFolder() async throws {
   let examples = URL(fileURLWithPath: #filePath)
     .deletingLastPathComponent().deletingLastPathComponent()

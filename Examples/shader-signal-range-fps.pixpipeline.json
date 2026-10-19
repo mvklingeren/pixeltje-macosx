@@ -428,6 +428,138 @@
         "nodeID": "generate-launch",
         "port": "audio"
       }
+    },
+    {
+      "id": "prompt-shotgun.prompt->generate-shotgun.prompt",
+      "input": {
+        "nodeID": "generate-shotgun",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-shotgun",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-shotgun.seed->generate-shotgun.seed",
+      "input": {
+        "nodeID": "generate-shotgun",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-shotgun",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-shotgun.audio->texture-cache.asset6",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset6"
+      },
+      "output": {
+        "nodeID": "generate-shotgun",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-laser.prompt->generate-laser.prompt",
+      "input": {
+        "nodeID": "generate-laser",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-laser",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-laser.seed->generate-laser.seed",
+      "input": {
+        "nodeID": "generate-laser",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-laser",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-laser.audio->texture-cache.asset7",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset7"
+      },
+      "output": {
+        "nodeID": "generate-laser",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-hover.prompt->generate-hover.prompt",
+      "input": {
+        "nodeID": "generate-hover",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-hover",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-hover.seed->generate-hover.seed",
+      "input": {
+        "nodeID": "generate-hover",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-hover",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-hover.audio->texture-cache.asset8",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset8"
+      },
+      "output": {
+        "nodeID": "generate-hover",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-drone-down.prompt->generate-drone-down.prompt",
+      "input": {
+        "nodeID": "generate-drone-down",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-drone-down",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-drone-down.seed->generate-drone-down.seed",
+      "input": {
+        "nodeID": "generate-drone-down",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-drone-down",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-drone-down.audio->texture-cache.asset9",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset9"
+      },
+      "output": {
+        "nodeID": "generate-drone-down",
+        "port": "audio"
+      }
     }
   ],
   "controlConnections": [
@@ -535,7 +667,7 @@
       "id": "note",
       "kind": "edit.markdownNote",
       "parameters": {
-        "text": "# Signal Range · Five-Room First-Person Shooter\nTwo spiders patrol the starting arena, unaware of you, and a third ambushes you in the northern room. Clear all three to unlock the northern route, then enter the boss arena and defeat the giant black spider. A spider notices you when you walk into its view or come close, and a gunshot within earshot alerts it through walls; an alerted spider rouses its neighbours and hunts you. Spiders move along a waypoint network that is generated afresh for every match: an unaware spider walks a random patrol of its room along it, pausing now and then to look around, and an alerted spider that loses sight of you runs the network's shortest route to you, through doorways, up the stairs and out onto the moon. Range spiders run in quick surges that briefly outpace you. Before it bites, a spider coils back and rears with its fangs spread, shuddering for a moment, then leaps at you, drives down onto its fangs and slams you backwards with a jolt of the view. Back away while it rears, or shoot it to cancel the bite and shove it back. Half a second after each bite it can strike again. A body hit deals one point and a head hit two, so a range spider falls to two body hits or one headshot; the boss has fourteen points. The crosshair flashes a white marker for a body hit, orange for a headshot and red for a kill. Defeated spiders collapse and remain on the floor. Top left: health bar and value. Four squares at the top right: defeated spiders. Bottom right: rounds left in the pistol's twelve-round magazine; an empty magazine reloads by itself in 1.6 seconds. NORTH GATE OPEN appears after the third range kill, and the boss's name and red bar appear during the fight. Red screen edges and a red arc around the crosshair show damage and the direction it came from; the edges pulse at low health. A green VICTORY banner ends the match; two seconds later Scene Switch starts the spinning triangle. A red YOU DIED banner means defeat.\n\n**Map and boss reveal:** The starting arena and its northern, eastern and western rooms keep their existing materials, objects, stairways and jump pads. Crates, the chrome cube and the glass box block both you and the spiders. Entering the northern room plays its scare sound once per visit; on the first visit a spider drops from the dark ceiling ahead of you. Once the three range spiders are down, a steel gate opens at the far north end of the terrazzo room. A short corridor leads into a wide, dark steel boss chamber. Crossing the arena threshold drops a sliding gate behind you. Across the room, a second blast door rises; a super-sized black spider walks out of its staging bay, then that door closes. A brief closeup follows the emerging spider. Movement and shooting resume after the doors close. The player cannot retreat through the sealed entrance. The boss has a red health bar. The existing generated crate and impact textures, three cached sounds, chrome cube, glass box, room scare and jump pads remain part of the range. Link the compatible Klein and Stable Audio 3 Core AI packages if the graph asks for models.\n\n**Boss fight:** The giant has a fixed-heading rush. It sights your position once, pauses briefly, then sprints along that line to strike. It does not steer during the run, so strafing can dodge it. Between rushes it throws a visible web cloth toward your last position. The cloth travels through the air, lands on the floor and lingers; walking into it slows movement temporarily. It expires after a few seconds. Below half health the boss is enraged: its eyes glow, its pause before a rush shortens, it charges faster, and each throw lands two cloths, one on you and one where you are heading. Defeat the boss to finish the match.\n\n**Controls:** Run the workflow with Save generated images to disk turned off, then open the Scene Switch full-screen preview. Focus the preview and hold W/S to walk forward/back, A/D to strafe. Move the pointer into the full-screen preview to capture and hide the cursor. Move the mouse or swipe the trackpad to aim without clicking; left/right keeps turning even at the screen edge, and up/down changes pitch. Escape closes the preview and restores the cursor. Only WASD moves the player. Movement accelerates and brakes quickly, with less control in the air. Left click fires and plays the cached gunshot when a shot passes the fire cooldown. Press Space, J, or right click to jump. Step onto either northern jump pad for an automatic launch and its cached sound; landing on one launches again. The Trackpad card has an Action 2 button for jumping and its Spacebar setting selects Action 2. Movement releases when the preview loses focus. After victory, wait for the triangle scene; click there to return to a fresh match. Click after defeat to restart.\n\n**Rendering:** SignalRangeFPSProgram.metal ray traces the five main rooms, connecting corridors, two sliding boss doors, staging bay, jump pads, crates, chrome cube, glass box, three range spiders, giant boss and airborne or landed web cloths. SignalRangeSpider.metal contains shared articulated geometry, materials and spider behaviour. NPCPathNetwork.metal is a reusable include for any GPU Program: it generates a waypoint graph from a list of room rectangles and doorway joins, routes it toward one goal and steers patrolling or hunting NPCs along it. The boss uses the black spider silhouette at much larger scale, with red eyes and a separate fixed-heading attack. SignalRangeCeilingLamps.metal defines two reusable ceiling armatures, a pendant with an opaque dome shade and a flush bulkhead with a frosted glass dome; two pendants and one bulkhead light the starting arena. SignalRangeTLBox.metal defines the northern ceiling fixture. A held pistol is ray traced in view space, lit by the room lights and its own muzzle flash. It sways behind turns, bobs with each step, kicks on every shot and dips out of view to reload. Recoil climbs with rapid fire and recovers by itself. Head bob, a dip on landing and camera shake from hits and the boss's rush move only the view. The same spider geometry serves drawing and hit detection. Shots show depth-aware tracers, impact flashes and generated strike textures. Spider hits spray yellow-green particles. Floor and wall materials are procedural; point lights and GGX reflections shade the scene. Each shot briefly lights the room from the muzzle and from its spark at the impact. Every spider, living or fallen, casts a soft shadow from its body. Floors darken where they meet walls, in corners and around crates, the cube and spiders. The present phase renders the scene to an HDR texture, blurs its brightest light into a bloom texture, then composites with a lens vignette, film grain and red-blue fringing when you are hurt. A final pass draws the HUD text with the macOS system font. Start at 1440 × 900 and 30 Hz; adjust Width, Height and Loop rate if needed. The game runs in the Pipeline Editor.\n\n**Exit to the moon:** Behind the starting position, a green light marks an exit door in the arena's south wall. It rises as you or a spider comes near and leads straight onto a lunar surface outside the base: dark maria in warm brown and blue-grey between pale highlands, brighter crater walls, craters of three sizes, fields of boulders and stones you can climb over, a ring of distant highlands, a black sky with stars and a low sun that casts long, hard shadows. You can walk anywhere within 1.5 km, around the base's outer shell, a clad station with steel ribs, lit ribbon windows, an orange band and hazard stripes at the exit, and over crater rims, and spiders that follow you keep hunting outside. The match rules are unchanged; head back through the door to finish the range. The landscape uses the Pixeltje procedural terrain library (`// pixeltje:terrain-v1`), which any GPU Program can opt into.\n\n**Scene handoff:** Signal Range writes scene index 1 to its dedicated GPU request buffer after the victory pause. Scene Switch displays the completed winning frame, then runs only the triangle program on the next Loop call. The triangle writes index 0 when clicked. Each program keeps its own GPU state while inactive; both use the same Trackpad action counter. A stopped or failed frame does not commit a scene change."
+        "text": "# Signal Range · Five-Room First-Person Shooter\nTwo spiders patrol the starting arena, unaware of you, and a third ambushes you in the northern room. Clear all three to unlock the northern route, then enter the boss arena and defeat the giant black spider. A spider notices you when you walk into its view or come close, and a gunshot within earshot alerts it through walls; an alerted spider rouses its neighbours and hunts you. Spiders move along a waypoint network that is generated afresh for every match: an unaware spider walks a random patrol of its room along it, pausing now and then to look around, and an alerted spider that loses sight of you runs the network's shortest route to you, through doorways, up the stairs and out onto the moon. Range spiders run in quick surges that briefly outpace you. Before it bites, a spider coils back and rears with its fangs spread, shuddering for a moment, then leaps at you, drives down onto its fangs and slams you backwards with a jolt of the view. Back away while it rears, or shoot it to cancel the bite and shove it back. Half a second after each bite it can strike again. A body hit deals one point and a head hit two, so a range spider falls to two body hits or one headshot; the boss has fourteen points. The crosshair flashes a white marker for a body hit, orange for a headshot and red for a kill. Defeated spiders collapse and remain on the floor. Top left: health bar and value. Four squares at the top right: defeated spiders. Bottom right: rounds left in the pistol's twelve-round magazine; an empty magazine reloads by itself in 1.6 seconds. NORTH GATE OPEN appears after the third range kill, and the boss's name and red bar appear during the fight. Red screen edges and a red arc around the crosshair show damage and the direction it came from; the edges pulse at low health. A green VICTORY banner ends the match; two seconds later Scene Switch starts the spinning triangle. A red YOU DIED banner means defeat.\n\n**Map and boss reveal:** The starting arena and its northern, eastern and western rooms keep their existing materials, objects, stairways and jump pads. Crates, the chrome cube and the glass box block both you and the spiders. Entering the northern room plays its scare sound once per visit; on the first visit a spider drops from the dark ceiling ahead of you. Once the three range spiders are down, a steel gate opens at the far north end of the terrazzo room. A short corridor leads into a wide, dark steel boss chamber. Crossing the arena threshold drops a sliding gate behind you. Across the room, a second blast door rises; a super-sized black spider walks out of its staging bay, then that door closes. A brief closeup follows the emerging spider. Movement and shooting resume after the doors close. The player cannot retreat through the sealed entrance. The boss has a red health bar. The existing generated crate and impact textures, three cached sounds, chrome cube, glass box, room scare and jump pads remain part of the range. Link the compatible Klein and Stable Audio 3 Core AI packages if the graph asks for models.\n\n**Boss fight:** The giant has a fixed-heading rush. It sights your position once, pauses briefly, then sprints along that line to strike. It does not steer during the run, so strafing can dodge it. Between rushes it throws a visible web cloth toward your last position. The cloth travels through the air, lands on the floor and lingers; walking into it slows movement temporarily. It expires after a few seconds. Below half health the boss is enraged: its eyes glow, its pause before a rush shortens, it charges faster, and each throw lands two cloths, one on you and one where you are heading. Defeat the boss to finish the match.\n\n**Controls:** Run the workflow with Save generated images to disk turned off, then open the Scene Switch full-screen preview. Focus the preview and hold W/S to walk forward/back, A/D to strafe. Move the pointer into the full-screen preview to capture and hide the cursor. Move the mouse or swipe the trackpad to aim without clicking; left/right keeps turning even at the screen edge, and up/down changes pitch. Escape closes the preview and restores the cursor. Only WASD moves the player. Movement accelerates and brakes quickly, with less control in the air. Left click fires and plays the cached gunshot when a shot passes the fire cooldown. Press Space, J, or right click to jump. Step onto either northern jump pad for an automatic launch and its cached sound; landing on one launches again. The Trackpad card has an Action 2 button for jumping and its Spacebar setting selects Action 2. Movement releases when the preview loses focus. After victory, wait for the triangle scene; click there to return to a fresh match. Click after defeat to restart.\n\n**Rendering:** SignalRangeFPSProgram.metal ray traces the five main rooms, connecting corridors, two sliding boss doors, staging bay, jump pads, crates, chrome cube, glass box, three range spiders, giant boss and airborne or landed web cloths. SignalRangeSpider.metal contains shared articulated geometry, materials and spider behaviour. NPCPathNetwork.metal is a reusable include for any GPU Program: it generates a waypoint graph from a list of room rectangles and doorway joins, routes it toward one goal and steers patrolling or hunting NPCs along it. The boss uses the black spider silhouette at much larger scale, with red eyes and a separate fixed-heading attack. SignalRangeCeilingLamps.metal defines two reusable ceiling armatures, a pendant with an opaque dome shade and a flush bulkhead with a frosted glass dome; two pendants and one bulkhead light the starting arena. SignalRangeTLBox.metal defines the northern ceiling fixture. A held pistol is ray traced in view space, lit by the room lights and its own muzzle flash. It sways behind turns, bobs with each step, kicks on every shot and dips out of view to reload. Recoil climbs with rapid fire and recovers by itself. Head bob, a dip on landing and camera shake from hits and the boss's rush move only the view. The same spider geometry serves drawing and hit detection. Shots show depth-aware tracers, impact flashes and generated strike textures. Spider hits spray yellow-green particles. Floor and wall materials are procedural; point lights and GGX reflections shade the scene. Each shot briefly lights the room from the muzzle and from its spark at the impact. Every spider, living or fallen, casts a soft shadow from its body. Floors darken where they meet walls, in corners and around crates, the cube and spiders. The present phase renders the scene to an HDR texture, blurs its brightest light into a bloom texture, then composites with a lens vignette, film grain and red-blue fringing when you are hurt. A final pass draws the HUD text with the macOS system font. Start at 1440 × 900 and 30 Hz; adjust Width, Height and Loop rate if needed. The game runs in the Pipeline Editor.\n\n**Exit to the moon:** Behind the starting position, a green light marks an exit door in the arena's south wall. It rises as you or a spider comes near and leads straight onto a lunar surface outside the base: dark maria in warm brown and blue-grey between pale highlands, brighter crater walls, craters of three sizes, fields of boulders and stones you can climb over, a ring of distant highlands, a black sky with stars and a low sun that casts long, hard shadows. You can walk anywhere within 1.5 km, around the base's outer shell, a clad station with steel ribs, lit ribbon windows, an orange band and hazard stripes at the exit, and over crater rims, and spiders that follow you keep hunting outside. The match rules are unchanged; head back through the door to finish the range. The landscape uses the Pixeltje procedural terrain library (`// pixeltje:terrain-v1`), which any GPU Program can opt into.\n\n**Drones and the shotgun:** Three quadcopter drones keep station a few metres above the plain south of the exit. They fly like real multirotors: rotors only push along the body, so a drone tilts toward where it wants to go, overshoots slightly and settles, and gusts keep it from hanging perfectly still. Each carries a steady red and a blinking blue navigation light, faint spinning rotor discs and a laser rifle under its nose, and casts a shadow in the low sun. A drone ignores you until you shoot one. Then it and every drone in radio range turn hostile: they circle you at standoff range, the rifle's emitter glows red for a moment, and a red laser bolt flies at you. Bolts travel at a finite speed and lead your movement, so strafing dodges them; each one that reaches you costs nine health. A drone takes three hits. Shot down, its lights go out, sparks burst, its motors spin down and it tumbles onto the regolith. Step out of the door and the pistol is lowered and swapped for a double-barrel shotgun, and back inside the pistol returns. Each click fires one barrel, right then left, as a cone of eight pellets; with both spent, the gun breaks open and reloads by itself in 2.3 seconds. Red shells at the bottom right show what is loaded. The shotgun has its own Stable Audio blast; the drones have a laser shot, a crash and a looping hover hum. The hum is spatial: it fades with distance, pans between the ears, rises in pitch with rotor thrust and carries a Doppler shift from both the drone's and your motion, so a drone sweeping past audibly drops in pitch. GPU Program voices do this: the shader writes each drone's gain, playback rate and pan every frame, using SignalRangeDoppler.metal, and the editor loops the sound with those settings. The flight, rifle and lights live in SignalRangeDrone.metal and the shotgun in SignalRangeShotgun.metal.\n\n**Scene handoff:** Signal Range writes scene index 1 to its dedicated GPU request buffer after the victory pause. Scene Switch displays the completed winning frame, then runs only the triangle program on the next Loop call. The triangle writes index 0 when clicked. Each program keeps its own GPU state while inactive; both use the same Trackpad action counter. A stopped or failed frame does not commit a scene change."
       },
       "resources": {},
       "title": "How to play"
@@ -571,7 +703,7 @@
       "id": "program-text",
       "kind": "primitive.string",
       "parameters": {
-        "value": "{\"version\":2,\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":8192},{\"name\":\"display\",\"kind\":\"texture\"},{\"name\":\"sceneColor\",\"kind\":\"texture\"},{\"name\":\"antialiased\",\"kind\":\"texture\"},{\"name\":\"crateATexture\",\"kind\":\"inputTexture\",\"input\":\"asset0\"},{\"name\":\"crateBTexture\",\"kind\":\"inputTexture\",\"input\":\"asset1\"},{\"name\":\"impactTexture\",\"kind\":\"inputTexture\",\"input\":\"asset2\"},{\"name\":\"route\",\"kind\":\"buffer\",\"bytes\":4},{\"name\":\"shotAudio\",\"kind\":\"buffer\",\"bytes\":4},{\"name\":\"scareAudio\",\"kind\":\"buffer\",\"bytes\":4},{\"name\":\"launchAudio\",\"kind\":\"buffer\",\"bytes\":4},{\"name\":\"hudFont\",\"kind\":\"systemFont\",\"design\":\"monospaced\",\"weight\":\"semibold\",\"strings\":[\"HEALTH\",\"SPIDERS\",\"BROODMOTHER\",\"ENRAGED\",\"RELOADING\",\"NORTH GATE OPEN\",\"VICTORY\",\"THE RANGE IS CLEAR\",\"YOU DIED\",\"CLICK TO RESTART\",\"0\",\"1\",\"2\",\"3\",\"4\",\"5\",\"6\",\"7\",\"8\",\"9\"]}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"2\":\"route\",\"4\":\"scareAudio\",\"5\":\"launchAudio\"}},{\"kind\":\"compute\",\"function\":\"fireRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"shotAudio\"}}],\"present\":[{\"kind\":\"compute\",\"function\":\"buildRangeHUD\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"2\":\"hudFont\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"rangeFragment\",\"target\":\"sceneColor\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"crateATexture\",\"2\":\"crateBTexture\",\"3\":\"impactTexture\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"antialiasFragment\",\"target\":\"antialiased\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentTextures\":{\"1\":\"sceneColor\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"bloomFragment\",\"target\":\"sceneColor\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentTextures\":{\"1\":\"antialiased\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"compositeFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"antialiased\",\"2\":\"sceneColor\"}},{\"kind\":\"render\",\"vertex\":\"rangeHUDVertex\",\"fragment\":\"rangeHUDFragment\",\"target\":\"display\",\"load\":\"load\",\"blend\":\"alpha\",\"vertexCount\":6,\"instanceCount\":96,\"vertexBuffers\":{\"1\":\"hudFont\",\"2\":\"game\"},\"fragmentBuffers\":{\"1\":\"hudFont\"}}],\"swaps\":[],\"output\":\"display\",\"sceneRequestBuffer\":\"route\",\"audioEvents\":[{\"buffer\":\"shotAudio\",\"asset\":\"asset3\"},{\"buffer\":\"scareAudio\",\"asset\":\"asset4\"},{\"buffer\":\"launchAudio\",\"asset\":\"asset5\"}]}"
+        "value": "{\"version\":2,\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":8192},{\"name\":\"display\",\"kind\":\"texture\"},{\"name\":\"sceneColor\",\"kind\":\"texture\"},{\"name\":\"antialiased\",\"kind\":\"texture\"},{\"name\":\"crateATexture\",\"kind\":\"inputTexture\",\"input\":\"asset0\"},{\"name\":\"crateBTexture\",\"kind\":\"inputTexture\",\"input\":\"asset1\"},{\"name\":\"impactTexture\",\"kind\":\"inputTexture\",\"input\":\"asset2\"},{\"name\":\"route\",\"kind\":\"buffer\",\"bytes\":4},{\"name\":\"audio\",\"kind\":\"buffer\",\"bytes\":80},{\"name\":\"hudFont\",\"kind\":\"systemFont\",\"design\":\"monospaced\",\"weight\":\"semibold\",\"strings\":[\"HEALTH\",\"SPIDERS\",\"BROODMOTHER\",\"ENRAGED\",\"RELOADING\",\"NORTH GATE OPEN\",\"VICTORY\",\"THE RANGE IS CLEAR\",\"YOU DIED\",\"CLICK TO RESTART\",\"0\",\"1\",\"2\",\"3\",\"4\",\"5\",\"6\",\"7\",\"8\",\"9\",\"PISTOL\",\"SHOTGUN\"]}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"2\":\"route\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"fireRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"advanceDrones\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}}],\"present\":[{\"kind\":\"compute\",\"function\":\"buildRangeHUD\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"2\":\"hudFont\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"rangeFragment\",\"target\":\"sceneColor\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"crateATexture\",\"2\":\"crateBTexture\",\"3\":\"impactTexture\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"antialiasFragment\",\"target\":\"antialiased\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentTextures\":{\"1\":\"sceneColor\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"bloomFragment\",\"target\":\"sceneColor\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentTextures\":{\"1\":\"antialiased\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"compositeFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"antialiased\",\"2\":\"sceneColor\"}},{\"kind\":\"render\",\"vertex\":\"rangeHUDVertex\",\"fragment\":\"rangeHUDFragment\",\"target\":\"display\",\"load\":\"load\",\"blend\":\"alpha\",\"vertexCount\":6,\"instanceCount\":96,\"vertexBuffers\":{\"1\":\"hudFont\",\"2\":\"game\"},\"fragmentBuffers\":{\"1\":\"hudFont\"}}],\"swaps\":[],\"output\":\"display\",\"sceneRequestBuffer\":\"route\",\"audioEvents\":[{\"buffer\":\"audio\",\"word\":0,\"asset\":\"asset3\"},{\"buffer\":\"audio\",\"word\":1,\"asset\":\"asset4\"},{\"buffer\":\"audio\",\"word\":2,\"asset\":\"asset5\"},{\"buffer\":\"audio\",\"word\":3,\"asset\":\"asset6\"},{\"buffer\":\"audio\",\"word\":4,\"asset\":\"asset7\"},{\"buffer\":\"audio\",\"word\":5,\"asset\":\"asset9\"}],\"audioVoices\":[{\"buffer\":\"audio\",\"word\":8,\"asset\":\"asset8\"},{\"buffer\":\"audio\",\"word\":12,\"asset\":\"asset8\"},{\"buffer\":\"audio\",\"word\":16,\"asset\":\"asset8\"}]}"
       },
       "resources": {},
       "title": "Game state and render passes"
@@ -870,11 +1002,11 @@
         "keepBetweenRuns": true,
         "slotCount": {
           "$type": "integer",
-          "value": 6
+          "value": 10
         }
       },
       "resources": {},
-      "title": "Klein materials and three sounds · asset cache"
+      "title": "Klein materials and seven sounds · asset cache"
     },
     {
       "id": "triangle-source",
@@ -1237,6 +1369,426 @@
           }
         }
       }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-shotgun",
+      "kind": "input.prompt",
+      "title": "Double-barrel shotgun blast sound prompt",
+      "parameters": {
+        "value": "A single powerful double-barrel shotgun blast fired outdoors: deep booming report with a sharp crack and a brief rolling echo, no reloading or shell sounds, no voices or music"
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-shotgun",
+      "kind": "input.seed",
+      "title": "Double-barrel shotgun blast fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 3456
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-shotgun",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Double-barrel shotgun blast sound · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 2
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "3c3ead00ddda0cd08c5ee67f140b16ad740d7885c6ab9d0e0950676fc0203abc",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "faf0fcd4028b833f2d1f5e6197b2a0f4b6f396ad8aa58fb9b199fe7e3f14a8b0",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "a393376b99a0c532c4c0f8e4d1e38295e0cd3b53ff5d9ee3eb4f91bb6e850efc",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "bafbe50f630c9e6dd2477e320a974d90ef2a27f734f9b610b19e1d0f1b4b4698",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-laser",
+      "kind": "input.prompt",
+      "title": "Drone laser rifle shot sound prompt",
+      "parameters": {
+        "value": "A single short science-fiction laser rifle shot: bright electric zap with a quick descending pitch sweep and a crisp sizzling tail, no explosion, no voices or music"
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-laser",
+      "kind": "input.seed",
+      "title": "Drone laser rifle shot fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 7890
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-laser",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Drone laser rifle shot sound · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 1
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "3c3ead00ddda0cd08c5ee67f140b16ad740d7885c6ab9d0e0950676fc0203abc",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "faf0fcd4028b833f2d1f5e6197b2a0f4b6f396ad8aa58fb9b199fe7e3f14a8b0",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "a393376b99a0c532c4c0f8e4d1e38295e0cd3b53ff5d9ee3eb4f91bb6e850efc",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "bafbe50f630c9e6dd2477e320a974d90ef2a27f734f9b610b19e1d0f1b4b4698",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-hover",
+      "kind": "input.prompt",
+      "title": "Drone hover loop sound prompt",
+      "parameters": {
+        "value": "Steady continuous hum of a small quadcopter drone hovering in place nearby: four propellers buzzing at a constant speed, smooth sustained tone without any start, stop, fade or pause, no wind, voices or music"
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-hover",
+      "kind": "input.seed",
+      "title": "Drone hover loop fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 2468
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-hover",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Drone hover loop sound · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 2
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "3c3ead00ddda0cd08c5ee67f140b16ad740d7885c6ab9d0e0950676fc0203abc",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "faf0fcd4028b833f2d1f5e6197b2a0f4b6f396ad8aa58fb9b199fe7e3f14a8b0",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "a393376b99a0c532c4c0f8e4d1e38295e0cd3b53ff5d9ee3eb4f91bb6e850efc",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "bafbe50f630c9e6dd2477e320a974d90ef2a27f734f9b610b19e1d0f1b4b4698",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-drone-down",
+      "kind": "input.prompt",
+      "title": "Drone shot down sound prompt",
+      "parameters": {
+        "value": "A small drone being shot down: a sharp electrical pop and crackle of sparks, propellers sputtering to a stop, then a light plastic and metal crash onto the ground, no voices or music"
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-drone-down",
+      "kind": "input.seed",
+      "title": "Drone shot down fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 1357
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-drone-down",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Drone shot down sound · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 2
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "3c3ead00ddda0cd08c5ee67f140b16ad740d7885c6ab9d0e0950676fc0203abc",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "faf0fcd4028b833f2d1f5e6197b2a0f4b6f396ad8aa58fb9b199fe7e3f14a8b0",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "a393376b99a0c532c4c0f8e4d1e38295e0cd3b53ff5d9ee3eb4f91bb6e850efc",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "bafbe50f630c9e6dd2477e320a974d90ef2a27f734f9b610b19e1d0f1b4b4698",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
     }
   ],
   "presentation": {
@@ -1377,6 +1929,54 @@
       "generate-launch": {
         "x": 1160,
         "y": 2510
+      },
+      "prompt-shotgun": {
+        "x": 860,
+        "y": 2970
+      },
+      "seed-shotgun": {
+        "x": 860,
+        "y": 3180
+      },
+      "generate-shotgun": {
+        "x": 1160,
+        "y": 2970
+      },
+      "prompt-laser": {
+        "x": 860,
+        "y": 3430
+      },
+      "seed-laser": {
+        "x": 860,
+        "y": 3640
+      },
+      "generate-laser": {
+        "x": 1160,
+        "y": 3430
+      },
+      "prompt-hover": {
+        "x": 860,
+        "y": 3890
+      },
+      "seed-hover": {
+        "x": 860,
+        "y": 4100
+      },
+      "generate-hover": {
+        "x": 1160,
+        "y": 3890
+      },
+      "prompt-drone-down": {
+        "x": 860,
+        "y": 4350
+      },
+      "seed-drone-down": {
+        "x": 860,
+        "y": 4560
+      },
+      "generate-drone-down": {
+        "x": 1160,
+        "y": 4350
       }
     },
     "nodeSizes": {

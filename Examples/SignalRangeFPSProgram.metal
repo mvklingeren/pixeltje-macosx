@@ -7,7 +7,9 @@ using namespace metal;
 // Signal Range: a five-room first-person arena shooter for gpu.program.
 // The compute pass owns all mutable game state. The fragment pass traces the
 // same room and walking spider drones from the camera, then draws the HUD.
-// An exit door in the starting arena's south wall leads onto the moon.
+// An exit door in the starting arena's south wall leads onto the moon, where
+// quadcopter drones hover and fire back with laser rifles once shot at, and
+// the player switches to a double-barrel shotgun.
 
 constant uint enemyCount = 4u;
 constant uint ordinaryEnemyCount = 3u;
@@ -58,6 +60,8 @@ constant int moonShadeDetail = 7;         // normal octaves
 // A low sun in the south-west throws long shadows across the craters.
 constant float3 sunDirection = float3(-0.8494f, 0.2199f, 0.4797f);
 constant float sunPower = 1.13e10f;       // irradiance 9 from 10 km away
+constant uint droneCount = 3u;
+constant uint laserCount = 6u;
 
 #include "NPCPathNetwork.metal"
 
@@ -89,6 +93,37 @@ struct WebCloth {
     float4 startTime;      // launch position XYZ and launch time
     float4 targetExpiry;   // landing position XYZ and expiry time
 };
+
+struct Drone {
+    float4 pose;           // centre XYZ, health (zero once shot down)
+    float4 velocity;       // world velocity XYZ, heading yaw
+    float4 attitude;       // tilt tangent along world X and Z, hit flash, thrust
+    float4 brain;          // hostile flag, fire cooldown, unused, time shot down
+    float4 wander;         // station XZ, hover height, loiter phase;
+                           // the spark burst XYZ once shot down
+};
+
+struct LaserBolt {
+    float4 startTime;      // muzzle XYZ and firing time
+    float4 endHit;         // stop point XYZ; 1 on a surface, 2 on the player
+};
+
+// The audio buffer the engine reads after each frame. Event words count
+// one-shot sounds and are cleared before every tick; each drone voice is the
+// gain, playback rate and pan of its looping hover sound.
+struct RangeAudio {
+    uint shot;
+    uint scare;
+    uint launch;
+    uint shotgun;
+    uint laser;
+    uint droneDown;
+    uint reserved[2];
+    float4 droneVoice[droneCount];
+};
+
+static_assert(sizeof(RangeAudio) == 80,
+    "The audio words must match the program's audioEvents and audioVoices");
 
 constant uint hudCapacity = 96u;
 
@@ -126,8 +161,15 @@ struct GameState {
     float4 pathFollow[enemyCount]; // NPC path follower for each spider
     NPCPathNetwork paths;   // generated waypoint graph and route to the player
     // Rebuilt from the state above by every present pass. It shares this
-    // buffer because the program already uses all twelve resource slots.
+    // buffer because GPU Program resource slots are scarce.
     HUDGlyph hud[hudCapacity];
+    // The moon's state follows the HUD, so earlier offsets stay where
+    // preview views write them.
+    Drone drones[droneCount];
+    LaserBolt lasers[laserCount];
+    float4 arms;            // held weapon (0 pistol, 1 shotgun), raised 0–1,
+                            // shells loaded, shell reload left
+    uint4 burst;            // pellets in the latest discharge, bolts fired
 };
 
 static_assert(sizeof(GameState) <= 8192,
@@ -233,6 +275,7 @@ PointLight roomLight(uint index, float time) {
 
 float stairHeight(float2 point);
 bool walkable(float2 point);
+bool outdoors(float2 point, float pad);
 
 void damagePlayer(device GameState &game, float amount, float2 source,
     float flash) {
@@ -267,14 +310,18 @@ GunPose gunPose(device const GameState &game) {
     float kick = game.recoil.z;
     float bob = game.motion.w, phase = game.motion.z;
     float2 sway = game.look.zw;
+    // Lowered out of view while the shotgun is swapped in or out.
+    float lowered = 1.0f - smoothstep(0.0f, 1.0f, game.arms.y);
     // The gun lags behind turns, bobs with steps, kicks back on each shot
     // and dips out of view while the magazine is changed.
     float3 pivot = float3(0.17f, -0.17f, 0.36f) + float3(
         0.010f * bob * sin(phase) - 0.006f * sway.x,
         -0.007f * bob * abs(cos(phase)) - 0.006f * sway.y
-            + 0.010f * kick - 0.12f * reload - 0.5f * game.hurt.w,
+            + 0.010f * kick - 0.12f * reload - 0.34f * lowered
+            - 0.5f * game.hurt.w,
         -0.045f * kick);
-    float pitch = 0.17f * kick - 0.5f * reload - 0.02f * sway.y;
+    float pitch = 0.17f * kick - 0.5f * reload - 0.9f * lowered
+        - 0.02f * sway.y;
     float yaw = -0.03f * sway.x;
     float roll = 0.55f * reload;
     float3 f = float3(sin(yaw) * cos(pitch), sin(pitch),
@@ -315,7 +362,23 @@ constant uint2 rangePathJoins[pathJoinCount] = {
     uint2(8u, 9u)
 };
 
+struct GunHit {
+    float distance;
+    float3 normal;          // gun frame
+    uint part;              // 1 slide, 2 polymer, 3 dark steel, 4 glove,
+                            // 5 sleeve, 6 blued barrel, 7 walnut
+    float3 local;
+};
+
+void gunBox(thread GunHit &hit, float3 origin, float3 direction,
+    float3 lower, float3 upper, uint part);
+void gunCapsule(thread GunHit &hit, float3 origin, float3 direction,
+    float3 start, float3 end, float radius, uint part);
+
 #include "SignalRangeSpider.metal"
+#include "SignalRangeDoppler.metal"
+#include "SignalRangeShotgun.metal"
+#include "SignalRangeDrone.metal"
 
 void resetGame(device GameState &game, uint seed) {
     game.player = float4(0.0f, 1.55f, 12.0f, 0.0f);
@@ -367,12 +430,18 @@ void resetGame(device GameState &game, uint seed) {
     // Every match generates a fresh network over the same rooms.
     npcPathGenerate(game.paths, rangePathAreas, pathAreaCount,
         rangePathJoins, pathJoinCount, npcPathHash(seed));
+    resetArms(game);
+    resetDrones(game);
 }
 
 kernel void initializeRange(constant ProgramUniforms &u [[buffer(0)]],
     device GameState *states [[buffer(1)]],
+    device RangeAudio *audio [[buffer(3)]],
     uint id [[thread_position_in_grid]]) {
-    if (id == 0u) resetGame(states[0], u.frameSeed.y ^ u.frameSeed.z);
+    if (id != 0u) return;
+    resetGame(states[0], u.frameSeed.y ^ u.frameSeed.z);
+    // Voice words persist between frames; start every hover sound silent.
+    for (uint i = 0u; i < droneCount; ++i) audio[0].droneVoice[i] = float4(0.0f);
 }
 
 float rayBox(float3 origin, float3 direction, float3 lower, float3 upper,
@@ -598,8 +667,7 @@ bool onJumpPad(float2 position) {
 kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     device GameState *states [[buffer(1)]],
     device uint *sceneRequest [[buffer(2)]],
-    device uint *scareAudioEvent [[buffer(4)]],
-    device uint *launchAudioEvent [[buffer(5)]],
+    device RangeAudio *audio [[buffer(3)]],
     uint id [[thread_position_in_grid]]) {
     if (id != 0u) return;
     device GameState &game = states[0];
@@ -718,7 +786,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
         && (insideNorthernEntryTrigger(next)
             || (previousPosition.y >= -outerRoomNear
                 && next.y < -outerRoomNear))) {
-        scareAudioEvent[0] = 1u;
+        audio[0].scare = 1u;
         game.roomTriggers.x = 1u;
         if (game.roomTriggers.y == 0u) {
             game.roomTriggers.y = 1u;
@@ -739,7 +807,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     }
     if (grounded && overJumpPad) {
         game.effects.w = jumpPadLaunchSpeed;
-        launchAudioEvent[0] = 1u;
+        audio[0].launch = 1u;
     }
     if (!grounded || game.effects.w > 0.0f) {
         game.effects.w -= 13.0f * dt;
@@ -757,17 +825,139 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
         game.effects.w = min(game.effects.w, 0.0f);
     }
 
+    advanceArms(game, dt);
     advanceSpiders(game, dt);
     advanceBoss(game, dt);
+}
+
+// What a shot from the eye strikes first: the rooms and props (the crates and
+// chrome cube are part of the environment), a spider, or a flying drone.
+struct ShotTrace {
+    float distance;
+    float3 normal;
+    uint material;
+    int spider;
+    int drone;
+    bool surface;           // the environment stopped the ray
+};
+
+ShotTrace traceShot(device const GameState &game, float3 eye,
+    float3 shotDirection) {
+    ShotTrace shot = {sceneRayLimit, -shotDirection, 0u, -1, -1, false};
+    ChromePose chrome = {game.chromeRotation, game.chromeCentre.xyz};
+    SceneHit environment = {sceneRayLimit, float3(0.0f),
+        float3(0.0f), 0u, -1, 0u};
+    traceEnvironment(environment, eye, shotDirection, chrome, game);
+    if (environment.material != 0u) {
+        shot.distance = environment.distance;
+        shot.normal = environment.normal;
+        shot.material = environment.material;
+        shot.surface = true;
+    }
+    for (uint i = 0u; i < enemyCount; ++i) {
+        if (!spiderActive(game, i)) continue;
+        SpiderHit spider = traceSpider(eye, shotDirection,
+            game.enemy[i].xyz, spiderVariantForSlot(i),
+            game.enemyClock[i].w,
+            game.gait[i].x, game.gait[i].y,
+            spiderBodyRise(game.effects.x, i), 0.0f,
+            spiderRear(game, i), spiderStrike(game, i), shot.distance);
+        if (spider.material != 0u) {
+            shot.distance = spider.distance;
+            shot.spider = int(i);
+            shot.normal = spider.normal;
+            shot.material = spider.material;
+        }
+    }
+    float limit = shot.distance;
+    float3 normal = float3(0.0f);
+    uint material = 0u;
+    int drone = traceDroneShot(eye, shotDirection, game, limit, normal,
+        material);
+    if (drone >= 0) {
+        shot.distance = limit;
+        shot.normal = normal;
+        shot.material = material;
+        shot.spider = -1;
+        shot.drone = drone;
+    }
+    return shot;
+}
+
+// One pistol round or one shotgun pellet: record its tracer and impact, and
+// damage what it struck.
+void fireRound(device GameState &game, float3 eye, float3 shotDirection,
+    float3 muzzle, device RangeAudio &audio) {
+    ShotTrace trace = traceShot(game, eye, shotDirection);
+    int target = trace.spider;
+    float3 impactPoint = eye + shotDirection * trace.distance;
+    uint impactMaterial = trace.material;
+    if (target < 0 && trace.drone < 0 && !trace.surface) {
+        impactPoint = eye + shotDirection * 28.0f;
+        impactMaterial = 0u;
+    }
+    game.progress.y += 1u;
+    ShotImpact shot;
+    shot.muzzleTime = float4(muzzle, game.effects.x);
+    shot.pointEnemy = float4(impactPoint, float(target + 1));
+    shot.normalMaterial = float4(trace.normal, float(impactMaterial));
+    shot.localPointYaw = float4(0.0f);
+    if (target >= 0) {
+        float yaw = game.enemyClock[target].w;
+        float cosine = cos(yaw), sine = sin(yaw);
+        float3 relative = impactPoint - game.enemy[target].xyz;
+        shot.localPointYaw = float4(
+            cosine * relative.x + sine * relative.z,
+            relative.y,
+            -sine * relative.x + cosine * relative.z,
+            yaw);
+    }
+    game.impacts[(game.progress.y - 1u) % impactCount] = shot;
+    if (trace.drone >= 0)
+        damageDrone(game, uint(trace.drone), shotDirection, audio);
+    if (target < 0) return;
+    uint slot = uint(target);
+    SpiderTraits traits = spiderTraits(spiderVariantForSlot(slot));
+    // Head and eyes sit at the front of the chassis (-Z local).
+    float3 head = shot.localPointYaw.xyz / traits.scale
+        - float3(0.0f, 0.05f, -0.45f);
+    bool headshot = length(head / float3(0.48f, 0.38f, 0.50f)) < 1.0f;
+    game.enemy[slot].w -= headshot ? 2.0f : 1.0f;
+    game.enemyClock[slot].z = 0.24f;
+    game.weapon.zw = headshot ? float2(0.30f, 2.0f) : float2(0.22f, 1.0f);
+    if (slot == bossSlot) {
+        game.reaction[slot].x = 0.12f;
+    } else {
+        float2 push = shotDirection.xz;
+        game.reaction[slot].xyz = float3(0.32f,
+            length(push) > 0.01f ? normalize(push) * 2.6f : float2(0.0f));
+        game.senses[slot].w = -1.0f;   // a hit interrupts a bite
+        wakeSpider(game, slot, game.player.xz);
+    }
+    if (game.enemy[target].w <= 0.0f) {
+        game.weapon.zw = float2(0.40f, 3.0f);
+        uint fallenIndex = game.progress.x;
+        if (fallenIndex < targetKills) {
+            game.fallen[fallenIndex].pose = float4(
+                game.enemy[target].xyz, game.enemyClock[target].w);
+            game.fallen[fallenIndex].motion = float4(
+                game.gait[target].x, game.gait[target].y, game.effects.x,
+                spiderBodyRise(game.effects.x, uint(target)));
+            game.fallen[fallenIndex].appearance = uint4(
+                uint(spiderVariantForSlot(uint(target))), 0u, 0u, 0u);
+        }
+        game.progress.x += 1u;
+    }
 }
 
 // Shooting is a separate tick pass that runs after advanceRange. A shot traces
 // the scene and the furred spiders; in one kernel with the spider AI, Metal
 // took minutes to compile the tick cold, while each pass alone compiles in
-// seconds.
+// seconds. The pistol fires one round and the shotgun one barrel of pellets
+// through the same loop, so the trace is compiled once.
 kernel void fireRange(constant ProgramUniforms &u [[buffer(0)]],
     device GameState *states [[buffer(1)]],
-    device uint *shotAudioEvent [[buffer(3)]],
+    device RangeAudio *audio [[buffer(3)]],
     uint id [[thread_position_in_grid]]) {
     if (id != 0u) return;
     device GameState &game = states[0];
@@ -775,149 +965,62 @@ kernel void fireRange(constant ProgramUniforms &u [[buffer(0)]],
     uint action = uint(u.pointer.z);
     if (action > game.progress.z) {
         game.progress.z = action;
-        if (game.view.z <= 0.0f && game.weapon.x >= 1.0f
+        bool shotgun = holdingShotgun(game);
+        bool loaded = shotgun
+            ? game.arms.z >= 1.0f && game.arms.w <= 0.0f
+            : game.weapon.x >= 1.0f;
+        if (game.view.z <= 0.0f && loaded && armsReady(game)
             && (game.bossScene.x < 0.0f || game.bossScene.x >= 5.0f)) {
-            game.view.z = 0.22f;
-            game.view.w = 0.11f;
-            game.progress.y += 1u;
-            game.weapon.x -= 1.0f;
-            // An empty magazine reloads by itself; there is no reload key.
-            if (game.weapon.x < 1.0f) game.weapon.y = reloadDuration;
-            shotAudioEvent[0] = 1u;
+            uint pellets = 1u;
+            if (shotgun) {
+                game.view.z = 0.32f;
+                game.view.w = 0.14f;
+                game.arms.z -= 1.0f;
+                // Both barrels spent: it breaks open and reloads by itself.
+                if (game.arms.z < 1.0f) game.arms.w = shotgunReloadDuration;
+                audio[0].shotgun = 1u;
+                pellets = shotgunPellets;
+            } else {
+                game.view.z = 0.22f;
+                game.view.w = 0.11f;
+                game.weapon.x -= 1.0f;
+                // An empty magazine reloads by itself; there is no reload key.
+                if (game.weapon.x < 1.0f) game.weapon.y = reloadDuration;
+                audio[0].shot = 1u;
+            }
             hearGunshot(game);
             float3 eye = game.player.xyz + eyeOffset(game);
-            float3 shotDirection = pixeltje_3d::forward(
-                game.player.w, game.view.x);
-            float3 normal;
-            float3 impactNormal = -shotDirection;
-            uint impactMaterial = 0u;
-            ChromePose chrome = {game.chromeRotation,
-                game.chromeCentre.xyz};
-            SceneHit environment = {sceneRayLimit, float3(0.0f),
-                float3(0.0f), 0u, -1, 0u};
-            traceEnvironment(environment, eye,
-                shotDirection, chrome, game);
-            float block = environment.material != 0u
-                ? environment.distance : sceneRayLimit;
-            if (environment.material != 0u) {
-                impactNormal = environment.normal;
-                impactMaterial = environment.material;
-            }
-            float t = rayBox(eye, shotDirection,
-                float3(-4.1f, 0.0f, -3.1f),
-                float3(-1.8f, 2.5f, -0.7f), normal);
-            if (t > 0.0f && t < block) {
-                block = t;
-                impactNormal = normal;
-                impactMaterial = 14u;
-            }
-            t = rayBox(eye, shotDirection,
-                float3(2.1f, 0.0f, -6.5f),
-                float3(4.5f, 2.5f, -4.1f), normal);
-            if (t > 0.0f && t < block) {
-                block = t;
-                impactNormal = normal;
-                impactMaterial = 4u;
-            }
-            t = rayChrome(eye, shotDirection,
-                chrome, normal);
-            if (t > 0.0f && t < block) {
-                block = t;
-                impactNormal = normal;
-                impactMaterial = 20u;
-            }
-            int target = -1;
-            for (uint i = 0u; i < enemyCount; ++i) {
-                if (!spiderActive(game, i)) continue;
-                SpiderHit spider = traceSpider(eye, shotDirection,
-                    game.enemy[i].xyz, spiderVariantForSlot(i),
-                    game.enemyClock[i].w,
-                    game.gait[i].x, game.gait[i].y,
-                    spiderBodyRise(game.effects.x, i), 0.0f,
-                    spiderRear(game, i), spiderStrike(game, i), block);
-                if (spider.material != 0u) {
-                    block = spider.distance;
-                    target = int(i);
-                    impactNormal = spider.normal;
-                    impactMaterial = spider.material;
+            float3 aim = pixeltje_3d::forward(game.player.w, game.view.x);
+            float3 aimRight = normalize(cross(aim, float3(0.0f, 1.0f, 0.0f)));
+            float3 aimUp = cross(aimRight, aim);
+            // Tracers leave the barrel that just fired.
+            float3 muzzleView = heldMuzzle(game);
+            float3 muzzle = eye + aimRight * muzzleView.x
+                + aimUp * muzzleView.y + aim * muzzleView.z;
+            for (uint pellet = 0u; pellet < pellets; ++pellet) {
+                float3 direction = aim;
+                if (shotgun) {
+                    // Pellets fill the cone evenly, in a new pattern each shot.
+                    float2 key = float2(float(game.progress.y),
+                        3.7f * float(pellet) + 1.0f);
+                    float radius = shotgunSpread * sqrt(hashTile(key));
+                    float angle = 2.0f * rangePi
+                        * hashTile(key + float2(17.0f, 5.0f));
+                    direction = normalize(aim
+                        + aimRight * (radius * cos(angle))
+                        + aimUp * (radius * sin(angle)));
                 }
+                fireRound(game, eye, direction, muzzle, audio[0]);
             }
-            float3 impactPoint = eye + shotDirection * block;
-            if (target < 0) {
-                if (environment.material == 0u) {
-                    impactPoint = eye + shotDirection * 28.0f;
-                    impactMaterial = 0u;
-                }
-            }
-            float3 muzzleRight = normalize(cross(shotDirection,
-                float3(0.0f, 1.0f, 0.0f)));
-            float3 muzzleUp = cross(muzzleRight, shotDirection);
-            GunPose gun = gunPose(game);
-            float3 muzzle = gun.pivot + gun.basis * gunMuzzle;
-            ShotImpact shot;
-            shot.muzzleTime = float4(eye + muzzleRight * muzzle.x
-                + muzzleUp * muzzle.y + shotDirection * muzzle.z,
-                game.effects.x);
-            shot.pointEnemy = float4(impactPoint, float(target + 1));
-            shot.normalMaterial = float4(impactNormal,
-                float(impactMaterial));
-            shot.localPointYaw = float4(0.0f);
-            if (target >= 0) {
-                float yaw = game.enemyClock[target].w;
-                float cosine = cos(yaw), sine = sin(yaw);
-                float3 relative = impactPoint - game.enemy[target].xyz;
-                shot.localPointYaw = float4(
-                    cosine * relative.x + sine * relative.z,
-                    relative.y,
-                    -sine * relative.x + cosine * relative.z,
-                    yaw);
-            }
-            game.impacts[(game.progress.y - 1u) % impactCount] = shot;
+            game.burst.x = pellets;
             // The kick lands after the shot, so the first round goes where
             // the crosshair was; follow-ups climb until the recoil recovers.
-            game.recoil.x += 0.032f;
-            game.recoil.y += 0.024f
+            // The shotgun throws the view up and shakes it.
+            game.recoil.x += shotgun ? 0.085f : 0.032f;
+            game.recoil.y += (shotgun ? 0.05f : 0.024f)
                 * (hashTile(float2(float(game.progress.y), 7.3f)) - 0.5f);
             game.recoil.z = 1.0f;
-            if (target >= 0) {
-                uint slot = uint(target);
-                SpiderTraits traits = spiderTraits(spiderVariantForSlot(slot));
-                // Head and eyes sit at the front of the chassis (-Z local).
-                float3 head = shot.localPointYaw.xyz / traits.scale
-                    - float3(0.0f, 0.05f, -0.45f);
-                bool headshot = length(head / float3(0.48f, 0.38f, 0.50f))
-                    < 1.0f;
-                game.enemy[slot].w -= headshot ? 2.0f : 1.0f;
-                game.enemyClock[slot].z = 0.24f;
-                game.weapon.zw = headshot ? float2(0.30f, 2.0f)
-                    : float2(0.22f, 1.0f);
-                if (slot == bossSlot) {
-                    game.reaction[slot].x = 0.12f;
-                } else {
-                    float2 push = shotDirection.xz;
-                    game.reaction[slot].xyz = float3(0.32f,
-                        length(push) > 0.01f ? normalize(push) * 2.6f
-                            : float2(0.0f));
-                    game.senses[slot].w = -1.0f;   // a hit interrupts a bite
-                    wakeSpider(game, slot, game.player.xz);
-                }
-                if (game.enemy[target].w <= 0.0f) {
-                    game.weapon.zw = float2(0.40f, 3.0f);
-                    uint fallenIndex = game.progress.x;
-                    if (fallenIndex < targetKills) {
-                        game.fallen[fallenIndex].pose = float4(
-                            game.enemy[target].xyz,
-                            game.enemyClock[target].w);
-                        game.fallen[fallenIndex].motion = float4(
-                            game.gait[target].x, game.gait[target].y,
-                            game.effects.x,
-                            spiderBodyRise(game.effects.x, uint(target)));
-                        game.fallen[fallenIndex].appearance = uint4(
-                            uint(spiderVariantForSlot(uint(target))), 0u, 0u, 0u);
-                    }
-                    game.progress.x += 1u;
-                }
-            }
+            if (shotgun) game.recoil.w = max(game.recoil.w, 0.45f);
         }
     }
     if (game.progress.x >= targetKills) {
@@ -1676,6 +1779,8 @@ SurfaceMaterial surfaceMaterial(SceneHit hit,
         || hit.material == 18u || hit.material == 19u)
         return spiderSurfaceMaterial(hit.material, furPosition,
             hit.fur, SpiderVariant(hit.variant));
+    if (droneMaterial(hit.material))
+        return droneSurfaceMaterial(hit.material, false);
     return {float3(0.0f),
         1.0f, 0.0f, float3(0.0f)};
 }
@@ -1823,7 +1928,8 @@ float3 shadeSunlight(SceneHit hit, SurfaceMaterial material,
         || crateBlocksLight(origin, sunDirection, 1.0e4f,
             hullRearLower, hullRearUpper)) return float3(0.0f);
     float lit = pixeltje_terrain::softShadow(MoonSurface{moonTraceDetail},
-        origin, sunDirection, 0.1f, 600.0f, moonCeiling, 10.0f, 48);
+        origin, sunDirection, 0.1f, 600.0f, moonCeiling, 10.0f, 48)
+        * droneShadow(origin, sunDirection, 1.0e4f, game);
     if (lit <= 0.0f) return float3(0.0f);
     PointLight sun = {hit.position + sunDirection * 1.0e4f,
         float3(1.0f, 0.97f, 0.92f), sunPower, false};
@@ -2039,6 +2145,7 @@ void traceScene(thread SceneHit &hit, thread float3 &furPosition,
         hit = {t, float3(0.0f, direction.y < 0.0f ? 1.0f : -1.0f,
             0.0f), origin + direction * t, 26u, -1, i};
     }
+    traceDrones(hit, origin, direction, game);
 }
 
 float3 chromeReflection(SceneHit hit, float3 incoming,
@@ -2132,7 +2239,8 @@ float3 shadeImpacts(float3 color, SceneHit hit,
         ShotImpact shot = game.impacts[i];
         float age = game.effects.x - shot.muzzleTime.w;
         bool spider = shot.pointEnemy.w > 0.0f;
-        bool movingSurface = spider || uint(shot.normalMaterial.w) == 20u;
+        bool movingSurface = spider || uint(shot.normalMaterial.w) == 20u
+            || droneMaterial(uint(shot.normalMaterial.w));
         if (age < 0.0f || age >= (movingSurface ? 0.28f : 8.0f))
             continue;
         if (spider) {
@@ -2183,53 +2291,58 @@ float3 shadeImpacts(float3 color, SceneHit hit,
     return color;
 }
 
+// Tracers and impact flashes of the latest discharge: one pistol round or
+// every pellet of a shotgun barrel.
 float3 shadeShot(float3 color, float3 origin, float3 direction,
     float sceneDistance, device const GameState &game) {
     if (game.progress.y == 0u) return color;
-    ShotImpact shot = game.impacts[(game.progress.y - 1u) % impactCount];
-    float age = game.effects.x - shot.muzzleTime.w;
-    if (age < 0.0f || age >= 0.18f) return color;
-    float fade = 1.0f - smoothstep(0.035f, 0.18f, age);
-    float3 impactPoint, impactNormal;
-    resolvedImpact(game, shot, impactPoint, impactNormal);
-    float3 start = shot.muzzleTime.xyz;
-    float3 segment = impactPoint - start;
-    float segmentLengthSquared = dot(segment, segment);
-    if (segmentLengthSquared < 0.01f) return color;
-    float3 fromStart = origin - start;
-    float along = dot(direction, segment);
-    float rayOffset = dot(direction, fromStart);
-    float segmentOffset = dot(segment, fromStart);
-    float fraction = clamp((segmentOffset - along * rayOffset)
-        / max(segmentLengthSquared - along * along, 0.0001f),
-        0.0f, 1.0f);
-    float3 closest = start + segment * fraction;
-    float rayDistance = dot(closest - origin, direction);
-    if (rayDistance > 0.0f && rayDistance < sceneDistance - 0.02f) {
-        float separation = length(origin + direction * rayDistance
-            - closest);
-        float width = 0.012f + rayDistance * 0.0015f;
-        float core = 1.0f - smoothstep(width * 0.35f,
-            width, separation);
-        float halo = 1.0f - smoothstep(width,
-            width * 4.0f, separation);
-        float ends = smoothstep(0.0f, 0.07f, fraction)
-            * (1.0f - smoothstep(0.88f, 1.0f, fraction));
-        color += (float3(2.7f, 1.8f, 0.95f) * core
-            + float3(0.7f, 0.20f, 0.045f) * halo)
-            * ends * fade;
-    }
-    if (shot.normalMaterial.w > 0.0f) {
-        float3 flashPoint = impactPoint + impactNormal * 0.025f;
-        float flashDistance = dot(flashPoint - origin, direction);
-        if (flashDistance > 0.0f
-            && flashDistance < sceneDistance + 0.05f) {
-            float separation = length(origin + direction * flashDistance
-                - flashPoint);
-            float flash = 1.0f - smoothstep(0.015f,
-                0.16f, separation);
-            color += float3(2.0f, 0.76f, 0.18f) * flash
-                * (1.0f - smoothstep(0.0f, 0.12f, age));
+    uint tracers = clamp(game.burst.x, 1u, min(game.progress.y, impactCount));
+    for (uint k = 0u; k < tracers; ++k) {
+        ShotImpact shot = game.impacts[(game.progress.y - 1u - k) % impactCount];
+        float age = game.effects.x - shot.muzzleTime.w;
+        if (age < 0.0f || age >= 0.18f) continue;
+        float fade = 1.0f - smoothstep(0.035f, 0.18f, age);
+        float3 impactPoint, impactNormal;
+        resolvedImpact(game, shot, impactPoint, impactNormal);
+        float3 start = shot.muzzleTime.xyz;
+        float3 segment = impactPoint - start;
+        float segmentLengthSquared = dot(segment, segment);
+        if (segmentLengthSquared < 0.01f) continue;
+        float3 fromStart = origin - start;
+        float along = dot(direction, segment);
+        float rayOffset = dot(direction, fromStart);
+        float segmentOffset = dot(segment, fromStart);
+        float fraction = clamp((segmentOffset - along * rayOffset)
+            / max(segmentLengthSquared - along * along, 0.0001f),
+            0.0f, 1.0f);
+        float3 closest = start + segment * fraction;
+        float rayDistance = dot(closest - origin, direction);
+        if (rayDistance > 0.0f && rayDistance < sceneDistance - 0.02f) {
+            float separation = length(origin + direction * rayDistance
+                - closest);
+            float width = 0.012f + rayDistance * 0.0015f;
+            float core = 1.0f - smoothstep(width * 0.35f,
+                width, separation);
+            float halo = 1.0f - smoothstep(width,
+                width * 4.0f, separation);
+            float ends = smoothstep(0.0f, 0.07f, fraction)
+                * (1.0f - smoothstep(0.88f, 1.0f, fraction));
+            color += (float3(2.7f, 1.8f, 0.95f) * core
+                + float3(0.7f, 0.20f, 0.045f) * halo)
+                * ends * fade;
+        }
+        if (shot.normalMaterial.w > 0.0f) {
+            float3 flashPoint = impactPoint + impactNormal * 0.025f;
+            float flashDistance = dot(flashPoint - origin, direction);
+            if (flashDistance > 0.0f
+                && flashDistance < sceneDistance + 0.05f) {
+                float separation = length(origin + direction * flashDistance
+                    - flashPoint);
+                float flash = 1.0f - smoothstep(0.015f,
+                    0.16f, separation);
+                color += float3(2.0f, 0.76f, 0.18f) * flash
+                    * (1.0f - smoothstep(0.0f, 0.12f, age));
+            }
         }
     }
     return color;
@@ -2281,13 +2394,6 @@ float3 shadeSpiderParticles(float3 color, float3 origin,
     }
     return color;
 }
-
-struct GunHit {
-    float distance;
-    float3 normal;          // gun frame
-    uint part;              // 1 slide, 2 polymer, 3 dark steel, 4 glove, 5 sleeve
-    float3 local;
-};
 
 void gunBox(thread GunHit &hit, float3 origin, float3 direction,
     float3 lower, float3 upper, uint part) {
@@ -2382,27 +2488,35 @@ SurfaceMaterial gunMaterial(GunHit hit) {
         0.95f, 0.0f, float3(0.0f)};
 }
 
-// The viewmodel is lit by the same room lights as the scene it moves through.
-float3 shadeGun(GunHit gun, GunPose pose, float3 eye, float3 right,
-    float3 up, float3 front, float3 direction, ChromePose chrome,
-    device const GameState &game) {
+// The viewmodel is lit by the same lights as the scene it moves through: the
+// room lights indoors and the sun on the moon.
+float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
+    float3 right, float3 up, float3 front, float3 direction,
+    ChromePose chrome, device const GameState &game) {
     float3 viewPoint = pose.pivot + pose.basis * gun.local;
     float3 viewNormal = pose.basis * gun.normal;
     SceneHit hit = {length(viewPoint), normalize(right * viewNormal.x
             + up * viewNormal.y + front * viewNormal.z),
         eye + right * viewPoint.x + up * viewPoint.y + front * viewPoint.z,
         30u, -1, 0u};
-    SurfaceMaterial material = gunMaterial(gun);
+    SurfaceMaterial material = gun.part >= 6u ? shotgunMaterial(gun)
+        : gunMaterial(gun);
     float3 color = material.albedo * (1.0f - material.metallic)
             * float3(0.030f, 0.038f, 0.046f)
         + material.albedo * material.metallic
             * (0.05f + 0.07f * saturate(hit.normal.y));
-    for (uint i = 0u; i < 8u; ++i)
+    if (outdoors(eye.xz, 0.0f)) {
+        // Regolith bounces sunlight up onto the underside.
+        color += material.albedo * float3(1.0f, 0.97f, 0.92f)
+            * 0.05f * saturate(-hit.normal.y);
+        color += shadeSunlight(hit, material, -direction, chrome, game);
+    } else for (uint i = 0u; i < 8u; ++i) {
         color += shadePointLight(hit, material, -direction,
             roomLight(i, game.effects.x), chrome, game);
+    }
     if (game.view.w > 0.0f) {
         float3 muzzle = pose.pivot + pose.basis
-            * (gunMuzzle + float3(0.0f, 0.0f, 0.012f));
+            * (muzzleLocal + float3(0.0f, 0.0f, 0.012f));
         PointLight flash = {eye + right * muzzle.x + up * muzzle.y
             + front * muzzle.z, float3(1.0f, 0.62f, 0.26f),
             3.0f * game.view.w / 0.11f};
@@ -2456,8 +2570,13 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
 
     SurfaceMaterial material = surfaceMaterial(hit, crateA, crateB,
         furPosition, game.effects.x, direction, pixelSpread * hit.distance);
-    // Room lights stay indoors; the sun lights the shell and the moon.
-    bool exterior = hit.material == 40u || hit.material == 41u;
+    bool drone = droneMaterial(hit.material);
+    if (drone)
+        material = droneSurfaceMaterial(hit.material,
+            !droneFlying(game, hit.variant));
+    // Room lights stay indoors; the sun lights the shell, the moon and the
+    // drones over it.
+    bool exterior = hit.material == 40u || hit.material == 41u || drone;
     // The moon has no sky light, only sunlight bounced off the plain, which
     // reaches slopes, boulder sides and the shell's walls more than ground
     // or roofs facing the sky.
@@ -2466,6 +2585,7 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         : float3(0.030f, 0.038f, 0.046f);
     float3 color = material.emission
         + material.albedo * (1.0f - material.metallic) * ambient;
+    if (drone) color += droneEmission(hit, game);
     if (exterior)
         color += shadeSunlight(hit, material, -direction, chrome, game);
     else for (uint i = 0u; i < 8u; ++i) {
@@ -2523,11 +2643,20 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     color = shadeShot(color, origin, direction, hit.distance, game);
     color = shadeSpiderParticles(color, origin, direction,
         hit.distance, game);
+    float pixelAngle = 1.0f / (focal * u.resolutionTime.y);
+    color = shadeDroneRotors(color, origin, direction, hit.distance, game);
+    color = shadeLasers(color, origin, direction, hit.distance, pixelAngle,
+        game);
+    color = shadeDroneLights(color, origin, direction, hit.distance,
+        pixelAngle, game);
+    color = shadeDroneSparks(color, origin, direction, hit.distance, game);
 
-    // The held pistol is drawn over the world, as in any shooter, so a wall
-    // in front of the face never swallows it.
+    // The held weapon is drawn over the world, as in any shooter, so a wall
+    // in front of the face never swallows it. Outside it is the shotgun.
     bool holdingGun = reveal <= 0.0f && game.progress.w != phaseLost;
-    GunPose gun = gunPose(game);
+    bool shotgun = holdingShotgun(game);
+    GunPose gun = heldPose(game);
+    float3 muzzleLocal = shotgun ? shotgunLastMuzzle(game) : gunMuzzle;
     float3 viewFront = pixeltje_3d::forward(viewYaw, viewPitch);
     float3 viewRight = normalize(cross(viewFront, float3(0.0f, 1.0f, 0.0f)));
     float3 viewUp = cross(viewRight, viewFront);
@@ -2535,29 +2664,32 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         float3 viewDirection = float3(dot(direction, viewRight),
             dot(direction, viewUp), dot(direction, viewFront));
         float3x3 toGun = transpose(gun.basis);
-        GunHit gunHit = traceGun(toGun * -gun.pivot, toGun * viewDirection,
-            gun.slide);
+        GunHit gunHit = shotgun
+            ? traceShotgun(toGun * -gun.pivot, toGun * viewDirection)
+            : traceGun(toGun * -gun.pivot, toGun * viewDirection, gun.slide);
         if (gunHit.part != 0u)
-            color = shadeGun(gunHit, gun, eye, viewRight, viewUp, viewFront,
-                direction, chrome, game);
+            color = shadeGun(gunHit, gun, muzzleLocal, eye, viewRight, viewUp,
+                viewFront, direction, chrome, game);
     }
     if (holdingGun && game.view.w > 0.0f) {
         // The flash is drawn in scene light so the bloom pass spreads it.
         float2 pixel = in.uv * u.resolutionTime.xy;
         float2 centre = u.resolutionTime.xy * 0.5f;
         float3 muzzle = gun.pivot + gun.basis
-            * (gunMuzzle + float3(0.0f, 0.0f, 0.012f));
+            * (muzzleLocal + float3(0.0f, 0.0f, 0.012f));
         float2 muzzlePixel = centre + float2(muzzle.x, -muzzle.y)
             / muzzle.z * 1.1f * u.resolutionTime.y;
         float2 offset = pixel - muzzlePixel;
         float radius = length(offset) / u.resolutionTime.y;
         float angle = atan2(offset.y, offset.x) + float(game.progress.y) * 1.7f;
         float spikes = pow(abs(cos(angle * 2.5f)), 6.0f);
-        float flash = (1.0f - smoothstep(0.0f, 0.022f, radius))
-            + 0.8f * spikes * (1.0f - smoothstep(0.0f, 0.075f, radius))
-            + 0.25f * (1.0f - smoothstep(0.0f, 0.12f, radius));
+        // A shotgun barrel throws a wider, longer flash.
+        float size = shotgun ? 1.7f : 1.0f;
+        float flash = (1.0f - smoothstep(0.0f, 0.022f * size, radius))
+            + 0.8f * spikes * (1.0f - smoothstep(0.0f, 0.075f * size, radius))
+            + 0.25f * (1.0f - smoothstep(0.0f, 0.12f * size, radius));
         color += float3(1.0f, 0.62f, 0.24f) * flash
-            * (game.view.w / 0.11f) * 2.5f;
+            * saturate(game.view.w / (shotgun ? 0.14f : 0.11f)) * 2.5f;
     }
     // Linear scene light before exposure; the composite pass tone maps it.
     return float4(color, 1.0f);
@@ -2747,8 +2879,30 @@ fragment float4 compositeFragment(ScreenVertex in [[stage_in]],
             : (game.weapon.w > 1.5f ? float3(1.0f, 0.62f, 0.18f)
                 : float3(1.0f)), saturate(game.weapon.z / 0.12f));
     }
-    // Magazine rounds at the bottom right, with a bar while reloading.
-    if (game.progress.w == phasePlaying) {
+    // Magazine rounds or shotgun shells at the bottom right, with a bar
+    // while reloading.
+    if (game.progress.w == phasePlaying && holdingShotgun(game)) {
+        float2 corner = u.resolutionTime.xy - float2(28.0f, 28.0f);
+        for (uint i = 0u; i < 2u; ++i) {
+            float right = corner.x - float(i) * 16.0f;
+            if (pixel.x > right - 10.0f && pixel.x < right
+                && pixel.y > corner.y - 24.0f && pixel.y < corner.y) {
+                bool brass = pixel.y > corner.y - 6.0f;
+                color = float(i) < game.arms.z
+                    ? (brass ? float3(0.85f, 0.66f, 0.30f)
+                        : float3(0.78f, 0.10f, 0.06f))
+                    : float3(0.10f, 0.13f, 0.14f);
+            }
+        }
+        float barWidth = 26.0f;
+        if (game.arms.w > 0.0f && pixel.y > corner.y + 5.0f
+            && pixel.y < corner.y + 8.0f && pixel.x < corner.x
+            && pixel.x > corner.x - barWidth) {
+            color = corner.x - pixel.x > barWidth
+                    * (game.arms.w / shotgunReloadDuration)
+                ? float3(0.95f, 0.82f, 0.45f) : float3(0.10f, 0.13f, 0.14f);
+        }
+    } else if (game.progress.w == phasePlaying) {
         float2 corner = u.resolutionTime.xy - float2(28.0f, 28.0f);
         for (uint i = 0u; i < magazineSize; ++i) {
             float right = corner.x - float(i) * 9.0f;
@@ -2822,6 +2976,8 @@ constant uint textRangeClear = 7u;
 constant uint textDied = 8u;
 constant uint textRestart = 9u;
 constant uint textDigitZero = 10u;
+constant uint textPistol = 20u;
+constant uint textShotgun = 21u;
 
 float4 fontRun(device const float4 *font, uint index) {
     return font[uint(font[0].y) + index];
@@ -2903,15 +3059,21 @@ kernel void buildRangeHUD(constant ProgramUniforms &u [[buffer(0)]],
         float2(size.x - 25.0f - runWidth(font, textSpiders, 11.0f), 45.0f),
         11.0f, ink);
     if (game.progress.w == phasePlaying) {
-        if (game.weapon.y > 0.0f) {
+        bool shotgun = holdingShotgun(game);
+        uint weaponName = shotgun ? textShotgun : textPistol;
+        addRun(glyphs, count, font, weaponName,
+            float2(size.x - 28.0f - runWidth(font, weaponName, 11.0f),
+                size.y - 104.0f), 11.0f, ink, 0.4f + 0.6f * game.arms.y);
+        if (shotgun ? game.arms.w > 0.0f : game.weapon.y > 0.0f) {
             addRun(glyphs, count, font, textReloading,
                 float2(size.x - 28.0f - runWidth(font, textReloading, 13.0f),
                     size.y - 70.0f), 13.0f, gold, pulse);
         } else {
-            uint rounds = uint(game.weapon.x);
+            uint rounds = uint(shotgun ? game.arms.z : game.weapon.x);
             addNumber(glyphs, count, font, rounds,
                 float2(size.x - 28.0f - numberWidth(font, rounds, 30.0f),
-                    size.y - 86.0f), 30.0f, rounds <= 3u ? danger : gold);
+                    size.y - 86.0f), 30.0f,
+                rounds <= (shotgun ? 1u : 3u) ? danger : gold);
         }
         // The north gate prompt follows the third range kill.
         float sinceGate = game.progress.x >= ordinaryEnemyCount
