@@ -29,6 +29,13 @@ struct SceneHit {
 SceneHit traceScene(float3 origin, float3 direction,
     device const GameState &game);
 
+// The target is a glowing orb and the room's warm light until it is shot.
+constant float3 orbCentre = float3(0.0f, 1.35f, -6.5f);
+constant float orbRadius = 0.65f;
+constant float3 orbRadiance = float3(0.85f, 0.27f, 0.10f) * 5.0f;
+constant float3 crateLower = float3(1.5f, 0.0f, -4.9f);
+constant float3 crateUpper = float3(3.5f, 2.2f, -2.5f);
+
 kernel void initializeFPS(device GameState *states [[buffer(1)]],
     uint id [[thread_position_in_grid]]) {
     if (id != 0u) return;
@@ -82,19 +89,44 @@ SceneHit traceScene(float3 origin, float3 direction,
         float3(-12.0f, 0.0f, -12.0f), float3(12.0f, 5.0f, 12.0f),
         0.01f, normal);
     if (t > 0.0f) hit = {t, -normal, 1u};
-    t = pixeltje_3d::rayBox(origin, direction,
-        float3(1.5f, 0.0f, -4.9f), float3(3.5f, 2.2f, -2.5f),
+    t = pixeltje_3d::rayBox(origin, direction, crateLower, crateUpper,
         0.01f, normal);
     if (t > 0.0f && t < hit.distance) hit = {t, normal, 2u};
     if (game.view.w > 0.0f) {
-        t = pixeltje_3d::raySphere(origin, direction,
-            float3(0.0f, 1.35f, -6.5f), 0.65f, 0.01f);
+        t = pixeltje_3d::raySphere(origin, direction, orbCentre, orbRadius,
+            0.01f);
         if (t > 0.0f && t < hit.distance) {
             float3 point = origin + direction * t;
-            hit = {t, normalize(point - float3(0.0f, 1.35f, -6.5f)), 3u};
+            hit = {t, normalize(point - orbCentre), 3u};
         }
     }
     return hit;
+}
+
+float crateDistance(float3 p) {
+    float3 q = abs(p - (crateLower + crateUpper) * 0.5f)
+        - (crateUpper - crateLower) * 0.5f;
+    return length(max(q, 0.0f)) + min(max(q.x, max(q.y, q.z)), 0.0f);
+}
+
+// Cone-traced soft shadow from the crate, the only possible occluder. The
+// penumbra widens with the orb's angular size as seen from the point.
+float orbVisibility(float3 point, float3 normal) {
+    float3 origin = point + normal * 0.01f;
+    float3 toOrb = orbCentre - origin;
+    float distance = length(toOrb);
+    float3 direction = toOrb / distance;
+    float spread = orbRadius / distance;
+    float lit = 1.0f;
+    float t = 0.02f;
+    for (int i = 0; i < 48 && t < distance - orbRadius; i++) {
+        float h = crateDistance(origin + direction * t);
+        lit = min(lit, h / (spread * t));
+        if (lit < -1.0f) break;
+        t += clamp(h, 0.01f, 0.5f);
+    }
+    lit = max(lit, -1.0f);
+    return 0.25f * (1.0f + lit) * (1.0f + lit) * (2.0f - lit);
 }
 
 struct ScreenVertex {
@@ -130,19 +162,41 @@ fragment float4 fpsFragment(ScreenVertex in [[stage_in]],
     }
     float3 light = normalize(float3(-3.0f, 4.5f, 2.0f) - point);
     float diffuse = max(dot(hit.normal, light), 0.0f);
-    float3 color = base * (0.26f + 0.95f * diffuse);
+    // A dim, cool fill keeps the room readable without drowning the orb.
+    float3 color = base * float3(0.80f, 0.90f, 1.15f)
+        * (0.08f + 0.30f * diffuse);
+    float3 emission = game.view.w > 0.0f ? orbRadiance : float3(0.0f);
     if (hit.material == 3u) {
-        color += base * 0.45f
-            * pow(1.0f - max(dot(hit.normal, -direction), 0.0f), 3.0f);
+        // Self-lit: the limb darkens and reddens, as it does on a star.
+        color = emission * pow(max(dot(hit.normal, -direction), 0.0f),
+            float3(0.15f, 0.4f, 0.7f));
+    } else if (game.view.w > 0.0f) {
+        // A sphere of radiance L lights a Lambert surface by L sin²α cosθ.
+        float3 toOrb = orbCentre - point;
+        float distance2 = dot(toOrb, toOrb);
+        float facing = dot(hit.normal, toOrb) * rsqrt(distance2);
+        if (facing > 0.0f) {
+            color += base * emission * facing * orbRadius * orbRadius
+                / distance2 * orbVisibility(point, hit.normal);
+        }
     }
+    // Faint haze scatters the orb's light toward the eye. Its 1/d² falloff
+    // integrates in closed form along the ray up to the surface it hits.
+    float3 offset = orbCentre - game.player.xyz;
+    float along = dot(offset, direction);
+    float miss = max(length(offset - direction * along), 0.01f);
+    color += emission * 0.02f * orbRadius * orbRadius / miss
+        * (atan((hit.distance - along) / miss) + atan(along / miss));
     color = pixeltje_3d::filmicToneMap(color * 1.7f);
     float2 pixel = in.uv * u.resolutionTime.xy;
     float2 centre = u.resolutionTime.xy * 0.5f;
     float2 cross = abs(pixel - centre);
     if ((cross.x < 1.3f && cross.y > 3.0f && cross.y < 10.0f)
         || (cross.y < 1.3f && cross.x > 3.0f && cross.x < 10.0f)) {
-        color = game.view.w > 0.0f
+        float3 mark = game.view.w > 0.0f
             ? float3(0.90f, 1.0f, 0.91f) : float3(0.35f, 1.0f, 0.45f);
+        // Darken over the glowing orb so the crosshair stays visible.
+        color = dot(color, float3(0.3333f)) > 0.7f ? mark * 0.15f : mark;
     }
     color += game.view.z * float3(1.1f, 0.47f, 0.15f);
     return float4(clamp(pixeltje_3d::linearToSRGB(

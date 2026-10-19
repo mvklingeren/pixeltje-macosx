@@ -165,11 +165,65 @@ maintainer, never by an agent. Do not use computer use, screen capture,
 AppleScript or System Events, accessibility clicking, or any other UI automation
 to look at or drive this app.
 
-Agents verify their work with `swift build`, code reading, and the tests chosen
-by the maintainer under the test execution preference above.
+Agents verify their work with `swift build`, code reading, offline render
+previews where they apply (below), and the tests chosen by the maintainer under
+the test execution preference above.
 When a change needs to be seen, say how to launch it (for example
 `swift run PixeltjeMacApp "/path/to/photo.RAF"`) and what to look at, then leave
 the looking to the maintainer.
+
+### Offline render previews
+
+Rendering shader source offscreen with the preview harness is not inspection
+of the running application, and agents are expected to do it. Whenever you add
+or change pixel-producing code that can run without the app (GPU Program
+shaders in `Examples/*.metal`, the opt-in Metal libraries, and the example
+pipelines built on them), render the old and the new source from the same
+views, look at the images, and tune before reporting. Show the maintainer the
+before/after pair. Their look at the running app remains the final check,
+because these renders skip live input, the editor's presentation, and any node
+upstream of the GPU Program other than primitives.
+
+The harness lives in [`Scripts/ShaderPreview`](Scripts/ShaderPreview/). It
+reads a workflow's `gpu.program` node and its primitive inputs, resolves the
+source through the engine's own `PipelineMetalLibraries` and
+`PipelineSystemFont` code, runs `initialize`, `tick` and `present` the way
+`PipelineGPUProgram` does, and writes one PNG per view. A views file lists the
+views. Each one sets how many frames to tick, pointer and movement input,
+parameter overrides, and raw writes into state buffers. Writes land after the
+ticks, so a view can place the camera or set game state such as a target that
+has been shot. The format is documented at the top of
+[`main.swift`](Scripts/ShaderPreview/main.swift), and
+[`fps-3d-starter.views.json`](Scripts/ShaderPreview/fps-3d-starter.views.json)
+is a worked example:
+
+```sh
+git show HEAD:Examples/FPS3DStarterProgram.metal > "$scratch/old.metal"
+Scripts/ShaderPreview/render-preview.sh Examples/shader-fps-3d-starter.pixpipeline.json \
+  Scripts/ShaderPreview/fps-3d-starter.views.json "$scratch/preview" \
+  --before "$scratch/old.metal"
+```
+
+- With `--before`, each PNG shows the old source on the left and the current
+  source on the right.
+- Open each PNG with the Read tool so it appears inline in the session.
+- Write images to the session scratchpad, never into the repository.
+- Commit a views file next to the harness when a workflow is worth previewing
+  again.
+- The script builds with the Xcode beta toolchain unless `DEVELOPER_DIR` is
+  set, and rebuilds only when its sources change. In Codex's sandbox it needs
+  the same escalation as a SwiftPM build.
+- A shader compile error surfaces here and doubles as the shader's build
+  check.
+- Generated image inputs render as mid grey unless the views file maps their
+  asset port to an image. Audio events are ignored.
+- Use `--node` when a workflow has more than one GPU Program.
+
+Choose views that exercise the change: the default start, a close-up, the angle
+that shows a new effect such as a cast shadow or halo, and each relevant game
+state. Place cameras by reasoning about scene coordinates, then confirm the
+framing in the image. An effect too weak to see in any view counts as a
+finding, not a pass.
 
 ## Toolbar containers
 

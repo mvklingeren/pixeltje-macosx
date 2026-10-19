@@ -1608,25 +1608,59 @@ float3 shadeSunlight(SceneHit hit, SurfaceMaterial material,
         game);
 }
 
-// An airless black sky with the sun's disc and fixed stars.
-float3 spaceSky(float3 direction) {
+// An airless black sky with the sun's disc and fixed stars. Stars are point
+// sources, so each is drawn about one pixel (pixelAngle radians) wide.
+float3 spaceSky(float3 direction, float pixelAngle) {
     float facing = dot(direction, sunDirection);
     float3 color = float3(1.0f, 0.97f, 0.92f)
         * (60.0f * smoothstep(0.99990f, 0.99993f, facing)
             + 0.6f * pow(saturate(facing), 600.0f));
-    // The longitude seam faces north, behind the base for anyone outside.
-    float2 angles = float2(atan2(direction.x, direction.z), direction.y)
-        * 380.0f;
-    float2 cell = floor(angles);
-    float star = pixeltje_terrain::hash(cell, 71.0f);
-    if (star > 0.9965f) {
-        float2 offset = angles - cell - 0.5f
-            - 0.3f * (float2(pixeltje_terrain::hash(cell, 72.0f),
-                pixeltje_terrain::hash(cell, 73.0f)) - 0.5f);
-        color += float3(0.75f, 0.82f, 1.0f) * 1.4f
-            * exp(-dot(offset, offset) * 6.0f) * (star - 0.9965f) / 0.0035f;
+    // Stars sit in equal-angle cells on the six faces of a cube, which has
+    // no pole or seam to stretch them. Each face-local frame is a signed axis
+    // permutation, so distances measured in it are angles on the sky.
+    float3 a = abs(direction);
+    float3 local;
+    float face;
+    if (a.x >= a.y && a.x >= a.z) {
+        local = float3(direction.yz, a.x);
+        face = direction.x > 0.0f ? 0.0f : 1.0f;
+    } else if (a.y >= a.z) {
+        local = float3(direction.xz, a.y);
+        face = direction.y > 0.0f ? 2.0f : 3.0f;
+    } else {
+        local = float3(direction.xy, a.z);
+        face = direction.z > 0.0f ? 4.0f : 5.0f;
     }
-    return color;
+    const float cells = 96.0f;  // per face edge, about 0.94° each
+    float cellAngle = M_PI_2_F / cells;
+    float2 cell = floor(atan(local.xy / local.z) / cellAngle);
+    float2 key = cell + float2(face * 2.0f * cells, 0.0f);
+    // Equal-angle cells still cover 0.71–1× the solid angle of a face-centre
+    // cell; scaling the odds by it keeps the stars evenly spread.
+    float2 t = tan((cell + 0.5f) * cellAngle);
+    float solidAngle = (1.0f + t.x * t.x) * (1.0f + t.y * t.y)
+        * pow(1.0f + dot(t, t), -1.5f);
+    if (pixeltje_terrain::hash(key, 71.0f) > 0.14f * solidAngle)
+        return color;
+    // Centres stay a quarter cell from the edges, and the width is capped so
+    // four sigma fits there even in the narrowest (0.71×) cells: no star is
+    // ever cut by its cell or by a cube seam.
+    float2 centre = (cell + 0.25f + 0.5f * float2(
+        pixeltje_terrain::hash(key, 72.0f),
+        pixeltje_terrain::hash(key, 73.0f))) * cellAngle;
+    float3 star = normalize(float3(tan(centre), 1.0f));
+    float sigma = min(0.7f * pixelAngle, 0.25f * 0.71f * cellAngle / 4.0f);
+    float d = distance(local, star);
+    // Counts follow N(>F) ~ F^-1.5: a few bright stars over many faint ones.
+    float flux = 0.025f * pow(max(pixeltje_terrain::hash(key, 74.0f), 1e-4f),
+        -2.0f / 3.0f);
+    float temperature = pixeltje_terrain::hash(key, 75.0f);
+    float3 tint = temperature < 0.5f
+        ? mix(float3(1.0f, 0.78f, 0.56f), float3(1.0f, 0.96f, 0.90f),
+            temperature * 2.0f)
+        : mix(float3(1.0f, 0.96f, 0.90f), float3(0.74f, 0.84f, 1.0f),
+            temperature * 2.0f - 1.0f);
+    return color + tint * flux * exp(-0.5f * d * d / (sigma * sigma));
 }
 
 // The latest shot lights the room twice: from the muzzle while the flash
@@ -2164,8 +2198,9 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         + shake * (sin(jitter) + 0.5f * sin(jitter * 2.3f + 1.0f));
     float viewPitch = game.view.x
         + shake * (sin(jitter * 1.7f + 2.0f) + 0.5f * sin(jitter * 3.1f));
+    float focal = 1.1f;
     float3 direction = pixeltje_3d::cameraDirection(in.uv,
-        u.resolutionTime.xy, viewYaw, viewPitch, 1.1f);
+        u.resolutionTime.xy, viewYaw, viewPitch, focal);
     float3 eye = game.player.xyz + eyeOffset(game);
     float3 origin = eye;
     float reveal = 0.0f;
@@ -2204,7 +2239,8 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         color += shadePointLight(hit, material, -direction,
             roomLight(i, game.effects.x), chrome, game);
     }
-    if (hit.material == 0u) color = spaceSky(direction);
+    if (hit.material == 0u)
+        color = spaceSky(direction, 1.0f / (focal * u.resolutionTime.y));
     color += shadeShotLights(hit, material, -direction, chrome, game);
     color *= mix(1.0f, ambientOcclusion(hit, game), 0.85f);
     if (hit.material == 20u) {
