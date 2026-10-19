@@ -219,6 +219,14 @@ Scripts/ShaderPreview/render-preview.sh Examples/shader-fps-3d-starter.pixpipeli
   asset port to an image. Audio events and looping audio voices are ignored.
 - Use `--node` when a workflow has more than one GPU Program.
 
+Where Apple's Metal compiler is unavailable, such as in a Linux agent
+container, `Scripts/MetalSyntaxCheck/check.py <Shader.metal>` parses a shader
+with its libraries and includes as C++ for OpenCL through a Metal shim, and
+evaluates its static asserts. Run it on the shader's previous revision
+(`--rev`) as well, so remaining errors belong to the change. It is a syntax and
+type check only: still say that the shader was not built with Metal, rendered
+or run.
+
 Choose views that exercise the change: the default start, a close-up, the angle
 that shows a new effect such as a cast shadow or halo, and each relevant game
 state. Place cameras by reasoning about scene coordinates, then confirm the
