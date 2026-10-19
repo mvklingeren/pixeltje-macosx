@@ -405,18 +405,34 @@ bool outdoors(float2 point, float pad) {
         || point.y <= hullNorth - pad || point.y >= hullSouth + pad;
 }
 
-// Lunar surface around the base: rolling regolith, three crater sizes and a
-// ring of distant highlands. It is level ground beside the base walls.
-float moonHeight(float2 p, int detail) {
+// The moon flattens to level ground beside the base walls.
+float moonApron(float2 p) {
     float2 wall = clamp(p, float2(-hullHalfWidth, hullNorth),
         float2(hullHalfWidth, hullSouth));
+    return smoothstep(6.0f, 60.0f, distance(p, wall));
+}
+
+// Boulders up to 1.5 m tall and scattered stones gather in patchy fields
+// between bare plains.
+float moonRocks(float2 p) {
+    float field = smoothstep(0.35f, 0.75f,
+        pixeltje_terrain::valueNoise(p / 90.0f, 91.0f));
+    if (field <= 0.0f) return 0.0f;
+    return field * (pixeltje_terrain::rocks(p, 12.0f, 0.35f, 92.0f)
+        + pixeltje_terrain::rocks(p, 3.5f, 0.3f, 93.0f));
+}
+
+// Lunar surface around the base: rolling regolith, three crater sizes,
+// boulder fields and a ring of distant highlands.
+float moonHeight(float2 p, int detail) {
     float h = 7.0f * pixeltje_terrain::fbm(p / 160.0f, detail, 11.0f)
         + pixeltje_terrain::craters(p, 260.0f, 0.55f, 21.0f)
         + pixeltje_terrain::craters(p, 70.0f, 0.6f, 31.0f)
-        + pixeltje_terrain::craters(p, 17.0f, 0.5f, 41.0f);
+        + pixeltje_terrain::craters(p, 17.0f, 0.5f, 41.0f)
+        + moonRocks(p);
     if (detail > moonTraceDetail)
         h += pixeltje_terrain::craters(p, 4.5f, 0.5f, 51.0f);
-    h *= smoothstep(6.0f, 60.0f, distance(p, wall));
+    h *= moonApron(p);
     float radius = length(p);
     if (radius > 500.0f)
         h += 95.0f * smoothstep(500.0f, 1300.0f, radius)
@@ -1446,13 +1462,33 @@ SurfaceMaterial surfaceMaterial(SceneHit hit,
             * (0.75f + 0.3f * smoothNoise(hit.position.xz * 0.7f)),
         0.88f, 0.0f, float3(0.0f)};
     if (hit.material == 40u) {
-        // Grey regolith: dark maria patches, paler dust and fine grit.
+        // Regolith: dark basalt maria, warm brown or blue-grey with their
+        // titanium, between pale highlands that also cap the distant ring.
+        // Steep crater walls shed dust and show fresher, brighter soil.
         float2 p = hit.position.xz;
-        float maria = pixeltje_terrain::valueNoise(p / 220.0f, 81.0f);
-        float grit = pixeltje_terrain::valueNoise(p * 2.3f, 82.0f);
-        return {mix(float3(0.085f, 0.083f, 0.08f),
-            float3(0.20f, 0.195f, 0.185f), smoothstep(0.25f, 0.75f, maria))
-            * (0.85f + 0.3f * grit), 0.97f, 0.0f, float3(0.0f)};
+        float highland = smoothstep(0.35f, 0.7f, 0.5f + hit.position.y / 120.0f
+            + 0.5f * pixeltje_terrain::fbm(p / 260.0f, 3, 81.0f));
+        float3 mare = mix(float3(0.080f, 0.068f, 0.056f),
+            float3(0.058f, 0.066f, 0.078f),
+            pixeltje_terrain::valueNoise(p / 140.0f, 82.0f));
+        float3 upland = mix(float3(0.19f, 0.186f, 0.178f),
+            float3(0.235f, 0.218f, 0.19f),
+            pixeltje_terrain::valueNoise(p / 60.0f, 83.0f));
+        float3 soil = mix(mare, upland, highland)
+            * (0.8f + 0.4f * pixeltje_terrain::valueNoise(p / 9.0f, 84.0f))
+            * (0.85f + 0.3f * pixeltje_terrain::valueNoise(p * 2.3f, 85.0f));
+        soil = mix(soil, soil * 1.35f + 0.015f,
+            smoothstep(0.1f, 0.4f, 1.0f - hit.normal.y));
+        // Boulders are darker basalt or paler breccia, grainy and dusted on
+        // their tops; soil skirts their feet.
+        float rock = smoothstep(0.04f, 0.25f, moonRocks(p) * moonApron(p));
+        float3 stone = mix(float3(0.05f, 0.048f, 0.046f),
+            float3(0.15f, 0.145f, 0.138f),
+            pixeltje_terrain::valueNoise(p / 7.0f, 86.0f))
+            * (0.7f + 0.6f * pixeltje_terrain::valueNoise(p * 4.0f, 87.0f));
+        stone = mix(stone, soil, 0.6f * smoothstep(0.8f, 0.97f, hit.normal.y));
+        return {mix(soil, stone, rock), mix(0.97f, 0.82f, rock), 0.0f,
+            float3(0.0f)};
     }
     if (hit.material == 41u) {
         // Pale shell panels, dusted with regolith near the ground.

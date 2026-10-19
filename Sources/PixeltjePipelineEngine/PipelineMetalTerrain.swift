@@ -1,7 +1,7 @@
 /// Stateless procedural terrain for GPU Program and Metal Render sources.
-/// Version 1 supplies seeded noise, crater layers and a generic height-field
-/// tracer. The caller composes its own height field from them and keeps
-/// materials, lighting and collision policy.
+/// Version 1 supplies seeded noise, crater and rock layers and a generic
+/// height-field tracer. The caller composes its own height field from them and
+/// keeps materials, lighting and collision policy.
 ///
 /// A height field is any value with `float operator()(float2 xz) const`
 /// returning the surface height at world XZ. Pass a cheaper field to `trace`
@@ -64,6 +64,31 @@ enum PipelineMetalTerrain {
         float profile = d < 1.0f ? 0.43f * d * d - 0.35f
           : 0.08f * (1.0f - smoothstep(1.0f, 1.45f, d));
         return profile * radius * cellSize;
+      }
+
+      // At most one boulder per square cell of cellSize world units, with the
+      // given chance per cell. Returns a height offset in world units: a
+      // lumpy, flat-topped mound up to 0.125 cellSize tall, turned and
+      // stretched at random and kept inside its own cell like a crater. Its
+      // sides stay below slope 1.8, which `trace` steps across safely.
+      inline float rocks(float2 p, float cellSize, float density,
+                         float seed) {
+        float2 q = p / cellSize, cell = floor(q);
+        if (hash(cell, seed) >= density) return 0.0f;
+        float2 centre = 0.35f + 0.3f * float2(hash(cell, seed + 1.0f),
+          hash(cell, seed + 2.0f));
+        float radius = mix(0.1f, 0.25f, hash(cell, seed + 3.0f));
+        float angle = 6.2831853f * hash(cell, seed + 4.0f);
+        float2 axis = float2(cos(angle), sin(angle));
+        float2 o = (q - cell - centre) / radius;
+        float2 local = float2(dot(o, axis), dot(o, float2(-axis.y, axis.x))
+          * mix(1.0f, 1.5f, hash(cell, seed + 5.0f)));
+        // The lumpy outline shrinks d by at most 0.85, so the footprint
+        // reaches at most 0.25 / 0.85 of the cell from its centre.
+        float d = length(local) * (0.85f
+          + 0.3f * valueNoise(o * 1.7f + cell * 7.0f, seed + 6.0f));
+        return mix(0.25f, 0.5f, hash(cell, seed + 7.0f)) * radius * cellSize
+          * (1.0f - smoothstep(0.25f, 1.0f, d));
       }
 
       // Ray distance to the field between near and far, or -1 on a miss. A

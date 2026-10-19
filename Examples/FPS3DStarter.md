@@ -23,10 +23,11 @@ seconds. Tick passes run in order over the same buffers, so splitting a large
 tick at a natural seam keeps its behaviour.
 
 For outdoor ground, add `// pixeltje:terrain-v1` to the leading marker lines.
-It supplies seeded `pixeltje_terrain::valueNoise`, `fbm` and `craters` to
-compose a height field, and `trace`, `normal` and `softShadow`, which accept
-any struct with `float operator()(float2 xz) const` as that field. Use the
-same field for collision height so the player walks on what is drawn.
+It supplies seeded `pixeltje_terrain::valueNoise`, `fbm`, `craters` and
+`rocks` to compose a height field, and `trace`, `normal` and `softShadow`,
+which accept any struct with `float operator()(float2 xz) const` as that
+field. Use the same field for collision height so the player walks on what is
+drawn.
 
 Signal Range shows a larger FPS built on the same pattern, with enemy AI,
 generated assets, audio, a scene handoff, and an exit onto a terrain-library
