@@ -851,9 +851,7 @@ void advanceSpiders(device GameState &game, float dt) {
             > 0.42f * distanceToPlayer;
         bool sees = distanceToPlayer < 24.0f
             && (aware || inView || distanceToPlayer < 4.5f)
-            && spiderSeesPoint(game, game.enemy[i].xyz
-                + float3(0.0f, 0.3f * traits.scale + 0.1f, 0.0f),
-                game.player.xyz);
+            && game.sightLines[i] != 0u;   // traced by senseSpiders
         if (sees) {
             wakeSpider(game, i, game.player.xz);
             aware = true;

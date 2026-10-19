@@ -158,6 +158,46 @@ existing nodes are insufficient. A general request for a new workflow does
 not grant permission to add node kinds. An explicit instruction to implement
 an already proposed node kind does grant that permission.
 
+### GPU Program compile time
+
+Metal compiles each GPU Program kernel and render pipeline the first time it
+runs and then caches the result, so a warm reload says nothing about cost.
+Cold compile time grows far faster than kernel complexity: one added feature
+can turn seconds into many minutes, and every shader edit and every other
+machine pays it again. Signal Range crossed that cliff three times:
+
+- Its single tick kernel took 132 s once the fur-coated spider hit test joined
+  the spider AI. Split into movement and shooting passes, they compiled in
+  0.5 s and 0.3 s.
+- Restarting a match from `advanceRange` pulled the path-network generator
+  into the per-frame tick, which then took over 90 s. As its own pass the
+  restart compiles in 0.1 s.
+- Each spider's line-of-sight scene trace, in the same loop body as the new
+  route following, made the spider AI take about a minute. Tracing the sight
+  lines in their own pass and storing one flag per spider brought the AI to
+  4.4 s, with the sensing pass at 0.1 s.
+
+In every case the expensive pattern was heavy work combined in one loop body
+or one kernel. Each part compiled in seconds on its own, and the same helpers
+in straight-line code compiled quickly.
+
+- Keep one concern per kernel. When a tick kernel grows, split it at a natural
+  seam into ordered tick passes; passes run in order over the same buffers, so
+  behaviour is unchanged.
+- Never reach one-time work from a per-frame kernel. Procedural generation,
+  graph or route-network building and full resets belong in the initialize
+  pass, or in a dedicated tick pass that acts only when the state asks for it.
+- Keep scene traces and other heavy queries out of loops that also do heavy
+  decision work. Run the queries in an earlier pass and store their results
+  in the state for the decision pass to read.
+- Measure the cold compile of every pipeline you add or change before you
+  finish. Make each entry point's code unique so the cache misses, for example
+  with a never-true early return that compares `thread_position_in_grid` or
+  the fragment position against a random constant, then time
+  `makeComputePipelineState` and `makeRenderPipelineState` on the resolved
+  source. Treat more than about 10 s for one pipeline as a defect, and report
+  the timings.
+
 ## Visual verification
 
 Visual inspection of the running application is always done by the human

@@ -235,6 +235,7 @@ struct GameState {
     float4 boltPosition[boltCount];    // XYZ, fire time (-100 unused)
     float4 boltVelocity[boltCount];    // velocity XYZ, burst time (-1 in flight)
     uint4 pickups;          // taken bits, last pickup kind, sentries destroyed, bolts fired
+    uint4 sightLines;       // per range spider: 1 when its view of the player is clear
 };
 
 static_assert(sizeof(GameState) <= 12288,
@@ -797,6 +798,30 @@ bool onJumpPad(float2 position) {
     return false;
 }
 
+// A click after defeat restarts. After victory, the triangle scene's click
+// returned here; clicks during the victory pause must not restart the game
+// before handoff.
+bool restartRequested(device const GameState &game, uint action) {
+    return game.progress.w != phasePlaying && action > game.progress.z
+        && (game.progress.w == phaseLost
+            || (game.progress.w == phaseWon && game.sceneTransition.y > 0.5f));
+}
+
+// Restarting regenerates the path network, so it is a tick pass of its own
+// after advanceRange: inlined into advanceRange, the generator's loop nests
+// made that kernel take minutes to compile cold.
+kernel void restartRange(constant ProgramUniforms &u [[buffer(0)]],
+    device GameState *states [[buffer(1)]],
+    uint id [[thread_position_in_grid]]) {
+    if (id != 0u) return;
+    device GameState &game = states[0];
+    uint action = uint(u.pointer.z);
+    if (!restartRequested(game, action)) return;
+    resetGame(game, u.frameSeed.y ^ npcPathHash(action + u.frameSeed.x));
+    game.progress.z = action;
+    game.effects.z = float(uint(u.movement.z));
+}
+
 kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     device GameState *states [[buffer(1)]],
     device uint *sceneRequest [[buffer(2)]],
@@ -842,17 +867,8 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
         }
     }
     if (game.progress.w != phasePlaying) {
-        // A click after defeat restarts. After victory, the triangle scene's
-        // click returned here; clicks during the victory pause must not
-        // restart the game before handoff.
-        if (action > game.progress.z && (game.progress.w == phaseLost
-            || (game.progress.w == phaseWon
-                && game.sceneTransition.y > 0.5f))) {
-            // One call site keeps the network generator inlined once.
-            resetGame(game, u.frameSeed.y ^ npcPathHash(action + u.frameSeed.x));
-            game.progress.z = action;
-            game.effects.z = float(jumpAction);
-        } else if (game.progress.w == phaseWon
+        // A requested restart happens in the restartRange tick pass.
+        if (!restartRequested(game, action) && game.progress.w == phaseWon
             && game.effects.x - game.sceneTransition.x >= 2.0f) {
             sceneRequest[0] = 1u;
             game.sceneTransition.y = 1.0f;
@@ -1014,6 +1030,35 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     collectPickups(game);
 
     advanceArms(game, dt);
+}
+
+// Each range spider's sight line to the player, traced in the tick pass
+// between advanceRange and advanceEnemies. In the same kernel as the spiders'
+// route following, this scene trace made their AI take a minute to compile
+// cold. A spider moves only itself, so these are the positions each check saw.
+kernel void senseSpiders(device GameState *states [[buffer(1)]],
+    uint id [[thread_position_in_grid]]) {
+    if (id != 0u) return;
+    device GameState &game = states[0];
+    if (game.progress.w != phasePlaying) return;
+    for (uint i = 0u; i < ordinaryEnemyCount; ++i) {
+        float scale = spiderTraits(spiderVariantForSlot(i)).scale;
+        game.sightLines[i] = spiderSeesPoint(game, game.enemy[i].xyz
+            + float3(0.0f, 0.3f * scale + 0.1f, 0.0f), game.player.xyz)
+            ? 1u : 0u;
+    }
+}
+
+// Spider and boss AI is the tick pass after senseSpiders. Apart from the
+// player's movement and the sight traces, each kernel compiles in seconds.
+kernel void advanceEnemies(constant ProgramUniforms &u [[buffer(0)]],
+    device GameState *states [[buffer(1)]],
+    uint id [[thread_position_in_grid]]) {
+    if (id != 0u) return;
+    device GameState &game = states[0];
+    if (game.progress.w != phasePlaying) return;
+    float dt = clamp(u.pointer.w > 0.0f ? u.pointer.w : u.resolutionTime.w,
+        0.0f, 0.10f);
     advanceSpiders(game, dt);
     advanceBoss(game, dt);
 }
