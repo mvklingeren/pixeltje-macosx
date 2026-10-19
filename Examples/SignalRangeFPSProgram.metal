@@ -412,10 +412,11 @@ float moonApron(float2 p) {
     return smoothstep(6.0f, 60.0f, distance(p, wall));
 }
 
-// Boulders up to 1.5 m tall and scattered stones gather in patchy fields
+// Boulders about 2 m tall and scattered stones gather in patchy fields
 // between bare plains.
 float moonRocks(float2 p) {
-    float field = smoothstep(0.35f, 0.75f,
+    // A narrow edge keeps few boulders flattened into slabs.
+    float field = smoothstep(0.5f, 0.58f,
         pixeltje_terrain::valueNoise(p / 90.0f, 91.0f));
     if (field <= 0.0f) return 0.0f;
     return field * (pixeltje_terrain::rocks(p, 12.0f, 0.35f, 92.0f)
@@ -1462,32 +1463,32 @@ SurfaceMaterial surfaceMaterial(SceneHit hit,
             * (0.75f + 0.3f * smoothNoise(hit.position.xz * 0.7f)),
         0.88f, 0.0f, float3(0.0f)};
     if (hit.material == 40u) {
-        // Regolith: dark basalt maria, warm brown or blue-grey with their
+        // Regolith: dark basalt maria, ochre-brown or slate-blue with their
         // titanium, between pale highlands that also cap the distant ring.
         // Steep crater walls shed dust and show fresher, brighter soil.
         float2 p = hit.position.xz;
-        float highland = smoothstep(0.35f, 0.7f, 0.5f + hit.position.y / 120.0f
+        float highland = smoothstep(0.38f, 0.62f, 0.5f + hit.position.y / 120.0f
             + 0.5f * pixeltje_terrain::fbm(p / 260.0f, 3, 81.0f));
-        float3 mare = mix(float3(0.080f, 0.068f, 0.056f),
-            float3(0.058f, 0.066f, 0.078f),
-            pixeltje_terrain::valueNoise(p / 140.0f, 82.0f));
-        float3 upland = mix(float3(0.19f, 0.186f, 0.178f),
-            float3(0.235f, 0.218f, 0.19f),
+        float3 mare = mix(float3(0.084f, 0.068f, 0.05f),
+            float3(0.052f, 0.061f, 0.08f), smoothstep(0.3f, 0.7f, 0.5f
+                + 0.6f * pixeltje_terrain::fbm(p / 160.0f, 3, 82.0f)));
+        float3 upland = mix(float3(0.20f, 0.196f, 0.188f),
+            float3(0.25f, 0.218f, 0.175f),
             pixeltje_terrain::valueNoise(p / 60.0f, 83.0f));
         float3 soil = mix(mare, upland, highland)
-            * (0.8f + 0.4f * pixeltje_terrain::valueNoise(p / 9.0f, 84.0f))
+            * (0.75f + 0.5f * pixeltje_terrain::valueNoise(p / 9.0f, 84.0f))
             * (0.85f + 0.3f * pixeltje_terrain::valueNoise(p * 2.3f, 85.0f));
         soil = mix(soil, soil * 1.35f + 0.015f,
             smoothstep(0.1f, 0.4f, 1.0f - hit.normal.y));
-        // Boulders are darker basalt or paler breccia, grainy and dusted on
+        // Boulders are dark basalt or paler breccia, grainy and dusted on
         // their tops; soil skirts their feet.
-        float rock = smoothstep(0.04f, 0.25f, moonRocks(p) * moonApron(p));
-        float3 stone = mix(float3(0.05f, 0.048f, 0.046f),
-            float3(0.15f, 0.145f, 0.138f),
+        float rock = smoothstep(0.0f, 0.06f, moonRocks(p) * moonApron(p));
+        float3 stone = mix(float3(0.035f, 0.034f, 0.033f),
+            float3(0.13f, 0.122f, 0.11f),
             pixeltje_terrain::valueNoise(p / 7.0f, 86.0f))
             * (0.7f + 0.6f * pixeltje_terrain::valueNoise(p * 4.0f, 87.0f));
-        stone = mix(stone, soil, 0.6f * smoothstep(0.8f, 0.97f, hit.normal.y));
-        return {mix(soil, stone, rock), mix(0.97f, 0.82f, rock), 0.0f,
+        stone = mix(stone, soil, 0.45f * smoothstep(0.85f, 0.98f, hit.normal.y));
+        return {mix(soil, stone, rock), mix(0.97f, 0.8f, rock), 0.0f,
             float3(0.0f)};
     }
     if (hit.material == 41u) {

@@ -67,28 +67,31 @@ enum PipelineMetalTerrain {
       }
 
       // At most one boulder per square cell of cellSize world units, with the
-      // given chance per cell. Returns a height offset in world units: a
-      // lumpy, flat-topped mound up to 0.125 cellSize tall, turned and
-      // stretched at random and kept inside its own cell like a crater. Its
-      // sides stay below slope 1.8, which `trace` steps across safely.
+      // given chance per cell. Returns a height offset in world units: an
+      // angular rock of six sloping faces under a tilted top, up to 0.17
+      // cellSize tall and kept inside its own cell like a crater. Its faces
+      // stay below slope 1.8, which `trace` steps across safely.
       inline float rocks(float2 p, float cellSize, float density,
                          float seed) {
         float2 q = p / cellSize, cell = floor(q);
         if (hash(cell, seed) >= density) return 0.0f;
-        float2 centre = 0.35f + 0.3f * float2(hash(cell, seed + 1.0f),
+        float2 o = q - cell - 0.35f - 0.3f * float2(hash(cell, seed + 1.0f),
           hash(cell, seed + 2.0f));
-        float radius = mix(0.1f, 0.25f, hash(cell, seed + 3.0f));
-        float angle = 6.2831853f * hash(cell, seed + 4.0f);
-        float2 axis = float2(cos(angle), sin(angle));
-        float2 o = (q - cell - centre) / radius;
-        float2 local = float2(dot(o, axis), dot(o, float2(-axis.y, axis.x))
-          * mix(1.0f, 1.5f, hash(cell, seed + 5.0f)));
-        // The lumpy outline shrinks d by at most 0.85, so the footprint
-        // reaches at most 0.25 / 0.85 of the cell from its centre.
-        float d = length(local) * (0.85f
-          + 0.3f * valueNoise(o * 1.7f + cell * 7.0f, seed + 6.0f));
-        return mix(0.25f, 0.5f, hash(cell, seed + 7.0f)) * radius * cellSize
-          * (1.0f - smoothstep(0.25f, 1.0f, d));
+        float slope = mix(1.1f, 1.8f, hash(cell, seed + 3.0f));
+        float turn = 6.2831853f * hash(cell, seed + 4.0f);
+        float2 tilt = 0.3f * float2(hash(cell, seed + 5.0f),
+          hash(cell, seed + 6.0f)) - 0.15f;
+        float h = mix(0.04f, 0.1f, hash(cell, seed + 7.0f)) + dot(o, tilt);
+        // Each face's foot lies 0.1 to 0.22 of the cell from the centre, and
+        // neighbouring faces turn 60 +- 18 degrees apart, so no corner of the
+        // footprint lies farther than 0.33 of the cell from the centre.
+        for (int k = 0; k < 6; ++k) {
+          float angle = turn + 1.0471976f
+            * (float(k) + 0.6f * hash(cell, seed + 8.0f + float(k)) - 0.3f);
+          float reach = mix(0.1f, 0.22f, hash(cell, seed + 14.0f + float(k)));
+          h = min(h, slope * (reach - dot(o, float2(cos(angle), sin(angle)))));
+        }
+        return max(h, 0.0f) * cellSize;
       }
 
       // Ray distance to the field between near and far, or -1 on a miss. A

@@ -90,8 +90,8 @@ import Testing
   #expect(results[6] > 0 && results[6] <= 0.08 * 0.23 * 40 + 0.01)
   #expect(results[7] > 0.1 && results[7] < 1)
   #expect(results[8] == -1)
-  // Rocks rise at most 0.5 of a 0.25-cell radius and stay off cell edges.
+  // Rocks rise at most 0.17 of a cell and stay off its edges.
   #expect(results[9] == 0)
-  #expect(results[10] > 0.5 && results[10] <= 0.5 * 0.25 * 40 + 0.01)
+  #expect(results[10] > 0.5 && results[10] <= 0.17 * 40 + 0.01)
   #expect(results[11] == 0)
 }
