@@ -265,8 +265,8 @@ void collectPickups(device GameState &game) {
 
 // MARK: Targets shared by the seeker and the blast
 
-// Target IDs: 1–4 are spider slots + 1, 5–8 sentries + 5 and 9–11 drones
-// + 9; 0 is none.
+// Target IDs: 1–4 are spider slots + 1, 5–7 sentries + 5 and 8–10 drones
+// + 8; 0 is none.
 constant uint firstSentryTarget = enemyCount + 1u;
 constant uint firstDroneTarget = enemyCount + sentryCount + 1u;
 constant uint targetCount = enemyCount + sentryCount + droneCount;
@@ -480,7 +480,8 @@ void detonateMissile(device GameState &game, float3 point,
         uint hits = gap < 1.5f ? 3u : (gap < 3.0f ? 2u : 1u);
         float3 shove = length(away) > 0.01f ? normalize(away)
             : float3(0.0f, 1.0f, 0.0f);
-        for (uint k = 0u; k < hits; ++k) damageDrone(game, i, shove, audio);
+        for (uint k = 0u; k < hits; ++k)
+            damageDrone(game, i, shove, 1.0f, audio);
     }
     float3 body = game.player.xyz - float3(0.0f, 0.75f, 0.0f);
     float gap = distance(point, body);

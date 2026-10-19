@@ -82,20 +82,18 @@ constant uint keyV = 16u;
 constant uint keyX = 32u;
 constant uint keyDigit1 = 128u;
 constant uint keyDigit2 = 256u;
-// Sentry turrets guard the east, west and north rooms and the moon outside
-// the exit. Each stands on a tripod and first watches its room's entrance.
-constant uint sentryCount = 4u;
+// Sentry turrets guard the east, west and north rooms. Each stands on a
+// tripod and first watches its room's entrance.
+constant uint sentryCount = 3u;
 constant float sentryHealth = 6.0f;
 constant float sentryCharge = 0.75f;
 constant float sentryBoltSpeed = 21.0f;
 constant float sentryBoltDamage = 9.0f;
 constant uint boltCount = 6u;
 constant float2 sentryGround[sentryCount] = {
-    float2(50.0f, -9.0f), float2(-50.0f, 9.0f),
-    float2(13.0f, -55.0f), float2(9.0f, 38.0f)};
+    float2(50.0f, -9.0f), float2(-50.0f, 9.0f), float2(13.0f, -55.0f)};
 constant float2 sentryWatch[sentryCount] = {
-    float2(24.0f, 0.0f), float2(-24.0f, 0.0f),
-    float2(0.0f, -24.0f), float2(0.0f, 18.3f)};
+    float2(24.0f, 0.0f), float2(-24.0f, 0.0f), float2(0.0f, -24.0f)};
 // Two rocket caches (east room, boss corridor) and two medkits (west room,
 // north room). Positions are on the floor.
 constant uint pickupCount = 4u;
@@ -147,7 +145,8 @@ struct Drone {
     float4 pose;           // centre XYZ, health (zero once shot down)
     float4 velocity;       // world velocity XYZ, heading yaw
     float4 attitude;       // tilt tangent along world X and Z, hit flash, thrust
-    float4 brain;          // hostile flag, fire cooldown, unused, time shot down
+    float4 brain;          // hostile flag, fire cooldown, health the bar
+                           // shows (drains toward pose.w), time shot down
     float4 wander;         // station XZ, hover height, loiter phase;
                            // the spark burst XYZ once shot down
 };
@@ -1159,7 +1158,8 @@ void fireRound(device GameState &game, float3 eye, float3 shotDirection,
     }
     game.impacts[(game.progress.y - 1u) % impactCount] = shot;
     if (trace.drone >= 0)
-        damageDrone(game, uint(trace.drone), shotDirection, audio);
+        damageDrone(game, uint(trace.drone), shotDirection,
+            holdingShotgun(game) ? dronePelletDamage : 1.0f, audio);
     if (trace.sentry >= 0) {
         // Armour takes one point; the sensor eye takes three.
         bool sensor = trace.material == sentrySensorMaterial;
@@ -3376,6 +3376,28 @@ fragment float4 compositeFragment(ScreenVertex in [[stage_in]],
                     color = seekerLocked(game) ? float3(1.0f, 0.2f, 0.12f)
                         : float3(0.9f, 1.0f, 0.92f);
             }
+        }
+    }
+    // A damaged drone shows a small power bar above it: wide and green when
+    // full, shrinking and reddening as it runs down to nothing. Drones fly
+    // outside, so the bars show only there.
+    // shortcut: no depth test, so a bar shows through a crater rim; test
+    // against the scene depth if that reads wrong.
+    if (game.progress.w == phasePlaying && !flightCam
+        && outdoors(game.player.xz, 0.0f)) {
+        for (uint i = 0u; i < droneCount; ++i) {
+            float power = game.drones[i].brain.z / droneHealth;
+            if (power <= 0.0f || power >= 1.0f) continue;
+            float3 projected = projectToScreen(game, u.resolutionTime.xy,
+                game.drones[i].pose.xyz);
+            if (projected.z < 0.5f) continue;
+            float lift = 0.3f / projected.z * 1.1f * u.resolutionTime.y + 9.0f;
+            float2 q = pixel - projected.xy + float2(20.0f, lift);
+            if (q.x < 0.0f || q.x > 40.0f || abs(q.y) > 2.5f) continue;
+            color = q.x < 40.0f * power
+                ? float3(saturate(2.0f - 2.0f * power),
+                    saturate(2.0f * power), 0.12f)
+                : float3(0.08f, 0.10f, 0.11f);
         }
     }
     // Hit marker: white for a body hit, orange for the head, red for a kill.

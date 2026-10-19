@@ -11,6 +11,10 @@
 // it from hanging perfectly still.
 
 constant float droneHealth = 3.0f;
+// A pistol round or a blast step costs a drone one point; a shotgun pellet
+// only part of one, so each barrel visibly drains its power bar.
+constant float dronePelletDamage = 0.25f;
+constant float droneBarDrain = 2.0f;      // health per second the bar runs down
 constant float droneGravity = 9.81f;      // the tilt a drone needs, as on Earth
 constant float droneFallGravity = 13.0f;  // matches the player's jumps
 constant float droneTiltLag = 0.16f;      // seconds for the frame to follow
@@ -61,7 +65,7 @@ void resetDrones(device GameState &game) {
         game.drones[i].velocity = float4(0.0f, 0.0f, 0.0f,
             1.3f * float(i) - 1.0f);
         game.drones[i].attitude = float4(0.0f, 0.0f, 0.0f, 1.0f);
-        game.drones[i].brain = float4(0.0f, 0.0f, 0.0f, -1.0f);
+        game.drones[i].brain = float4(0.0f, 0.0f, droneHealth, -1.0f);
         game.drones[i].wander = float4(station, height, 2.1f * float(i));
     }
     for (uint i = 0u; i < laserCount; ++i) {
@@ -234,10 +238,10 @@ float droneShadow(float3 origin, float3 direction, float lightDistance,
 // Pellets also shove it and kick its frame, which the controller then
 // fights to level again.
 void damageDrone(device GameState &game, uint index, float3 shotDirection,
-    device RangeAudio &audio) {
+    float amount, device RangeAudio &audio) {
     device Drone &drone = game.drones[index];
     if (drone.pose.w <= 0.0f) return;
-    drone.pose.w -= 1.0f;
+    drone.pose.w -= amount;
     drone.attitude.z = 0.2f;
     drone.velocity.xyz += shotDirection * 1.2f;
     drone.attitude.xy += shotDirection.xz * 0.35f;
@@ -342,6 +346,7 @@ void flyDrone(device GameState &game, uint index, float dt,
     device Drone &drone = game.drones[index];
     float time = game.effects.x;
     drone.attitude.z = max(drone.attitude.z - dt, 0.0f);
+    drone.brain.z = max(drone.brain.z - droneBarDrain * dt, drone.pose.w);
     if (drone.pose.w <= 0.0f) {
         fallDrone(drone, dt);
         return;
@@ -426,17 +431,18 @@ void flyDrone(device GameState &game, uint index, float dt,
         0.6f * sin(time * 2.3f + float(index) * 1.7f),
         cos(time * 1.1f + float(index) * 2.9f)
             + 0.5f * sin(time * 4.3f + float(index) * 0.7f));
-    float3 actual = float3(drone.attitude.x * droneGravity,
-        clamp(acceleration.y, -4.0f, 5.0f), drone.attitude.y * droneGravity)
-        + gust - v * 0.25f;
+    float3 rotor = float3(drone.attitude.x * droneGravity,
+        clamp(acceleration.y, -4.0f, 5.0f), drone.attitude.y * droneGravity);
+    float3 actual = rotor + gust - v * 0.25f;
     v += actual * dt;
     p += v * dt;
     // Keep the skids above the regolith even after a hard shove.
     p.y = max(p.y, droneGround(p.xz) + 0.6f);
     drone.pose.xyz = p;
     drone.velocity.xyz = v;
-    // Thrust in units of hover thrust sets the rotor speed and its pitch.
-    float thrust = length(float3(actual.x, actual.y + droneGravity, actual.z))
+    // Rotor thrust in units of hover thrust sets the rotor speed and its
+    // pitch. Gusts and drag act on the airframe, not through the motors.
+    float thrust = length(rotor + float3(0.0f, droneGravity, 0.0f))
         / droneGravity;
     drone.attitude.w = mix(drone.attitude.w, thrust, 1.0f - exp(-dt * 6.0f));
     drone.velocity.w += clamp(wrapAngle(targetYaw - drone.velocity.w),
@@ -479,10 +485,13 @@ void advanceLasers(device GameState &game, float dt) {
     }
 }
 
-// The hover hum of each drone as the player hears it: inverse-distance
-// loudness, panning, Doppler shift from both motions, and rotor pitch that
-// rises with thrust. A downed drone's motors spin down in under a second.
-// Walls muffle drones the player cannot see from inside the base.
+// The motor whine of each drone as the player hears it: inverse-distance
+// loudness, panning, Doppler shift from both motions, and FPV motor pitch.
+// Rotor speed follows the square root of thrust, and like an FPV pilot the
+// controller punches the throttle to climb and cuts it to drop, so the whine
+// rises and gets louder as a drone goes up and sags as it descends. A downed
+// drone's motors spin down in under a second. Walls muffle drones the player
+// cannot see from inside the base.
 void updateDroneVoices(device GameState &game, float dt,
     device RangeAudio &audio, bool playing) {
     DopplerListener listener = {game.player.xyz,
@@ -494,8 +503,10 @@ void updateDroneVoices(device GameState &game, float dt,
     const float detune[droneCount] = {0.97f, 1.0f, 1.04f};
     for (uint i = 0u; i < droneCount; ++i) {
         Drone drone = game.drones[i];
-        float loudness = 0.85f;
-        float pitch = detune[i] * clamp(sqrt(drone.attitude.w), 0.85f, 1.25f);
+        float climb = drone.pose.w > 0.0f ? drone.velocity.y : 0.0f;
+        float rpm = sqrt(max(drone.attitude.w + 0.15f * climb, 0.35f));
+        float loudness = 0.85f * clamp(rpm, 0.75f, 1.25f);
+        float pitch = detune[i] * clamp(rpm, 0.7f, 1.6f);
         if (drone.pose.w <= 0.0f) {
             float spin = smoothstep(0.0f, 0.9f,
                 game.effects.x - drone.brain.w);
