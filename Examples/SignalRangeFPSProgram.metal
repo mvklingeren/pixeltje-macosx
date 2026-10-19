@@ -39,7 +39,7 @@ constant float bossCeilingY = 13.0f;
 constant uint ambushSlot = 2u;
 constant uint magazineSize = 12u;
 constant float reloadDuration = 1.6f;
-constant float biteWindup = 0.45f;
+constant float biteWindup = 0.30f;
 constant float exitHalfWidth = 2.5f;
 constant float exitDoorTop = 3.5f;
 constant float exitDoorZ = 18.15f;
@@ -58,6 +58,8 @@ constant int moonShadeDetail = 7;         // normal octaves
 // A low sun in the south-west throws long shadows across the craters.
 constant float3 sunDirection = float3(-0.8494f, 0.2199f, 0.4797f);
 constant float sunPower = 1.13e10f;       // irradiance 9 from 10 km away
+
+#include "NPCPathNetwork.metal"
 
 struct ProgramUniforms {
     float4 resolutionTime;
@@ -121,12 +123,14 @@ struct GameState {
     float4 ambush;          // drop start time (-1 before trigger), fall speed, landed
     float4 senses[enemyCount];   // last known player XZ, awareness, bite clock
     float4 reaction[enemyCount]; // flinch time, knockback XZ, startle time
+    float4 pathFollow[enemyCount]; // NPC path follower for each spider
+    NPCPathNetwork paths;   // generated waypoint graph and route to the player
     // Rebuilt from the state above by every present pass. It shares this
     // buffer because the program already uses all twelve resource slots.
     HUDGlyph hud[hudCapacity];
 };
 
-static_assert(sizeof(GameState) <= 5120,
+static_assert(sizeof(GameState) <= 8192,
     "The GPU Program game buffer must contain game state and the HUD glyphs");
 
 struct SceneHit {
@@ -282,9 +286,38 @@ GunPose gunPose(device const GameState &game) {
         0.028f * saturate((kick - 0.55f) / 0.45f)};
 }
 
+// The spiders' path network: the four rooms and the moon outside, joined by
+// a portal node in each doorway. Jitter stays within 2.5 m, so the nodes
+// facing each doorway keep a straight walk to its portal. Moon grid points
+// inside the base's shell are dropped by generation, which leaves a ring
+// around its south half; range spiders never go farther north than the
+// northern room.
+constant uint pathAreaArena = 0u;
+constant uint pathAreaNorth = 1u;
+constant uint pathAreaMoon = 9u;
+constant uint pathAreaCount = 10u;
+constant NPCPathArea rangePathAreas[pathAreaCount] = {
+    {float2(-16.5f, -16.5f), float2(16.5f, 16.5f), uint2(5u, 5u), 0.3f},  // arena
+    {float2(-16.5f, -58.5f), float2(16.5f, -25.5f), uint2(5u, 5u), 0.3f}, // north
+    {float2(25.5f, -16.5f), float2(58.5f, 16.5f), uint2(3u, 3u), 0.15f},  // east
+    {float2(-58.5f, -16.5f), float2(-25.5f, 16.5f), uint2(3u, 3u), 0.15f}, // west
+    {float2(0.0f, -21.0f), float2(0.0f, -21.0f), uint2(1u, 1u), 0.0f},    // north stairs
+    {float2(21.0f, 0.0f), float2(21.0f, 0.0f), uint2(1u, 1u), 0.0f},      // east stairs
+    {float2(-21.0f, 0.0f), float2(-21.0f, 0.0f), uint2(1u, 1u), 0.0f},    // west stairs
+    {float2(0.0f, 18.0f), float2(0.0f, 18.0f), uint2(1u, 1u), 0.0f},      // exit door
+    {float2(0.0f, 21.0f), float2(0.0f, 21.0f), uint2(1u, 1u), 0.0f},      // outside it
+    {float2(-68.0f, -56.0f), float2(68.0f, 26.0f), uint2(5u, 3u), 0.06f}  // the moon
+};
+constant uint pathJoinCount = 9u;
+constant uint2 rangePathJoins[pathJoinCount] = {
+    uint2(0u, 4u), uint2(4u, 1u), uint2(0u, 5u), uint2(5u, 2u),
+    uint2(0u, 6u), uint2(6u, 3u), uint2(0u, 7u), uint2(7u, 8u),
+    uint2(8u, 9u)
+};
+
 #include "SignalRangeSpider.metal"
 
-void resetGame(device GameState &game) {
+void resetGame(device GameState &game, uint seed) {
     game.player = float4(0.0f, 1.55f, 12.0f, 0.0f);
     game.view = float4(0.0f, 100.0f, 0.0f, 0.0f);
     game.effects = float4(0.0f);
@@ -328,12 +361,18 @@ void resetGame(device GameState &game) {
         game.reaction[i] = float4(0.0f);
         game.gait[i] = float4(0.07f + float(i) * 0.31f,
             0.0f, 0.0f, 0.0f);
+        // Range spiders hold their opening pose for a moment, then patrol.
+        game.pathFollow[i] = npcPathFollower(2.2f + 0.9f * float(i));
     }
+    // Every match generates a fresh network over the same rooms.
+    npcPathGenerate(game.paths, rangePathAreas, pathAreaCount,
+        rangePathJoins, pathJoinCount, npcPathHash(seed));
 }
 
-kernel void initializeRange(device GameState *states [[buffer(1)]],
+kernel void initializeRange(constant ProgramUniforms &u [[buffer(0)]],
+    device GameState *states [[buffer(1)]],
     uint id [[thread_position_in_grid]]) {
-    if (id == 0u) resetGame(states[0]);
+    if (id == 0u) resetGame(states[0], u.frameSeed.y ^ u.frameSeed.z);
 }
 
 float rayBox(float3 origin, float3 direction, float3 lower, float3 upper,
@@ -500,6 +539,18 @@ bool walkable(float2 point) {
         && abs(z) <= roomLimit;
 }
 
+// Where a spider body may stand: the walkable floor clear of the props. The
+// pad is the larger of the two range spiders' prop clearances.
+bool npcPathPointClear(float2 point) {
+    return walkable(point) && point.y > -outerRoomFar
+        && !insideProp(point, 0.6f);
+}
+
+// Moon nodes stay outside the shell, clear of its walls.
+bool npcPathNodeAllowed(float2 point, uint area) {
+    return area != pathAreaMoon || outdoors(point, 2.0f);
+}
+
 float entranceDoorBottom(device const GameState &game) {
     return game.bossScene.x < 0.0f ? 9.0f
         : mix(9.0f, 1.2f, smoothstep(0.0f, 0.85f, game.bossScene.x));
@@ -574,16 +625,14 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
         if (game.weapon.y <= 0.0f) game.weapon.x = float(magazineSize);
     }
     if (game.progress.w != phasePlaying) {
-        if (game.progress.w == phaseLost && action > game.progress.z) {
-            resetGame(game);
-            game.progress.z = action;
-            game.effects.z = float(jumpAction);
-        } else if (game.progress.w == phaseWon
-            && game.sceneTransition.y > 0.5f
-            && action > game.progress.z) {
-            // The triangle scene's click returned here. Keep clicks during
-            // the victory pause from restarting the game before handoff.
-            resetGame(game);
+        // A click after defeat restarts. After victory, the triangle scene's
+        // click returned here; clicks during the victory pause must not
+        // restart the game before handoff.
+        if (action > game.progress.z && (game.progress.w == phaseLost
+            || (game.progress.w == phaseWon
+                && game.sceneTransition.y > 0.5f))) {
+            // One call site keeps the network generator inlined once.
+            resetGame(game, u.frameSeed.y ^ npcPathHash(action + u.frameSeed.x));
             game.progress.z = action;
             game.effects.z = float(jumpAction);
         } else if (game.progress.w == phaseWon
@@ -785,7 +834,7 @@ kernel void fireRange(constant ProgramUniforms &u [[buffer(0)]],
                     game.enemyClock[i].w,
                     game.gait[i].x, game.gait[i].y,
                     spiderBodyRise(game.effects.x, i), 0.0f,
-                    spiderRear(game, i), block);
+                    spiderRear(game, i), spiderStrike(game, i), block);
                 if (spider.material != 0u) {
                     block = spider.distance;
                     target = int(i);
@@ -1939,7 +1988,7 @@ void traceScene(thread SceneHit &hit, thread float3 &furPosition,
             spiderVariantForSlot(i), game.enemyClock[i].w,
             game.gait[i].x, game.gait[i].y,
             spiderBodyRise(game.effects.x, i), 0.0f,
-            spiderRear(game, i), hit.distance);
+            spiderRear(game, i), spiderStrike(game, i), hit.distance);
         if (spider.material != 0u) {
             hit = {spider.distance, spider.normal,
                 origin + direction * spider.distance, spider.material,
@@ -1959,7 +2008,7 @@ void traceScene(thread SceneHit &hit, thread float3 &furPosition,
         SpiderHit spider = traceSpider(origin, direction, centre,
             variant, fallen.pose.w, fallen.motion.x,
             fallen.motion.y * (1.0f - collapse),
-            fallen.motion.w * (1.0f - collapse), collapse, 0.0f,
+            fallen.motion.w * (1.0f - collapse), collapse, 0.0f, 0.0f,
             hit.distance);
         if (spider.material != 0u) {
             hit = {spider.distance, spider.normal,

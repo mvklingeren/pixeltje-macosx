@@ -1,7 +1,14 @@
 // Signal Range spider geometry, locomotion, and pursuit behavior.
-// Included by SignalRangeFPSProgram.metal after shared game state.
+// Included by SignalRangeFPSProgram.metal after shared game state. Spiders
+// walk the generated waypoint network from NPCPathNetwork.metal.
 
-constant float spiderChaseSpeed = 1.8f;
+constant float spiderChaseSpeed = 3.8f;
+constant float spiderPatrolSpeed = 1.9f;
+// A bite coils for biteWindup, lunges for spiderLungeTime and lands its fangs
+// partway through the lunge, then recovers until spiderBiteEnd.
+constant float spiderLungeTime = 0.14f;
+constant float spiderBiteHit = 0.384f;   // biteWindup + 0.6 × spiderLungeTime
+constant float spiderBiteEnd = 0.62f;
 
 enum class SpiderVariant : uint {
     brown = 0u,
@@ -92,7 +99,8 @@ float bossWindup(device const GameState &game) {
 }
 
 // How far the front of a spider rears up: before a bite or rush, and briefly
-// when a shot lands.
+// when a shot lands. A coiling spider shudders, then drops out of the rear
+// the instant it lunges.
 float spiderRear(device const GameState &game, uint slot) {
     float rear = 0.0f;
     if (slot == bossSlot) {
@@ -101,10 +109,37 @@ float spiderRear(device const GameState &game, uint slot) {
             rear = smoothstep(0.0f, bossWindup(game), charge);
     } else if (game.senses[slot].w >= 0.0f) {
         float bite = game.senses[slot].w;
-        rear = smoothstep(0.0f, 0.4f, bite)
-            * (1.0f - smoothstep(biteWindup, 0.6f, bite));
+        rear = smoothstep(0.0f, 0.75f * biteWindup, bite)
+            * (1.0f + 0.16f * sin(bite * 75.0f))
+            * (1.0f - smoothstep(biteWindup, biteWindup + 0.05f, bite));
     }
     return max(rear, 0.6f * smoothstep(0.0f, 0.32f, game.reaction[slot].x));
+}
+
+// How hard a spider drives forward into a strike: the body thrusts past its
+// planted legs, pitches down onto its fangs and the front legs stab ahead.
+float spiderStrike(device const GameState &game, uint slot) {
+    if (slot == bossSlot) {
+        float charge = game.bossAttack.x - bossWindup(game);
+        return charge <= 0.0f ? 0.0f : 0.6f * smoothstep(0.0f, 0.12f, charge)
+            * (1.0f - smoothstep(0.55f, 0.82f, charge));
+    }
+    float bite = game.senses[slot].w;
+    if (bite < biteWindup) return 0.0f;
+    return smoothstep(biteWindup, biteWindup + 0.05f, bite)
+        * (1.0f - smoothstep(biteWindup + spiderLungeTime, spiderBiteEnd,
+            bite));
+}
+
+// The lunge is a short leap: zero on the ground, one at its top.
+float spiderLungeHop(device const GameState &game, uint slot) {
+    float lunge = (game.senses[slot].w - biteWindup) / spiderLungeTime;
+    return lunge > 0.0f && lunge < 1.0f ? sin(rangePi * lunge) : 0.0f;
+}
+
+// How far a lunge carries the spider toward its prey.
+float spiderLungeReach(SpiderTraits traits) {
+    return 2.0f * traits.scale + 0.5f;
 }
 
 float spiderJumpLift(SpiderTraits traits, bool pursuing, float dt,
@@ -475,9 +510,11 @@ float3 rotateSpiderPitch(float3 point, float sine, float cosine) {
 SpiderHit traceSpider(float3 origin, float3 direction, float3 centre,
     SpiderVariant variant, float yaw, float gaitPhase,
     float movementBlend, float bodyRise,
-    float collapse, float rear, float maxDistance) {
+    float collapse, float rear, float strike, float maxDistance) {
     SpiderTraits traits = spiderTraits(variant);
-    bodyRise += 0.10f * rear;
+    bodyRise += 0.10f * rear - 0.06f * strike;
+    // A strike drives the body forward (local -Z) past its planted legs.
+    float thrust = 0.30f * strike;
     float cosine = cos(yaw), sine = sin(yaw);
     // Keep the authored geometry in one local scale for both gun hits and
     // drawing; converting the final distance preserves world-space depth.
@@ -491,7 +528,7 @@ SpiderHit traceSpider(float3 origin, float3 direction, float3 centre,
     SpiderHit hit = {localMaxDistance, float3(0.0f), 0u, float3(0.0f)};
     float farthestFootX = 1.19f + traits.legSpread + 0.22f * collapse;
     float farthestFootZ = 0.67f + traits.legFan
-        + traits.frontLegReach + 0.5f * traits.strideSpan;
+        + traits.frontLegReach + 0.5f * traits.strideSpan + 0.6f * strike;
     float boundRadius = max(2.15f,
         length(float2(farthestFootX, farthestFootZ)) + 0.30f);
     float bound = raySphere(localOrigin, localDirection,
@@ -509,10 +546,10 @@ SpiderHit traceSpider(float3 origin, float3 direction, float3 centre,
     float pitch = (0.23f * startLift + 0.12f * movementBlend
         * sin(gaitPhase * 2.0f * rangePi - 0.5f))
         * traits.bodyMotion * (1.0f - collapse) - 0.32f * collapse
-        + 0.55f * rear;
+        + 0.55f * rear - 0.42f * strike;
     float sinePitch = sin(pitch), cosinePitch = cos(pitch);
     float3 bodyOrigin = rotateSpiderPitch(
-        localOrigin - float3(0.0f, bodyRise, 0.0f),
+        localOrigin - float3(0.0f, bodyRise, -thrust),
         -sinePitch, cosinePitch);
     float3 bodyDirection = rotateSpiderPitch(
         localDirection, -sinePitch, cosinePitch);
@@ -542,6 +579,19 @@ SpiderHit traceSpider(float3 origin, float3 direction, float3 centre,
             float3(0.16f, 0.15f, 0.19f), 0.04f, 17u);
     }
     acceptSpiderEyes(bodyHit, bodyOrigin, bodyDirection, variant);
+    // Two fangs below the eyes spread wide while the spider rears and snap
+    // shut as it strikes.
+    float gape = saturate(rear);
+    for (uint side = 0u; side < 2u; ++side) {
+        float signX = side == 0u ? -1.0f : 1.0f;
+        float before = bodyHit.distance;
+        acceptSpiderFacetedLeg(bodyHit, bodyOrigin, bodyDirection,
+            float3(signX * 0.12f, -0.08f, -0.66f),
+            float3(signX * (0.05f + 0.13f * gape), -0.33f - 0.05f * gape,
+                -0.80f - 0.06f * gape + 0.04f * strike),
+            0.065f, 0.012f);
+        if (bodyHit.distance < before) bodyHit.material = 19u;
+    }
     if (bodyHit.material != 0u) {
         bodyHit.normal = rotateSpiderPitch(
             bodyHit.normal, sinePitch, cosinePitch);
@@ -559,8 +609,9 @@ SpiderHit traceSpider(float3 origin, float3 direction, float3 centre,
         float signX = side == 0u ? -1.0f : 1.0f;
         for (uint leg = 0u; leg < 3u; ++leg) {
             float z = -0.42f + float(leg) * 0.42f;
-            float forwardReach = leg == 0u
-                ? traits.frontLegReach * reachBlend : 0.0f;
+            float forwardReach = (leg == 0u
+                ? traits.frontLegReach * reachBlend : 0.0f)
+                + strike * (leg == 0u ? 0.55f : (leg == 1u ? 0.18f : 0.0f));
             // Opposite tripods alternate. Local -Z is forward: planted tips
             // sweep rearward as the chassis advances, then lift and reach
             // forward for the next contact.
@@ -584,12 +635,12 @@ SpiderHit traceSpider(float3 origin, float3 direction, float3 centre,
             float3 hip = rotateSpiderPitch(
                 float3(signX * 0.33f, -0.08f, z),
                 sinePitch, cosinePitch)
-                + float3(0.0f, bodyRise, 0.0f);
+                + float3(0.0f, bodyRise, -thrust);
             float fan = (float(leg) - 1.0f) * legFan;
             float3 knee = float3(signX * (0.83f
                     + 0.55f * legSpread + 0.15f * collapse),
                 mix(traits.kneeHeight, -0.10f, collapse)
-                    + lift * 0.35f,
+                    + lift * 0.35f + (leg == 0u ? 0.28f * strike : 0.0f),
                 z + (float(leg) - 1.0f) * 0.13f
                     + fan * 0.5f + stride * 0.5f
                     - forwardReach * 0.45f);
@@ -713,34 +764,6 @@ float2 moveSpider(float2 position, float2 step, uint self,
     return spiderPositionClear(slide, self, game) ? slide : position;
 }
 
-// Coarse navigation: the start room is a hub with a passage and a room along
-// each branch (0 north, 1 east, 2 west). A region is (branch, depth), with
-// depth 0 for the hub, 1 for a passage and 2 for the room beyond it.
-uint2 navRegion(float2 p) {
-    if (p.y < -mainRoomHalfExtent)
-        return uint2(0u, p.y < -outerRoomNear ? 2u : 1u);
-    if (p.x > mainRoomHalfExtent)
-        return uint2(1u, p.x > outerRoomNear ? 2u : 1u);
-    if (p.x < -mainRoomHalfExtent)
-        return uint2(2u, p.x < -outerRoomNear ? 2u : 1u);
-    return uint2(0u, 0u);
-}
-
-// The next point to walk toward: the goal itself in the same region,
-// otherwise just past the boundary into the next region along the route.
-float2 navWaypoint(float2 from, float2 goal) {
-    uint2 a = navRegion(from), b = navRegion(goal);
-    if (a.y == b.y && (a.x == b.x || a.y == 0u)) return goal;
-    uint branch = a.y == 0u ? b.x : a.x;
-    bool inward = a.y != 0u && (a.x != b.x || b.y < a.y);
-    uint nextDepth = inward ? a.y - 1u : a.y + 1u;
-    float boundary = min(a.y, nextDepth) == 0u
-        ? mainRoomHalfExtent : outerRoomNear;
-    float2 axis = branch == 0u ? float2(0.0f, -1.0f)
-        : (branch == 1u ? float2(1.0f, 0.0f) : float2(-1.0f, 0.0f));
-    return axis * (boundary + (inward ? -0.8f : 0.8f));
-}
-
 bool spiderSeesPoint(device const GameState &game, float3 eye,
     float3 target) {
     float3 offset = target - eye;
@@ -786,6 +809,8 @@ void startAmbush(device GameState &game) {
 }
 
 void advanceSpiders(device GameState &game, float dt) {
+    // One route field toward the player serves every hunting spider.
+    npcPathRouteTo(game.paths, game.player.xz);
     for (uint i = 0u; i < ordinaryEnemyCount; ++i) {
         game.enemyClock[i].x = max(game.enemyClock[i].x - dt, 0.0f);
         game.enemyClock[i].z = max(game.enemyClock[i].z - dt, 0.0f);
@@ -831,51 +856,88 @@ void advanceSpiders(device GameState &game, float dt) {
             aware = true;
         }
 
-        // A bite is telegraphed: the spider rears, then strikes whoever is
-        // still within reach. Backing off or a hit avoids it.
+        // A bite is telegraphed: the spider coils and rears with its fangs
+        // spread, then leaps at whoever is still within reach and slams into
+        // them. Backing off or a hit avoids it.
         float attackRange = 1.65f * traits.scale;
+        float pounceRange = attackRange + spiderLungeReach(traits);
         float playerLift = game.player.y - 1.55f - stairHeight(game.player.xz);
         bool busy = game.reaction[i].x > 0.0f || game.reaction[i].w > 0.0f;
+        float2 toPlayerDirection = toPlayer / max(distanceToPlayer, 0.001f);
+        float lungeSpeed = 0.0f;
         if (game.senses[i].w >= 0.0f) {
             float before = game.senses[i].w;
             game.senses[i].w += dt;
-            if (before < biteWindup && game.senses[i].w >= biteWindup
-                && distanceToPlayer <= attackRange * 1.3f && playerLift < 1.2f)
-                damagePlayer(game, 12.0f, game.enemy[i].xz, 0.35f);
-            if (game.senses[i].w >= 0.6f) {
-                game.senses[i].w = -1.0f;
-                game.enemyClock[i].x = 1.2f;
+            float bite = game.senses[i].w;
+            // It rocks back while coiling, then springs forward.
+            if (bite < biteWindup) lungeSpeed = -0.6f * traits.scale;
+            else if (bite < biteWindup + spiderLungeTime)
+                lungeSpeed = spiderLungeReach(traits) / spiderLungeTime;
+            if (before < spiderBiteHit && bite >= spiderBiteHit
+                && distanceToPlayer <= attackRange * 1.35f
+                && playerLift < 1.2f) {
+                damagePlayer(game, 12.0f, game.enemy[i].xz, 0.45f);
+                // The impact shoves the player and jerks the view aside.
+                game.motion.xy += toPlayerDirection * 6.5f;
+                game.recoil.x += 0.05f;
+                game.recoil.y += (i & 1u) == 0u ? 0.06f : -0.06f;
+                game.recoil.w = max(game.recoil.w, 1.0f);
             }
-        } else if (aware && sees && !busy && distanceToPlayer <= attackRange
-            && game.enemyClock[i].x <= 0.0f) {
+            if (bite >= spiderBiteEnd) {
+                game.senses[i].w = -1.0f;
+                game.enemyClock[i].x = 0.5f;
+            }
+        } else if (aware && sees && !busy && distanceToPlayer <= pounceRange
+            && game.enemyClock[i].x <= 0.0f && playerLift < 1.2f) {
             game.senses[i].w = 0.0f;
         }
         bool biting = game.senses[i].w >= 0.0f;
+        bool lunging = game.senses[i].w >= biteWindup;
 
-        // Out of sight, a spider makes for where it last saw the player;
-        // after that it homes on the player's noise.
-        // shortcut: no search pattern or memory timeout; add one if spiders
-        // tracking through walls feels unfair.
-        float2 goal = game.player.xz;
-        if (aware && !sees
-            && distance(game.enemy[i].xz, game.senses[i].xy) > 1.2f)
-            goal = game.senses[i].xy;
-        float2 toWaypoint = navWaypoint(game.enemy[i].xz, goal)
-            - game.enemy[i].xz;
-        float desiredYaw = aware
-            ? (biting || distanceToPlayer <= attackRange
-                || length(toWaypoint) < 0.01f
-                ? atan2(toPlayer.x, -toPlayer.y)
-                : atan2(toWaypoint.x, -toWaypoint.y))
-            : idleYaw(i) + 0.7f * sin(game.effects.x * 0.31f + float(i) * 2.0f);
-        float maximumTurn = aware ? 2.4f : 0.7f;
+        // Steering: straight at the player while in sight with a clear run,
+        // along the path network's route to the player otherwise, and on a
+        // patrol of its home room while unaware.
+        // shortcut: the route leads to the player's true position, so an
+        // aware spider tracks the player through walls; route to the last
+        // known position in senses.xy first if that feels unfair.
+        float4 follower = game.pathFollow[i];
+        bool resting = false;
+        float2 steer = game.player.xz;
+        if (aware) {
+            if (sees && npcPathSegmentClear(game.enemy[i].xz, game.player.xz))
+                npcPathRelease(follower);
+            else
+                steer = npcPathHunt(game.paths, follower, game.enemy[i].xz,
+                    game.player.xz, 1.4f);
+        } else {
+            steer = npcPathPatrol(game.paths, follower, game.enemy[i].xz,
+                1u << (i == ambushSlot ? pathAreaNorth : pathAreaArena),
+                i + 1u, as_type<uint>(game.effects.x), dt, 1.2f, 0.3f,
+                resting);
+        }
+        float2 toSteer = steer - game.enemy[i].xz;
+        bool facingPlayer = aware && (biting
+            || (sees && distanceToPlayer <= pounceRange)
+            || length(toSteer) < 0.01f);
+        float desiredYaw = facingPlayer ? atan2(toPlayer.x, -toPlayer.y)
+            : length(toSteer) >= 0.01f
+                ? atan2(toSteer.x, -toSteer.y)
+                    + (resting ? 0.6f * sin(game.effects.x * 1.7f
+                        + float(i) * 2.0f) : 0.0f)
+                : idleYaw(i) + 0.7f * sin(game.effects.x * 0.31f
+                    + float(i) * 2.0f);
+        // A lunge is committed: it no longer turns to follow a sidestep.
+        if (lunging) desiredYaw = yaw;
+        float maximumTurn = aware ? 5.5f : 2.2f;
+        float headingError = 0.0f;
         if (game.reaction[i].x <= 0.0f) {
             float delta = desiredYaw - yaw;
             float shortestTurn = atan2(sin(delta), cos(delta));
-            float desiredTurnRate = clamp(shortestTurn * 4.0f,
+            headingError = abs(shortestTurn);
+            float desiredTurnRate = clamp(shortestTurn * 6.0f,
                 -maximumTurn, maximumTurn);
             game.gait[i].w = mix(game.gait[i].w, desiredTurnRate,
-                1.0f - exp(-dt * 6.0f));
+                1.0f - exp(-dt * 10.0f));
             float turn = game.gait[i].w * dt;
             if (abs(turn) >= abs(shortestTurn)) {
                 game.enemyClock[i].w = desiredYaw;
@@ -889,12 +951,14 @@ void advanceSpiders(device GameState &game, float dt) {
 
         bool pursuing = aware && !busy && !biting
             && distanceToPlayer > attackRange;
+        bool patrolling = !aware && !resting && length(toSteer) > 0.05f;
+        bool walking = pursuing || patrolling;
         float2 oldPosition = game.enemy[i].xz;
-        float walkBlend = mix(game.gait[i].y, pursuing ? 1.0f : 0.0f,
-            1.0f - exp(-dt * 7.0f));
-        if (pursuing) {
-            // Two smooth, differently timed rhythms give each spider slow
-            // approaches and brief rushes without a walk/pause switch.
+        float walkBlend = mix(game.gait[i].y, walking ? 1.0f : 0.0f,
+            1.0f - exp(-dt * 9.0f));
+        if (walking) {
+            // Two smooth, differently timed rhythms give each spider surges
+            // and brief checks without a walk/pause switch.
             float slot = float(i);
             float slowPace = smoothNoise(float2(
                 game.effects.x * 0.37f + slot * 2.17f,
@@ -902,21 +966,37 @@ void advanceSpiders(device GameState &game, float dt) {
             float quickPace = smoothNoise(float2(
                 game.effects.x * 1.07f + slot * 3.41f,
                 slot * 7.19f + 2.13f));
-            float targetSpeed = spiderChaseSpeed
-                * (0.38f + 0.95f * slowPace + 0.22f * quickPace);
+            float targetSpeed
+                = (pursuing ? spiderChaseSpeed : spiderPatrolSpeed)
+                * (0.75f + 0.45f * slowPace + 0.25f * quickPace);
+            // Slow into sharp turns so bends in the path are followed, not
+            // overshot.
+            targetSpeed *= mix(1.0f, 0.35f,
+                smoothstep(0.4f, 1.6f, headingError));
             float speedResponse = targetSpeed > game.gait[i].z
-                ? 1.8f : 2.8f;
+                ? 4.0f : 6.0f;
             game.gait[i].z = mix(game.gait[i].z, targetSpeed,
                 1.0f - exp(-dt * speedResponse));
             float heading = game.enemyClock[i].w;
-            float2 nextEnemy = oldPosition
-                + float2(sin(heading), -cos(heading))
-                    * min(game.gait[i].z * walkBlend * dt,
-                        distanceToPlayer - attackRange);
+            float step = game.gait[i].z * walkBlend * dt;
+            if (pursuing) step = min(step, distanceToPlayer - attackRange);
             game.enemy[i].xz = moveSpider(oldPosition,
-                nextEnemy - oldPosition, i, game);
+                float2(sin(heading), -cos(heading)) * step, i, game);
+            npcPathProgress(follower,
+                length(game.enemy[i].xz - oldPosition), step, dt);
         } else {
             game.gait[i].z *= exp(-dt * 3.0f);
+        }
+        game.pathFollow[i] = follower;
+        if (lungeSpeed != 0.0f) {
+            // The lunge stops short of the player's body.
+            float heading = game.enemyClock[i].w;
+            float step = lungeSpeed * dt;
+            if (step > 0.0f)
+                step = min(step, max(distanceToPlayer - 0.75f * attackRange,
+                    0.0f));
+            game.enemy[i].xz = moveSpider(game.enemy[i].xz,
+                float2(sin(heading), -cos(heading)) * step, i, game);
         }
         // A hit shoves the spider back along the shot.
         if (game.reaction[i].x > 0.0f)
@@ -926,16 +1006,18 @@ void advanceSpiders(device GameState &game, float dt) {
         float travel = length(game.enemy[i].xz - oldPosition);
         game.gait[i].x = fract(game.gait[i].x
             + 0.6f * travel / (traits.strideSpan * traits.scale));
-        game.gait[i].y = pursuing && travel > 0.0001f
+        game.gait[i].y = walking && travel > 0.0001f
             ? walkBlend
-            : mix(game.gait[i].y, 0.0f, 1.0f - exp(-dt * 7.0f));
+            : mix(game.gait[i].y, lunging ? 1.0f : 0.0f,
+                1.0f - exp(-dt * 7.0f));
         float jumpClock = game.enemyClock[i].y;
         float jumpLift = spiderJumpLift(traits, pursuing, dt, jumpClock);
         game.enemyClock[i].y = jumpClock;
         game.enemy[i].y = stairHeight(game.enemy[i].xz)
             + traits.scale * (0.52f
                 + spiderBodyBob(game.gait[i].x, game.gait[i].y,
-                    traits))
+                    traits)
+                + 0.45f * spiderLungeHop(game, i))
             + jumpLift;
     }
 }

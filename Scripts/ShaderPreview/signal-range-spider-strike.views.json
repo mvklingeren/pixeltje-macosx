@@ -1,0 +1,61 @@
+{
+  "width": 960,
+  "height": 540,
+  "views": [
+    {
+      "name": "front-idle",
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 12, 0] },
+        { "buffer": "game", "offset": 16, "floats": [-0.18] },
+        { "buffer": "game", "offset": 48, "floats": [0, 0.364, 9.6, 2] },
+        { "buffer": "game", "offset": 112, "floats": [0, -0.55, 0, 3.1416] },
+        { "buffer": "game", "offset": 176, "floats": [0.3, 0, 0, 0] },
+        { "buffer": "game", "offset": 1568, "floats": [0, 12, 1, -1] }
+      ]
+    },
+    {
+      "name": "front-coil",
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 12, 0] },
+        { "buffer": "game", "offset": 16, "floats": [-0.18] },
+        { "buffer": "game", "offset": 48, "floats": [0, 0.364, 9.6, 2] },
+        { "buffer": "game", "offset": 112, "floats": [0, -0.55, 0, 3.1416] },
+        { "buffer": "game", "offset": 176, "floats": [0.3, 0, 0, 0] },
+        { "buffer": "game", "offset": 1568, "floats": [0, 12, 1, 0.22] }
+      ]
+    },
+    {
+      "name": "front-strike",
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 12, 0] },
+        { "buffer": "game", "offset": 16, "floats": [-0.18] },
+        { "buffer": "game", "offset": 48, "floats": [0, 0.679, 10.4, 2] },
+        { "buffer": "game", "offset": 112, "floats": [0, -0.55, 0, 3.1416] },
+        { "buffer": "game", "offset": 176, "floats": [0.3, 1, 0, 0] },
+        { "buffer": "game", "offset": 1568, "floats": [0, 12, 1, 0.37] }
+      ]
+    },
+    {
+      "name": "side-coil",
+      "writes": [
+        { "buffer": "game", "floats": [3.2, 0.9, 9.6, -1.5708] },
+        { "buffer": "game", "offset": 16, "floats": [0] },
+        { "buffer": "game", "offset": 48, "floats": [0, 0.364, 9.6, 2] },
+        { "buffer": "game", "offset": 112, "floats": [0, -0.55, 0, 3.1416] },
+        { "buffer": "game", "offset": 176, "floats": [0.3, 0, 0, 0] },
+        { "buffer": "game", "offset": 1568, "floats": [0, 12, 1, 0.22] }
+      ]
+    },
+    {
+      "name": "side-strike",
+      "writes": [
+        { "buffer": "game", "floats": [3.2, 0.9, 9.6, -1.5708] },
+        { "buffer": "game", "offset": 16, "floats": [0] },
+        { "buffer": "game", "offset": 48, "floats": [0, 0.679, 9.6, 2] },
+        { "buffer": "game", "offset": 112, "floats": [0, -0.55, 0, 3.1416] },
+        { "buffer": "game", "offset": 176, "floats": [0.3, 1, 0, 0] },
+        { "buffer": "game", "offset": 1568, "floats": [0, 12, 1, 0.37] }
+      ]
+    }
+  ]
+}
