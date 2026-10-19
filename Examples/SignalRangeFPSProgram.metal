@@ -1289,6 +1289,134 @@ float3 crateTexture(texture2d<float> image, SceneHit hit, float3 direction,
     return mix(paint, float3(0.32f, 0.34f, 0.35f), rivet);
 }
 
+// Coverage of seam lines of half-width `width` every `spacing` metres along
+// coord. Lines narrower than a pixel fade to their average coverage.
+float shellLines(float coord, float spacing, float width, float blur) {
+    float d = (0.5f - abs(fract(coord / spacing) - 0.5f)) * spacing;
+    float line = 1.0f - smoothstep(width - blur, width + blur, d);
+    return mix(line, min(2.0f * width / spacing, 1.0f),
+        saturate(2.0f * blur / spacing));
+}
+
+// The base's outer shell, built like a surface station: a dark concrete
+// plinth, warm grey cladding panels of slightly varied tone between steel
+// ribs, ribbon windows lit from inside, a burnt-orange band under a steel
+// coping, steel corner columns and hazard stripes around the exit. The
+// cladding stays near the highlands' albedo so the low sun does not blow it
+// out to white, and regolith dusts the lowest metre.
+SurfaceMaterial shellMaterial(SceneHit hit, float pixelWidth) {
+    float3 p = hit.position;
+    float3 n = hit.normal;
+    float blur = max(pixelWidth, 0.004f);
+    const float3 steel = float3(0.105f, 0.11f, 0.118f);
+    const float3 regolith = float3(0.15f, 0.142f, 0.132f);
+    float dustNoise = smoothNoise(p.xz * 1.7f + p.y * 0.6f);
+    float dust = (1.0f - smoothstep(0.1f, 1.2f + 0.6f * dustNoise, p.y))
+        * 0.75f;
+
+    if (n.y > 0.5f) {
+        if (p.y < 1.0f) return {mix(steel, regolith, 0.5f), 0.5f, 0.4f,
+            float3(0.0f)};
+        // Roof: a dark membrane laid in bays, with drifted regolith.
+        float joint = max(shellLines(p.x, 6.0f, 0.06f, blur),
+            shellLines(p.z, 6.0f, 0.06f, blur));
+        float3 membrane = float3(0.075f, 0.074f, 0.072f)
+            * (0.85f + 0.3f * smoothNoise(p.xz * 0.35f));
+        membrane = mix(membrane, steel * 0.8f, joint);
+        return {mix(membrane, regolith,
+            0.35f * smoothNoise(p.xz * 0.08f + 3.0f)), 0.75f, 0.05f,
+            float3(0.0f)};
+    }
+
+    bool alongX = abs(n.z) > 0.5f;
+    float s = alongX ? p.x : p.z;
+    bool southFace = n.z > 0.5f && p.z > hullSouth - 0.4f;
+    // The exit's jambs and lintel stand proud of the shell; their inner
+    // faces and the faces turned into the arena are bare steel.
+    if (p.z > hullSouth - 0.4f && abs(p.x) < 2.95f && p.y < 3.95f
+        && !southFace)
+        return {steel, 0.45f, 0.55f, float3(0.0f)};
+    if (southFace && abs(p.x) < 3.5f && p.y < 4.5f) {
+        float stripe = step(0.5f, fract((p.x * sign(p.x) + p.y) / 0.6f));
+        stripe = mix(stripe, 0.5f, saturate(2.0f * blur / 0.6f));
+        float3 hazard = mix(float3(0.03f, 0.028f, 0.025f),
+            float3(0.42f, 0.30f, 0.035f), stripe);
+        return {mix(hazard, regolith, dust * 0.6f), 0.55f, 0.0f,
+            float3(0.0f)};
+    }
+
+    float top = p.z > hullRearUpper.z + 0.05f
+        ? hullFrontUpper.y : hullRearUpper.y;
+    float corner = alongX ? hullHalfWidth - abs(p.x)
+        : min(hullSouth - p.z, p.z - hullNorth);
+    // The tall block steps up behind the low one.
+    if (!alongX && p.y > hullFrontUpper.y)
+        corner = min(corner, abs(p.z - hullRearUpper.z));
+    if (corner < 0.7f || p.y > top - 0.45f) {
+        float bolts = shellLines(p.y, 0.9f, 0.05f, blur);
+        return {mix(steel, steel * 0.6f, bolts * 0.5f), 0.42f, 0.6f,
+            float3(0.0f)};
+    }
+    if (p.y < 0.9f) {
+        float3 concrete = float3(0.105f, 0.101f, 0.096f)
+            * (0.8f + 0.35f * smoothNoise(float2(s, p.y) * 2.3f));
+        return {mix(concrete, regolith, dust), 0.9f, 0.0f, float3(0.0f)};
+    }
+    // Steel ribs every 12 m, offset so none crosses the exit.
+    float rib = shellLines(s + 6.0f, 12.0f, 0.22f, blur);
+    if (rib > 0.5f) return {mix(steel, regolith, dust), 0.42f, 0.6f,
+        float3(0.0f)};
+    if (p.y > top - 1.65f && p.y < top - 1.2f)
+        return {mix(float3(0.30f, 0.105f, 0.035f), regolith, dust),
+            0.55f, 0.05f, float3(0.0f)};
+
+    // Ribbon windows: three per bay, one row on the low block and two on
+    // the tall one, clear of the exit.
+    float row = p.y - 3.4f;
+    float rowIndex = floor(row / 7.0f);
+    float rowLocal = row - rowIndex * 7.0f;
+    float bayLocal = fract((s + 6.0f) / 4.0f) * 4.0f;
+    bool window = row >= 0.0f && rowLocal < 1.0f && p.y < top - 2.2f
+        && bayLocal > 0.45f && bayLocal < 3.55f
+        && !(southFace && abs(p.x) < 6.5f);
+    if (window) {
+        float2 inset = float2(min(bayLocal - 0.45f, 3.55f - bayLocal),
+            min(rowLocal, 1.0f - rowLocal));
+        float frame = 1.0f - smoothstep(0.07f - blur, 0.07f + blur,
+            min(inset.x, inset.y));
+        float face = alongX ? (n.z > 0.0f ? 1.0f : 2.0f)
+            : (n.x > 0.0f ? 3.0f : 4.0f);
+        float pick = hashTile(float2(floor((s + 6.0f) / 4.0f),
+            rowIndex + 17.0f * face));
+        float3 glow = pick < 0.35f ? float3(1.0f, 0.72f, 0.42f) * 0.32f
+            : (pick < 0.5f ? float3(0.62f, 0.8f, 1.0f) * 0.22f : float3(0.0f));
+        // Blinds and room depth vary the glow across the pane.
+        glow *= 0.7f + 0.3f * smoothNoise(float2(s * 1.3f, rowLocal * 3.0f));
+        return {mix(float3(0.018f, 0.022f, 0.028f), steel * 0.7f, frame),
+            mix(0.08f, 0.45f, frame), mix(0.0f, 0.6f, frame),
+            glow * (1.0f - frame)};
+    }
+
+    // Cladding: 3 m by 1.5 m panels of slightly varied tone, darker seams,
+    // and faint dust stains running down from the window sills.
+    float2 panelCell = floor(float2(s / 3.0f, p.y / 1.5f));
+    float tone = 0.86f + 0.24f * hashTile(panelCell
+        + float2(alongX ? 0.0f : 53.0f, 0.0f));
+    float3 cladding = float3(0.27f, 0.262f, 0.25f) * tone;
+    float seam = max(shellLines(s, 3.0f, 0.025f, blur),
+        shellLines(p.y, 1.5f, 0.025f, blur));
+    float below = row < 0.0f ? -row : 7.0f - rowLocal;
+    bool underWindow = p.y + below < top - 2.2f
+        && bayLocal > 0.45f && bayLocal < 3.55f;
+    float streak = underWindow && below < 2.2f
+        ? (1.0f - below / 2.2f) * smoothstep(0.55f, 0.9f,
+            smoothNoise(float2(s * 2.5f, 0.0f)))
+        : 0.0f;
+    cladding *= 1.0f - 0.28f * streak;
+    cladding = mix(cladding, cladding * 0.35f, seam);
+    return {mix(cladding, regolith, dust), 0.5f, 0.1f, float3(0.0f)};
+}
+
 SurfaceMaterial surfaceMaterial(SceneHit hit,
     texture2d<float> crateA, texture2d<float> crateB,
     float3 furPosition, float time, float3 direction, float pixelWidth) {
@@ -1491,18 +1619,7 @@ SurfaceMaterial surfaceMaterial(SceneHit hit,
         return {mix(soil, stone, rock), mix(0.97f, 0.8f, rock), 0.0f,
             float3(0.0f)};
     }
-    if (hit.material == 41u) {
-        // Pale shell panels, dusted with regolith near the ground.
-        float2 uv = abs(hit.normal.x) > 0.5f ? hit.position.zy
-            : (abs(hit.normal.z) > 0.5f ? hit.position.xy : hit.position.xz);
-        float2 seam = abs(fract(uv * float2(0.25f, 0.4f)) - 0.5f);
-        float panel = 1.0f - 0.55f * smoothstep(0.47f, 0.49f,
-            max(seam.x, seam.y));
-        float dust = 1.0f - smoothstep(0.0f, 1.4f, hit.position.y);
-        return {mix(float3(0.50f, 0.51f, 0.52f) * panel,
-            float3(0.16f, 0.155f, 0.15f), dust * 0.7f),
-            0.55f, 0.15f, float3(0.0f)};
-    }
+    if (hit.material == 41u) return shellMaterial(hit, pixelWidth);
     if (hit.material == 42u) return {
         float3(0.05f), 0.4f, 0.0f, float3(0.10f, 1.6f, 0.45f)};
     if (hit.material == 5u || hit.material == 15u
@@ -2293,8 +2410,9 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     // Room lights stay indoors; the sun lights the shell and the moon.
     bool exterior = hit.material == 40u || hit.material == 41u;
     // The moon has no sky light, only sunlight bounced off the plain, which
-    // reaches slopes and boulder sides more than ground facing the sky.
-    float3 ambient = hit.material == 40u
+    // reaches slopes, boulder sides and the shell's walls more than ground
+    // or roofs facing the sky.
+    float3 ambient = exterior
         ? float3(1.0f, 0.97f, 0.92f) * (0.006f + 0.05f * (1.0f - hit.normal.y))
         : float3(0.030f, 0.038f, 0.046f);
     float3 color = material.emission
