@@ -3,12 +3,14 @@
 //
 // Each building lives in its own file and builds itself with the parts of
 // HauntedBuildingKit.metal into its own site; site 0 is the Victorian house
-// of HauntedHouse.metal. The program includes the kit first, then each
-// building, then this file, and calls only the functions here for what
-// every building shares: the scene traces, the Earth's shadows, the glass,
-// footing, obstacles, the levelled ground and the doors a visitor can knock
-// on. A building's own lights,
-// rooms and haunting stay in its file.
+// of HauntedHouse.metal. HauntedStreet.metal lays the road and drives
+// between them, copies the cottage, the barn and the shed along it and
+// puts up its lamps. The program includes the kit first, then each
+// building and the street, then this file, and calls only the functions
+// here for what every building shares: the scene traces, the Earth's
+// shadows, the glass, footing, obstacles, the levelled ground, the paving,
+// the lights outside and the doors a visitor can knock on. A building's own
+// lights, rooms and haunting stay in its file.
 //
 // The traces loop over groups, never over buildings, so a new building adds
 // parts rather than code to the kernels that trace the scene. Footing and
@@ -19,7 +21,8 @@
 // ---------------------------------------------------------------- building
 
 // Runs once in the initialize pass: the house with its graveyards and
-// their mausoleums as site 0, then the shed yard behind it.
+// their mausoleums as site 0, the shed yard behind it and the cottage, then
+// the street's copies of them and its lamps.
 void buildBuildings(device HouseModel &house) {
     house.counts = uint4(0u);
     beginBuildingSite(house);
@@ -27,6 +30,7 @@ void buildBuildings(device HouseModel &house) {
     buildMausoleums(house);
     buildShedYard(house);
     buildCottage(house);
+    buildStreet(house);
 }
 
 // ----------------------------------------------------------------- tracing
@@ -143,35 +147,64 @@ float buildingsGlassCrossing(float3 origin, float3 direction, float limit,
 
 // ------------------------------------------------------------------ ground
 
-// Weight of the natural terrain at p: 0 on a building's levelled ground,
-// rising to 1 away from it.
+// Weight of the natural terrain at p: 0 on a building's levelled ground and
+// under the street, rising to 1 away from them.
 float buildingsGroundBlend(float2 p) {
-    return houseLotBlend(p) * shedYardBlend(p) * cottageGroundBlend(p);
+    return houseLotBlend(p) * shedYardBlend(p) * cottageGroundBlend(p)
+        * streetGroundBlend(p);
 }
 
-// The terrain height h at p, levelled under the buildings.
+// The terrain height h at p, graded under the street and levelled under the
+// buildings.
 float buildingsGround(float2 p, float h) {
+    h = streetGround(p, h);
     h = mix(houseOrigin.y, h, houseLotBlend(p));
     h = mix(shedYardOrigin.y, h, shedYardBlend(p));
     return mix(cottageOrigin.y, h, cottageGroundBlend(p));
 }
 
-// The flagstone paths: the house's, and the cottage's branch from it.
+// The flagstone paths: the house's, and the aisles of its graveyards.
 float3 buildingsPath(float2 p, float blur) {
-    float3 path = housePath(p, blur);
-    return path.x > 0.0f ? path : cottagePath(p, blur);
+    return housePath(p, blur);
 }
 
-// The lanterns outside: the house's, then the cottage's porch lantern.
-// They go out while the house is haunted.
-constant uint buildingsOutdoorLightCount = houseOutdoorLightCount + 1u;
+// The asphalt of the road and the drives under p: its colour, and how much
+// of the ground it covers.
+float4 buildingsPaving(float2 p, float blur) {
+    return streetPaving(p, blur);
+}
+
+// 0 to 1: how much of p is paved. The plain's fine relief stays off it.
+float buildingsPaved(float2 p) {
+    return streetPaved(p);
+}
+
+// The lanterns outside: the house's, then the porch lanterns of the cottage
+// and its copies. They go out while the house is haunted.
+constant uint buildingsOutdoorLightCount = houseOutdoorLightCount
+    + streetCottageCount;
 
 PointLight buildingsOutdoorLight(uint index, device const GameState &game) {
     if (index < houseOutdoorLightCount)
         return houseHauntedOutdoorLight(index, game);
-    PointLight light = cottageLanternLight(game.effects.x);
+    PointLight light = streetCottageLantern(index - houseOutdoorLightCount,
+        game.effects.x);
     light.power *= houseHaunting(game).dim;
     return light;
+}
+
+// The street lamps, too many to light every point: only those from x up to
+// y can reach p, and each reaches buildingsStreetLampReach. dim is the
+// haunting's.
+constant float buildingsStreetLampReach = streetLampReach;
+
+uint2 buildingsStreetLampsNear(float3 p) {
+    return streetLampsNear(p);
+}
+
+PointLight buildingsStreetLamp(uint index, device const GameState &game,
+    float dim) {
+    return streetLampLight(index, game, dim);
 }
 
 // The floor, deck, step or stair under p, or ground where there is none.
@@ -182,7 +215,8 @@ float buildingsStand(float2 p, float ground) {
 // True where a wall, post, fence, grave or piece of furniture keeps the
 // walker out, padded by the walker's reach. Each site keeps a table of
 // footprints in its own frame; the site under p picks the table, so one
-// loop serves them all.
+// loop serves them all. Off every site, the street's lamp posts and its
+// copies of the buildings.
 bool buildingsBlocked(float2 p) {
     float2 local;
     float pad;
@@ -206,7 +240,14 @@ bool buildingsBlocked(float2 p) {
         footprints = cottageObstacles;
         count = cottageObstacleCount;
     } else {
-        return false;
+        // The street: its lamp posts, then the copies' footprints, worked
+        // out from their originals' tables as the program compiles.
+        if (streetLampBlocked(p, housePlayerPad)) return true;
+        if (!streetNearProperties(p)) return false;
+        local = p;
+        pad = housePlayerPad;
+        footprints = streetObstacles;
+        count = streetObstacleCount;
     }
     for (uint i = 0u; i < count; ++i) {
         float4 r = footprints[i];

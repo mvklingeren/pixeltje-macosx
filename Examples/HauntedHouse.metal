@@ -2029,10 +2029,12 @@ SurfaceMaterial houseGraveMaterial(device const HousePart &part, float3 p,
         stone *= (0.85f + 0.3f * hashTile(float2(floor(along / 0.7f), course)))
             * (1.0f - 0.55f * mortar);
         // A line over the tomb's door, or the one a mausoleum's part
-        // carries.
+        // carries on its front: the -z face, or the +z face of a copy
+        // turned about, which marks the line's part with a negative w.
         float centre = 0.5f * (part.lower.x + part.upper.x);
         bool carved = part.rows.z > 0.0f;
-        if (n.z < -0.9f && (carved || (part.upper.x - part.lower.x > 2.0f
+        float front = part.rows.w < -0.5f ? 1.0f : -1.0f;
+        if (n.z * front > 0.9f && (carved || (part.upper.x - part.lower.x > 2.0f
                 && height > 2.42f && height < 2.66f && part.rows.w > 0.5f)))
             stone *= 1.0f - 0.6f * houseLettering(float2(p.x - centre,
                 carved ? p.y - part.lower.y - part.rows.x : height - 2.54f),
@@ -2339,6 +2341,8 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
     if (style == houseGrave)
         return houseGraveMaterial(part, p, n, blur, mood, time);
     if (style == houseCorrugated) return houseCorrugatedMaterial(p, n, blur);
+    if (style == houseCastIron || style == houseCastIronRod)
+        return houseCastIronMaterial(p, n, blur);
 
     if (style == houseRoof) {
         if (n.y < -0.5f) {
@@ -2602,7 +2606,9 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
         float2 rim = min(face, 1.0f - face);
         if (abs(n.y) > 0.5f || rim.x < 0.12f || rim.y < 0.1f)
             return {iron, 0.5f, 0.6f, float3(0.0f)};
-        float level = houseFlicker(time, part.lower.x, 0.12f) * mood.dim;
+        // rows.w brightens a lantern; it is 1 unless its builder sets it.
+        float level = houseFlicker(time, part.lower.x, 0.12f) * mood.dim
+            * part.rows.w;
         return {float3(0.05f, 0.04f, 0.03f), 0.2f, 0.0f,
             float3(1.0f, 0.62f, 0.28f) * 1.4f * level};
     }

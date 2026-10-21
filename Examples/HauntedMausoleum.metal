@@ -24,10 +24,15 @@ constant float mausoleumHalfSpan = 2.95f;       // the pediment's
 constant float mausoleumPedimentRise = 1.4f;
 
 // The footprint's lower and upper corners in x and z: from the bottom step
-// to the back of the plinth.
+// to the back of the plinth. The street's copies use it as their table of
+// obstacles.
+constant uint mausoleumObstacleCount = 1u;
+constant float4 mausoleumObstacles[mausoleumObstacleCount] = {
+    float4(-3.2f, mausoleumPlinthFront
+        - mausoleumStepRun * float(mausoleumStepCount), 3.2f, 5.7f)};
+
 float4 mausoleumFootprint() {
-    return float4(-3.2f, mausoleumPlinthFront
-        - mausoleumStepRun * float(mausoleumStepCount), 3.2f, 5.7f);
+    return mausoleumObstacles[0];
 }
 
 // Limestone without the small tomb's lettering. Engraved parts set rows to
@@ -145,7 +150,8 @@ void addMausoleum(device HouseModel &house, float3 o) {
     }
 }
 
-// A mausoleum at the back of each plot, each traced as a group of its own.
+// A mausoleum at the back of each plot, each traced as a group of its own:
+// the last two groups of the house's site, the west plot's first.
 void buildMausoleums(device HouseModel &house) {
     for (uint plot = 0u; plot < 2u; ++plot) {
         beginHouseGroup(house);

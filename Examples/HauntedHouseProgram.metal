@@ -12,7 +12,9 @@ using namespace metal;
 // quadcopter drones hover and fire back with laser rifles once shot at. The
 // sun has set: a full Earth lights the plain, and a flagstone path leads
 // from the exit to a procedurally built Victorian haunted house whose ground
-// floor is open. The player starts outside on that path, facing the house.
+// floor is open. An asphalt street lit by lantern posts crosses the path,
+// with smaller copies of the cottage, barn and shed along it. The player
+// starts outside on that path, facing the house.
 // The hand, pistol, double-barrel shotgun and launcher are on keys 1 to 4
 // everywhere; the hand punches, and knocks on doors. enableDrones and
 // renderBase below switch the drones and the drawn base off for now.
@@ -258,7 +260,7 @@ struct HouseGroup {
     uint4 last;             // the last group these bounds enclose, unused
 };
 
-constant uint houseCapacity = 1024u;
+constant uint houseCapacity = 1280u;
 constant uint houseGroupCapacity = 64u;
 constant uint buildingSiteCapacity = 8u;
 
@@ -455,6 +457,7 @@ PointLight roomLight(uint index, float time) {
 #include "HauntedMausoleum.metal"
 #include "HauntedShed.metal"
 #include "HauntedCottage.metal"
+#include "HauntedStreet.metal"
 #include "HauntedBuildings.metal"
 
 float stairHeight(float2 point);
@@ -1915,8 +1918,10 @@ void traceOutside(thread SceneHit &hit, float3 origin, float3 direction,
     if (t < 0.0f) return;
     float3 p = origin + direction * t;
     float epsilon = 0.02f + 0.002f * t;
-    // Fine relief fades out before it shrinks below a pixel and aliases.
-    float grain = 1.0f - smoothstep(0.06f, 0.2f, epsilon);
+    // Fine relief fades out before it shrinks below a pixel and aliases,
+    // and stays off the street's asphalt.
+    float grain = (1.0f - smoothstep(0.06f, 0.2f, epsilon))
+        * (1.0f - buildingsPaved(p.xz));
     hit = {t, pixeltje_terrain::normal(MoonSurface{moonShadeDetail, grain},
         p.xz, epsilon), p, 40u, -1, 0u};
 }
@@ -2422,6 +2427,13 @@ SurfaceMaterial surfaceMaterial(SceneHit hit,
             ground = mix(soil * 0.8f, flag, path.y);
             rock = 0.0f;
         }
+        // The street's asphalt, over the flagstones where the road crosses
+        // the path, and dusted with soil at its edges.
+        float4 paving = buildingsPaving(p, pixelWidth);
+        if (paving.w > 0.0f) {
+            ground = mix(ground, paving.xyz, paving.w);
+            rock *= 1.0f - paving.w;
+        }
         return {ground, mix(0.97f, 0.8f, rock), 0.0f, float3(0.0f)};
     }
     if (hit.material == 41u) return shellMaterial(hit, pixelWidth);
@@ -2640,8 +2652,9 @@ float3 houseGhostLighting(SceneHit hit, SurfaceMaterial material,
     return shadePointLight(hit, material, viewDirection, ghost, chrome, game);
 }
 
-// The haunted buildings' lanterns light what is near them outside. They cast
-// no shadows; the house's own walls face away from them.
+// The haunted buildings' lanterns and the street lamps light what is near
+// them outside. They cast no shadows; the house's own walls face away from
+// them.
 float3 houseOutdoorLighting(SceneHit hit, SurfaceMaterial material,
     float3 viewDirection, ChromePose chrome, device const GameState &game) {
     float3 color = float3(0.0f);
@@ -2649,6 +2662,18 @@ float3 houseOutdoorLighting(SceneHit hit, SurfaceMaterial material,
         PointLight light = buildingsOutdoorLight(i, game);
         float reach = distance(light.position, hit.position)
             / (16.0f * houseScale);
+        if (reach >= 1.0f) continue;
+        float window = 1.0f - reach * reach * reach * reach;
+        light.power *= window * window;
+        color += shadePointLight(hit, material, viewDirection, light, chrome,
+            game);
+    }
+    uint2 lamps = buildingsStreetLampsNear(hit.position);
+    float dim = lamps.y > lamps.x ? houseHaunting(game).dim : 0.0f;
+    for (uint i = lamps.x; i < lamps.y; ++i) {
+        PointLight light = buildingsStreetLamp(i, game, dim);
+        float reach = distance(light.position, hit.position)
+            / buildingsStreetLampReach;
         if (reach >= 1.0f) continue;
         float window = 1.0f - reach * reach * reach * reach;
         light.power *= window * window;

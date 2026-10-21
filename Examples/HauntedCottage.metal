@@ -1,6 +1,6 @@
-// The cottage for HauntedHouseProgram.metal: a smaller haunted house beside
-// the flagstone path from the base, west of it and halfway to the big
-// house, on a branch path of its own.
+// The cottage for HauntedHouseProgram.metal: a smaller haunted house west
+// of the flagstone path from the base, halfway to the big house, across a
+// short drive from the street.
 //
 // A storey and a half under a steep slate roof whose gable ends jut out
 // over the walls, with a catslide lean-to down its back, a dormer in its
@@ -55,21 +55,6 @@ PointLight cottageLanternLight(float time) {
     return {cottageOrigin + cottageLantern - float3(0.0f, 0.1f, 0.0f),
         float3(1.0f, 0.6f, 0.27f), 150.0f * houseFlicker(time, 7.0f, 0.15f),
         false};
-}
-
-// The branch path from the flagstone path to the cottage's step, as
-// housePath measures it.
-float3 cottagePath(float2 p, float blur) {
-    const float2 from = float2(-1.2f, 46.0f);
-    float2 to = cottageOrigin.xz + float2(0.0f, -4.8f);
-    float2 along = normalize(to - from);
-    float2 offset = p - from;
-    float2 metres = float2(dot(offset, float2(-along.y, along.x)),
-        dot(offset, along));
-    if (metres.y < 0.0f || metres.y > distance(from, to)
-        || abs(metres.x) > 1.05f + 0.12f * smoothNoise(p * 1.7f))
-        return float3(0.0f);
-    return houseFlagstones(metres, blur);
 }
 
 // A box in the cottage's frame.

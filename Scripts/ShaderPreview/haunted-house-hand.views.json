@@ -29,7 +29,7 @@
         { "buffer": "game", "offset": 16, "floats": [-0.05] },
         { "buffer": "game", "offset": 560, "floats": [100] },
         { "buffer": "game", "offset": 8768, "floats": [3, 1, 2, 0] },
-        { "buffer": "game", "offset": 143936, "floats": [-100, 0, 0, 0] }
+        { "buffer": "game", "offset": 176704, "floats": [-100, 0, 0, 0] }
       ]
     },
     {
@@ -40,7 +40,7 @@
         { "buffer": "game", "offset": 16, "floats": [-0.05] },
         { "buffer": "game", "offset": 560, "floats": [100] },
         { "buffer": "game", "offset": 8768, "floats": [3, 1, 2, 0] },
-        { "buffer": "game", "offset": 143936, "floats": [99.9, 0, 1, 0] }
+        { "buffer": "game", "offset": 176704, "floats": [99.9, 0, 1, 0] }
       ]
     },
     {
@@ -51,7 +51,7 @@
         { "buffer": "game", "offset": 16, "floats": [-0.05] },
         { "buffer": "game", "offset": 560, "floats": [100] },
         { "buffer": "game", "offset": 8768, "floats": [3, 1, 2, 0] },
-        { "buffer": "game", "offset": 143936, "floats": [99.78, 0, 1, 0] }
+        { "buffer": "game", "offset": 176704, "floats": [99.78, 0, 1, 0] }
       ]
     },
     {
@@ -62,7 +62,7 @@
         { "buffer": "game", "offset": 16, "floats": [-0.05] },
         { "buffer": "game", "offset": 560, "floats": [100] },
         { "buffer": "game", "offset": 8768, "floats": [3, 1, 2, 0] },
-        { "buffer": "game", "offset": 143936, "floats": [-100, 0, 0, 2] }
+        { "buffer": "game", "offset": 176704, "floats": [-100, 0, 0, 2] }
       ]
     },
     {
@@ -73,7 +73,7 @@
         { "buffer": "game", "offset": 16, "floats": [-0.05] },
         { "buffer": "game", "offset": 560, "floats": [100] },
         { "buffer": "game", "offset": 8768, "floats": [3, 1, 2, 0] },
-        { "buffer": "game", "offset": 143936, "floats": [99.64, 1, 2, 0] }
+        { "buffer": "game", "offset": 176704, "floats": [99.64, 1, 2, 0] }
       ]
     },
     {
@@ -84,7 +84,7 @@
         { "buffer": "game", "offset": 16, "floats": [-0.05] },
         { "buffer": "game", "offset": 560, "floats": [100] },
         { "buffer": "game", "offset": 8768, "floats": [3, 1, 2, 0] },
-        { "buffer": "game", "offset": 143936, "floats": [99.72, 1, 1, 0] }
+        { "buffer": "game", "offset": 176704, "floats": [99.72, 1, 1, 0] }
       ]
     },
     {
@@ -95,7 +95,7 @@
         { "buffer": "game", "offset": 16, "floats": [-0.05] },
         { "buffer": "game", "offset": 560, "floats": [100] },
         { "buffer": "game", "offset": 8768, "floats": [3, 1, 2, 0] },
-        { "buffer": "game", "offset": 143936, "floats": [-100, 0, 0, 3] }
+        { "buffer": "game", "offset": 176704, "floats": [-100, 0, 0, 3] }
       ]
     },
     {
@@ -125,7 +125,7 @@
         { "buffer": "game", "offset": 16, "floats": [-0.05] },
         { "buffer": "game", "offset": 560, "floats": [100] },
         { "buffer": "game", "offset": 8768, "floats": [3, 1, 2, 0] },
-        { "buffer": "game", "offset": 143936, "floats": [-100, 0, 0, 1] }
+        { "buffer": "game", "offset": 176704, "floats": [-100, 0, 0, 1] }
       ]
     }
   ]

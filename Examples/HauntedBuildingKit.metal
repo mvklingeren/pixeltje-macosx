@@ -3,12 +3,12 @@
 //
 // A building is written once, in the initialize pass, into the game
 // buffer's HouseModel as convex parts: boxes, some cut by up to four planes
-// into gables, hips, spires and sloping boards, and round logs. Parts are
-// gathered into groups, and groups into building sites. A ray tests a
-// group's parts only when it enters the group's bounds, and a site's first
-// group bounds the whole site, so a ray that misses it skips every group of
-// that site. Adding a building therefore adds parts, not code, to the scene
-// traces in HauntedBuildings.metal.
+// into gables, hips, spires and sloping boards, and round logs and
+// cast-iron rods. Parts are gathered into groups, and groups into building
+// sites. A ray tests a group's parts only when it enters the group's
+// bounds, and a site's first group bounds the whole site, so a ray that
+// misses it skips every group of that site. Adding a building therefore
+// adds parts, not code, to the scene traces in HauntedBuildings.metal.
 //
 // A part's style picks its shading: clapboard, battens, slate, trim,
 // stone, brick, cut-out iron and the rest. Styles are shared, so a new
@@ -40,7 +40,9 @@ constant uint houseTimber = 13u;    // a board or beam from addHouseBoard
 constant uint houseLog = 14u;       // a round log from addHouseLog
 constant uint houseGrave = 15u;     // headstones, the tomb, the mausoleums
 constant uint houseCorrugated = 16u; // rusted corrugated iron: shed roofs
-constant uint houseStyleCount = 17u;
+constant uint houseCastIron = 17u;  // rusted cast iron: lamp caps and bases
+constant uint houseCastIronRod = 18u; // a round cast-iron rod from addHouseRod
+constant uint houseStyleCount = 19u;
 
 bool houseMaterial(uint material) {
     return material >= houseMaterialBase
@@ -249,20 +251,34 @@ void addHouseBoard(device HouseModel &house, float3 centre, float3 along,
     addHouseWorldPart(house, part);
 }
 
-// A round log along any direction.
-void addHouseLog(device HouseModel &house, float3 centre, float3 along,
-    float halfLength, float radius) {
+// A round part along any direction: a log, or a cast-iron rod.
+HousePart houseRound(float3 centre, float3 along, float halfLength,
+    float radius, uint style) {
     float3 a = normalize(along);
     float3 reach = abs(a) * halfLength
         + sqrt(max(1.0f - a * a, float3(0.0f))) * radius;
-    HousePart part = houseBox(centre - reach, centre + reach, houseLog);
+    HousePart part = houseBox(centre - reach, centre + reach, style);
     part.windows = float4(a, halfLength);
     part.rows = float4(centre, radius);
-    addHouseWorldPart(house, part);
+    return part;
 }
 
-// Entry distance of a ray into a log, or -1. A ray that starts inside the
-// log misses it, as with every other part.
+void addHouseLog(device HouseModel &house, float3 centre, float3 along,
+    float halfLength, float radius) {
+    addHouseWorldPart(house, houseRound(centre, along, halfLength, radius,
+        houseLog));
+}
+
+// A cast-iron rod from one point to another. It runs on past both by half
+// its radius, so the rods of a bent bar meet without a gap.
+void addHouseRod(device HouseModel &house, float3 from, float3 to,
+    float radius) {
+    addHouseWorldPart(house, houseRound(0.5f * (from + to), to - from,
+        0.5f * (distance(from, to) + radius), radius, houseCastIronRod));
+}
+
+// Entry distance of a ray into a log or a rod, or -1. A ray that starts
+// inside it misses it, as with every other part.
 float houseLogHit(device const HousePart &part, float3 origin,
     float3 direction, float limit, thread float3 &normal) {
     float3 a = part.windows.xyz;
@@ -355,11 +371,12 @@ float housePartHit(device const HousePart &part, float3 origin,
     return entry > 1.0e-4f && entry < exit ? entry : -1.0f;
 }
 
-// Entry distance into any part: logs are round, everything else is a cut
-// box.
+// Entry distance into any part: logs and rods are round, everything else is
+// a cut box.
 float houseHitPart(device const HousePart &part, float3 origin,
     float3 direction, float limit, thread float3 &normal) {
-    return uint(part.lower.w) == houseLog
+    uint style = uint(part.lower.w);
+    return style == houseLog || style == houseCastIronRod
         ? houseLogHit(part, origin, direction, limit, normal)
         : housePartHit(part, origin, direction, limit, normal);
 }
@@ -556,6 +573,20 @@ SurfaceMaterial houseCorrugatedMaterial(float3 p, float3 n, float blur) {
         float3(0.095f, 0.042f, 0.022f), rust) * (0.75f + 0.35f * rib)
         * (1.0f - 0.35f * lap);
     return {albedo, mix(0.55f, 0.9f, rust), 0.3f * (1.0f - rust),
+        float3(0.0f)};
+}
+
+// Cast iron gone to rust: a brown-black skin flaking to orange-brown rust in
+// blotches, flecked finely until the flecks are smaller than a pixel.
+SurfaceMaterial houseCastIronMaterial(float3 p, float3 n, float blur) {
+    float2 q = abs(n.y) > 0.7f ? p.xz : float2(p.x + p.z, p.y);
+    float rust = smoothstep(0.35f, 0.75f, 0.6f * smoothNoise(q * 7.0f)
+        + 0.4f * smoothNoise(q * 29.0f + 3.1f));
+    float fleck = (hashTile(floor(q * 260.0f)) - 0.5f)
+        * (1.0f - saturate(blur / 0.006f));
+    float3 albedo = mix(float3(0.032f, 0.024f, 0.019f),
+        float3(0.11f, 0.05f, 0.024f), rust) * (1.0f + 0.6f * fleck);
+    return {albedo, mix(0.5f, 0.85f, rust), 0.4f * (1.0f - rust),
         float3(0.0f)};
 }
 
