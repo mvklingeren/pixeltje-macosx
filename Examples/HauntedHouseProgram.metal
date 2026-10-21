@@ -103,7 +103,7 @@ constant uint effectAberration = 4u;
 // `lensAperture` pixels with the lens focused at infinity, and no blur grows
 // past `lensMaxBlur`. Autofocus eases toward the crosshair at `lensFocusRate`
 // per second, measured in inverse distance as a focus ring turns.
-constant float lensAperture = 30.0f;
+constant float lensAperture = 60.0f;
 constant float lensMaxBlur = 10.0f;
 constant float lensFocusRate = 8.0f;
 // Sentry turrets guard the east, west and north rooms. Each stands on a
