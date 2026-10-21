@@ -12,8 +12,10 @@ using namespace metal;
 // quadcopter drones hover and fire back with laser rifles once shot at. The
 // sun has set: a full Earth lights the plain, and a flagstone path leads
 // from the exit to a procedurally built Victorian haunted house whose ground
-// floor is open. The hand, pistol, double-barrel shotgun and launcher are
-// on keys 1 to 4 everywhere; the hand punches, and knocks on doors.
+// floor is open. The player starts outside on that path, facing the house.
+// The hand, pistol, double-barrel shotgun and launcher are on keys 1 to 4
+// everywhere; the hand punches, and knocks on doors. enableDrones and
+// renderBase below switch the drones and the drawn base off for now.
 
 // Spider slots: two brown range spiders, the ambush spider, seven dark brown
 // hoppers, then the boss. Every slot before the boss runs the same AI.
@@ -74,6 +76,20 @@ constant float3 earthColor = float3(0.78f, 0.86f, 1.0f);
 constant float earthRadius = 0.028f;      // drawn 1.6°, larger than life
 constant uint droneCount = 3u;
 constant uint laserCount = 6u;
+// Switched off for now: the drones neither fly, sound, shoot nor show, and
+// nothing can hit or lock onto them. Set true to bring them back.
+constant bool enableDrones = false;
+// Whether the view draws the base: its rooms, corridors, props, exit and
+// outer shell. Off for now, so the moon runs on across its footprint. It
+// only changes what is drawn; shots, sight lines, lasers and the walker
+// still meet the base, and the spiders, sentries and pickups inside it
+// still show.
+constant bool renderBase = false;
+// The player starts outside on the flagstone path, a few metres south of
+// the exit door, facing the haunted house. The trackpad's centre looks
+// along spawnYaw; a yaw of 0 would look north at the base.
+constant float2 spawnGround = float2(0.0f, 26.0f);
+constant float spawnYaw = 3.14159265f;
 
 // A Javelin-style launcher joins the hand, the pistol and the shotgun. Keys
 // 1 to 4 pick the hand, pistol, shotgun and launcher; X swaps back to the
@@ -585,7 +601,8 @@ void gunCapsule(thread GunHit &hit, float3 origin, float3 direction,
 #include "SignalRangeArsenal.metal"
 
 void resetGame(device GameState &game, uint seed) {
-    game.player = float4(0.0f, 1.55f, 12.0f, 0.0f);
+    game.player = float4(spawnGround.x, 1.55f + stairHeight(spawnGround),
+        spawnGround.y, spawnYaw);
     game.view = float4(0.0f, 100.0f, 0.0f, 0.0f);
     game.effects = float4(0.0f);
     game.sceneTransition = float4(0.0f);
@@ -1111,7 +1128,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     game.look.zw = mix(game.look.zw,
         dt > 0.0f ? clamp(turn / dt, float2(-4.0f), float2(4.0f)) : float2(0.0f),
         1.0f - exp(-dt * 10.0f));
-    game.player.w = baseYaw + game.recoil.y;
+    game.player.w = baseYaw + spawnYaw + game.recoil.y;
     game.view.x = basePitch + game.recoil.x;
     bool cutscene = bossCutscene(game);
 
@@ -1871,10 +1888,12 @@ float2 footprintSpan(float3 origin, float3 direction) {
 // From outside, the shell hides the rooms except through the exit opening,
 // and the moon is traced up to the shell. From inside, a ray reaches the
 // moon only through the exit, so the terrain march starts where it leaves.
-void traceOutside(thread SceneHit &hit, float3 origin, float3 direction) {
-    bool inside = !outdoors(origin.xz, 0.0f);
+// Without the base, the moon is traced across its footprint as well.
+void traceOutside(thread SceneHit &hit, float3 origin, float3 direction,
+    bool base) {
+    bool inside = base && !outdoors(origin.xz, 0.0f);
     float2 span = footprintSpan(origin, direction);
-    if (!inside) {
+    if (base && !inside) {
         for (uint block = 0u; block < 2u; ++block) {
             float3 normal;
             float t = rayBox(origin, direction,
@@ -1888,7 +1907,7 @@ void traceOutside(thread SceneHit &hit, float3 origin, float3 direction) {
         }
     }
     float near = inside ? span.y : 0.0f;
-    float far = !inside && span.x > 0.0f && span.x <= span.y
+    float far = base && !inside && span.x > 0.0f && span.x <= span.y
         ? min(hit.distance, span.x) : hit.distance;
     if (near >= far) return;
     float t = pixeltje_terrain::trace(MoonSurface{moonTraceDetail}, origin,
@@ -1969,7 +1988,7 @@ void traceEnvironment(thread SceneHit &hit, float3 origin,
     traceExit(hit, origin, direction, game);
     traceBuildings(hit, origin, direction, game);
     // Last, so the terrain march stops at the nearest other surface.
-    traceOutside(hit, origin, direction);
+    traceOutside(hit, origin, direction, true);
 }
 
 float hashTile(float2 p) {
@@ -2588,10 +2607,10 @@ float3 shadeEarthlight(SceneHit hit, SurfaceMaterial material,
     float3 viewDirection, ChromePose chrome, device const GameState &game) {
     if (dot(hit.normal, earthDirection) <= 0.0f) return float3(0.0f);
     float3 origin = hit.position + hit.normal * 0.05f;
-    if (crateBlocksLight(origin, earthDirection, 1.0e4f,
+    if ((renderBase && (crateBlocksLight(origin, earthDirection, 1.0e4f,
             hullFrontLower, hullFrontUpper)
         || crateBlocksLight(origin, earthDirection, 1.0e4f,
-            hullRearLower, hullRearUpper)
+            hullRearLower, hullRearUpper)))
         || buildingsBlockLight(origin, earthDirection, 1.0e4f, game))
         return float3(0.0f);
     float lit = pixeltje_terrain::softShadow(MoonSurface{moonTraceDetail},
@@ -2886,7 +2905,14 @@ float ambientOcclusion(SceneHit hit, device const GameState &game) {
 void traceScene(thread SceneHit &hit, thread float3 &furPosition,
     float3 origin, float3 direction, ChromePose chrome,
     device const GameState &game) {
-    traceEnvironment(hit, origin, direction, chrome, game);
+    // Shots and sight lines always meet the base through traceEnvironment;
+    // renderBase only decides whether the view draws it.
+    if (renderBase) {
+        traceEnvironment(hit, origin, direction, chrome, game);
+    } else {
+        traceBuildings(hit, origin, direction, game);
+        traceOutside(hit, origin, direction, false);
+    }
     for (uint i = 0u; i < enemyCount; ++i) {
         if (!spiderActive(game, i)) continue;
         SpiderHit spider = traceSpider(origin, direction, game.enemy[i].xyz,
