@@ -203,12 +203,13 @@ struct HUDGlyph {
     float4 ink;             // display-referred sRGB and opacity
 };
 
-// The haunted house is a list of convex parts that HauntedHouse.metal
-// generates once in the initialize pass. Each part is a world box cut by up
-// to four more half-spaces, which makes gables, hips, spires and tapers.
-// Timber and logs reuse the window fields for their frame, and a clad wall,
-// which has no cutting planes, keeps the gaps its loose boards left in them.
-// Clapboards and battens are traced in relief on the walls' faces.
+// The haunted house and the buildings around it are a list of convex parts
+// that HauntedBuildings.metal generates once in the initialize pass. Each
+// part is a world box cut by up to four more half-spaces, which makes
+// gables, hips, spires and tapers. Timber and logs reuse the window fields
+// for their frame, and a clad wall, which has no cutting planes, keeps the
+// gaps its loose boards left in them. Clapboards and battens are traced in
+// relief on the walls' faces.
 struct HousePart {
     float4 lower;           // world box corner, style
     float4 upper;           // world box corner, number of cutting planes
@@ -220,26 +221,32 @@ struct HousePart {
 };
 
 // Parts are traced group by group, and a ray tests a group's parts only when
-// it enters the group's bounds.
+// it enters the group's bounds. A building site's first group bounds the
+// whole site, so a ray that misses it skips to the site's last group.
 struct HouseGroup {
     float4 lower;           // bounds, first part
     float4 upper;           // bounds, end part
+    uint4 last;             // the last group these bounds enclose, unused
 };
 
-constant uint houseCapacity = 384u;
-constant uint houseGroupCapacity = 24u;
+constant uint houseCapacity = 1024u;
+constant uint houseGroupCapacity = 64u;
+constant uint buildingSiteCapacity = 8u;
 
 constant uint houseCandleCapacity = 4u;
 
 struct HouseModel {
-    uint4 counts;           // parts, groups, candle lights
-    HouseGroup groups[houseGroupCapacity];
-    float4 candles[houseCandleCapacity];  // flame XYZ, room
+    uint4 counts;           // parts, groups, candle lights, sites
     // A shot through a window wakes the house. Start time (negative while
     // it is quiet) and the ghost's centre; its velocity and the time it
-    // began to vanish (negative until then).
+    // began to vanish (negative until then). Ahead of the arrays, so these
+    // offsets stay put when a capacity changes.
     float4 haunt;
     float4 hauntMotion;
+    float4 candles[houseCandleCapacity];  // flame XYZ, room
+    uint4 sites[buildingSiteCapacity];    // first and end group, first and
+                                          // end part; site 0 is the house
+    HouseGroup groups[houseGroupCapacity];
     HousePart parts[houseCapacity];
 };
 
@@ -305,9 +312,9 @@ struct GameState {
     HouseModel house;
 };
 
-static_assert(sizeof(GameState) <= 61440,
+static_assert(sizeof(GameState) <= 262144,
     "The GPU Program game buffer must contain game state, the HUD glyphs "
-    "and the house");
+    "and the buildings");
 
 struct SceneHit {
     float distance;
@@ -409,7 +416,9 @@ PointLight roomLight(uint index, float time) {
         float3(0.44f, 0.68f, 0.90f), 1400.0f};
 }
 
+#include "HauntedBuildingKit.metal"
 #include "HauntedHouse.metal"
+#include "HauntedBuildings.metal"
 
 float stairHeight(float2 point);
 bool walkable(float2 point);
@@ -637,8 +646,8 @@ kernel void initializeRange(constant ProgramUniforms &u [[buffer(0)]],
     device RangeAudio *audio [[buffer(3)]],
     uint id [[thread_position_in_grid]]) {
     if (id != 0u) return;
-    // The haunted house is generated once; restarts keep it.
-    buildHouse(states[0].house);
+    // The haunted buildings are generated once; restarts keep them.
+    buildBuildings(states[0].house);
     // The missile flight cam starts on; V toggles it.
     states[0].controls = float4(0.0f, 1.0f, 0.0f, 0.0f);
     resetGame(states[0], u.frameSeed.y ^ u.frameSeed.z);
@@ -771,8 +780,8 @@ float moonHeight(float2 p, int detail) {
     if (detail > moonTraceDetail)
         h += pixeltje_terrain::craters(p, 4.5f, 0.5f, 51.0f);
     h *= moonApron(p);
-    // The haunted house's lot is levelled and blends into the plain.
-    h = mix(houseOrigin.y, h, houseLotBlend(p));
+    // The buildings' lots are levelled and blend into the plain.
+    h = buildingsGround(p, h);
     float radius = length(p);
     if (radius > 500.0f)
         h += 95.0f * smoothstep(500.0f, 1300.0f, radius)
@@ -802,7 +811,7 @@ struct MoonSurface {
 // the haunted house's porch, floor and stairs are walkable.
 float stairHeight(float2 point) {
     if (outdoors(point, 0.0f))
-        return houseStand(point, moonHeight(point, moonTraceDetail));
+        return buildingsStand(point, moonHeight(point, moonTraceDetail));
     if (abs(point.x) < passageHalfWidth
         && point.y < -mainRoomHalfExtent && point.y > -outerRoomNear)
         return (floor(clamp(-point.y - mainRoomHalfExtent,
@@ -834,7 +843,7 @@ bool walkable(float2 point) {
         && z <= hullSouth + 0.45f) return true;
     if (outdoors(point, 0.45f))
         return dot(point, point) < moonWalkRadius * moonWalkRadius
-            && !houseBlocked(point);
+            && !buildingsBlocked(point);
     if (abs(x) <= passageLimit
         && z >= -outerRoomNear && z <= -roomLimit) return true;
     if (abs(x) <= roomLimit
@@ -1840,7 +1849,7 @@ void traceEnvironment(thread SceneHit &hit, float3 origin,
     for (uint i = 0u; i < ceilingLampCount; ++i)
         traceCeilingLamp(hit, origin, direction, ceilingLamps[i], i);
     traceExit(hit, origin, direction, game);
-    traceHouse(hit, origin, direction, game);
+    traceBuildings(hit, origin, direction, game);
     // Last, so the terrain march stops at the nearest other surface.
     traceOutside(hit, origin, direction);
 }
@@ -2252,7 +2261,7 @@ SurfaceMaterial surfaceMaterial(SceneHit hit,
         // Boulders are dark basalt or paler breccia, grainy and dusted on
         // their tops; soil skirts their feet.
         float rock = smoothstep(0.0f, 0.06f,
-            moonRocks(p) * moonApron(p) * houseLotBlend(p));
+            moonRocks(p) * moonApron(p) * buildingsGroundBlend(p));
         float3 stone = mix(float3(0.035f, 0.034f, 0.033f),
             float3(0.13f, 0.122f, 0.11f),
             pixeltje_terrain::valueNoise(p / 7.0f, 86.0f))
@@ -2456,7 +2465,7 @@ float3 regolithReflectance(float3 normal, float3 viewDirection,
 }
 
 // The Earth is a point light 10 km away, so room-light shading serves it.
-// The shell, the haunted house and the terrain cast its shadows.
+// The shell, the haunted buildings and the terrain cast its shadows.
 float3 shadeEarthlight(SceneHit hit, SurfaceMaterial material,
     float3 viewDirection, ChromePose chrome, device const GameState &game) {
     if (dot(hit.normal, earthDirection) <= 0.0f) return float3(0.0f);
@@ -2465,7 +2474,7 @@ float3 shadeEarthlight(SceneHit hit, SurfaceMaterial material,
             hullFrontLower, hullFrontUpper)
         || crateBlocksLight(origin, earthDirection, 1.0e4f,
             hullRearLower, hullRearUpper)
-        || houseBlocksLight(origin, earthDirection, 1.0e4f, game))
+        || buildingsBlockLight(origin, earthDirection, 1.0e4f, game))
         return float3(0.0f);
     float lit = pixeltje_terrain::softShadow(MoonSurface{moonTraceDetail},
         origin, earthDirection, 0.1f, 600.0f, moonCeiling, 10.0f, 48)
@@ -3546,8 +3555,8 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     // through them, and the pane tints, smears and reflects it.
     float3 paneNormal;
     HouseWindow pane;
-    float paneDistance = houseGlassCrossing(origin, direction, hit.distance,
-        game, paneNormal, pane);
+    float paneDistance = buildingsGlassCrossing(origin, direction,
+        hit.distance, game, paneNormal, pane);
     if (paneDistance > 0.0f)
         color = houseThroughGlass(color, pane, paneNormal, direction,
             origin + direction * paneDistance, houseInteriorPoint(origin));
