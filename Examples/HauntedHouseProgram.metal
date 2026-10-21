@@ -99,6 +99,13 @@ constant uint keyDigit7 = 8192u;
 constant uint effectBokeh = 1u;
 constant uint effectBloom = 2u;
 constant uint effectAberration = 4u;
+// Depth of field at 900 pixels tall: a point 1 m away blurs by
+// `lensAperture` pixels with the lens focused at infinity, and no blur grows
+// past `lensMaxBlur`. Autofocus eases toward the crosshair at `lensFocusRate`
+// per second, measured in inverse distance as a focus ring turns.
+constant float lensAperture = 30.0f;
+constant float lensMaxBlur = 10.0f;
+constant float lensFocusRate = 8.0f;
 // Sentry turrets guard the east, west and north rooms. Each stands on a
 // tripod and first watches its room's entrance.
 constant uint sentryCount = 3u;
@@ -310,6 +317,8 @@ struct GameState {
                                  // shows, draining toward its real health
     // Last, so every Signal Range offset stays where preview views write it.
     HouseModel house;
+    float4 lens;            // autofocus distance (0 until the first frame),
+                            // elapsed time it was last pulled; unused
 };
 
 static_assert(sizeof(GameState) <= 262144,
@@ -3639,18 +3648,54 @@ bool effectOn(device const GameState &game, uint effect) {
     return (uint(game.controls.w) & effect) == 0u;
 }
 
-// Depth of field focused on whatever sits under the crosshair, scaled with
-// the frame so card previews match the full-screen view.
+// The crosshair pixel and its four neighbours, in steps of 1/300 of the
+// frame height: close enough to stay on the aimed-at object, far enough to
+// straddle an edge running through the crosshair.
+constant int2 focusTaps[5] = {
+    int2(0, 0), int2(1, 0), int2(-1, 0), int2(0, 1), int2(0, -1)};
+
+// Autofocus for the bokeh pass. The lens pulls toward whatever sits under
+// the crosshair instead of jumping, so a change of subject reads as a focus
+// pull. The nearest of the five taps wins, so an edge under the crosshair
+// settles on the nearer object instead of flickering between two, and the
+// held weapon (depth 0) never takes focus. The first frame, a restart and
+// a long gap focus at once.
+kernel void focusLens(constant ProgramUniforms &u [[buffer(0)]],
+    device GameState *states [[buffer(1)]],
+    texture2d<float> scene [[texture(1)]],
+    uint id [[thread_position_in_grid]]) {
+    if (id != 0u) return;
+    device GameState &game = states[0];
+    int2 size = int2(u.resolutionTime.xy);
+    int reach = max(size.y / 300, 1);
+    float target = 0.0f;
+    for (uint i = 0u; i < 5u; ++i) {
+        int2 pixel = clamp(size / 2 + focusTaps[i] * reach, int2(0), size - 1);
+        float depth = scene.read(uint2(pixel)).a;
+        if (depth > 0.0f && (target <= 0.0f || depth < target)) target = depth;
+    }
+    if (target <= 0.0f) target = game.lens.x > 0.0f ? game.lens.x : sceneRayLimit;
+    float step = game.effects.x - game.lens.y;
+    if (game.lens.x <= 0.0f || step < 0.0f || step > 0.5f) {
+        game.lens.x = target;
+    } else {
+        float pull = 1.0f - exp(-step * lensFocusRate);
+        game.lens.x = 1.0f / mix(1.0f / game.lens.x, 1.0f / target, pull);
+    }
+    game.lens.y = game.effects.x;
+}
+
+// Depth of field at the distance the autofocus pass left the lens, scaled
+// with the frame so card previews match the full-screen view.
 fragment float4 bokehFragment(ScreenVertex in [[stage_in]],
     constant ProgramUniforms &u [[buffer(0)]],
     device const GameState *states [[buffer(1)]],
     texture2d<float> scene [[texture(1)]]) {
     float scale = u.resolutionTime.y / 900.0f;
-    float aperture = effectOn(states[0], effectBokeh) ? 5.0f * scale : 0.0f;
-    // One pixel, so an edge under the crosshair never averages two depths.
-    float focus = scene.read(uint2(u.resolutionTime.xy * 0.5f)).a;
-    return pixeltje_postfx::bokeh(scene, in.uv, u.resolutionTime.xy, focus,
-        aperture, 10.0f * scale);
+    float aperture = effectOn(states[0], effectBokeh)
+        ? lensAperture * scale : 0.0f;
+    return pixeltje_postfx::bokeh(scene, in.uv, u.resolutionTime.xy,
+        states[0].lens.x, aperture, lensMaxBlur * scale);
 }
 
 // Horizontal half of a separable Gaussian over the scene's brightest light.

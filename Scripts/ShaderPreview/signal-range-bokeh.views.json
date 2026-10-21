@@ -1,0 +1,35 @@
+{
+  "width": 1440,
+  "height": 900,
+  "views": [
+    { "name": "start" },
+    {
+      "name": "cube-closeup",
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 6.8, 0] },
+        { "buffer": "game", "offset": 16, "floats": [-0.24] }
+      ]
+    },
+    {
+      "name": "far-focus",
+      "writes": [
+        { "buffer": "game", "floats": [-2.2, 1.55, 8.5, 0.05] },
+        { "buffer": "game", "offset": 16, "floats": [-0.02] }
+      ]
+    },
+    {
+      "name": "moon-horizon",
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 25, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [-0.05] }
+      ]
+    },
+    {
+      "name": "moon-sky",
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 25, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.12] }
+      ]
+    }
+  ]
+}

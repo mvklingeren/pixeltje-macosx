@@ -13,19 +13,24 @@ enum PipelineMetalPostFX {
       constexpr sampler linearClamp(coord::normalized,
         address::clamp_to_edge, filter::linear);
 
-      // Blur radius in pixels: `aperture` at infinite depth, growing toward
-      // `maxRadius` in front of the focus plane. Depth <= 0 stays sharp.
+      // Thin-lens blur radius in pixels. `aperture` is the radius of a point
+      // one unit away with the lens focused at infinity; blur follows the
+      // difference in inverse distance from the focus plane. Focused far,
+      // distant detail stays sharp and only near things soften; focused
+      // near, everything behind blurs by up to aperture / focusDistance.
+      // Depth <= 0 stays sharp.
       inline float circleOfConfusion(float depth, float focusDistance,
                                      float aperture, float maxRadius) {
         if (depth <= 0.0f) return 0.0f;
-        return clamp(aperture * abs(1.0f - focusDistance / depth),
-          0.0f, maxRadius);
+        return clamp(aperture * abs(1.0f / max(focusDistance, 0.001f)
+          - 1.0f / depth), 0.0f, maxRadius);
       }
 
       // Single-pass gather depth of field over linear light with view depth
-      // in alpha. Running before tone mapping turns bright highlights into
-      // discs. Cost grows with maxRadius squared, so it is capped at 32
-      // pixels. Aperture <= 0 returns the pixel unchanged.
+      // in alpha, using circleOfConfusion above. Running before tone
+      // mapping turns bright highlights into discs. Cost grows with
+      // maxRadius squared, so it is capped at 32 pixels. Aperture <= 0
+      // returns the pixel unchanged.
       inline float4 bokeh(texture2d<float> scene, float2 uv,
                           float2 resolution, float focusDistance,
                           float aperture, float maxRadius) {

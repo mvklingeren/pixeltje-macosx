@@ -41,6 +41,15 @@ import Testing
       results[10] = fringe.b;
       results[11] = fringe.r;
       results[12] = pixeltje_3d::forward(0.0f, 0.0f).z;
+      // Focused at 1000, the same lens leaves the spot at 100 nearly sharp:
+      // blur follows inverse distance, so far focus keeps the distance clear.
+      results[13] = pixeltje_postfx::bokeh(spot, uv(16, 16), resolution,
+        1000.0f, 6.0f, 8.0f).r;
+      results[14] = pixeltje_postfx::bokeh(spot, uv(19, 16), resolution,
+        1000.0f, 6.0f, 8.0f).r;
+      // Focus distance 0 is treated as very close rather than dividing by 0.
+      results[15] = pixeltje_postfx::bokeh(spot, uv(16, 16), resolution,
+        0.0f, 6.0f, 8.0f).r;
     }
     """
   let resolved = PipelineMetalLibraries.resolving(source)
@@ -73,7 +82,7 @@ import Testing
   }
 
   let queue = try #require(device.makeCommandQueue())
-  let buffer = try #require(device.makeBuffer(length: 13 * MemoryLayout<Float>.stride,
+  let buffer = try #require(device.makeBuffer(length: 16 * MemoryLayout<Float>.stride,
     options: .storageModeShared))
   let commands = try #require(queue.makeCommandBuffer())
   let encoder = try #require(commands.makeComputeCommandEncoder())
@@ -87,7 +96,7 @@ import Testing
   commands.commit()
   commands.waitUntilCompleted()
   let results = Array(UnsafeBufferPointer(
-    start: buffer.contents().assumingMemoryBound(to: Float.self), count: 13))
+    start: buffer.contents().assumingMemoryBound(to: Float.self), count: 16))
 
   // In focus, every tap is rejected and depth passes through.
   #expect(abs(results[0]) < 0.001)
@@ -104,4 +113,7 @@ import Testing
   #expect(results[10] > 99)
   #expect(results[11] == 0)
   #expect(results[12] == -1)
+  #expect(results[13] > 99)
+  #expect(results[14] == 0)
+  #expect(results[15] > 0 && results[15] < 50)
 }
