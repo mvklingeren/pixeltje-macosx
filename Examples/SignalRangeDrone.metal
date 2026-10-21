@@ -505,16 +505,15 @@ void advanceLasers(device GameState &game, float dt) {
 // takes more against the drag, so a moving drone sounds higher than a
 // hovering one. Drive tells the synthesizer how hard the motors work: it
 // brightens the sound and splits the motor speeds as a tilted frame runs one
-// side faster. A downed drone's motors spin down in under a second. Walls
-// muffle drones the player cannot see from inside the base.
+// side faster. A downed drone's motors spin down in under a second. Each
+// program's droneHearing sets how much of the sound reaches the player
+// through walls.
 void updateDroneVoices(device GameState &game, float dt,
     device RangeAudio &audio, bool playing) {
     DopplerListener listener = {game.player.xyz,
         float3(game.motion.x, game.effects.w, game.motion.y),
         float3(cos(game.player.w), 0.0f, sin(game.player.w))};
-    float muffle = outdoors(game.player.xz, 0.0f) ? 1.0f
-        : 0.35f * (1.0f - smoothstep(0.0f, 30.0f,
-            hullSouth - game.player.z));
+    float muffle = droneHearing(game.player.xz);
     const float detune[droneCount] = {0.97f, 1.0f, 1.04f};
     for (uint i = 0u; i < droneCount; ++i) {
         Drone drone = game.drones[i];

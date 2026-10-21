@@ -1,0 +1,69 @@
+{
+  "width": 960,
+  "height": 540,
+  "views": [
+    {
+      "name": "overview-front",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [0, 42, 40, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [-0.48] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "above-west",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-48, 26, 68, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [-0.5] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "gate-west",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-48, 0.3, 82, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [-0.04] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "rows-east",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [40, -0.75, 104, 2.6] },
+        { "buffer": "game", "offset": 16, "floats": [-0.12] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "tomb-west",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-50, -0.75, 129, -2.97] },
+        { "buffer": "game", "offset": 16, "floats": [0.08] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "inside-east-to-house",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [56, -0.75, 132, -1.42] },
+        { "buffer": "game", "offset": 16, "floats": [0.06] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "soil-east-plot",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [44, 9, 98, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [-0.9] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    }
+  ]
+}

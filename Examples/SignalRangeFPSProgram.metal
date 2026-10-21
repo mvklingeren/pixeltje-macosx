@@ -357,6 +357,7 @@ PointLight roomLight(uint index, float time) {
 float stairHeight(float2 point);
 bool walkable(float2 point);
 bool outdoors(float2 point, float pad);
+float droneHearing(float2 point);
 
 void damagePlayer(device GameState &game, float amount, float2 source,
     float flash) {
@@ -668,6 +669,14 @@ void pushOutOfChrome(thread float2 &point) {
 bool outdoors(float2 point, float pad) {
     return point.x <= -hullHalfWidth - pad || point.x >= hullHalfWidth + pad
         || point.y <= hullNorth - pad || point.y >= hullSouth + pad;
+}
+
+// How much of the drones' rotor sound reaches a player standing at point.
+// Inside the base the walls muffle drones the player cannot see, less so
+// toward the open south doorway.
+float droneHearing(float2 point) {
+    return outdoors(point, 0.0f) ? 1.0f
+        : 0.35f * (1.0f - smoothstep(0.0f, 30.0f, hullSouth - point.y));
 }
 
 // The moon flattens to level ground beside the base walls.

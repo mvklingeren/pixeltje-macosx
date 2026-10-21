@@ -12,10 +12,11 @@
 //
 // The ground floor is open: a hall with a staircase, a parlour with a
 // fireplace and a coffin, and a dining room. A small graveyard of crosses,
-// headstones and a tomb surrounds the house. Floors, steps, walls and graves
-// for walking come from the same layout constants in straight-line code, so
-// the spider and drone kernels that test walkability never loop over the
-// parts.
+// headstones and a tomb surrounds the house, and a large one lies on a
+// fenced plot of its own on either side of the lot. Floors, steps, walls and
+// graves for walking come from the same layout constants in straight-line
+// code, so the spider and drone kernels that test walkability never loop
+// over the parts.
 //
 // Shooting any window wakes the house: its lights go out, a wind rises and
 // blows the curtains about, a poison green glow snaps on, and a ghost flies
@@ -50,6 +51,12 @@ constant float2 houseLotLower = float2(-15.0f, -17.0f);  // the fence
 constant float2 houseLotUpper = float2(15.0f, 9.0f);
 constant float houseGatePostX = 2.0f;
 constant float housePlayerPad = 0.4f;
+// The graveyard plots flank the lot and share its side fences: each is
+// 18 units wide and as deep as the lot, so the levelled ground spans both.
+constant float2 houseGroundLower = float2(-33.0f, -17.0f);
+constant float2 houseGroundUpper = float2(33.0f, 9.0f);
+constant float houseYardAisleX = 24.0f;   // |x| of each plot's gate and aisle
+constant float houseYardGatePostX = 1.2f; // gate posts either side of it
 
 // Styles; a part's material is houseMaterialBase plus its style. The
 // cut-out styles are thin panels whose openings rays pass through.
@@ -1283,6 +1290,155 @@ void buildHouseGraveyard(device HouseModel &house) {
     }
 }
 
+// --------------------------------------------------------- graveyard plots
+// A large graveyard lies on a plot of its own west and east of the lot. Each
+// is fenced in iron on its three open sides, with a gate in front between
+// stone posts carrying lanterns and its two leaves swung open into the plot.
+// An aisle runs from the gate to the back, and graves stand in rows either
+// side of it, all facing the front. They are set out on a grid of cells, one
+// marker or none to a cell, whose kind, size, lean and offset come from a
+// hash of the cell, so walking and the dug earth find a cell's grave by
+// arithmetic rather than a loop. Plot 0 is west and plot 1 east; a plot's
+// columns run west to east, three either side of its aisle.
+constant uint houseYardRows = 9u;
+constant uint houseYardColumns = 6u;
+constant uint houseYardBandRows = 3u;      // rows traced as one group
+constant float houseYardFrontRow = -13.0f; // z of the front row's cells
+constant float houseYardRowPitch = 2.5f;
+constant float houseYardColumnPitch = 2.2f;
+constant uint houseYardTombRow = 8u;       // each plot's tomb, at the back
+constant uint houseGraveNone = 5u;         // an empty cell
+
+struct HouseYardGrave {
+    float2 at;      // house-local x and z of the foot
+    uint kind;
+    float lean;     // radians; the fallen cross's turn on the ground
+    float2 size;    // 0 to 1, for its width and its height
+};
+
+float houseYardAisle(uint plot) {
+    return plot == 0u ? -houseYardAisleX : houseYardAisleX;
+}
+
+// The tomb stands beside the aisle on the plot's outer side.
+uint houseYardTombColumn(uint plot) {
+    return plot == 0u ? 2u : 3u;
+}
+
+HouseYardGrave houseYardGrave(uint plot, uint row, uint column) {
+    float o = float(column) - 2.5f;
+    float2 cell = float2(houseYardAisle(plot)
+        + sign(o) * (abs(o) + 0.5f) * houseYardColumnPitch,
+        houseYardFrontRow + float(row) * houseYardRowPitch);
+    if (row == houseYardTombRow && column == houseYardTombColumn(plot))
+        return {cell, houseGraveTomb, 0.0f, float2(0.0f)};
+    float seed = float(plot * 64u + row * houseYardColumns + column) * 1.37f
+        + 211.0f;
+    float pick = houseHash(seed);
+    uint kind = pick < 0.08f ? houseGraveNone
+        : (pick < 0.15f ? houseGraveFallen
+            : (pick < 0.45f ? houseGraveCross
+                : (pick < 0.75f ? houseGraveRound : houseGravePointed)));
+    float2 shift = float2(0.5f, 0.4f)
+        * (float2(houseHash(seed + 1.0f), houseHash(seed + 2.0f)) - 0.5f);
+    float swing = houseHash(seed + 3.0f) - 0.5f;
+    float lean = kind == houseGraveFallen ? 2.0f * rangePi * swing
+        : swing * (kind == houseGraveCross ? 0.6f : 0.34f);
+    return {cell + shift, kind, lean,
+        float2(houseHash(seed + 4.0f), houseHash(seed + 5.0f))};
+}
+
+// The plot, row and column of the cell nearest a house-local point on a
+// plot, its row found with z moved on by ahead.
+uint3 houseYardCell(float2 local, float ahead) {
+    uint plot = local.x < 0.0f ? 0u : 1u;
+    float u = local.x - houseYardAisle(plot);
+    float step = clamp(round(abs(u) / houseYardColumnPitch), 1.0f, 3.0f);
+    uint column = u < 0.0f ? uint(3.0f - step) : uint(2.0f + step);
+    float row = clamp(round((local.y + ahead - houseYardFrontRow)
+        / houseYardRowPitch), 0.0f, float(houseYardRows - 1u));
+    return uint3(plot, uint(row), column);
+}
+
+// The footprint a walker cannot enter, in house-local x/z as lower and
+// upper corners, matching the parts addHouseYardGrave makes. An empty cell
+// and a fallen cross, which can be stepped over, have none.
+float4 houseYardFootprint(HouseYardGrave grave) {
+    if (grave.kind == houseGraveTomb)
+        return float4(grave.at + float2(-0.85f, -1.275f),
+            grave.at + float2(0.85f, 1.1f));
+    if (grave.kind == houseGraveNone || grave.kind == houseGraveFallen)
+        return float4(1.0e9f, 1.0e9f, -1.0e9f, -1.0e9f);
+    float2 reach = grave.kind == houseGraveCross ? float2(0.16f, 0.06f)
+        : float2(0.25f * (0.58f + 0.2f * grave.size.x) + 0.02f, 0.11f);
+    return float4(grave.at - reach, grave.at + reach);
+}
+
+void addHouseYardGrave(device HouseModel &house, HouseYardGrave grave) {
+    const float3 face = float3(0.0f, 0.0f, -1.0f);
+    float3 ground = houseWorld(float3(grave.at.x, 0.0f, grave.at.y));
+    if (grave.kind == houseGraveCross)
+        addGraveCross(house, ground - float3(0.0f, 0.3f, 0.0f), face,
+            1.25f + 0.35f * grave.size.y, grave.lean);
+    else if (grave.kind == houseGraveFallen)
+        addFallenCross(house, ground, grave.lean);
+    else if (grave.kind == houseGraveTomb)
+        addHouseTomb(house, ground);
+    else if (grave.kind != houseGraveNone)
+        addHeadstone(house, ground - float3(0.0f, 0.2f, 0.0f), face,
+            0.58f + 0.2f * grave.size.x, 0.95f + 0.3f * grave.size.y,
+            grave.lean, grave.kind == houseGravePointed);
+}
+
+// A plot's fence and gate. The lot's side fence closes its inner side.
+void buildHouseYardFence(device HouseModel &house, uint plot) {
+    beginHouseGroup(house);
+    const float top = 1.0f, base = -0.05f;
+    float side = plot == 0u ? -1.0f : 1.0f;
+    float inner = side * houseLotUpper.x, outer = side * houseGroundUpper.x;
+    float west = min(inner, outer), east = max(inner, outer);
+    float c = houseYardAisle(plot), gap = houseYardGatePostX + 0.25f;
+    float front = houseGroundLower.y, back = houseGroundUpper.y;
+    addHousePart(house, houseBox(float3(west, base, front - 0.03f),
+        float3(c - gap, top, front + 0.03f), houseIron));
+    addHousePart(house, houseBox(float3(c + gap, base, front - 0.03f),
+        float3(east, top, front + 0.03f), houseIron));
+    addHousePart(house, houseBox(float3(outer - 0.03f, base, front),
+        float3(outer + 0.03f, top, back), houseIron));
+    addHousePart(house, houseBox(float3(west, base, back - 0.03f),
+        float3(east, top, back + 0.03f), houseIron));
+    for (uint k = 0u; k < 2u; ++k) {
+        float post = c + (k == 0u ? -1.0f : 1.0f) * houseYardGatePostX;
+        addHousePart(house, houseBox(float3(post - 0.25f, base, front - 0.25f),
+            float3(post + 0.25f, 2.0f, front + 0.25f), houseStone));
+        addHousePart(house, houseBox(float3(post - 0.32f, 2.0f, front - 0.32f),
+            float3(post + 0.32f, 2.14f, front + 0.32f), houseStone));
+        addHousePart(house, houseBox(float3(post - 0.13f, 2.14f, front - 0.13f),
+            float3(post + 0.13f, 2.56f, front + 0.13f), houseLantern));
+        // The gate leaf hung on this post stands open against the plot.
+        float leaf = c + (k == 0u ? -0.9f : 0.9f);
+        addHousePart(house, houseBox(float3(leaf - 0.03f, 0.02f, front + 0.25f),
+            float3(leaf + 0.03f, 0.92f, front + 1.17f), houseIron));
+    }
+}
+
+// Each plot's fence, then its graves in bands of rows either side of the
+// aisle, so a ray tests only the bands it passes over.
+void buildHouseYards(device HouseModel &house) {
+    for (uint plot = 0u; plot < 2u; ++plot) {
+        buildHouseYardFence(house, plot);
+        for (uint band = 0u; band < houseYardRows; band += houseYardBandRows)
+            for (uint aisleSide = 0u; aisleSide < 2u; ++aisleSide) {
+                beginHouseGroup(house);
+                uint first = aisleSide * 3u;
+                for (uint row = band; row < band + houseYardBandRows; ++row)
+                    for (uint column = first; column < first + 3u; ++column)
+                        addHouseYardGrave(house,
+                            houseYardGrave(plot, row, column));
+            }
+    }
+}
+
 void buildHouse(device HouseModel &house) {
     house.counts = uint4(0u);
     buildHouseBody(house);
@@ -1290,6 +1446,7 @@ void buildHouse(device HouseModel &house) {
     buildHousePorch(house);
     buildHouseFence(house);
     buildHouseGraveyard(house);
+    buildHouseYards(house);
 }
 
 // ----------------------------------------------------------------- tracing
@@ -1568,12 +1725,12 @@ float3 houseThroughGlass(float3 color, HouseWindow pane, float3 normal,
 
 // --------------------------------------------------------------- footing
 
-// Weight of the natural terrain: 0 on the lot and one unit beyond its
-// fence, rising to 1 another 18 m out.
+// Weight of the natural terrain: 0 on the lot and the graveyard plots and
+// one unit beyond their fences, rising to 1 another 18 m out.
 float houseLotBlend(float2 p) {
     float2 local = houseLocal(p);
-    float2 outside = max(max(houseLotLower - 1.0f - local,
-        local - houseLotUpper - 1.0f), float2(0.0f));
+    float2 outside = max(max(houseGroundLower - 1.0f - local,
+        local - houseGroundUpper - 1.0f), float2(0.0f));
     return smoothstep(0.0f, 18.0f, length(outside) * houseScale);
 }
 
@@ -1601,11 +1758,12 @@ float houseStand(float2 p, float ground) {
 // Footprints the walker cannot enter, in house-local x/z: walls,
 // partitions, door leaves, furniture, stair sides, porch posts and
 // railings out to the deck edge, the sides of the steps, the gate posts, the
-// fence and the graves. Each matches a part buildHouse makes. The graves'
-// footprints are listed here rather than read from houseGraves: a second
-// loop in this test, which the spider kernels inline, made them take a
-// minute to compile cold.
-constant uint houseObstacleCount = 54u;
+// fence and the graves, then the plots' fences, gate posts and open gate
+// leaves. Each matches a part buildHouse makes. The graves' footprints are
+// listed here rather than read from houseGraves: a second loop in this
+// test, which the spider kernels inline, made them take a minute to compile
+// cold. The plots' graves are found by houseYardBlocked without one.
+constant uint houseObstacleCount = 70u;
 constant float4 houseObstacles[houseObstacleCount] = {
     float4(-8.0f, -6.0f, -0.9f, -5.7f), float4(0.9f, -6.0f, 8.0f, -5.7f),
     float4(-8.0f, 5.7f, 8.0f, 6.0f), float4(-8.0f, -6.0f, -7.7f, 6.0f),
@@ -1647,14 +1805,41 @@ constant float4 houseObstacles[houseObstacleCount] = {
     float4(12.49f, -6.61f, 12.71f, -6.19f),
     float4(10.94f, -2.725f, 11.06f, -2.475f),
     float4(12.89f, 0.99f, 13.11f, 1.41f),
-    float4(11.34f, 4.475f, 11.46f, 4.725f)
+    float4(11.34f, 4.475f, 11.46f, 4.725f),
+    // The west plot, then the east.
+    float4(-33.0f, -17.03f, -25.45f, -16.97f),
+    float4(-22.55f, -17.03f, -15.0f, -16.97f),
+    float4(-33.03f, -17.0f, -32.97f, 9.0f), float4(-33.0f, 8.97f, -15.0f, 9.03f),
+    float4(-25.45f, -17.25f, -24.95f, -16.75f),
+    float4(-23.05f, -17.25f, -22.55f, -16.75f),
+    float4(-24.93f, -16.75f, -24.87f, -15.83f),
+    float4(-23.13f, -16.75f, -23.07f, -15.83f),
+    float4(15.0f, -17.03f, 22.55f, -16.97f),
+    float4(25.45f, -17.03f, 33.0f, -16.97f),
+    float4(32.97f, -17.0f, 33.03f, 9.0f), float4(15.0f, 8.97f, 33.0f, 9.03f),
+    float4(22.55f, -17.25f, 23.05f, -16.75f),
+    float4(24.95f, -17.25f, 25.45f, -16.75f),
+    float4(23.07f, -16.75f, 23.13f, -15.83f),
+    float4(24.87f, -16.75f, 24.93f, -15.83f)
 };
+
+// True where the grave in the plot cell nearest a house-local point keeps
+// the walker out. A footprint stays well inside its cell, so no neighbour
+// can reach the point.
+bool houseYardBlocked(float2 local, float pad) {
+    uint3 cell = houseYardCell(local, 0.0f);
+    float4 r = houseYardFootprint(houseYardGrave(cell.x, cell.y, cell.z));
+    return all(local > r.xy - pad) && all(local < r.zw + pad);
+}
 
 bool houseBlocked(float2 p) {
     float2 local = houseLocal(p);
-    if (any(local < houseLotLower - 1.0f) || any(local > houseLotUpper + 1.0f))
+    if (any(local < houseGroundLower - 1.0f)
+        || any(local > houseGroundUpper + 1.0f))
         return false;
     float pad = housePlayerPad / houseScale;
+    if (abs(local.x) > houseLotUpper.x && houseYardBlocked(local, pad))
+        return true;
     for (uint i = 0u; i < houseObstacleCount; ++i) {
         float4 r = houseObstacles[i];
         if (all(local > r.xy - pad) && all(local < r.zw + pad)) return true;
@@ -1689,18 +1874,19 @@ float houseFlicker(float time, float phase, float depth) {
         + 0.2f * sin(time * 17.9f + 2.7f * phase));
 }
 
-// Three lanterns light the outside: one on each gate post and one over the
-// porch steps.
-constant uint houseOutdoorLightCount = 3u;
+// Five lights the outside: one on each gate post, one over the porch steps,
+// and one for the pair of lanterns over each graveyard plot's gate.
+constant uint houseOutdoorLightCount = 5u;
 
 PointLight houseOutdoorLight(uint index, float time) {
     float3 position = index < 2u
         ? float3(index == 0u ? -houseGatePostX : houseGatePostX, 2.35f,
             houseLotLower.y)
-        : float3(0.0f, houseFloorY + 2.57f, -8.2f);
+        : (index == 2u ? float3(0.0f, houseFloorY + 2.57f, -8.2f)
+            : float3(houseYardAisle(index - 3u), 2.35f, houseGroundLower.y));
     return {houseWorld(position), float3(1.0f, 0.6f, 0.27f),
-        (index < 2u ? 55.0f : 75.0f) * houseScale * houseScale
-            * houseFlicker(time, float(index), 0.12f),
+        (index < 2u ? 55.0f : (index == 2u ? 75.0f : 110.0f))
+            * houseScale * houseScale * houseFlicker(time, float(index), 0.12f),
         false};
 }
 
@@ -1915,9 +2101,12 @@ bool houseShotHitsWindow(device const GameState &game, float3 origin,
     return w.glass + w.drape + w.frame > 0.5f;
 }
 
+// The scare sound plays a moment after the shot, as the lamps die; the
+// ghost's own looping voice follows it from when it emerges.
+//
 // Moves the ghost: out of the hall through the front doors to the foot of
 // the porch steps, then straight at the player, gathering speed. It
-// vanishes when it reaches them, with a jolt and the scare sound.
+// vanishes when it reaches them, with a jolt and the scare sound again.
 void advanceHaunt(device GameState &game, device RangeAudio &audio,
     float dt) {
     device HouseModel &house = game.house;
@@ -1928,8 +2117,8 @@ void advanceHaunt(device GameState &game, device RangeAudio &audio,
         houseQuiet(game);
         return;
     }
+    if (age >= houseLightsOut && age - dt < houseLightsOut) audio.scare = 1u;
     if (age < houseGhostEmerge) return;
-    if (age - dt < houseGhostEmerge) audio.scare = 1u;
     float3 ghost = house.haunt.yzw, velocity = house.hauntMotion.xyz;
     float3 eye = game.player.xyz;
     float3 steps = houseWorld(float3(0.0f, houseFloorY,
@@ -3058,15 +3247,24 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
 
 // ------------------------------------------------------------------ ground
 
-// The flagstone path from the base exit to the porch steps, as on the path
-// (0 or 1), stone coverage against the grout, and a tone per stone.
+// The flagstone path from the base exit to the porch steps, and the
+// narrower aisle of each graveyard plot from its gate to its tomb, as on a
+// path (0 or 1), stone coverage against the grout, and a tone per stone.
 float3 housePath(float2 p, float blur) {
     float2 metres = p - houseOrigin.xz;
     float stepsFront = (housePorchFront
         - houseStepRun * float(houseStepCount)) * houseScale;
     float edge = 1.6f + 0.15f * smoothNoise(p * 1.7f);
     if (abs(metres.x) > edge || p.y < hullSouth + 0.3f
-        || metres.y > stepsFront + 0.05f) return float3(0.0f);
+        || metres.y > stepsFront + 0.05f) {
+        float aisle = abs(metres.x) - houseYardAisleX * houseScale;
+        float tombFront = houseYardFrontRow
+            + float(houseYardTombRow) * houseYardRowPitch - 1.3f;
+        if (abs(aisle) > edge - 0.5f
+            || metres.y < (houseGroundLower.y - 0.4f) * houseScale
+            || metres.y > tombFront * houseScale) return float3(0.0f);
+        metres.x = aisle;
+    }
     // Uneven stones: each row is offset, each stone its own size.
     float row = floor(metres.y / 0.5f);
     float2 cell = float2(metres.x / 0.62f + 0.5f * fmod(abs(row), 2.0f)
@@ -3083,9 +3281,22 @@ float3 housePath(float2 p, float blur) {
 // marker with a ragged edge.
 float houseGraveSoil(float2 p) {
     float2 local = houseLocal(p);
+    float ragged = 0.04f * (smoothNoise(p * 9.0f) - 0.5f);
+    if (abs(local.x) > houseLotUpper.x && all(local >= houseGroundLower)
+        && all(local <= houseGroundUpper)) {
+        // On a graveyard plot: the grave of the cell whose earth can lie
+        // here, which reaches up to 1.25 units in front of its foot.
+        uint3 cell = houseYardCell(local, 0.55f);
+        HouseYardGrave grave = houseYardGrave(cell.x, cell.y, cell.z);
+        if (grave.kind != houseGraveCross && grave.kind != houseGraveRound
+            && grave.kind != houseGravePointed) return 0.0f;
+        float2 offset = (local - grave.at) * houseScale;
+        float edge = max(abs(offset.x) - 0.45f, abs(-offset.y - 1.15f) - 0.95f)
+            + ragged;
+        return 1.0f - smoothstep(-0.05f, 0.03f, edge);
+    }
     if (any(local < houseLotLower) || any(local > houseLotUpper)) return 0.0f;
     float plot = 0.0f;
-    float ragged = 0.04f * (smoothNoise(p * 9.0f) - 0.5f);
     for (uint i = 0u; i < houseGraveCount; ++i) {
         HouseGrave grave = houseGraves[i];
         if (grave.kind == houseGraveFallen || grave.kind == houseGraveTomb)

@@ -178,6 +178,7 @@ struct LaserBolt {
 // gain, playback rate and pan of its looping hover sound, the two wind
 // voices layer the wind loop at different rates for the night, and the
 // haunt voice plays it as the gale that blows while the house is haunted.
+// The ghost voice loops the ghost's moan from wherever the ghost flies.
 struct RangeAudio {
     uint shot;
     uint scare;
@@ -189,9 +190,10 @@ struct RangeAudio {
     float4 droneVoice[droneCount];
     float4 windVoice[2];
     float4 hauntWind;
+    float4 ghostVoice;
 };
 
-static_assert(sizeof(RangeAudio) == 128,
+static_assert(sizeof(RangeAudio) == 144,
     "The audio words must match the program's audioEvents and audioVoices");
 
 constant uint hudCapacity = 96u;
@@ -224,8 +226,8 @@ struct HouseGroup {
     float4 upper;           // bounds, end part
 };
 
-constant uint houseCapacity = 224u;
-constant uint houseGroupCapacity = 8u;
+constant uint houseCapacity = 384u;
+constant uint houseGroupCapacity = 24u;
 
 constant uint houseCandleCapacity = 4u;
 
@@ -303,7 +305,7 @@ struct GameState {
     HouseModel house;
 };
 
-static_assert(sizeof(GameState) <= 40960,
+static_assert(sizeof(GameState) <= 61440,
     "The GPU Program game buffer must contain game state, the HUD glyphs "
     "and the house");
 
@@ -412,6 +414,7 @@ PointLight roomLight(uint index, float time) {
 float stairHeight(float2 point);
 bool walkable(float2 point);
 bool outdoors(float2 point, float pad);
+float droneHearing(float2 point);
 
 void damagePlayer(device GameState &game, float amount, float2 source,
     float flash) {
@@ -643,6 +646,7 @@ kernel void initializeRange(constant ProgramUniforms &u [[buffer(0)]],
     for (uint i = 0u; i < droneCount; ++i) audio[0].droneVoice[i] = float4(0.0f);
     for (uint i = 0u; i < 2u; ++i) audio[0].windVoice[i] = float4(0.0f, 1.0f, 0.0f, 0.0f);
     audio[0].hauntWind = float4(0.0f, 0.86f, 0.0f, 0.0f);
+    audio[0].ghostVoice = float4(0.0f, 1.0f, 0.0f, 0.0f);
 }
 
 float rayBox(float3 origin, float3 direction, float3 lower, float3 upper,
@@ -725,6 +729,17 @@ void pushOutOfChrome(thread float2 &point) {
 bool outdoors(float2 point, float pad) {
     return point.x <= -hullHalfWidth - pad || point.x >= hullHalfWidth + pad
         || point.y <= hullNorth - pad || point.y >= hullSouth + pad;
+}
+
+// How much of the drones' rotor sound reaches a player standing at point.
+// The house's walls and roof shut the rotors out entirely. Outside they sit
+// under the night wind rather than over it, and inside the base the walls
+// muffle them further, less so toward the open south doorway.
+float droneHearing(float2 point) {
+    if (houseUnderRoof(point)) return 0.0f;
+    float walls = outdoors(point, 0.0f) ? 1.0f
+        : 0.35f * (1.0f - smoothstep(0.0f, 30.0f, hullSouth - point.y));
+    return 0.45f * walls;
 }
 
 // The moon flattens to level ground beside the base walls.
@@ -964,6 +979,31 @@ void updateWindVoices(device GameState &game, device RangeAudio &audio,
     audio.hauntWind = mix(audio.hauntWind, gale, 1.0f - exp(-dt * 3.0f));
 }
 
+// The ghost moans on a loop from the moment it emerges until it has
+// vanished, as solid as it looks. It is a point source like a drone: its
+// level falls with distance, it pans between the ears, and its pitch rises
+// as it rushes at the player. Walls between them muffle it.
+void updateGhostVoice(device GameState &game, device RangeAudio &audio,
+    float dt) {
+    DopplerListener listener = {game.player.xyz,
+        float3(game.motion.x, game.effects.w, game.motion.y),
+        float3(cos(game.player.w), 0.0f, sin(game.player.w))};
+    float3 ghost = game.house.haunt.yzw;
+    bool base = !houseUnderRoof(game.player.xz)
+        && !outdoors(game.player.xz, 0.0f);
+    float doorway = 0.25f * (1.0f - smoothstep(0.0f, 25.0f,
+        hullSouth - game.player.z));
+    float walls = base ? doorway
+        : (houseInteriorPoint(ghost) != houseUnderRoof(game.player.xz)
+            ? 0.6f : 1.0f);
+    float time = game.effects.x;
+    DopplerSource source = {ghost, game.house.hauntMotion.xyz,
+        houseGhostFade(game) * walls, 5.0f,
+        1.0f + 0.03f * sin(time * 0.31f)};
+    audio.ghostVoice = smoothVoice(audio.ghostVoice,
+        dopplerVoice(listener, source), dt);
+}
+
 kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     device GameState *states [[buffer(1)]],
     device uint *sceneRequest [[buffer(2)]],
@@ -1005,6 +1045,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     // match ends.
     advanceHaunt(game, audio[0], dt);
     updateWindVoices(game, audio[0], dt);
+    updateGhostVoice(game, audio[0], dt);
     game.launcher.w *= exp(-dt * 6.0f);
     game.dodge.xy *= exp(-dt * 6.5f);
     if (game.launcher.z > 0.0f) {
