@@ -25,6 +25,7 @@ void buildBuildings(device HouseModel &house) {
     buildHouse(house);
     buildMausoleums(house);
     buildShedYard(house);
+    buildCottage(house);
 }
 
 // ----------------------------------------------------------------- tracing
@@ -144,13 +145,32 @@ float buildingsGlassCrossing(float3 origin, float3 direction, float limit,
 // Weight of the natural terrain at p: 0 on a building's levelled ground,
 // rising to 1 away from it.
 float buildingsGroundBlend(float2 p) {
-    return houseLotBlend(p) * shedYardBlend(p);
+    return houseLotBlend(p) * shedYardBlend(p) * cottageGroundBlend(p);
 }
 
 // The terrain height h at p, levelled under the buildings.
 float buildingsGround(float2 p, float h) {
     h = mix(houseOrigin.y, h, houseLotBlend(p));
-    return mix(shedYardOrigin.y, h, shedYardBlend(p));
+    h = mix(shedYardOrigin.y, h, shedYardBlend(p));
+    return mix(cottageOrigin.y, h, cottageGroundBlend(p));
+}
+
+// The flagstone paths: the house's, and the cottage's branch from it.
+float3 buildingsPath(float2 p, float blur) {
+    float3 path = housePath(p, blur);
+    return path.x > 0.0f ? path : cottagePath(p, blur);
+}
+
+// The lanterns outside: the house's, then the cottage's porch lantern.
+// They go out while the house is haunted.
+constant uint buildingsOutdoorLightCount = houseOutdoorLightCount + 1u;
+
+PointLight buildingsOutdoorLight(uint index, device const GameState &game) {
+    if (index < houseOutdoorLightCount)
+        return houseHauntedOutdoorLight(index, game);
+    PointLight light = cottageLanternLight(game.effects.x);
+    light.power *= houseHaunting(game).dim;
+    return light;
 }
 
 // The floor, deck, step or stair under p, or ground where there is none.
@@ -179,6 +199,11 @@ bool buildingsBlocked(float2 p) {
         pad = housePlayerPad;
         footprints = shedObstacles;
         count = shedObstacleCount;
+    } else if (cottageGroundHolds(p)) {
+        local = p - cottageOrigin.xz;
+        pad = housePlayerPad;
+        footprints = cottageObstacles;
+        count = cottageObstacleCount;
     } else {
         return false;
     }

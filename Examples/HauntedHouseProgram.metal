@@ -420,6 +420,7 @@ PointLight roomLight(uint index, float time) {
 #include "HauntedHouse.metal"
 #include "HauntedMausoleum.metal"
 #include "HauntedShed.metal"
+#include "HauntedCottage.metal"
 #include "HauntedBuildings.metal"
 
 float stairHeight(float2 point);
@@ -2280,7 +2281,7 @@ SurfaceMaterial surfaceMaterial(SceneHit hit,
                 plot);
             rock = 0.0f;
         }
-        float3 path = housePath(p, pixelWidth);
+        float3 path = buildingsPath(p, pixelWidth);
         if (path.x > 0.0f) {
             float3 flag = float3(0.2f, 0.193f, 0.18f)
                 * (0.75f + 0.5f * path.z);
@@ -2505,13 +2506,13 @@ float3 houseGhostLighting(SceneHit hit, SurfaceMaterial material,
     return shadePointLight(hit, material, viewDirection, ghost, chrome, game);
 }
 
-// The haunted house's lanterns light what is near them outside. They cast
+// The haunted buildings' lanterns light what is near them outside. They cast
 // no shadows; the house's own walls face away from them.
 float3 houseOutdoorLighting(SceneHit hit, SurfaceMaterial material,
     float3 viewDirection, ChromePose chrome, device const GameState &game) {
     float3 color = float3(0.0f);
-    for (uint i = 0u; i < houseOutdoorLightCount; ++i) {
-        PointLight light = houseHauntedOutdoorLight(i, game);
+    for (uint i = 0u; i < buildingsOutdoorLightCount; ++i) {
+        PointLight light = buildingsOutdoorLight(i, game);
         float reach = distance(light.position, hit.position)
             / (16.0f * houseScale);
         if (reach >= 1.0f) continue;

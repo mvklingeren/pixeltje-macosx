@@ -2625,10 +2625,24 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
 
 // ------------------------------------------------------------------ ground
 
+// Uneven flagstones at metres across and along a path: each row is
+// offset, each stone its own size. Returns 1 for on the path, stone
+// coverage against the grout, and a tone per stone.
+float3 houseFlagstones(float2 metres, float blur) {
+    float row = floor(metres.y / 0.5f);
+    float2 cell = float2(metres.x / 0.62f + 0.5f * fmod(abs(row), 2.0f)
+        + 0.3f * hashTile(float2(row, 5.0f)), metres.y / 0.5f);
+    float2 f = abs(fract(cell) - 0.5f) * float2(0.62f, 0.5f);
+    float2 shrink = 0.04f * float2(hashTile(floor(cell) + 11.0f),
+        hashTile(floor(cell) + 23.0f));
+    float grout = max(f.x - 0.29f + shrink.x, f.y - 0.23f + shrink.y);
+    return float3(1.0f, 1.0f - smoothstep(-blur, blur, grout),
+        hashTile(floor(cell)));
+}
+
 // The flagstone path from the base exit to the porch steps, and the
 // narrower aisle of each graveyard plot from its gate to the mausoleum's
-// steps, as on a path (0 or 1), stone coverage against the grout, and a
-// tone per stone.
+// steps, as houseFlagstones measures them, or zero off them.
 float3 housePath(float2 p, float blur) {
     float2 metres = p - houseOrigin.xz;
     float stepsFront = (housePorchFront
@@ -2644,16 +2658,7 @@ float3 housePath(float2 p, float blur) {
             || metres.y > aisleEnd * houseScale) return float3(0.0f);
         metres.x = aisle;
     }
-    // Uneven stones: each row is offset, each stone its own size.
-    float row = floor(metres.y / 0.5f);
-    float2 cell = float2(metres.x / 0.62f + 0.5f * fmod(abs(row), 2.0f)
-        + 0.3f * hashTile(float2(row, 5.0f)), metres.y / 0.5f);
-    float2 f = abs(fract(cell) - 0.5f) * float2(0.62f, 0.5f);
-    float2 shrink = 0.04f * float2(hashTile(floor(cell) + 11.0f),
-        hashTile(floor(cell) + 23.0f));
-    float grout = max(f.x - 0.29f + shrink.x, f.y - 0.23f + shrink.y);
-    return float3(1.0f, 1.0f - smoothstep(-blur, blur, grout),
-        hashTile(floor(cell)));
+    return houseFlagstones(metres, blur);
 }
 
 // Dug earth over each standing grave, 0 to 1: a plot in front of its

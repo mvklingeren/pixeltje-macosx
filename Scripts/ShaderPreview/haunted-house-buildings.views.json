@@ -119,6 +119,61 @@
         { "buffer": "game", "offset": 16, "floats": [0.2] },
         { "buffer": "game", "offset": 560, "floats": [100] }
       ]
+    },
+    {
+      "name": "cottage-approach",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [0, 2.0, 30, -2.159] },
+        { "buffer": "game", "offset": 16, "floats": [0.06] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "cottage-front",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-36, 2.0, 40, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.15] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "cottage-porch",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-35, 2.0, 46, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.22] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "cottage-chimney-west",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-50, 2.0, 46, 2.214] },
+        { "buffer": "game", "offset": 16, "floats": [0.2] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "cottage-back",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-26, 2.0, 66, -0.833] },
+        { "buffer": "game", "offset": 16, "floats": [0.15] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "cottage-haunted",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-36, 2.0, 42, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.15] },
+        { "buffer": "game", "offset": 560, "floats": [100] },
+        { "buffer": "game", "offset": 9552, "floats": [97.2, 0, 0.95, 122] }
+      ]
     }
   ]
 }
