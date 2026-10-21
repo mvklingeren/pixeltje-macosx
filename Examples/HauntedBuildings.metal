@@ -17,12 +17,14 @@
 
 // ---------------------------------------------------------------- building
 
-// Runs once in the initialize pass.
+// Runs once in the initialize pass: the house with its graveyards and
+// their mausoleums as site 0, then the shed yard behind it.
 void buildBuildings(device HouseModel &house) {
     house.counts = uint4(0u);
     beginBuildingSite(house);
     buildHouse(house);
     buildMausoleums(house);
+    buildShedYard(house);
 }
 
 // ----------------------------------------------------------------- tracing
@@ -142,12 +144,13 @@ float buildingsGlassCrossing(float3 origin, float3 direction, float limit,
 // Weight of the natural terrain at p: 0 on a building's levelled ground,
 // rising to 1 away from it.
 float buildingsGroundBlend(float2 p) {
-    return houseLotBlend(p);
+    return houseLotBlend(p) * shedYardBlend(p);
 }
 
 // The terrain height h at p, levelled under the buildings.
 float buildingsGround(float2 p, float h) {
-    return mix(houseOrigin.y, h, houseLotBlend(p));
+    h = mix(houseOrigin.y, h, houseLotBlend(p));
+    return mix(shedYardOrigin.y, h, shedYardBlend(p));
 }
 
 // The floor, deck, step or stair under p, or ground where there is none.
@@ -156,7 +159,32 @@ float buildingsStand(float2 p, float ground) {
 }
 
 // True where a wall, post, fence, grave or piece of furniture keeps the
-// walker out.
+// walker out, padded by the walker's reach. Each site keeps a table of
+// footprints in its own frame; the site under p picks the table, so one
+// loop serves them all.
 bool buildingsBlocked(float2 p) {
-    return houseBlocked(p);
+    float2 local;
+    float pad;
+    constant float4 *footprints;
+    uint count;
+    if (houseGroundHolds(p)) {
+        local = houseLocal(p);
+        pad = housePlayerPad / houseScale;
+        if (abs(local.x) > houseLotUpper.x && houseYardBlocked(local, pad))
+            return true;
+        footprints = houseObstacles;
+        count = houseObstacleCount;
+    } else if (shedYardHolds(p)) {
+        local = p - shedYardOrigin.xz;
+        pad = housePlayerPad;
+        footprints = shedObstacles;
+        count = shedObstacleCount;
+    } else {
+        return false;
+    }
+    for (uint i = 0u; i < count; ++i) {
+        float4 r = footprints[i];
+        if (all(local > r.xy - pad) && all(local < r.zw + pad)) return true;
+    }
+    return false;
 }

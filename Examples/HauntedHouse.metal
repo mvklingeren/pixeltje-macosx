@@ -423,6 +423,11 @@ void houseCladdingRelief(thread SceneHit &hit, float3 direction,
     if (!(t > 0.0f && t < 0.3f)) return;
     hit.distance += t;
     hit.position = p + direction * t;
+    // A batten's side lies inside the wall's box, where a shadow ray would
+    // pass through the wall it starts in. It is lit from the face plane
+    // instead, so a light behind the wall stays out.
+    if (abs(dot(normal, across)) > 0.5f)
+        hit.position += face * (into * t + 0.001f);
     hit.normal = normal;
 }
 
@@ -872,9 +877,25 @@ void buildHouseFence(device HouseModel &house) {
     addHousePart(house, houseBox(float3(houseLotUpper.x - 0.03f, base,
         houseLotLower.y), float3(houseLotUpper.x + 0.03f, top,
         houseLotUpper.y), houseIron));
+    float back = houseYardGatePostX + 0.25f;
     addHousePart(house, houseBox(float3(houseLotLower.x, base,
-        houseLotUpper.y - 0.03f), float3(houseLotUpper.x, top,
+        houseLotUpper.y - 0.03f), float3(-back, top,
         houseLotUpper.y + 0.03f), houseIron));
+    addHousePart(house, houseBox(float3(back, base, houseLotUpper.y - 0.03f),
+        float3(houseLotUpper.x, top, houseLotUpper.y + 0.03f), houseIron));
+    // A narrower gate in the back leads to the shed yard: plain posts, and
+    // both leaves standing open against the lot.
+    for (uint side = 0u; side < 2u; ++side) {
+        float s = side == 0u ? -1.0f : 1.0f;
+        float c = s * houseYardGatePostX, z = houseLotUpper.y;
+        addHousePart(house, houseBox(float3(c - 0.25f, base, z - 0.25f),
+            float3(c + 0.25f, 2.0f, z + 0.25f), houseStone));
+        addHousePart(house, houseBox(float3(c - 0.32f, 2.0f, z - 0.32f),
+            float3(c + 0.32f, 2.14f, z + 0.32f), houseStone));
+        addHousePart(house, houseBox(float3(s * 0.9f - 0.03f, 0.02f,
+            z - 1.17f), float3(s * 0.9f + 0.03f, 0.92f, z - 0.25f),
+            houseIron));
+    }
     for (uint side = 0u; side < 2u; ++side) {
         float c = (side == 0u ? -1.0f : 1.0f) * houseGatePostX;
         float z = houseLotLower.y;
@@ -1305,12 +1326,13 @@ float houseStand(float2 p, float ground) {
 // Footprints the walker cannot enter, in house-local x/z: walls,
 // partitions, door leaves, furniture, stair sides, porch posts and
 // railings out to the deck edge, the sides of the steps, the gate posts, the
-// fence and the graves, then the plots' fences, gate posts and open gate
-// leaves. Each matches a part buildHouse makes. The graves' footprints are
-// listed here rather than read from houseGraves: a second loop in this
-// test, which the spider kernels inline, made them take a minute to compile
-// cold. The plots' graves are found by houseYardBlocked without one.
-constant uint houseObstacleCount = 70u;
+// fence, the back gate and the graves, then the plots' fences, gate posts
+// and open gate leaves. Each matches a part buildHouse makes. The graves'
+// footprints are listed here rather than read from houseGraves: a second
+// loop in this test, which the spider kernels inline, made them take a
+// minute to compile cold. The plots' graves are found by houseYardBlocked
+// without one, and buildingsBlocked runs this table's loop for every site.
+constant uint houseObstacleCount = 75u;
 constant float4 houseObstacles[houseObstacleCount] = {
     float4(-8.0f, -6.0f, -0.9f, -5.7f), float4(0.9f, -6.0f, 8.0f, -5.7f),
     float4(-8.0f, 5.7f, 8.0f, 6.0f), float4(-8.0f, -6.0f, -7.7f, 6.0f),
@@ -1332,7 +1354,9 @@ constant float4 houseObstacles[houseObstacleCount] = {
     float4(-15.0f, -17.03f, -2.25f, -16.97f),
     float4(2.25f, -17.03f, 15.0f, -16.97f),
     float4(-15.03f, -17.0f, -14.97f, 9.0f), float4(14.97f, -17.0f, 15.03f, 9.0f),
-    float4(-15.0f, 8.97f, 15.0f, 9.03f),
+    float4(-15.0f, 8.97f, -1.45f, 9.03f), float4(1.45f, 8.97f, 15.0f, 9.03f),
+    float4(-1.45f, 8.75f, -0.95f, 9.25f), float4(0.95f, 8.75f, 1.45f, 9.25f),
+    float4(-0.93f, 7.83f, -0.87f, 8.75f), float4(0.87f, 7.83f, 0.93f, 8.75f),
     // The standing graves of houseGraves in order, and the tomb's plinth
     // and step; a fallen cross can be stepped over.
     float4(-4.81f, -14.31f, -4.39f, -14.09f),
@@ -1379,19 +1403,12 @@ bool houseYardBlocked(float2 local, float pad) {
     return all(local > r.xy - pad) && all(local < r.zw + pad);
 }
 
-bool houseBlocked(float2 p) {
+// True where p, in world x and z, lies on the lot or the graveyard plots or
+// within a unit of them.
+bool houseGroundHolds(float2 p) {
     float2 local = houseLocal(p);
-    if (any(local < houseGroundLower - 1.0f)
-        || any(local > houseGroundUpper + 1.0f))
-        return false;
-    float pad = housePlayerPad / houseScale;
-    if (abs(local.x) > houseLotUpper.x && houseYardBlocked(local, pad))
-        return true;
-    for (uint i = 0u; i < houseObstacleCount; ++i) {
-        float4 r = houseObstacles[i];
-        if (all(local > r.xy - pad) && all(local < r.zw + pad)) return true;
-    }
-    return false;
+    return all(local >= houseGroundLower - 1.0f)
+        && all(local <= houseGroundUpper + 1.0f);
 }
 
 // Inside the ground floor rooms, between floor and ceiling.
@@ -2313,6 +2330,7 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
     if (style == houseLog) return houseLogMaterial(part, p, n, blur, inside);
     if (style == houseGrave)
         return houseGraveMaterial(part, p, n, blur, mood, time);
+    if (style == houseCorrugated) return houseCorrugatedMaterial(p, n, blur);
 
     if (style == houseRoof) {
         if (n.y < -0.5f) {

@@ -38,8 +38,9 @@ constant uint houseLantern = 11u;
 constant uint houseCandle = 12u;    // a wax candle and its flame (cut out)
 constant uint houseTimber = 13u;    // a board or beam from addHouseBoard
 constant uint houseLog = 14u;       // a round log from addHouseLog
-constant uint houseGrave = 15u;     // headstones and the tomb
-constant uint houseStyleCount = 16u;
+constant uint houseGrave = 15u;     // headstones, the tomb, the mausoleums
+constant uint houseCorrugated = 16u; // rusted corrugated iron: shed roofs
+constant uint houseStyleCount = 17u;
 
 bool houseMaterial(uint material) {
     return material >= houseMaterialBase
@@ -49,6 +50,17 @@ bool houseMaterial(uint material) {
 // A repeatable hash in [0, 1) for the buildings' irregularities.
 float houseHash(float seed) {
     return fract(sin(seed * 12.9898f + 4.1414f) * 43758.5453f);
+}
+
+// Weight of the natural terrain around a building's levelled pad from
+// lower to upper in x and z, in metres from centre: 0 on the pad and margin
+// beyond it, rising to 1 another reach out.
+float buildingPadBlend(float2 p, float2 centre, float2 lower, float2 upper,
+    float margin, float reach) {
+    float2 local = p - centre;
+    float2 outside = max(max(lower - margin - local, local - upper - margin),
+        float2(0.0f));
+    return smoothstep(0.0f, reach, length(outside));
 }
 
 // Lamps, lanterns and candles flicker by the same law.
@@ -121,6 +133,23 @@ HousePart houseSpire(float3 lower, float3 upper, float2 lean, uint style) {
     houseCut(part, float3(rise, upper.x - apex.x, 0.0f), eave);
     houseCut(part, float3(0.0f, apex.y - lower.z, -rise), lower);
     houseCut(part, float3(0.0f, upper.z - apex.y, rise), eave);
+    return part;
+}
+
+// One side of a pitched roof as a sheet `thickness` thick, its top falling
+// `slope` per metre from the ridge, a line along z at x = ridge.x and
+// height ridge.y, to the eave `reach` metres out on side s (-1 or 1). It
+// runs from z.x to z.y.
+HousePart houseRoofSheet(float2 ridge, float s, float reach, float slope,
+    float thickness, float2 z, uint style) {
+    float drop = slope * reach + thickness + 0.01f;
+    HousePart part = houseBox(
+        float3(min(ridge.x, ridge.x + s * reach), ridge.y - drop, z.x),
+        float3(max(ridge.x, ridge.x + s * reach), ridge.y + 0.01f, z.y), style);
+    float3 top = float3(ridge.x, ridge.y, 0.0f);
+    houseCut(part, float3(s * slope, 1.0f, 0.0f), top);
+    houseCut(part, float3(-s * slope, -1.0f, 0.0f),
+        top - float3(0.0f, thickness, 0.0f));
     return part;
 }
 
@@ -506,6 +535,27 @@ SurfaceMaterial houseLogMaterial(device const HousePart &part, float3 p,
                 * (0.6f + 0.4f * smoothstep(0.012f, 0.0f, abs(knot - 0.026f))));
     }
     return {mix(albedo, float3(0.008f), soot), mix(0.95f, 0.7f, bare), 0.0f,
+        float3(0.0f)};
+}
+
+// Rusted corrugated iron in sheets 76 cm wide: ribs every 7.6 cm run down
+// the slope of a roof or up a wall, and a darker line marks where sheets
+// lap. Rust has eaten most of the galvanising, in streaks down the slope
+// around a few dull grey patches.
+SurfaceMaterial houseCorrugatedMaterial(float3 p, float3 n, float blur) {
+    float3 across = length(n.xz) > 0.05f
+        ? normalize(float3(n.z, 0.0f, -n.x)) : float3(1.0f, 0.0f, 0.0f);
+    float u = dot(p, across), v = dot(p, cross(n, across));
+    float rib = mix(0.5f + 0.5f * cos(u * (2.0f * rangePi / 0.076f)), 0.5f,
+        saturate(blur / 0.03f));
+    float lap = houseLines(u, 0.76f, 0.025f, blur);
+    float rust = smoothstep(0.3f, 0.7f,
+        0.55f * smoothNoise(float2(u * 3.0f, v * 0.35f))
+        + 0.65f * smoothNoise(float2(u, v) * 0.45f));
+    float3 albedo = mix(float3(0.075f, 0.074f, 0.07f),
+        float3(0.095f, 0.042f, 0.022f), rust) * (0.75f + 0.35f * rib)
+        * (1.0f - 0.35f * lap);
+    return {albedo, mix(0.55f, 0.9f, rust), 0.3f * (1.0f - rust),
         float3(0.0f)};
 }
 

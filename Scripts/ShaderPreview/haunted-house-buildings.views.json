@@ -56,6 +56,69 @@
         { "buffer": "game", "offset": 560, "floats": [100] },
         { "buffer": "game", "offset": 9552, "floats": [97.2, 0, 0.95, 122] }
       ]
+    },
+    {
+      "name": "yard-from-back-gate",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [0, -0.75, 150, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.08] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "barn-door",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-20, -0.75, 148, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.14] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "barn-inside",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-22, -0.75, 161, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.3] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "open-shed-front",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [8, -0.75, 168, 1.5708] },
+        { "buffer": "game", "offset": 16, "floats": [0.1] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "open-shed-inside",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [19, -0.75, 164, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.15] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "yard-above",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [0, 30, 128, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [-0.5] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "house-from-yard",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [0, -0.75, 162, 0.0] },
+        { "buffer": "game", "offset": 16, "floats": [0.2] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
     }
   ]
 }

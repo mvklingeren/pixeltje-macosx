@@ -122,14 +122,10 @@ void addMausoleum(device HouseModel &house, float3 o) {
     float slope = mausoleumPedimentRise / mausoleumHalfSpan;
     float apex = C + mausoleumPedimentRise;
     for (uint side = 0u; side < 2u; ++side) {
-        float s = side == 0u ? -1.0f : 1.0f;
-        HousePart slab = mausoleumStone(
-            o + float3(min(0.0f, s * 3.1f), apex - slope * 3.1f - 0.01f, -2.38f),
-            o + float3(max(0.0f, s * 3.1f), apex + 0.21f, 5.62f));
-        houseCut(slab, float3(s * slope, 1.0f, 0.0f),
-            o + float3(0.0f, apex + 0.2f, 0.0f));
-        houseCut(slab, float3(-s * slope, -1.0f, 0.0f),
-            o + float3(0.0f, apex, 0.0f));
+        HousePart slab = houseRoofSheet(float2(o.x, o.y + apex + 0.2f),
+            side == 0u ? -1.0f : 1.0f, 3.1f, slope, 0.2f,
+            float2(o.z - 2.38f, o.z + 5.62f), houseGrave);
+        slab.rows = float4(0.0f);
         addHouseWorldPart(house, slab);
     }
     // A cross on the apex, and a finial on each corner of the roof.
