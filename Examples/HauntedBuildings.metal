@@ -6,7 +6,8 @@
 // of HauntedHouse.metal. The program includes the kit first, then each
 // building, then this file, and calls only the functions here for what
 // every building shares: the scene traces, the Earth's shadows, the glass,
-// footing, obstacles and the levelled ground. A building's own lights,
+// footing, obstacles, the levelled ground and the doors a visitor can knock
+// on. A building's own lights,
 // rooms and haunting stay in its file.
 //
 // The traces loop over groups, never over buildings, so a new building adds
@@ -212,4 +213,54 @@ bool buildingsBlocked(float2 p) {
         if (all(local > r.xy - pad) && all(local < r.zw + pad)) return true;
     }
     return false;
+}
+
+// ------------------------------------------------------------------- doors
+
+// The doors a visitor can knock on: the house's two front doors, standing
+// open against the hall walls, the cottage's plank door and the barn's two
+// sliding leaves. Each building's file places its own.
+constant uint buildingsDoorCount = 5u;
+constant uint doorOfHouse = 1u;
+constant uint doorOfCottage = 2u;
+constant uint doorOfBarn = 3u;
+
+// Door i as a world box; returns the building it belongs to.
+uint buildingsDoorBox(uint i, thread float3 &lower, thread float3 &upper) {
+    if (i < 2u) {
+        houseFrontDoor(i, lower, upper);
+        lower = houseWorld(lower);
+        upper = houseWorld(upper);
+        return doorOfHouse;
+    }
+    if (i == 2u) {
+        cottageDoor(lower, upper);
+        lower += cottageOrigin;
+        upper += cottageOrigin;
+        return doorOfCottage;
+    }
+    shedDoorLeaf(barnSpec(), i - 3u, lower, upper);
+    lower += shedYardOrigin;
+    upper += shedYardOrigin;
+    return doorOfBarn;
+}
+
+// The nearest door the ray meets before limit: its distance, or -1 when
+// there is none. door names its building, or is 0.
+float buildingsDoorCrossing(float3 origin, float3 direction, float limit,
+    thread uint &door) {
+    float nearest = -1.0f;
+    door = 0u;
+    for (uint i = 0u; i < buildingsDoorCount; ++i) {
+        float3 lower, upper, normal;
+        uint building = buildingsDoorBox(i, lower, upper);
+        // A little proud of the boards, which are traced in relief.
+        float t = pixeltje_3d::rayBox(origin, direction, lower - 0.03f,
+            upper + 0.03f, 0.0f, normal);
+        if (t < 0.0f || t > limit) continue;
+        nearest = t;
+        limit = t;
+        door = building;
+    }
+    return nearest;
 }

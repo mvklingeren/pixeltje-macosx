@@ -1,10 +1,12 @@
-// Signal Range double-barrel shotgun: the automatic weapon switch at the
-// base exit, the break-action reload, and the viewmodel.
-// Included by SignalRangeFPSProgram.metal after the pistol's pose.
+// Signal Range double-barrel shotgun: the weapon switch, Signal Range's
+// automatic swap at the base exit, the break-action reload, and the
+// viewmodel. Included by SignalRangeFPSProgram.metal and
+// HauntedHouseProgram.metal after the pistol's pose.
 
 constant float heldPistol = 0.0f;
 constant float heldShotgun = 1.0f;
 constant float heldLauncher = 2.0f;
+constant float heldHand = 3.0f;         // bare hand; SignalRangeHand.metal
 constant float shotgunShells = 2.0f;
 constant float shotgunReloadDuration = 2.3f;
 constant uint shotgunPellets = 8u;
@@ -22,7 +24,11 @@ bool holdingShotgun(device const GameState &game) {
 }
 
 bool holdingLauncher(device const GameState &game) {
-    return game.arms.x > 1.5f;
+    return game.arms.x > 1.5f && game.arms.x < 2.5f;
+}
+
+bool holdingHand(device const GameState &game) {
+    return game.arms.x > 2.5f;
 }
 
 // Fully raised; a weapon being lowered or raised cannot fire.
@@ -30,15 +36,9 @@ bool armsReady(device const GameState &game) {
     return game.arms.y >= 1.0f;
 }
 
-// Stepping out onto the moon swaps the pistol for the shotgun, and stepping
-// back inside swaps it back. The thresholds sit half a metre either side of
-// the shell wall, so standing in the doorway never flickers between them.
-// The launcher, once chosen, stays in hand anywhere. The held weapon is
-// lowered out of view, swapped, then raised.
-void advanceArms(device GameState &game, float dt) {
-    bool outside = outdoors(game.player.xz, holdingShotgun(game) ? -0.5f : 0.5f);
-    float wanted = game.arsenal.x > 0.5f ? heldLauncher
-        : (outside ? heldShotgun : heldPistol);
+// Puts `wanted` in hand: the held weapon is lowered out of view, swapped,
+// then raised. An empty shotgun reloads meanwhile, in hand or not.
+void switchArms(device GameState &game, float wanted, float dt) {
     if (wanted != game.arms.x) {
         game.arms.y = max(game.arms.y - dt / weaponLowerTime, 0.0f);
         if (game.arms.y <= 0.0f) game.arms.x = wanted;
@@ -50,6 +50,16 @@ void advanceArms(device GameState &game, float dt) {
         game.arms.w = max(game.arms.w - dt, 0.0f);
         if (game.arms.w <= 0.0f) game.arms.z = shotgunShells;
     }
+}
+
+// Signal Range: stepping out onto the moon swaps the pistol for the
+// shotgun, and stepping back inside swaps it back. The thresholds sit half
+// a metre either side of the shell wall, so standing in the doorway never
+// flickers between them. The launcher, once chosen, stays in hand anywhere.
+void advanceArms(device GameState &game, float dt) {
+    bool outside = outdoors(game.player.xz, holdingShotgun(game) ? -0.5f : 0.5f);
+    switchArms(game, game.arsenal.x > 0.5f ? heldLauncher
+        : (outside ? heldShotgun : heldPistol), dt);
 }
 
 // How far the held weapon is lowered for a switch: 0 raised, 1 out of view.

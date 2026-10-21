@@ -130,6 +130,25 @@ bool shedYardHolds(float2 p) {
     return all(local > shedYardLower - 1.0f) && all(local < shedYardUpper + 1.0f);
 }
 
+// The barn: closed but for its south doorway, with two roof sheets gone.
+ShedSpec barnSpec() {
+    return {float2(barnX, barnZ), float2(barnHalfSpan, barnHalfLength),
+        5.5f, 4.5f, false, barnDoor, (1u << 2u) | (1u << (8u + 4u))};
+}
+
+// A sliding leaf of a shed's south doorway, as a box in the yard's frame:
+// leaf 0 closes the west half of the doorway, leaf 1 is drawn aside east.
+void shedDoorLeaf(ShedSpec shed, uint leaf, thread float3 &lower,
+    thread float3 &upper) {
+    float3 c = float3(shed.centre.x, 0.0f, shed.centre.y);
+    float d = 0.5f * shed.door, top = min(shed.eaves - 0.7f, 4.2f);
+    float width = d + 0.15f, front = -shed.halfSize.y;
+    lower = c + (leaf == 0u ? float3(-width, 0.05f, front - 0.13f)
+        : float3(d, 0.05f, front - 0.25f));
+    upper = c + (leaf == 0u ? float3(0.0f, top + 0.15f, front - 0.03f)
+        : float3(d + width, top + 0.15f, front - 0.15f));
+}
+
 // A box in the yard's frame.
 void addShedBox(device HouseModel &house, float3 lower, float3 upper,
     uint style) {
@@ -187,10 +206,11 @@ void buildShed(device HouseModel &house, ShedSpec shed) {
             addShedBox(house, c + float3(-d, top, z0), c + float3(d, E, z1),
                 houseBattens);
             float leaf = d + 0.15f;
-            addShedBox(house, c + float3(-leaf, 0.05f, -h.y - 0.13f),
-                c + float3(0.0f, top + 0.15f, -h.y - 0.03f), houseBattens);
-            addShedBox(house, c + float3(d, 0.05f, -h.y - 0.25f),
-                c + float3(d + leaf, top + 0.15f, -h.y - 0.15f), houseBattens);
+            for (uint k = 0u; k < 2u; ++k) {
+                float3 leafLower, leafUpper;
+                shedDoorLeaf(shed, k, leafLower, leafUpper);
+                addShedBox(house, leafLower, leafUpper, houseBattens);
+            }
             addHouseBoard(house, o + float3(0.5f * d, top + 0.3f,
                     -h.y - 0.09f), float3(1.0f, 0.0f, 0.0f),
                 float3(0.0f, 0.0f, 1.0f), float3(d + 2.0f * leaf + 0.1f, 0.14f,
@@ -239,9 +259,7 @@ void buildShed(device HouseModel &house, ShedSpec shed) {
 // the barn, each traced as a group of its own, in a site of their own.
 void buildShedYard(device HouseModel &house) {
     beginBuildingSite(house);
-    buildShed(house, {float2(barnX, barnZ), float2(barnHalfSpan,
-        barnHalfLength), 5.5f, 4.5f, false, barnDoor,
-        (1u << 2u) | (1u << (8u + 4u))});
+    buildShed(house, barnSpec());
     addHouseBoard(house, shedYardOrigin + float3(barnX - 3.0f, 0.04f,
             barnZ + 2.0f), float3(0.3f, 0.0f, 1.0f), float3(0.0f, 1.0f, 0.0f),
         float3(3.6f, 0.25f, 0.05f), houseNailsAtEnds);

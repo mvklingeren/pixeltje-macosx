@@ -9,10 +9,11 @@ using namespace metal;
 // The compute pass owns all mutable game state. The fragment pass traces the
 // same room and walking spider drones from the camera, then draws the HUD.
 // An exit door in the starting arena's south wall leads onto the moon, where
-// quadcopter drones hover and fire back with laser rifles once shot at, and
-// the player switches to a double-barrel shotgun. The sun has set: a full
-// Earth lights the plain, and a flagstone path leads from the exit to a
-// procedurally built Victorian haunted house whose ground floor is open.
+// quadcopter drones hover and fire back with laser rifles once shot at. The
+// sun has set: a full Earth lights the plain, and a flagstone path leads
+// from the exit to a procedurally built Victorian haunted house whose ground
+// floor is open. The hand, pistol, double-barrel shotgun and launcher are
+// on keys 1 to 4 everywhere; the hand punches, and knocks on doors.
 
 // Spider slots: two brown range spiders, the ambush spider, seven dark brown
 // hoppers, then the boss. Every slot before the boss runs the same AI.
@@ -74,8 +75,9 @@ constant float earthRadius = 0.028f;      // drawn 1.6°, larger than life
 constant uint droneCount = 3u;
 constant uint laserCount = 6u;
 
-// A Javelin-style launcher joins the pistol and the shotgun: 2 raises it,
-// 1 returns to the gun for where you stand, X swaps between them.
+// A Javelin-style launcher joins the hand, the pistol and the shotgun. Keys
+// 1 to 4 pick the hand, pistol, shotgun and launcher; X swaps back to the
+// one held before.
 constant float launcherReloadDuration = 2.4f;
 constant float rocketReserveStart = 4.0f;
 constant uint rocketLimit = 7u;            // loaded plus reserve
@@ -93,6 +95,8 @@ constant uint keyV = 16u;
 constant uint keyX = 32u;
 constant uint keyDigit1 = 128u;
 constant uint keyDigit2 = 256u;
+constant uint keyDigit3 = 512u;
+constant uint keyDigit4 = 1024u;
 constant uint keyDigit7 = 8192u;
 // Keys 7, 8 and 9 switch off bokeh, bloom and lens fringing; controls.w
 // holds the bits of the effects switched off.
@@ -186,6 +190,7 @@ struct LaserBolt {
 // voices layer the wind loop at different rates for the night, and the
 // haunt voice plays it as the gale that blows while the house is haunted.
 // The ghost voice loops the ghost's moan from wherever the ghost flies.
+// Each knuckle rap on a door and each punch that lands is one event.
 struct RangeAudio {
     uint shot;
     uint scare;
@@ -193,7 +198,8 @@ struct RangeAudio {
     uint shotgun;
     uint laser;
     uint droneDown;
-    uint reserved[2];
+    uint knock;
+    uint punch;
     float4 droneVoice[droneCount];
     float4 windVoice[2];
     float4 hauntWind;
@@ -292,11 +298,13 @@ struct GameState {
     // preview views write them.
     Drone drones[droneCount];
     LaserBolt lasers[laserCount];
-    float4 arms;            // held weapon (0 pistol, 1 shotgun), raised 0–1,
-                            // shells loaded, shell reload left
+    float4 arms;            // held weapon (0 pistol, 1 shotgun, 2 launcher,
+                            // 3 hand), raised 0–1, shells loaded, shell
+                            // reload left
     uint4 burst;            // pellets in the latest discharge, bolts fired
     // The launcher, dodge and sentries follow too.
-    float4 arsenal;         // launcher chosen, unused, reserve rockets, rocket loaded
+    float4 arsenal;         // weapon chosen and the one before it, as in
+                            // arms.x; reserve rockets, rocket loaded
     float4 launcher;        // lock target ID, lock progress, reload time left, launch kick
     float4 controls;        // previous action keys, flight cam on, dodge cooldown, effects off
     float4 dodge;           // dodge velocity XZ, pickup notice time, unused
@@ -319,6 +327,7 @@ struct GameState {
     HouseModel house;
     float4 lens;            // autofocus distance (0 until the first frame),
                             // elapsed time it was last pulled; unused
+    float4 hand;            // the hand's swing; see SignalRangeHand.metal
 };
 
 static_assert(sizeof(GameState) <= 262144,
@@ -571,6 +580,7 @@ void gunCapsule(thread GunHit &hit, float3 origin, float3 direction,
 #include "SignalRangeSpider.metal"
 #include "SignalRangeDoppler.metal"
 #include "SignalRangeShotgun.metal"
+#include "SignalRangeHand.metal"
 #include "SignalRangeDrone.metal"
 #include "SignalRangeArsenal.metal"
 
@@ -629,8 +639,9 @@ void resetGame(device GameState &game, uint seed) {
     resetArms(game);
     resetDrones(game);
     // The previous keys, the flight-cam option and effect switches survive a
-    // restart.
-    game.arsenal = float4(0.0f, 0.0f, rocketReserveStart, 1.0f);
+    // restart. The pistol is in hand; X swaps to the launcher.
+    game.arsenal = float4(heldPistol, heldLauncher, rocketReserveStart, 1.0f);
+    game.hand = float4(-100.0f, 0.0f, 0.0f, 0.0f);
     game.launcher = float4(0.0f);
     game.controls.z = 0.0f;
     game.dodge = float4(0.0f, 0.0f, -100.0f, 0.0f);
@@ -1104,12 +1115,16 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     game.view.x = basePitch + game.recoil.x;
     bool cutscene = bossCutscene(game);
 
-    // 2 picks the launcher, 1 the gun for where you stand, X swaps them;
-    // advanceArms lowers one weapon and raises the other.
-    if ((pressed & keyDigit1) != 0u) game.arsenal.x = 0.0f;
-    if ((pressed & keyDigit2) != 0u) game.arsenal.x = 1.0f;
-    if ((pressed & keyX) != 0u)
-        game.arsenal.x = game.arsenal.x > 0.5f ? 0.0f : 1.0f;
+    // 1 picks the hand, 2 the pistol, 3 the shotgun and 4 the launcher,
+    // indoors and out; X swaps back to the one held before. switchArms
+    // lowers one weapon and raises the other.
+    float chosen = game.arsenal.x;
+    if ((pressed & keyDigit1) != 0u) chosen = heldHand;
+    if ((pressed & keyDigit2) != 0u) chosen = heldPistol;
+    if ((pressed & keyDigit3) != 0u) chosen = heldShotgun;
+    if ((pressed & keyDigit4) != 0u) chosen = heldLauncher;
+    if ((pressed & keyX) != 0u) chosen = game.arsenal.y;
+    if (chosen != game.arsenal.x) game.arsenal.xy = float2(chosen, game.arsenal.x);
     // R reloads the weapon in hand early.
     if ((pressed & keyR) != 0u && armsReady(game)) {
         if (holdingLauncher(game)) {
@@ -1119,7 +1134,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
         } else if (holdingShotgun(game)) {
             if (game.arms.w <= 0.0f && game.arms.z < shotgunShells)
                 game.arms.w = shotgunReloadDuration;
-        } else if (game.weapon.y <= 0.0f
+        } else if (!holdingHand(game) && game.weapon.y <= 0.0f
             && game.weapon.x < float(magazineSize)) {
             game.weapon.y = reloadDuration;
         }
@@ -1245,7 +1260,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     }
     collectPickups(game);
 
-    advanceArms(game, dt);
+    switchArms(game, game.arsenal.x, dt);
 }
 
 // Each range spider's sight line to the player, traced in the tick pass
@@ -1417,7 +1432,8 @@ kernel void fireRange(constant ProgramUniforms &u [[buffer(0)]],
     device GameState &game = states[0];
     if (game.progress.w != phasePlaying) return;
     uint action = uint(u.pointer.z);
-    if (action > game.progress.z) {
+    // With the hand out, clicks are swingHand's.
+    if (action > game.progress.z && !holdingHand(game)) {
         game.progress.z = action;
         bool shotgun = holdingShotgun(game);
         bool loaded = shotgun
@@ -1496,6 +1512,96 @@ kernel void fireRange(constant ProgramUniforms &u [[buffer(0)]],
         game.sceneTransition.x = game.effects.x;
     }
     else if (game.view.y <= 0.0f) game.progress.w = phaseLost;
+}
+
+// What a punch strikes within reach when the fist arrives. A pane of the
+// house, or its sash, curtain or boards, wakes it as a shot would; a
+// spider, sentry or drone takes a blow like a pistol round's, and a spider
+// is shoved back out of its bite. Returns true when the punch landed.
+bool landPunch(device GameState &game, ShotTrace trace, float3 eye,
+    float3 aim, device RangeAudio &audio) {
+    if (houseShotHitsWindow(game, eye, aim,
+            min(trace.distance, handPunchReach))) {
+        if (game.house.haunt.x < 0.0f) houseWake(game);
+        audio.punch += 1u;
+        return true;
+    }
+    if (trace.distance > handPunchReach) return false;
+    audio.punch += 1u;
+    game.recoil.w = max(game.recoil.w, 0.3f);
+    if (trace.drone >= 0)
+        damageDrone(game, uint(trace.drone), aim, handPunchDamage, audio);
+    if (trace.sentry >= 0) {
+        bool sensor = trace.material == sentrySensorMaterial;
+        bool destroyed = damageSentry(game, uint(trace.sentry),
+            sensor ? 3.0f : handPunchDamage);
+        game.weapon.zw = destroyed ? float2(0.40f, 3.0f)
+            : (sensor ? float2(0.30f, 2.0f) : float2(0.22f, 1.0f));
+    }
+    if (trace.spider >= 0) {
+        float2 push = aim.xz;
+        bool killed = damageSpider(game, uint(trace.spider), handPunchDamage,
+            length(push) > 0.01f ? normalize(push) * handPunchShove
+                : float2(0.0f));
+        game.weapon.zw = killed ? float2(0.40f, 3.0f) : float2(0.22f, 1.0f);
+    }
+    return true;
+}
+
+// The hand swings in its own tick pass after fireRange, for the compile-time
+// reason fireRange gives: its reach is traced like a shot. A click while a
+// door is the nearest thing within knocking reach knocks: three raps, and
+// the first on the house's front doors wakes it. Any other click punches,
+// and the punch strikes when the fist arrives. Clicks while the hand is
+// lowered, raised or mid-swing are spent, as a gun spends them.
+kernel void swingHand(constant ProgramUniforms &u [[buffer(0)]],
+    device GameState *states [[buffer(1)]],
+    device RangeAudio *audio [[buffer(3)]],
+    uint id [[thread_position_in_grid]]) {
+    if (id != 0u) return;
+    device GameState &game = states[0];
+    if (game.progress.w != phasePlaying) return;
+    if (!holdingHand(game) || game.arsenal.x != heldHand) {
+        game.hand = float4(-100.0f, 0.0f, 0.0f, 0.0f);
+        return;
+    }
+    float3 eye = game.player.xyz + eyeOffset(game);
+    float3 aim = pixeltje_3d::forward(game.player.w, game.view.x);
+    uint door;
+    float doorDistance = buildingsDoorCrossing(eye, aim, handKnockReach, door);
+    float age = handSwingAge(game);
+    // While idle, w names the door in reach for the HUD's prompt.
+    if (age < 0.0f) game.hand.w = armsReady(game) ? float(door) : 0.0f;
+    bool click = false;
+    uint action = uint(u.pointer.z);
+    if (action > game.progress.z) {
+        game.progress.z = action;
+        click = age < 0.0f && armsReady(game) && !bossCutscene(game);
+    }
+    bool contact = age >= handPunchContact && !handKnocking(game)
+        && game.hand.z < 0.5f;
+    if (click || contact) {
+        ShotTrace trace = traceShot(game, eye, aim);
+        if (click) {
+            // The door must be what the hand meets first.
+            bool knock = door != 0u && doorDistance <= trace.distance + 0.1f;
+            game.hand = float4(game.effects.x, knock ? 1.0f : 0.0f, 0.0f,
+                knock ? float(door) : 0.0f);
+        } else {
+            game.hand.z = landPunch(game, trace, eye, aim, audio[0])
+                ? 2.0f : 1.0f;
+        }
+    }
+    age = handSwingAge(game);
+    uint struck = uint(game.hand.z);
+    if (age >= 0.0f && handKnocking(game) && struck < handRaps
+        && age >= handRapTime(struck)) {
+        game.hand.z = float(struck + 1u);
+        audio[0].knock += 1u;
+        if (struck == 0u && uint(game.hand.w) == doorOfHouse
+            && game.house.haunt.x < 0.0f)
+            houseWake(game);
+    }
 }
 
 // The seeker and the missile run in their own tick pass after shooting, for
@@ -3588,13 +3694,20 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         pixelAngle, game);
     color = shadeDroneSparks(color, origin, direction, hit.distance, game);
 
-    // The held weapon is drawn over the world, as in any shooter, so a wall
-    // in front of the face never swallows it. Outside it is the shotgun.
+    // The held weapon or the hand is drawn over the world, as in any
+    // shooter, so a wall in front of the face never swallows it.
     bool holdingGun = reveal <= 0.0f && game.progress.w != phaseLost
         && !flightCam;
     bool shotgun = holdingShotgun(game);
     bool launcher = holdingLauncher(game);
+    bool hand = holdingHand(game);
     GunPose gun = heldPose(game);
+    float3 elbow = float3(0.0f);
+    if (hand) {
+        HandPose arm = handPose(game);
+        gun = arm.fist;
+        elbow = arm.elbow;
+    }
     float3 muzzleLocal = launcher ? launcherMuzzle
         : (shotgun ? shotgunLastMuzzle(game) : gunMuzzle);
     float3 viewFront = pixeltje_3d::forward(viewYaw, viewPitch);
@@ -3604,19 +3717,21 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         float3 viewDirection = float3(dot(direction, viewRight),
             dot(direction, viewUp), dot(direction, viewFront));
         float3x3 toGun = transpose(gun.basis);
-        GunHit gunHit = launcher
-            ? traceLauncher(toGun * -gun.pivot, toGun * viewDirection)
-            : (shotgun
-                ? traceShotgun(toGun * -gun.pivot, toGun * viewDirection)
-                : traceGun(toGun * -gun.pivot, toGun * viewDirection,
-                    gun.slide));
+        GunHit gunHit = hand
+            ? traceHand(toGun * -gun.pivot, toGun * viewDirection, elbow)
+            : (launcher
+                ? traceLauncher(toGun * -gun.pivot, toGun * viewDirection)
+                : (shotgun
+                    ? traceShotgun(toGun * -gun.pivot, toGun * viewDirection)
+                    : traceGun(toGun * -gun.pivot, toGun * viewDirection,
+                        gun.slide)));
         if (gunHit.part != 0u) {
             color = shadeGun(gunHit, gun, muzzleLocal, eye, viewRight, viewUp,
                 viewFront, direction, chrome, game);
             depth = 0.0f;  // the bokeh pass keeps depth 0 sharp
         }
     }
-    if (holdingGun && !launcher && game.view.w > 0.0f) {
+    if (holdingGun && !launcher && !hand && game.view.w > 0.0f) {
         // The flash is drawn in scene light so the bloom pass spreads it.
         float2 pixel = in.uv * u.resolutionTime.xy;
         float2 centre = u.resolutionTime.xy * 0.5f;
@@ -3965,7 +4080,7 @@ fragment float4 compositeFragment(ScreenVertex in [[stage_in]],
                 : float3(1.0f)), saturate(game.weapon.z / 0.12f));
     }
     // Magazine rounds, shotgun shells or rockets at the bottom right, with a
-    // bar while reloading.
+    // bar while reloading. The hand has none.
     if (game.progress.w == phasePlaying && holdingLauncher(game)) {
         float2 corner = u.resolutionTime.xy - float2(28.0f, 28.0f);
         uint rockets = uint(game.arsenal.w + game.arsenal.z + 0.5f);
@@ -4008,7 +4123,7 @@ fragment float4 compositeFragment(ScreenVertex in [[stage_in]],
                     * (game.arms.w / shotgunReloadDuration)
                 ? float3(0.95f, 0.82f, 0.45f) : float3(0.10f, 0.13f, 0.14f);
         }
-    } else if (game.progress.w == phasePlaying) {
+    } else if (game.progress.w == phasePlaying && !holdingHand(game)) {
         float2 corner = u.resolutionTime.xy - float2(28.0f, 28.0f);
         for (uint i = 0u; i < magazineSize; ++i) {
             float right = corner.x - float(i) * 9.0f;
@@ -4101,6 +4216,8 @@ constant uint textDirect = 27u;
 constant uint textSentries = 28u;
 constant uint textMedkit = 29u;
 constant uint textRockets = 30u;
+constant uint textHand = 31u;
+constant uint textKnock = 32u;
 
 float4 fontRun(device const float4 *font, uint index) {
     return font[uint(font[0].y) + index];
@@ -4189,14 +4306,20 @@ kernel void buildRangeHUD(constant ProgramUniforms &u [[buffer(0)]],
     if (game.progress.w == phasePlaying) {
         bool shotgun = holdingShotgun(game);
         bool launcher = holdingLauncher(game);
-        uint weaponName = launcher ? textJavelin
-            : (shotgun ? textShotgun : textPistol);
+        bool hand = holdingHand(game);
+        uint weaponName = hand ? textHand : (launcher ? textJavelin
+            : (shotgun ? textShotgun : textPistol));
         addRun(glyphs, count, font, weaponName,
             float2(size.x - 28.0f - runWidth(font, weaponName, 11.0f),
                 size.y - 104.0f), 11.0f, ink, 0.4f + 0.6f * game.arms.y);
-        bool reloading = launcher ? game.launcher.z > 0.0f
-            : (shotgun ? game.arms.w > 0.0f : game.weapon.y > 0.0f);
-        if (reloading) {
+        bool reloading = !hand && (launcher ? game.launcher.z > 0.0f
+            : (shotgun ? game.arms.w > 0.0f : game.weapon.y > 0.0f));
+        if (hand) {
+            // A door within reach invites a knock.
+            if (game.hand.w > 0.5f && handSwingAge(game) < 0.0f)
+                addCentered(glyphs, count, font, textKnock, centreX,
+                    centreY + 0.09f * size.y, 12.0f, ink, 0.85f);
+        } else if (reloading) {
             addRun(glyphs, count, font, textReloading,
                 float2(size.x - 28.0f - runWidth(font, textReloading, 13.0f),
                     size.y - 70.0f), 13.0f, gold, pulse);

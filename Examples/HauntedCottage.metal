@@ -44,6 +44,12 @@ bool cottageGroundHolds(float2 p) {
     return all(local > cottagePadLower) && all(local < cottagePadUpper);
 }
 
+// The plank door in the front wall, as a box in the cottage's frame.
+void cottageDoor(thread float3 &lower, thread float3 &upper) {
+    lower = float3(-0.55f, cottageFloor, -cottageHalf.y - 0.06f);
+    upper = float3(0.55f, cottageFloor + 2.2f, -cottageHalf.y);
+}
+
 // The porch lantern's light.
 PointLight cottageLanternLight(float time) {
     return {cottageOrigin + cottageLantern - float3(0.0f, 0.1f, 0.0f),
@@ -91,8 +97,9 @@ void buildCottage(device HouseModel &house) {
         float2(o.x - 0.9f, o.x + 0.9f), 2u);
     addLooseClapboards(house, wallIndex, float3(1.0f, 0.0f, 0.0f), clad,
         houseNoSkip, 1u);
-    addHouseWorldPart(house, cottageBox(float3(-0.55f, F, -h.y - 0.06f),
-        float3(0.55f, F + 2.2f, -h.y), houseBattens));
+    float3 doorLower, doorUpper;
+    cottageDoor(doorLower, doorUpper);
+    addHouseWorldPart(house, cottageBox(doorLower, doorUpper, houseBattens));
     addHouseWorldPart(house, cottageBox(float3(-1.2f, -0.3f, -4.8f),
         float3(1.2f, 0.3f, -h.y - 0.15f), houseStone));
     // The door hood on two posts, and the lantern under it.

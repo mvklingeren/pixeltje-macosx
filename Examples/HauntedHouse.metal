@@ -18,9 +18,10 @@
 // constants in straight-line code, so the spider and drone kernels that
 // test walkability never loop over the parts.
 //
-// Shooting any window wakes the house: its lights go out, a wind rises and
-// blows the curtains about, a poison green glow snaps on, and a ghost flies
-// out of the front doors at you.
+// Shooting or punching any window, or knocking on the front doors, wakes the
+// house: its lights go out, a wind rises and blows the curtains about, a
+// poison green glow snaps on, and a ghost flies out of the front doors at
+// you.
 
 // ------------------------------------------------------------------ layout
 // House-local coordinates: x across the facade, y up from the levelled lot,
@@ -68,6 +69,14 @@ float2 houseLocal(float2 worldXZ) {
 
 float3 houseWorld(float3 local) {
     return houseOrigin + local * houseScale;
+}
+
+// A front door, standing open against a hall wall, as a house-local box:
+// side 0 is the west door, 1 the east.
+void houseFrontDoor(uint side, thread float3 &lower, thread float3 &upper) {
+    float x = side == 0u ? -0.9f : 0.84f;
+    lower = float3(x, houseFloorY, -5.7f);
+    upper = float3(x + 0.06f, houseFloorY + houseDoorHeight, -4.8f);
 }
 
 // Scales a house-local part into the world and adds it to the open group.
@@ -718,10 +727,9 @@ void buildHouseRooms(device HouseModel &house) {
             float3(x0, F + houseInnerDoorHeight, houseInnerDoorZ.x),
             float3(x1, C, houseInnerDoorZ.y), houseSiding));
         // The front doors stand open against the hall walls.
-        addHousePart(house, houseBox(
-            float3(side == 0u ? -0.9f : 0.84f, F, -5.7f),
-            float3(side == 0u ? -0.84f : 0.9f, F + houseDoorHeight, -4.8f),
-            houseTrim));
+        float3 doorLower, doorUpper;
+        houseFrontDoor(side, doorLower, doorUpper);
+        addHousePart(house, houseBox(doorLower, doorUpper, houseTrim));
         // Closed stringers flank the hall stairs, their tops following the
         // handrail.
         HousePart stringer = houseBox(
