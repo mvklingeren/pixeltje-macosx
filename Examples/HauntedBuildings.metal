@@ -22,6 +22,7 @@ void buildBuildings(device HouseModel &house) {
     house.counts = uint4(0u);
     beginBuildingSite(house);
     buildHouse(house);
+    buildMausoleums(house);
 }
 
 // ----------------------------------------------------------------- tracing

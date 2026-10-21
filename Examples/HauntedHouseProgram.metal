@@ -418,6 +418,7 @@ PointLight roomLight(uint index, float time) {
 
 #include "HauntedBuildingKit.metal"
 #include "HauntedHouse.metal"
+#include "HauntedMausoleum.metal"
 #include "HauntedBuildings.metal"
 
 float stairHeight(float2 point);

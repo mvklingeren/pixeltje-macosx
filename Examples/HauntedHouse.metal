@@ -13,10 +13,10 @@
 // The ground floor is open: a hall with a staircase, a parlour with a
 // fireplace and a coffin, and a dining room. A small graveyard of crosses,
 // headstones and a tomb surrounds the house, and a large one lies on a
-// fenced plot of its own on either side of the lot. Floors, steps, walls and
-// graves for walking come from the same layout constants in straight-line
-// code, so the spider and drone kernels that test walkability never loop
-// over the parts.
+// fenced plot of its own on either side of the lot, before a mausoleum.
+// Floors, steps, walls and graves for walking come from the same layout
+// constants in straight-line code, so the spider and drone kernels that
+// test walkability never loop over the parts.
 //
 // Shooting any window wakes the house: its lights go out, a wind rises and
 // blows the curtains about, a poison green glow snaps on, and a ghost flies
@@ -993,20 +993,26 @@ void buildHouseGraveyard(device HouseModel &house) {
 // A large graveyard lies on a plot of its own west and east of the lot. Each
 // is fenced in iron on its three open sides, with a gate in front between
 // stone posts carrying lanterns and its two leaves swung open into the plot.
-// An aisle runs from the gate to the back, and graves stand in rows either
-// side of it, all facing the front. They are set out on a grid of cells, one
-// marker or none to a cell, whose kind, size, lean and offset come from a
-// hash of the cell, so walking and the dug earth find a cell's grave by
-// arithmetic rather than a loop. Plot 0 is west and plot 1 east; a plot's
-// columns run west to east, three either side of its aisle.
+// An aisle runs from the gate to a mausoleum at the back, and graves stand
+// in rows either side of it, all facing the front. They are set out on a
+// grid of cells, one marker or none to a cell, whose kind, size, lean and
+// offset come from a hash of the cell, so walking and the dug earth find a
+// cell's grave by arithmetic rather than a loop. The mausoleum of
+// HauntedMausoleum.metal takes the four cells either side of the aisle in
+// the back two rows. Plot 0 is west and plot 1 east; a plot's columns run
+// west to east, three either side of its aisle.
 constant uint houseYardRows = 9u;
 constant uint houseYardColumns = 6u;
 constant uint houseYardBandRows = 3u;      // rows traced as one group
 constant float houseYardFrontRow = -13.0f; // z of the front row's cells
 constant float houseYardRowPitch = 2.5f;
 constant float houseYardColumnPitch = 2.2f;
-constant uint houseYardTombRow = 8u;       // each plot's tomb, at the back
+constant uint houseYardMausoleumRow = 7u;  // its first row
+constant float houseYardMausoleumZ = 5.26f; // z of the foot of its doorway
 constant uint houseGraveNone = 5u;         // an empty cell
+constant uint houseGraveMausoleum = 6u;    // a cell under the mausoleum
+
+float4 mausoleumFootprint();
 
 struct HouseYardGrave {
     float2 at;      // house-local x and z of the foot
@@ -1019,18 +1025,14 @@ float houseYardAisle(uint plot) {
     return plot == 0u ? -houseYardAisleX : houseYardAisleX;
 }
 
-// The tomb stands beside the aisle on the plot's outer side.
-uint houseYardTombColumn(uint plot) {
-    return plot == 0u ? 2u : 3u;
-}
-
 HouseYardGrave houseYardGrave(uint plot, uint row, uint column) {
     float o = float(column) - 2.5f;
     float2 cell = float2(houseYardAisle(plot)
         + sign(o) * (abs(o) + 0.5f) * houseYardColumnPitch,
         houseYardFrontRow + float(row) * houseYardRowPitch);
-    if (row == houseYardTombRow && column == houseYardTombColumn(plot))
-        return {cell, houseGraveTomb, 0.0f, float2(0.0f)};
+    if (row >= houseYardMausoleumRow && (column == 2u || column == 3u))
+        return {float2(houseYardAisle(plot), houseYardMausoleumZ),
+            houseGraveMausoleum, 0.0f, float2(0.0f)};
     float seed = float(plot * 64u + row * houseYardColumns + column) * 1.37f
         + 211.0f;
     float pick = houseHash(seed);
@@ -1060,12 +1062,15 @@ uint3 houseYardCell(float2 local, float ahead) {
 }
 
 // The footprint a walker cannot enter, in house-local x/z as lower and
-// upper corners, matching the parts addHouseYardGrave makes. An empty cell
-// and a fallen cross, which can be stepped over, have none.
+// upper corners, matching the parts addHouseYardGrave and the mausoleum
+// make. An empty cell and a fallen cross, which can be stepped over, have
+// none. Every cell under the mausoleum hands out its whole footprint, which
+// stays a pad's width inside those cells.
 float4 houseYardFootprint(HouseYardGrave grave) {
-    if (grave.kind == houseGraveTomb)
-        return float4(grave.at + float2(-0.85f, -1.275f),
-            grave.at + float2(0.85f, 1.1f));
+    if (grave.kind == houseGraveMausoleum) {
+        float4 r = mausoleumFootprint() / houseScale;
+        return float4(grave.at + r.xy, grave.at + r.zw);
+    }
     if (grave.kind == houseGraveNone || grave.kind == houseGraveFallen)
         return float4(1.0e9f, 1.0e9f, -1.0e9f, -1.0e9f);
     float2 reach = grave.kind == houseGraveCross ? float2(0.16f, 0.06f)
@@ -1081,9 +1086,7 @@ void addHouseYardGrave(device HouseModel &house, HouseYardGrave grave) {
             1.25f + 0.35f * grave.size.y, grave.lean);
     else if (grave.kind == houseGraveFallen)
         addFallenCross(house, ground, grave.lean);
-    else if (grave.kind == houseGraveTomb)
-        addHouseTomb(house, ground);
-    else if (grave.kind != houseGraveNone)
+    else if (grave.kind == houseGraveRound || grave.kind == houseGravePointed)
         addHeadstone(house, ground - float3(0.0f, 0.2f, 0.0f), face,
             0.58f + 0.2f * grave.size.x, 0.95f + 0.3f * grave.size.y,
             grave.lean, grave.kind == houseGravePointed);
@@ -1938,11 +1941,12 @@ SurfaceMaterial houseGlassPane(HouseWindow w, device const HousePart &part,
     return {albedo, mix(0.8f, 0.12f, w.glass), 0.0f, emission};
 }
 
-// Headstones and the tomb, in metres. A headstone is grey or dark slate,
-// streaked and blotched with lichen, dirty near the ground, and engraved
-// with a cross over three lines of lettering. The tomb is pale ashlar under
-// stone roof slabs, with a worn inscription over its door, and its doorway
-// is dark; a sick glow stirs in it while the house is haunted.
+// Headstones, the tomb and the mausoleums, in metres. A headstone is grey
+// or dark slate, streaked and blotched with lichen, dirty near the ground,
+// and engraved with a cross over three lines of lettering. The tomb and the
+// mausoleums are pale ashlar under stone roof slabs, with a worn
+// inscription over the door, and their doorways are dark; a sick glow stirs
+// in them while the house is haunted.
 SurfaceMaterial houseGraveMaterial(device const HousePart &part, float3 p,
     float3 n, float blur, HouseHaunting mood, float time) {
     float seed = dot(part.lower.xyz, float3(1.3f, 2.9f, 4.7f));
@@ -1999,11 +2003,16 @@ SurfaceMaterial houseGraveMaterial(device const HousePart &part, float3 p,
             houseLines(along, 0.7f, 0.012f, blur));
         stone *= (0.85f + 0.3f * hashTile(float2(floor(along / 0.7f), course)))
             * (1.0f - 0.55f * mortar);
+        // A line over the tomb's door, or the one a mausoleum's part
+        // carries.
         float centre = 0.5f * (part.lower.x + part.upper.x);
-        if (n.z < -0.9f && part.upper.x - part.lower.x > 2.0f
-            && height > 2.42f && height < 2.66f)
+        bool carved = part.rows.z > 0.0f;
+        if (n.z < -0.9f && (carved || (part.upper.x - part.lower.x > 2.0f
+                && height > 2.42f && height < 2.66f && part.rows.w > 0.5f)))
             stone *= 1.0f - 0.6f * houseLettering(float2(p.x - centre,
-                height - 2.54f), 0.8f, 0.09f, seed, blur);
+                carved ? p.y - part.lower.y - part.rows.x : height - 2.54f),
+                carved ? part.rows.y : 0.8f, carved ? part.rows.z : 0.09f,
+                seed, blur);
     } else if (n.y < 0.98f) {
         // Roof slabs, laid down the slope.
         stone *= 1.0f - 0.5f * houseLines(p.z, 0.5f, 0.015f, blur);
@@ -2599,8 +2608,9 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
 // ------------------------------------------------------------------ ground
 
 // The flagstone path from the base exit to the porch steps, and the
-// narrower aisle of each graveyard plot from its gate to its tomb, as on a
-// path (0 or 1), stone coverage against the grout, and a tone per stone.
+// narrower aisle of each graveyard plot from its gate to the mausoleum's
+// steps, as on a path (0 or 1), stone coverage against the grout, and a
+// tone per stone.
 float3 housePath(float2 p, float blur) {
     float2 metres = p - houseOrigin.xz;
     float stepsFront = (housePorchFront
@@ -2609,11 +2619,11 @@ float3 housePath(float2 p, float blur) {
     if (abs(metres.x) > edge || p.y < hullSouth + 0.3f
         || metres.y > stepsFront + 0.05f) {
         float aisle = abs(metres.x) - houseYardAisleX * houseScale;
-        float tombFront = houseYardFrontRow
-            + float(houseYardTombRow) * houseYardRowPitch - 1.3f;
+        float aisleEnd = houseYardMausoleumZ
+            + mausoleumFootprint().y / houseScale;
         if (abs(aisle) > edge - 0.5f
             || metres.y < (houseGroundLower.y - 0.4f) * houseScale
-            || metres.y > tombFront * houseScale) return float3(0.0f);
+            || metres.y > aisleEnd * houseScale) return float3(0.0f);
         metres.x = aisle;
     }
     // Uneven stones: each row is offset, each stone its own size.

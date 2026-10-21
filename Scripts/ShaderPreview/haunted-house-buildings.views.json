@@ -1,0 +1,61 @@
+{
+  "width": 960,
+  "height": 540,
+  "views": [
+    {
+      "name": "mausoleum-aisle-east",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [48, -0.75, 100, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.06] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "mausoleum-front-east",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [48, -0.75, 124, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.2] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "mausoleum-door-east",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [48.6, -0.75, 132.5, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.12] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "mausoleum-quarter-west",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-37, -0.75, 127, -2.44] },
+        { "buffer": "game", "offset": 16, "floats": [0.12] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "mausoleum-above-east",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [62, 14, 120, -2.53] },
+        { "buffer": "game", "offset": 16, "floats": [-0.45] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "mausoleum-haunted-east",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [48.6, -0.75, 132.5, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.12] },
+        { "buffer": "game", "offset": 560, "floats": [100] },
+        { "buffer": "game", "offset": 9552, "floats": [97.2, 0, 0.95, 122] }
+      ]
+    }
+  ]
+}
