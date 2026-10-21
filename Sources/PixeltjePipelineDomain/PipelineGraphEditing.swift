@@ -67,7 +67,8 @@ public enum PipelineGraphEditing {
     } else {
       1
     }
-    let count = Int(min(max(savedCount, 1), 16))
+    let count = Int(min(max(savedCount, PipelineAssetCacheSlots.range.lowerBound),
+      PipelineAssetCacheSlots.range.upperBound))
     for index in 0..<count {
       let name = "asset\(index)"
       descriptor.inputs.append(.init(name: name, type: .any,

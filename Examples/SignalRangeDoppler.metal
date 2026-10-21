@@ -1,10 +1,11 @@
 // Spatial sound for Signal Range's looping voices.
 // Included by SignalRangeFPSProgram.metal. A voice is four floats in the
 // audio buffer that the engine reads after every frame: gain, playback rate,
-// stereo pan, and one unused. The editor loops the voice's sound and applies
-// them, so a moving source carries distance loss, panning and Doppler shift
-// without any per-sample work here. Playback rate scales pitch and tempo
-// together, as a real Doppler shift does.
+// stereo pan and drive. The editor plays the voice's sound with them, so a
+// moving source carries distance loss, panning and Doppler shift without any
+// per-sample work here. Playback rate scales every frequency of the sound,
+// as a real Doppler shift does. Drive, 0–1, tells a synthesized voice how
+// hard its source works; dopplerVoice leaves it at zero for the caller.
 
 // Real sound at drone speeds shifts pitch by only a few percent. A slower
 // game-scale speed of sound keeps the rise and drop of a passing drone

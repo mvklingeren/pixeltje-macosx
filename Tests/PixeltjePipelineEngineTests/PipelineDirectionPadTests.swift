@@ -135,8 +135,6 @@ import Testing
       "BaseTestSet/two-tone.wav"), type: .audio),
     "asset8": PipelineNodeValue(examples.appendingPathComponent(
       "BaseTestSet/two-tone.wav"), type: .audio),
-    "asset9": PipelineNodeValue(examples.appendingPathComponent(
-      "BaseTestSet/two-tone.wav"), type: .audio),
   ])
   let executor = PipelineGPUProgram.executor(runner: runner)
 

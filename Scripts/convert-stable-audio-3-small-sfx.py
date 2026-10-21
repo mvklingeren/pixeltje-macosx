@@ -9,6 +9,7 @@ PYTHONPATH. The output is user-owned and never bundled with Pixeltje.
 import argparse
 import hashlib
 import json
+import math
 import shutil
 from pathlib import Path
 
@@ -24,6 +25,11 @@ from transformers import AutoConfig, T5GemmaEncoderModel
 SOURCE_REVISION = "05ca3857881c94a2b84026b1111c537d78f5f9f0"
 MAIN_SHA256 = "ed9cf1b6172f1a8c2921a9560c21109ff3239524563ced9dce6dcdef41e2f515"
 TEXT_SHA256 = "9b05ea5a4f211d023832f706fb2c0e83e4fc721b6da35ab69ceb0b55eb7800d3"
+SAMPLE_RATE = 44100
+# The publisher sizes the latent window as the requested duration plus this
+# headroom, rounded up to whole decoder chunks (StableAudio3._adapt_sample_size).
+PADDING_SECONDS = 6.0
+MIN_DURATION_SECONDS = 0.25
 
 
 class TextEncoder(torch.nn.Module):
@@ -75,19 +81,29 @@ def sha256(path):
     return digest.hexdigest()
 
 
-def export(module, inputs, input_names, output_name, target):
+def export(module, inputs, input_names, output_name, target, dynamic_shapes=None):
     module.eval().requires_grad_(False)
     with torch.no_grad():
         output = module(*inputs)
     print(target.name, "output", tuple(output.shape), flush=True)
-    program = export_stateless(module, inputs, input_names, (output_name,))
+    program = export_stateless(module, inputs, input_names, (output_name,),
+                               dynamic_shapes=dynamic_shapes)
     program.save_asset(target)
+
+
+def latent_frames(seconds, downsampling_ratio, alignment):
+    samples = int((seconds + PADDING_SECONDS) * SAMPLE_RATE)
+    frames = math.ceil(samples / downsampling_ratio)
+    return math.ceil(frames / alignment) * alignment
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--max-duration", type=float, default=11.0,
+        help="longest clip in seconds the exported denoiser and decoder accept")
     args = parser.parse_args()
     source = args.checkpoint.resolve()
     output = args.output.resolve()
@@ -99,8 +115,22 @@ def main():
     if sha256(encoder_root / "model.safetensors") != TEXT_SHA256:
         parser.error("T5Gemma checkpoint differs from reviewed publisher revision")
     config = json.loads((source / "model_config.json").read_text())
-    if config["sample_rate"] != 44100 or config["model"]["diffusion"]["diffusion_objective"] != "rf_denoiser":
+    if config["sample_rate"] != SAMPLE_RATE or config["model"]["diffusion"]["diffusion_objective"] != "rf_denoiser":
         parser.error("model configuration is incompatible")
+    pretransform = config["model"]["pretransform"]["config"]
+    downsampling_ratio = pretransform["downsampling_ratio"]
+    encoder_config = pretransform["encoder"]["config"]
+    alignment = encoder_config.get("chunk_size", 32) // encoder_config["strides"][0]
+    max_seconds = config["sample_size"] / SAMPLE_RATE - PADDING_SECONDS
+    if not MIN_DURATION_SECONDS <= args.max_duration <= max_seconds:
+        parser.error(f"--max-duration must be between {MIN_DURATION_SECONDS} and {max_seconds:.0f}")
+    min_frames = latent_frames(MIN_DURATION_SECONDS, downsampling_ratio, alignment)
+    max_frames = latent_frames(args.max_duration, downsampling_ratio, alignment)
+    # The denoiser and decoder take any whole number of decoder chunks in this
+    # range, so Swift can size each clip's window exactly as the publisher does.
+    chunks = torch.export.Dim("latent_chunks", min=min_frames // alignment,
+                              max=max_frames // alignment)
+    latent_shape = {2: alignment * chunks}
     output.mkdir(parents=True)
 
     text_config = AutoConfig.from_pretrained(encoder_root, local_files_only=True)
@@ -134,12 +164,13 @@ def main():
                  for name in weights.keys() if name.startswith("model.model.")}
     dit.load_state_dict(state, strict=True)
     export(Denoiser(dit),
-           (torch.zeros((1, 256, 88), dtype=torch.float32),
+           (torch.zeros((1, 256, max_frames), dtype=torch.float32),
             torch.tensor([0.5], dtype=torch.float32),
             torch.zeros((1, 257, 768), dtype=torch.float32),
             torch.zeros((1, 768), dtype=torch.float32)),
            ("latents", "sigma", "conditioning", "globalConditioning"),
-           "velocity", output / "Denoiser.aimodel")
+           "velocity", output / "Denoiser.aimodel",
+           dynamic_shapes=(latent_shape, None, None, None))
     del dit
 
     autoencoder = load_autoencoder(str(source / "model_config.json"),
@@ -151,8 +182,9 @@ def main():
         if hasattr(module, "mask_noise"):
             module.mask_noise = 0.0
     export(AudioDecoder(autoencoder),
-           (torch.zeros((1, 256, 88), dtype=torch.float32),),
-           ("latents",), "audio", output / "AudioDecoder.aimodel")
+           (torch.zeros((1, 256, max_frames), dtype=torch.float32),),
+           ("latents",), "audio", output / "AudioDecoder.aimodel",
+           dynamic_shapes=(latent_shape,))
     del autoencoder
 
     tokenizer = output / "tokenizer"
@@ -167,9 +199,14 @@ def main():
             "weights_sha256": MAIN_SHA256,
             "text_weights_sha256": TEXT_SHA256,
         },
-        "sample_rate": 44100, "channels": 2, "latent_frames": 88,
-        "latent_channels": 256, "duration_seconds": 2,
-        "padding_seconds": 6, "token_length": 256,
+        "sample_rate": SAMPLE_RATE, "channels": 2,
+        # latent_frames is the largest window; min_latent_frames and
+        # latent_frame_alignment describe the dynamic latent axis. An export
+        # without min_latent_frames has one fixed window of latent_frames.
+        "latent_frames": max_frames, "min_latent_frames": min_frames,
+        "latent_frame_alignment": alignment, "downsampling_ratio": downsampling_ratio,
+        "latent_channels": 256, "duration_seconds": args.max_duration,
+        "padding_seconds": PADDING_SECONDS, "token_length": 256,
         "assets": {
             "textEncoder": "TextEncoder.aimodel",
             "durationEncoder": "DurationEncoder.aimodel",

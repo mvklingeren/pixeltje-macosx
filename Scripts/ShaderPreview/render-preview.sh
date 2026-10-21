@@ -10,6 +10,7 @@ sources=(
   "$engine/PipelineMetalEasing.swift"
   "$engine/PipelineMetal3D.swift"
   "$engine/PipelineMetalTerrain.swift"
+  "$engine/PipelineMetalPostFX.swift"
   "$engine/PipelineSystemFont.swift"
 )
 binary=${TMPDIR:-/tmp}/pixeltje-shader-preview/render-preview

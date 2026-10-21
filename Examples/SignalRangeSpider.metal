@@ -13,7 +13,8 @@ constant float spiderBiteEnd = 0.62f;
 enum class SpiderVariant : uint {
     brown = 0u,
     blackRedEyes = 1u,
-    bossBlack = 2u
+    bossBlack = 2u,
+    darkBrownHopper = 3u
 };
 
 struct SpiderTraits {
@@ -30,19 +31,32 @@ struct SpiderTraits {
     float jumpHeight;
     float jumpDuration;
     float jumpInterval;
+    float speed;            // multiplies the shared patrol and chase speeds
+    float health;
 };
 
 SpiderTraits spiderTraits(SpiderVariant variant) {
-    // Both variants share a walking cycle and jump behavior; proportions and
+    // All variants share a walking cycle and jump behavior; proportions and
     // movement amplitudes define their different silhouettes.
     if (variant == SpiderVariant::bossBlack)
         return {3.30f, 0.75f, 1.05f, 0.72f, 0.79f, 0.50f,
-            0.84f, 0.30f, 0.18f, false, 0.0f, 0.0f, 0.0f};
+            0.84f, 0.30f, 0.18f, false, 0.0f, 0.0f, 0.0f, 1.0f, 14.0f};
     if (variant == SpiderVariant::blackRedEyes)
         return {0.35f, 0.70f, 1.08f, 0.70f, 0.66f, 0.44f,
-            0.84f, 0.34f, 0.22f, true, 0.28f, 0.46f, 2.0f};
+            0.84f, 0.34f, 0.22f, true, 0.28f, 0.46f, 2.0f, 1.0f, 5.0f};
+    // The hopper's legs reach farther than any other spider's, so a long
+    // stride carries it faster on fewer steps, with short hops between.
+    if (variant == SpiderVariant::darkBrownHopper)
+        return {0.52f, 0.95f, 1.35f, 0.85f, 0.72f, 0.50f,
+            1.40f, 0.42f, 0.20f, true, 0.38f, 0.40f, 1.1f, 1.45f, 3.0f};
     return {0.70f, 0.0f, 0.0f, 0.0f, 1.0f, 0.11f,
-        0.48f, 0.23f, 1.0f, false, 0.28f, 0.46f, 2.0f};
+        0.48f, 0.23f, 1.0f, false, 0.28f, 0.46f, 2.0f, 1.0f, 5.0f};
+}
+
+// Red eyes and a black coat; the brown spiders have neither.
+bool blackSpider(SpiderVariant variant) {
+    return variant == SpiderVariant::blackRedEyes
+        || variant == SpiderVariant::bossBlack;
 }
 
 float spiderFootprintRadius(SpiderTraits traits) {
@@ -52,7 +66,9 @@ float spiderFootprintRadius(SpiderTraits traits) {
 
 SpiderVariant spiderVariantForSlot(uint slot) {
     return slot == bossSlot ? SpiderVariant::bossBlack
-        : slot == 2u ? SpiderVariant::blackRedEyes : SpiderVariant::brown;
+        : slot == ambushSlot ? SpiderVariant::blackRedEyes
+        : slot >= hopperStart ? SpiderVariant::darkBrownHopper
+        : SpiderVariant::brown;
 }
 
 float spiderBodyBob(float phase, float movementBlend,
@@ -64,30 +80,67 @@ float spiderBodyBob(float phase, float movementBlend,
 
 float spiderBodyRise(float time, uint slot) {
     SpiderTraits traits = spiderTraits(spiderVariantForSlot(slot));
-    return 0.014f * (float(slot) - 1.0f)
+    return 0.014f * (float(min(slot, 3u)) - 1.0f)
         + traits.bodyMotion * 0.013f
             * sin(time * 1.9f + float(slot) * 2.2f);
 }
 
 float3 spawnPosition(uint slot) {
     // The third spider waits out of sight in the north room for the ambush.
-    float2 initial[4] = {
-        float2(-9.5f, -8.0f), float2(9.0f, -10.0f),
-        float2(0.0f, -38.0f), float2(0.0f, -118.0f)
+    // The hoppers hold the east, west and north rooms and the arena's far
+    // corner, clear of the props, sentries and pickups.
+    float2 initial[enemyCount] = {
+        float2(-9.5f, -8.0f), float2(9.0f, -10.0f), float2(0.0f, -38.0f),
+        float2(-13.0f, -13.5f),
+        float2(35.0f, 7.0f), float2(44.0f, -5.0f),
+        float2(-35.0f, -7.0f), float2(-44.0f, 5.0f),
+        float2(-11.0f, -51.0f), float2(8.0f, -30.0f),
+        float2(0.0f, -118.0f)
     };
     float2 xz = initial[slot];
     SpiderTraits traits = spiderTraits(spiderVariantForSlot(slot));
     return float3(xz.x, stairHeight(xz) + 0.52f * traits.scale, xz.y);
 }
 
+// The path-network room each unaware spider patrols.
+uint spiderHomeArea(uint slot) {
+    uint homes[ordinaryEnemyCount] = {
+        pathAreaArena, pathAreaArena, pathAreaNorth, pathAreaArena,
+        pathAreaEast, pathAreaEast, pathAreaWest, pathAreaWest,
+        pathAreaNorth, pathAreaNorth};
+    return homes[min(slot, ordinaryEnemyCount - 1u)];
+}
+
 // Unaware range spiders face away from the start so the player can open fire.
 float idleYaw(uint slot) {
+    if (slot >= hopperStart) return float(slot) * 2.4f;
     return slot == 0u ? -0.5f * rangePi : (slot == 1u ? 0.0f : rangePi);
 }
 
 // Dead spiders and the ambush spider before it drops are neither drawn nor hit.
 bool spiderActive(device const GameState &game, uint slot) {
     return game.enemy[slot].w > 0.0f && game.senses[slot].z >= 0.0f;
+}
+
+// The north gate opens once the three range spiders are down; the hoppers
+// are optional.
+bool rangeCleared(device const GameState &game) {
+    for (uint i = 0u; i < hopperStart; ++i)
+        if (game.enemy[i].w > 0.0f) return false;
+    return true;
+}
+
+// When the last range spider fell, or -1 while one still stands.
+float rangeClearedTime(device const GameState &game) {
+    if (!rangeCleared(game)) return -1.0f;
+    float latest = 0.0f;
+    for (uint i = 0u; i < min(game.progress.x, targetKills); ++i) {
+        SpiderVariant variant = SpiderVariant(game.fallen[i].appearance.x);
+        if (variant == SpiderVariant::brown
+            || variant == SpiderVariant::blackRedEyes)
+            latest = max(latest, game.fallen[i].motion.z);
+    }
+    return latest;
 }
 
 bool bossEnraged(device const GameState &game) {
@@ -142,12 +195,12 @@ float spiderLungeReach(SpiderTraits traits) {
     return 2.0f * traits.scale + 0.5f;
 }
 
-float spiderJumpLift(SpiderTraits traits, bool pursuing, float dt,
+float spiderJumpLift(SpiderTraits traits, bool moving, float dt,
     thread float &clock) {
     if (!traits.canJump) return 0.0f;
     // Negative time counts down to takeoff; nonnegative time is the jump arc.
     if (clock < 0.0f) {
-        if (pursuing) clock = min(0.0f, clock + dt);
+        if (moving) clock = min(0.0f, clock + dt);
     } else {
         clock += dt;
         if (clock >= traits.jumpDuration) {
@@ -460,7 +513,7 @@ void acceptSpiderEyes(thread SpiderHit &hit, float3 origin,
     if (bound < 0.0f || (dot(origin - eyeRegion, origin - eyeRegion)
         > 0.3025f && bound >= hit.distance)) return;
 
-    if (variant != SpiderVariant::brown) {
+    if (blackSpider(variant)) {
         // The black variant has only two red corneas, with no extra socket
         // spheres that could read as additional eyes.
         for (uint side = 0u; side < 2u; ++side) {
@@ -819,8 +872,12 @@ void advanceSpiders(device GameState &game, float dt) {
         game.enemyClock[i].z = max(game.enemyClock[i].z - dt, 0.0f);
         game.reaction[i].x = max(game.reaction[i].x - dt, 0.0f);
         game.reaction[i].w = max(game.reaction[i].w - dt, 0.0f);
-        if (game.enemy[i].w <= 0.0f) continue;
         SpiderTraits traits = spiderTraits(spiderVariantForSlot(i));
+        // The power bar runs down two thirds of its width a second, like
+        // the drones' bars.
+        game.spiderBar[i] = max(game.spiderBar[i] - dt * 0.67f,
+            max(game.enemy[i].w, 0.0f) / traits.health);
+        if (game.enemy[i].w <= 0.0f) continue;
         float2 toPlayer = game.player.xz - game.enemy[i].xz;
         float distanceToPlayer = length(toPlayer);
         if (game.senses[i].z < 0.0f) {
@@ -912,7 +969,7 @@ void advanceSpiders(device GameState &game, float dt) {
                     game.player.xz, 1.4f);
         } else {
             steer = npcPathPatrol(game.paths, follower, game.enemy[i].xz,
-                1u << (i == ambushSlot ? pathAreaNorth : pathAreaArena),
+                1u << spiderHomeArea(i),
                 i + 1u, as_type<uint>(game.effects.x), dt, 1.2f, 0.3f,
                 resting);
         }
@@ -969,6 +1026,7 @@ void advanceSpiders(device GameState &game, float dt) {
                 slot * 7.19f + 2.13f));
             float targetSpeed
                 = (pursuing ? spiderChaseSpeed : spiderPatrolSpeed)
+                * traits.speed
                 * (0.75f + 0.45f * slowPace + 0.25f * quickPace);
             // Slow into sharp turns so bends in the path are followed, not
             // overshot.
@@ -1012,7 +1070,8 @@ void advanceSpiders(device GameState &game, float dt) {
             : mix(game.gait[i].y, lunging ? 1.0f : 0.0f,
                 1.0f - exp(-dt * 7.0f));
         float jumpClock = game.enemyClock[i].y;
-        float jumpLift = spiderJumpLift(traits, pursuing, dt, jumpClock);
+        // Jumpers hop on patrol too; the ambush spider is always hunting.
+        float jumpLift = spiderJumpLift(traits, walking, dt, jumpClock);
         game.enemyClock[i].y = jumpClock;
         game.enemy[i].y = stairHeight(game.enemy[i].xz)
             + traits.scale * (0.52f
@@ -1138,15 +1197,15 @@ float3 spiderFurReflectance(float3 albedo, float4 fur, float3 normal,
 SurfaceMaterial spiderSurfaceMaterial(uint material, float3 furPosition,
     float4 fur, SpiderVariant variant) {
     if (material == 16u) return {
-        variant != SpiderVariant::brown
+        blackSpider(variant)
             ? float3(0.12f, 0.012f, 0.014f)
             : float3(0.012f, 0.019f, 0.023f),
         0.045f, 0.02f,
-        variant != SpiderVariant::brown
+        blackSpider(variant)
             ? float3(0.42f, 0.012f, 0.008f)
             : float3(0.0f)};
     if (material == 19u) return {
-        variant != SpiderVariant::brown
+        blackSpider(variant)
             ? float3(0.025f, 0.005f, 0.006f)
             : float3(0.035f, 0.018f, 0.012f),
         0.82f, 0.0f, float3(0.0f)};
@@ -1179,11 +1238,14 @@ SurfaceMaterial spiderSurfaceMaterial(uint material, float3 furPosition,
             root = float3(0.23f, 0.11f, 0.055f);
             tip = float3(0.56f, 0.33f, 0.17f);
         }
-        if (variant != SpiderVariant::brown) {
+        if (blackSpider(variant)) {
             root = float3(0.006f, 0.008f, 0.011f);
             tip = material == 17u
                 ? float3(0.085f, 0.094f, 0.10f)
                 : float3(0.049f, 0.055f, 0.063f);
+        } else if (variant == SpiderVariant::darkBrownHopper) {
+            root *= 0.42f;
+            tip *= 0.5f;
         }
         float3 coat = mix(root, tip, fibers)
             * (0.84f + 0.25f * flecks)

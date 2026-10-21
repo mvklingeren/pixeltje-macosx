@@ -28,6 +28,7 @@ constant float droneBoltLength = 1.5f;
 constant float droneLaserDamage = 9.0f;
 constant float droneLaserRange = 260.0f;
 constant float droneChargeTime = 0.4f;   // the emitter glows before a shot
+constant float droneScanPeriod = 5.5f;   // seconds between survey heights
 
 constant uint droneShellMaterial = 50u;
 constant uint droneCanopyMaterial = 51u;
@@ -358,12 +359,21 @@ void flyDrone(device GameState &game, uint index, float dt,
     float targetYaw;
     float speedLimit;
     if (!hostile) {
-        // A slow figure-of-eight around the station with gentle height drift.
+        // A slow figure-of-eight around the station. Every few seconds the
+        // drone picks a new survey height, climbs or sinks to it and holds
+        // there, scanning the plain, with a gentle bob on top.
         float phase = time * 0.19f + drone.wander.w;
         float2 point = drone.wander.xy
             + float2(7.0f * sin(phase), 3.5f * sin(2.0f * phase));
-        target = float3(point.x, stairHeight(point) + drone.wander.z
-            + 0.8f * sin(phase * 1.7f), point.y);
+        float beat = time / droneScanPeriod + 0.37f * float(index);
+        float leg = floor(beat);
+        float lane = float(index) + 11.0f;
+        float scan = mix(
+            mix(-1.8f, 2.6f, hashTile(float2(leg - 1.0f, lane))),
+            mix(-1.8f, 2.6f, hashTile(float2(leg, lane))),
+            smoothstep(0.0f, 0.45f, fract(beat)));
+        target = float3(point.x, stairHeight(point) + drone.wander.z + scan
+            + 0.35f * sin(phase * 2.3f), point.y);
         // Nose into the direction of travel once it is moving.
         targetYaw = length(v.xz) > 0.6f ? atan2(v.x, -v.z) : drone.velocity.w;
         speedLimit = droneLoiterSpeed;
@@ -485,13 +495,18 @@ void advanceLasers(device GameState &game, float dt) {
     }
 }
 
-// The motor whine of each drone as the player hears it: inverse-distance
-// loudness, panning, Doppler shift from both motions, and FPV motor pitch.
-// Rotor speed follows the square root of thrust, and like an FPV pilot the
-// controller punches the throttle to climb and cuts it to drop, so the whine
-// rises and gets louder as a drone goes up and sags as it descends. A downed
-// drone's motors spin down in under a second. Walls muffle drones the player
-// cannot see from inside the base.
+// The rotor sound of each drone as the player hears it: inverse-distance
+// loudness, panning, Doppler shift from both motions, and motor pitch. The
+// editor synthesizes the sound itself, so the playback rate sets the rotor
+// speed directly. Rotor speed follows the square root of thrust, and like a
+// pilot the controller punches the throttle to climb and cuts it to drop, so
+// the pitch rises and gets louder as a drone goes up and sags as it
+// descends. Tilting to accelerate takes extra thrust, and cruising fast
+// takes more against the drag, so a moving drone sounds higher than a
+// hovering one. Drive tells the synthesizer how hard the motors work: it
+// brightens the sound and splits the motor speeds as a tilted frame runs one
+// side faster. A downed drone's motors spin down in under a second. Walls
+// muffle drones the player cannot see from inside the base.
 void updateDroneVoices(device GameState &game, float dt,
     device RangeAudio &audio, bool playing) {
     DopplerListener listener = {game.player.xyz,
@@ -503,21 +518,28 @@ void updateDroneVoices(device GameState &game, float dt,
     const float detune[droneCount] = {0.97f, 1.0f, 1.04f};
     for (uint i = 0u; i < droneCount; ++i) {
         Drone drone = game.drones[i];
-        float climb = drone.pose.w > 0.0f ? drone.velocity.y : 0.0f;
-        float rpm = sqrt(max(drone.attitude.w + 0.15f * climb, 0.35f));
+        bool flying = drone.pose.w > 0.0f;
+        float climb = flying ? drone.velocity.y : 0.0f;
+        float cruise = flying ? length(drone.velocity.xz) : 0.0f;
+        float rpm = sqrt(max(drone.attitude.w + 0.15f * climb
+            + 0.004f * cruise * cruise, 0.35f));
         float loudness = 0.85f * clamp(rpm, 0.75f, 1.25f);
         float pitch = detune[i] * clamp(rpm, 0.7f, 1.6f);
-        if (drone.pose.w <= 0.0f) {
+        float drive = saturate(0.3f + 1.6f * (rpm - 1.0f)
+            + 0.8f * length(drone.attitude.xy));
+        if (!flying) {
             float spin = smoothstep(0.0f, 0.9f,
                 game.effects.x - drone.brain.w);
             loudness *= 1.0f - spin;
             pitch *= mix(1.0f, 0.45f, spin);
+            drive *= 1.0f - spin;
         }
         if (!playing) loudness = 0.0f;
         DopplerSource source = {drone.pose.xyz, drone.velocity.xyz,
             loudness, 6.0f, pitch};
         float4 voice = dopplerVoice(listener, source);
         voice.x *= muffle;
+        voice.w = drive;
         audio.droneVoice[i] = smoothVoice(audio.droneVoice[i], voice, dt);
     }
 }

@@ -73,9 +73,12 @@ public enum StableAudio3Family {
     func invalid(_ message: String) -> PipelineDiagnostic {
       .init(severity: .error, code: .invalidParameter, message: message, nodeID: node.id)
     }
+    // The linked export sets the real maximum; this bound is the publisher's
+    // 120-second training window less the generation headroom.
     guard case .number(let duration)? = node.parameters["duration"],
-      duration.isFinite, (0.25...2).contains(duration) else {
-      return [invalid("Audio duration must be between 0.25 and 2 seconds for this export.")]
+      duration.isFinite, (StableAudio3LatentWindow.minDurationSeconds...114).contains(duration)
+    else {
+      return [invalid("Audio duration must be between 0.25 and 114 seconds.")]
     }
     guard case .integer(let steps)? = node.parameters["steps"], (1...40).contains(steps) else {
       return [invalid("Audio diffusion steps must be between 1 and 40.")]
@@ -97,16 +100,26 @@ public enum StableAudio3Family {
       let package = try StableAudio3Package(at: url)
       for node in document.nodes where node.kind == nodeKind {
         try package.validateLinks(in: node)
+        if case .number(let duration)? = node.parameters["duration"],
+          let message = durationLimitMessage(duration, window: package.latentWindow) {
+          return message
+        }
       }
       return nil
     } catch { return error.localizedDescription }
   }
+
+  static func durationLimitMessage(_ duration: Double, window: StableAudio3LatentWindow) -> String? {
+    guard duration > window.maxDurationSeconds else { return nil }
+    return "This Stable Audio export generates at most \(window.maxDurationSeconds.formatted()) "
+      + "seconds; shorten the duration or re-export with a longer --max-duration."
+  }
 }
 
 public actor StableAudio3Runner {
-  private let sampleRate = 44_100
-  private let latentFrames = 88
-  private let latentChannels = 256
+  private let sampleRate = StableAudio3LatentWindow.sampleRate
+  private let latentChannels = StableAudio3LatentWindow.channels
+  private let downsamplingRatio = StableAudio3LatentWindow.downsamplingRatio
 
   public init() {}
 
@@ -121,6 +134,10 @@ public actor StableAudio3Runner {
       case .number(let guidance)? = node.parameters["guidance"] else {
       throw PipelineEngineError.invalidInvocation("Audio generation settings are incomplete.")
     }
+    if let message = StableAudio3Family.durationLimitMessage(duration, window: package.latentWindow) {
+      throw PipelineEngineError.invalidInvocation(message)
+    }
+    let latentFrames = package.latentWindow.frames(forDuration: duration)
     try Task.checkCancellation()
 
     let tokenizer = try await AutoTokenizer.from(
@@ -155,11 +172,12 @@ public actor StableAudio3Runner {
       try Task.checkCancellation()
       let sigma = schedule[index]
       let next = schedule[index + 1]
-      let velocity = try await predict(denoiser, latents: latents, sigma: sigma,
-        conditioning: conditioning, global: durationEmbedding)
+      let velocity = try await predict(denoiser, latents: latents, frames: latentFrames,
+        sigma: sigma, conditioning: conditioning, global: durationEmbedding)
       var prediction = velocity
       if guidance > 1 {
-        let unconditioned = try await predict(denoiser, latents: latents, sigma: sigma,
+        let unconditioned = try await predict(denoiser, latents: latents, frames: latentFrames,
+          sigma: sigma,
           conditioning: negativeConditioning ?? Array(repeating: 0, count: 257 * 768),
           global: durationEmbedding)
         // The publisher uses orthogonal APG for classifier-free guidance.
@@ -187,7 +205,7 @@ public actor StableAudio3Runner {
       .appendingPathComponent("AudioDecoder.aimodel", isDirectory: true))
     let samples = try await decoder.run(floatInputs: [(latents, [1, latentChannels, latentFrames])])
     await decoder.unloadResources()
-    guard samples.count == 2 * latentFrames * 4_096, samples.allSatisfy(\.isFinite) else {
+    guard samples.count == 2 * latentFrames * downsamplingRatio, samples.allSatisfy(\.isFinite) else {
       throw PipelineEngineError.planningFailed("Audio decoder returned invalid samples.")
     }
     let frames = Int((duration * Double(sampleRate)).rounded())
@@ -215,11 +233,11 @@ public actor StableAudio3Runner {
   }
 
   private func predict(
-    _ model: CoreAIDiffusionModelFunction, latents: [Float], sigma: Float,
+    _ model: CoreAIDiffusionModelFunction, latents: [Float], frames: Int, sigma: Float,
     conditioning: [Float], global: [Float]
   ) async throws -> [Float] {
     let velocity = try await model.run(floatInputs: [
-      (latents, [1, latentChannels, latentFrames]),
+      (latents, [1, latentChannels, frames]),
       ([sigma], [1]),
       (conditioning, [1, 257, 768]),
       (global, [1, 768]),

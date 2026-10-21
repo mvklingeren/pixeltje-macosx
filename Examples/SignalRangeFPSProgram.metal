@@ -1,6 +1,7 @@
 // pixeltje:easing-v1
 // pixeltje:3d-v1
 // pixeltje:terrain-v1
+// pixeltje:postfx-v1
 #include <metal_stdlib>
 using namespace metal;
 
@@ -11,9 +12,12 @@ using namespace metal;
 // quadcopter drones hover and fire back with laser rifles once shot at, and
 // the player switches to a double-barrel shotgun.
 
-constant uint enemyCount = 4u;
-constant uint ordinaryEnemyCount = 3u;
-constant uint bossSlot = 3u;
+// Spider slots: two brown range spiders, the ambush spider, seven dark brown
+// hoppers, then the boss. Every slot before the boss runs the same AI.
+constant uint enemyCount = 11u;
+constant uint ordinaryEnemyCount = 10u;
+constant uint hopperStart = 3u;
+constant uint bossSlot = 10u;
 constant uint targetKills = enemyCount;
 constant uint impactCount = 12u;
 constant uint webCount = 4u;
@@ -57,9 +61,10 @@ constant float moonCeiling = 110.0f;      // above the highest lunar terrain
 constant float moonWalkRadius = 1500.0f;
 constant int moonTraceDetail = 4;         // ray, shadow and footing octaves
 constant int moonShadeDetail = 7;         // normal octaves
-// A low sun in the south-west throws long shadows across the craters.
+// A low sun in the south-west throws long shadows across the craters. The
+// sky draws no disc for it, only stars.
 constant float3 sunDirection = float3(-0.8494f, 0.2199f, 0.4797f);
-constant float sunPower = 1.13e10f;       // irradiance 9 from 10 km away
+constant float sunPower = 5.03e9f;        // irradiance 4 from 10 km away
 constant uint droneCount = 3u;
 constant uint laserCount = 6u;
 
@@ -82,6 +87,12 @@ constant uint keyV = 16u;
 constant uint keyX = 32u;
 constant uint keyDigit1 = 128u;
 constant uint keyDigit2 = 256u;
+constant uint keyDigit7 = 8192u;
+// Keys 7, 8 and 9 switch off bokeh, bloom and lens fringing; controls.w
+// holds the bits of the effects switched off.
+constant uint effectBokeh = 1u;
+constant uint effectBloom = 2u;
+constant uint effectAberration = 4u;
 // Sentry turrets guard the east, west and north rooms. Each stands on a
 // tripod and first watches its room's entrance.
 constant uint sentryCount = 3u;
@@ -221,7 +232,7 @@ struct GameState {
     // The launcher, dodge and sentries follow too.
     float4 arsenal;         // launcher chosen, unused, reserve rockets, rocket loaded
     float4 launcher;        // lock target ID, lock progress, reload time left, launch kick
-    float4 controls;        // previous action keys, flight cam on, dodge cooldown, unused
+    float4 controls;        // previous action keys, flight cam on, dodge cooldown, effects off
     float4 dodge;           // dodge velocity XZ, pickup notice time, unused
     float4 missile;         // nose XYZ, launch time; W < 0 while none flies
     float4 missileVelocity; // velocity XYZ, locked target ID (0 flies straight)
@@ -234,7 +245,12 @@ struct GameState {
     float4 boltPosition[boltCount];    // XYZ, fire time (-100 unused)
     float4 boltVelocity[boltCount];    // velocity XYZ, burst time (-1 in flight)
     uint4 pickups;          // taken bits, last pickup kind, sentries destroyed, bolts fired
-    uint4 sightLines;       // per range spider: 1 when its view of the player is clear
+    uint sightLines[enemyCount]; // per ordinary spider: 1 when its view of
+                                 // the player is clear
+    float spiderBar[enemyCount]; // health fraction each ordinary spider's bar
+                                 // shows, draining toward its real health
+    float4 intro;           // seconds since the workflow started, kept on
+                            // restart, for the opening spider; unused
 };
 
 static_assert(sizeof(GameState) <= 12288,
@@ -436,6 +452,8 @@ GunPose launcherPose(device const GameState &game) {
 // northern room.
 constant uint pathAreaArena = 0u;
 constant uint pathAreaNorth = 1u;
+constant uint pathAreaEast = 2u;
+constant uint pathAreaWest = 3u;
 constant uint pathAreaMoon = 9u;
 constant uint pathAreaCount = 10u;
 constant NPCPathArea rangePathAreas[pathAreaCount] = {
@@ -460,7 +478,7 @@ constant uint2 rangePathJoins[pathJoinCount] = {
 struct GunHit {
     float distance;
     float3 normal;          // gun frame
-    uint part;              // 1 slide, 2 polymer, 3 dark steel, 4 glove,
+    uint part;              // 1 chrome, 2 polymer, 3 dark steel, 4 glove,
                             // 5 sleeve, 6 blued barrel, 7 walnut,
                             // 10 launch tube, 11 composite, 12 display
     float3 local;
@@ -476,6 +494,7 @@ void gunCapsule(thread GunHit &hit, float3 origin, float3 direction,
 #include "SignalRangeShotgun.metal"
 #include "SignalRangeDrone.metal"
 #include "SignalRangeArsenal.metal"
+#include "SignalRangeIntroSpider.metal"
 
 void resetGame(device GameState &game, uint seed) {
     game.player = float4(0.0f, 1.55f, 12.0f, 0.0f);
@@ -511,7 +530,9 @@ void resetGame(device GameState &game, uint seed) {
         game.webs[i].targetExpiry = float4(0.0f);
     }
     for (uint i = 0u; i < enemyCount; ++i) {
-        game.enemy[i] = float4(spawnPosition(i), i == bossSlot ? 14.0f : 2.0f);
+        game.enemy[i] = float4(spawnPosition(i),
+            spiderTraits(spiderVariantForSlot(i)).health);
+        game.spiderBar[i] = 1.0f;
         float2 toPlayer = game.player.xz - game.enemy[i].xz;
         game.enemyClock[i] = float4(0.0f, -0.55f, 0.0f,
             i == bossSlot ? atan2(toPlayer.x, -toPlayer.y) : idleYaw(i));
@@ -529,10 +550,11 @@ void resetGame(device GameState &game, uint seed) {
         rangePathJoins, pathJoinCount, npcPathHash(seed));
     resetArms(game);
     resetDrones(game);
-    // The previous keys and the flight-cam option survive a restart.
+    // The previous keys, the flight-cam option and effect switches survive a
+    // restart.
     game.arsenal = float4(0.0f, 0.0f, rocketReserveStart, 1.0f);
     game.launcher = float4(0.0f);
-    game.controls.zw = float2(0.0f);
+    game.controls.z = 0.0f;
     game.dodge = float4(0.0f, 0.0f, -100.0f, 0.0f);
     game.missile = float4(0.0f, 0.0f, 0.0f, -1.0f);
     game.missileVelocity = float4(0.0f, 0.0f, -1.0f, 0.0f);
@@ -559,6 +581,8 @@ kernel void initializeRange(constant ProgramUniforms &u [[buffer(0)]],
     if (id != 0u) return;
     // The missile flight cam starts on; V toggles it.
     states[0].controls = float4(0.0f, 1.0f, 0.0f, 0.0f);
+    // The opening spider visits once per run, not after every restart.
+    states[0].intro = float4(0.0f);
     resetGame(states[0], u.frameSeed.y ^ u.frameSeed.z);
     // Voice words persist between frames; start every hover sound silent.
     for (uint i = 0u; i < droneCount; ++i) audio[0].droneVoice[i] = float4(0.0f);
@@ -682,9 +706,21 @@ float moonHeight(float2 p, int detail) {
     return h;
 }
 
+// Relief under a couple of metres: craterlets, pebbles and rippled dust. It
+// only bends shading normals, so traces, shadows and footing skip it.
+float moonGrain(float2 p) {
+    return pixeltje_terrain::craters(p, 1.8f, 0.3f, 52.0f)
+        + pixeltje_terrain::rocks(p, 0.6f, 0.1f, 94.0f)
+        + 0.06f * pixeltje_terrain::fbm(p / 1.5f, 3, 95.0f);
+}
+
 struct MoonSurface {
     int detail;
-    float operator()(float2 p) const { return moonHeight(p, detail); }
+    float grain;  // weight of moonGrain; 0 when left out
+    float operator()(float2 p) const {
+        float h = moonHeight(p, detail);
+        return grain > 0.0f ? h + grain * moonGrain(p) : h;
+    }
 };
 
 // The three stair connectors have six real steps. The same height function
@@ -838,7 +874,10 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     game.controls.x = float(keys);
     if ((pressed & keyV) != 0u)
         game.controls.y = game.controls.y > 0.5f ? 0.0f : 1.0f;
+    // Keys 7, 8 and 9 are consecutive bits, in the order of the effect bits.
+    game.controls.w = float(uint(game.controls.w) ^ ((pressed / keyDigit7) & 7u));
     game.effects.x += dt;
+    game.intro.x = min(game.intro.x + dt, introSpiderEnd + 1.0f);
     if (game.bossScene.x >= 0.0f) game.bossScene.x += dt;
     game.bossScene.y = max(game.bossScene.y - dt, 0.0f);
     updateChromePose(game);
@@ -960,7 +999,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     next = position;
     // Walking around the outside of the base must not trip the room rules.
     bool outside = outdoors(next, 0.0f);
-    if (game.progress.x < ordinaryEnemyCount && !outside
+    if (!rangeCleared(game) && !outside
         && previousPosition.y >= -outerRoomFar + 0.3f)
         next.y = max(next.y, -outerRoomFar + 0.3f);
     if (game.bossScene.x >= 0.0f
@@ -979,7 +1018,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
             ? saturate(walked / max(dt * 4.6f, 0.00001f)) : 0.0f,
         1.0f - exp(-dt * 8.0f));
     if (game.bossScene.x < 0.0f && !outside
-        && game.progress.x >= ordinaryEnemyCount
+        && rangeCleared(game)
         && next.y < bossRoomSouth - 2.6f) {
         game.bossScene.x = 0.0f;
     }
@@ -1269,7 +1308,7 @@ kernel void fireRange(constant ProgramUniforms &u [[buffer(0)]],
             if (shotgun) game.recoil.w = max(game.recoil.w, 0.45f);
         }
     }
-    if (game.progress.x >= targetKills) {
+    if (game.enemy[bossSlot].w <= 0.0f) {
         game.progress.w = phaseWon;
         game.sceneTransition.x = game.effects.x;
     }
@@ -1567,8 +1606,11 @@ void traceOutside(thread SceneHit &hit, float3 origin, float3 direction) {
         direction, near, far, moonCeiling, 160);
     if (t < 0.0f) return;
     float3 p = origin + direction * t;
-    hit = {t, pixeltje_terrain::normal(MoonSurface{moonShadeDetail}, p.xz,
-        0.02f + 0.002f * t), p, 40u, -1, 0u};
+    float epsilon = 0.02f + 0.002f * t;
+    // Fine relief fades out before it shrinks below a pixel and aliases.
+    float grain = 1.0f - smoothstep(0.06f, 0.2f, epsilon);
+    hit = {t, pixeltje_terrain::normal(MoonSurface{moonShadeDetail, grain},
+        p.xz, epsilon), p, 40u, -1, 0u};
 }
 
 void traceEnvironment(thread SceneHit &hit, float3 origin,
@@ -1607,7 +1649,7 @@ void traceEnvironment(thread SceneHit &hit, float3 origin,
     // The first gate unlocks after the range is clear. The arena gate drops
     // behind the player; the far gate admits the boss and then seals.
     traceSlidingDoor(hit, origin, direction, 5.0f, -outerRoomFar,
-        game.progress.x >= ordinaryEnemyCount ? 9.0f : 1.2f,
+        rangeCleared(game) ? 9.0f : 1.2f,
         9.0f, 0u);
     traceSlidingDoor(hit, origin, direction, 5.0f, bossRoomSouth,
         entranceDoorBottom(game), 9.0f, 1u);
@@ -1731,11 +1773,11 @@ float shellLines(float coord, float spacing, float width, float blur) {
 }
 
 // The base's outer shell, built like a surface station: a dark concrete
-// plinth, warm grey cladding panels of slightly varied tone between steel
-// ribs, ribbon windows lit from inside, a burnt-orange band under a steel
-// coping, steel corner columns and hazard stripes around the exit. The
-// cladding stays near the highlands' albedo so the low sun does not blow it
-// out to white, and regolith dusts the lowest metre.
+// plinth, grey cladding panels of slightly varied tone between steel ribs,
+// ribbon windows lit from inside, a burnt-orange band under a steel coping,
+// steel corner columns and hazard stripes around the exit. The cladding stays
+// near the highlands' albedo so the low sun leaves it mid grey, and regolith
+// dusts the lowest metre.
 SurfaceMaterial shellMaterial(SceneHit hit, float pixelWidth) {
     float3 p = hit.position;
     float3 n = hit.normal;
@@ -1786,7 +1828,7 @@ SurfaceMaterial shellMaterial(SceneHit hit, float pixelWidth) {
         corner = min(corner, abs(p.z - hullRearUpper.z));
     if (corner < 0.7f || p.y > top - 0.45f) {
         float bolts = shellLines(p.y, 0.9f, 0.05f, blur);
-        return {mix(steel, steel * 0.6f, bolts * 0.5f), 0.42f, 0.6f,
+        return {mix(steel, steel * 0.6f, bolts * 0.5f), 0.7f, 0.6f,
             float3(0.0f)};
     }
     if (p.y < 0.9f) {
@@ -1796,11 +1838,11 @@ SurfaceMaterial shellMaterial(SceneHit hit, float pixelWidth) {
     }
     // Steel ribs every 12 m, offset so none crosses the exit.
     float rib = shellLines(s + 6.0f, 12.0f, 0.22f, blur);
-    if (rib > 0.5f) return {mix(steel, regolith, dust), 0.42f, 0.6f,
+    if (rib > 0.5f) return {mix(steel, regolith, dust), 0.7f, 0.6f,
         float3(0.0f)};
     if (p.y > top - 1.65f && p.y < top - 1.2f)
         return {mix(float3(0.30f, 0.105f, 0.035f), regolith, dust),
-            0.55f, 0.05f, float3(0.0f)};
+            0.85f, 0.0f, float3(0.0f)};
 
     // Ribbon windows: three per bay, one row on the low block and two on
     // the tall one, clear of the exit.
@@ -1825,7 +1867,7 @@ SurfaceMaterial shellMaterial(SceneHit hit, float pixelWidth) {
         // Blinds and room depth vary the glow across the pane.
         glow *= 0.7f + 0.3f * smoothNoise(float2(s * 1.3f, rowLocal * 3.0f));
         return {mix(float3(0.018f, 0.022f, 0.028f), steel * 0.7f, frame),
-            mix(0.08f, 0.45f, frame), mix(0.0f, 0.6f, frame),
+            mix(0.08f, 0.7f, frame), mix(0.0f, 0.6f, frame),
             glow * (1.0f - frame)};
     }
 
@@ -1834,7 +1876,7 @@ SurfaceMaterial shellMaterial(SceneHit hit, float pixelWidth) {
     float2 panelCell = floor(float2(s / 3.0f, p.y / 1.5f));
     float tone = 0.86f + 0.24f * hashTile(panelCell
         + float2(alongX ? 0.0f : 53.0f, 0.0f));
-    float3 cladding = float3(0.27f, 0.262f, 0.25f) * tone;
+    float3 cladding = float3(0.17f, 0.17f, 0.165f) * tone;
     float seam = max(shellLines(s, 3.0f, 0.025f, blur),
         shellLines(p.y, 1.5f, 0.025f, blur));
     float below = row < 0.0f ? -row : 7.0f - rowLocal;
@@ -1846,7 +1888,8 @@ SurfaceMaterial shellMaterial(SceneHit hit, float pixelWidth) {
         : 0.0f;
     cladding *= 1.0f - 0.28f * streak;
     cladding = mix(cladding, cladding * 0.35f, seam);
-    return {mix(cladding, regolith, dust), 0.5f, 0.1f, float3(0.0f)};
+    // Matte, so walls seen toward the sun do not sheen to white.
+    return {mix(cladding, regolith, dust), 0.85f, 0.0f, float3(0.0f)};
 }
 
 SurfaceMaterial surfaceMaterial(SceneHit hit,
@@ -2038,6 +2081,9 @@ SurfaceMaterial surfaceMaterial(SceneHit hit,
         float3 soil = mix(mare, upland, highland)
             * (0.75f + 0.5f * pixeltje_terrain::valueNoise(p / 9.0f, 84.0f))
             * (0.85f + 0.3f * pixeltje_terrain::valueNoise(p * 2.3f, 85.0f));
+        // Pebbly grain fades to its mean once it is finer than a pixel.
+        soil *= 1.0f + 0.4f * (1.0f - smoothstep(0.02f, 0.08f, pixelWidth))
+            * (pixeltje_terrain::valueNoise(p * 9.0f, 88.0f) - 0.5f);
         soil = mix(soil, soil * 1.35f + 0.015f,
             smoothstep(0.1f, 0.4f, 1.0f - hit.normal.y));
         // Boulders are dark basalt or paler breccia, grainy and dusted on
@@ -2212,16 +2258,18 @@ float3 shadePointLight(SceneHit hit, SurfaceMaterial material,
 // when you look into the sun, and it does not darken toward grazing view, so
 // the plain reads as lit dust. Its single-scattering albedo exceeds the
 // diffuse albedo; 1.6 times keeps a side-lit plain about as bright as before.
+// The lobe and surge are milder than measured lunar values, so the plain
+// with the sun behind you is not blown out to white.
 float3 regolithReflectance(float3 normal, float3 viewDirection,
     float3 albedo) {
     float mu0 = max(dot(normal, sunDirection), 0.0f);
     float mu = max(dot(normal, viewDirection), 0.0f);
     float cosPhase = clamp(dot(sunDirection, viewDirection), -1.0f, 1.0f);
-    const float asymmetry = 0.3f;
+    const float asymmetry = 0.2f;
     float lobe = (1.0f - asymmetry * asymmetry) / pow(1.0f
         + asymmetry * asymmetry - 2.0f * asymmetry * cosPhase, 1.5f);
     float halfTangent = sqrt((1.0f - cosPhase) / (1.0f + cosPhase + 1.0e-4f));
-    float surge = 1.0f / (1.0f + halfTangent / 0.06f);
+    float surge = 0.5f / (1.0f + halfTangent / 0.06f);
     return albedo * 1.6f / (4.0f * rangePi) * mu0 / max(mu0 + mu, 1.0e-4f)
         * lobe * (1.0f + surge);
 }
@@ -2251,13 +2299,10 @@ float3 shadeSunlight(SceneHit hit, SurfaceMaterial material,
         game);
 }
 
-// An airless black sky with the sun's disc and fixed stars. Stars are point
-// sources, so each is drawn about one pixel (pixelAngle radians) wide.
+// An airless black sky with fixed stars. Stars are point sources, so each
+// is drawn about one pixel (pixelAngle radians) wide.
 float3 spaceSky(float3 direction, float pixelAngle) {
-    float facing = dot(direction, sunDirection);
-    float3 color = float3(1.0f, 0.97f, 0.92f)
-        * (60.0f * smoothstep(0.99990f, 0.99993f, facing)
-            + 0.6f * pow(saturate(facing), 600.0f));
+    float3 color = float3(0.0f);
     // Stars sit in equal-angle cells on the six faces of a cube, which has
     // no pole or seam to stretch them. Each face-local frame is a signed axis
     // permutation, so distances measured in it are angles on the sky.
@@ -2768,34 +2813,97 @@ void gunCapsule(thread GunHit &hit, float3 origin, float3 direction,
             origin + direction * capsule.distance};
 }
 
+// A box with rounded edges: rounding.x rounds the edges that run along Z,
+// rounding.y every edge of the two faces across Z.
+float roundedBoxDistance(float3 p, float3 lower, float3 upper,
+    float2 rounding) {
+    float3 extent = (upper - lower) * 0.5f;
+    float3 q = abs(p - (lower + upper) * 0.5f);
+    float2 side = q.xy - extent.xy + rounding.x;
+    float2 w = float2(length(max(side, 0.0f))
+        + min(max(side.x, side.y), 0.0f) - rounding.x, q.z - extent.z)
+        + rounding.y;
+    return length(max(w, 0.0f)) + min(max(w.x, w.y), 0.0f) - rounding.y;
+}
+
+// Sphere-traces a rounded box from where the ray enters its bounds.
+void gunRoundedBox(thread GunHit &hit, float3 origin, float3 direction,
+    float3 lower, float3 upper, float2 rounding, uint part) {
+    float3 normal;
+    float t = pixeltje_3d::rayBox(origin, direction, lower, upper,
+        0.001f, normal);
+    if (t <= 0.0f || t >= hit.distance) return;
+    float limit = min(hit.distance, t + length(upper - lower));
+    for (uint step = 0u; step < 32u && t < limit; ++step) {
+        float3 p = origin + direction * t;
+        float d = roundedBoxDistance(p, lower, upper, rounding);
+        if (d < 2.0e-5f) {
+            const float2 e = float2(1.0e-4f, -1.0e-4f);
+            normal = normalize(
+                e.xyy * roundedBoxDistance(p + e.xyy, lower, upper, rounding)
+                + e.yyx * roundedBoxDistance(p + e.yyx, lower, upper, rounding)
+                + e.yxy * roundedBoxDistance(p + e.yxy, lower, upper, rounding)
+                + e.xxx * roundedBoxDistance(p + e.xxx, lower, upper, rounding));
+            hit = {t, normal, part, p};
+            return;
+        }
+        t += d;
+    }
+}
+
+struct PistolPart {
+    float3 lower;
+    float3 upper;
+    float2 rounding;        // see roundedBoxDistance
+    uint part;
+    bool slides;            // rides back with the slide after a shot
+};
+
+constant uint pistolPartCount = 6u;
+constant PistolPart pistolParts[pistolPartCount] = {
+    // Slide, front sight post and the two blocks of the rear sight notch.
+    {float3(-0.016f, 0.018f, -0.075f), float3(0.016f, 0.050f, 0.166f),
+        float2(0.0065f, 0.005f), 1u, true},
+    {float3(-0.0025f, 0.046f, 0.128f), float3(0.0025f, 0.057f, 0.140f),
+        float2(0.0015f), 3u, true},
+    {float3(-0.014f, 0.045f, -0.068f), float3(-0.004f, 0.058f, -0.058f),
+        float2(0.0025f, 0.002f), 3u, true},
+    {float3(0.004f, 0.045f, -0.068f), float3(0.014f, 0.058f, -0.058f),
+        float2(0.0025f, 0.002f), 3u, true},
+    // Round barrel, crowned just proud of the slide's nose; a shot bares it.
+    {float3(-0.0075f, 0.0245f, 0.100f), float3(0.0075f, 0.0395f, gunMuzzle.z),
+        float2(0.0075f, 0.001f), 1u, false},
+    // Frame and dust cover.
+    {float3(-0.014f, -0.004f, -0.060f), float3(0.014f, 0.020f, 0.140f),
+        float2(0.004f, 0.005f), 2u, false}
+};
+
+// The trigger guard is a round bar bent up into the dust cover.
+constant float3 triggerGuard[4] = {
+    float3(0.0f, -0.0265f, 0.006f), float3(0.0f, -0.0265f, 0.056f),
+    float3(0.0f, -0.019f, 0.0715f), float3(0.0f, -0.002f, 0.0715f)
+};
+
 GunHit traceGun(float3 origin, float3 direction, float slide) {
     GunHit hit = {1.0e6f, float3(0.0f), 0u, float3(0.0f)};
     if (raySphere(origin, direction, float3(0.0f, -0.1f, -0.05f), 0.40f)
         < 0.0f) return hit;
-    float3 back = float3(0.0f, 0.0f, -slide);
-    gunBox(hit, origin, direction, float3(-0.016f, 0.018f, -0.075f) + back,
-        float3(0.016f, 0.050f, 0.150f) + back, 1u);
-    gunBox(hit, origin, direction, float3(-0.0025f, 0.050f, 0.128f) + back,
-        float3(0.0025f, 0.057f, 0.140f) + back, 3u);
-    for (uint side = 0u; side < 2u; ++side) {
-        float x = side == 0u ? -0.014f : 0.004f;
-        gunBox(hit, origin, direction, float3(x, 0.050f, -0.068f) + back,
-            float3(x + 0.010f, 0.058f, -0.058f) + back, 3u);
+    for (uint i = 0u; i < pistolPartCount; ++i) {
+        PistolPart piece = pistolParts[i];
+        float3 back = float3(0.0f, 0.0f, piece.slides ? -slide : 0.0f);
+        gunRoundedBox(hit, origin, direction, piece.lower + back,
+            piece.upper + back, piece.rounding, piece.part);
     }
-    gunBox(hit, origin, direction, float3(-0.008f, 0.024f, 0.120f),
-        float3(0.008f, 0.040f, gunMuzzle.z), 3u);
-    gunBox(hit, origin, direction, float3(-0.014f, -0.004f, -0.060f),
-        float3(0.014f, 0.020f, 0.140f), 2u);
-    gunBox(hit, origin, direction, float3(-0.005f, -0.030f, 0.005f),
-        float3(0.005f, -0.024f, 0.075f), 2u);
-    gunBox(hit, origin, direction, float3(-0.005f, -0.030f, 0.068f),
-        float3(0.005f, -0.004f, 0.075f), 2u);
+    for (uint k = 0u; k < 3u; ++k)
+        gunCapsule(hit, origin, direction, triggerGuard[k],
+            triggerGuard[k + 1u], 0.0042f, 2u);
     // The grip rakes back 17 degrees from where it meets the frame.
     float c = cos(0.30f), s = sin(0.30f);
     GunHit grip = {hit.distance, float3(0.0f), 0u, float3(0.0f)};
-    gunBox(grip, rotateSpiderPitch(origin - float3(0.0f, 0.0f, -0.012f), -s, c),
-        rotateSpiderPitch(direction, -s, c),
-        float3(-0.015f, -0.115f, -0.026f), float3(0.015f, 0.0f, 0.018f), 2u);
+    gunRoundedBox(grip,
+        rotateSpiderPitch(origin - float3(0.0f, 0.0f, -0.012f), -s, c),
+        rotateSpiderPitch(direction, -s, c), float3(-0.015f, -0.115f, -0.026f),
+        float3(0.015f, 0.010f, 0.018f), float2(0.008f, 0.009f), 2u);
     if (grip.part != 0u)
         hit = {grip.distance, rotateSpiderPitch(grip.normal, s, c), 2u,
             origin + direction * grip.distance};
@@ -2870,27 +2978,50 @@ SurfaceMaterial launcherMaterial(GunHit hit) {
 SurfaceMaterial gunMaterial(GunHit hit) {
     float3 p = hit.local;
     if (hit.part == 1u) {
-        // Rear cocking serrations on the slide flanks.
-        float serration = abs(hit.normal.x) > 0.5f && p.z < -0.035f
-            ? step(0.5f, fract(p.z * 230.0f)) : 0.0f;
-        return {float3(0.20f, 0.21f, 0.22f) * (1.0f - 0.55f * serration),
-            0.32f + 0.25f * serration, 0.9f, float3(0.0f)};
-    }
-    if (hit.part == 3u) {
         bool bore = p.z > gunMuzzle.z - 0.002f
             && length(p.xy - gunMuzzle.xy) < 0.0045f;
-        return {bore ? float3(0.005f) : float3(0.09f, 0.09f, 0.095f),
-            0.40f, bore ? 0.0f : 0.85f, float3(0.0f)};
+        // Polished chrome, with cocking serrations at the rear and the nose
+        // of the slide flanks.
+        float serration = abs(hit.normal.x) > 0.5f
+            && (p.z < -0.035f || (p.z > 0.100f && p.z < 0.124f))
+            ? step(0.5f, fract(p.z * 230.0f)) : 0.0f;
+        return {bore ? float3(0.005f)
+                : float3(0.72f, 0.73f, 0.75f) * (1.0f - 0.5f * serration),
+            bore ? 0.40f : 0.14f + 0.3f * serration, bore ? 0.0f : 1.0f,
+            float3(0.0f)};
     }
+    if (hit.part == 3u) return {float3(0.09f, 0.09f, 0.095f), 0.40f, 0.85f,
+        float3(0.0f)};
     if (hit.part == 2u) return {
         float3(0.035f, 0.037f, 0.040f)
             * (0.85f + 0.3f * smoothNoise(p.yz * 900.0f)),
-        0.62f, 0.0f, float3(0.0f)};
+        0.34f, 0.0f, float3(0.0f)};
     if (hit.part == 4u) return {float3(0.045f, 0.043f, 0.040f),
         0.85f, 0.0f, float3(0.0f)};
     return {float3(0.085f, 0.090f, 0.060f)
         * (0.8f + 0.4f * smoothNoise(p.xy * 260.0f)),
         0.95f, 0.0f, float3(0.0f)};
+}
+
+// What the pistol mirrors from `origin`: indoors the tiled floor below, dark
+// walls around the horizon and a dim ceiling; on the moon sunlit regolith
+// under a black sky. Lamps and the sun add their own highlights. `detail`
+// is 0 on curved edges, where the grout would alias.
+// shortcut: the floor is the plane y = 0, so stairs mirror as flat tiles.
+float3 pistolSurroundings(float3 origin, float3 direction, bool outside,
+    float detail) {
+    if (outside) return float3(0.30f, 0.29f, 0.27f)
+        * smoothstep(0.04f, -0.04f, direction.y);
+    float3 wall = float3(0.035f, 0.04f, 0.048f);
+    if (direction.y >= 0.0f) return mix(wall, float3(0.014f, 0.016f, 0.02f),
+        smoothstep(0.0f, 0.5f, direction.y));
+    // The floor's grout lines, fading out before they alias.
+    float reach = origin.y / -direction.y;
+    float2 seam = abs(fract((origin.xz + direction.xz * reach) * 0.7f) - 0.5f);
+    float grout = smoothstep(0.465f, 0.49f, max(seam.x, seam.y))
+        * (1.0f - smoothstep(4.0f, 9.0f, reach)) * detail;
+    return mix(wall, float3(0.15f, 0.135f, 0.125f) * (1.0f - 0.7f * grout),
+        smoothstep(-0.02f, -0.25f, direction.y));
 }
 
 // The viewmodel is lit by the same lights as the scene it moves through: the
@@ -2906,18 +3037,40 @@ float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
         30u, -1, 0u};
     SurfaceMaterial material = gun.part >= 10u ? launcherMaterial(gun)
         : (gun.part >= 6u ? shotgunMaterial(gun) : gunMaterial(gun));
+    bool outside = outdoors(eye.xz, 0.0f);
     float3 color = material.albedo * (1.0f - material.metallic)
             * float3(0.030f, 0.038f, 0.046f)
         + material.albedo * material.metallic
             * (0.05f + 0.07f * saturate(hit.normal.y));
-    if (outdoors(eye.xz, 0.0f)) {
+    // The pistol's chrome and glossy polymer mirror their surroundings and
+    // a soft glow around each lamp; rougher finishes mirror less.
+    bool glossy = gun.part <= 2u;
+    float3 mirrored = reflect(direction, hit.normal);
+    float3 f0 = mix(float3(0.04f), material.albedo, material.metallic);
+    float3 sheen = f0 + (max(float3(1.0f - material.roughness), f0) - f0)
+        * pow(1.0f - saturate(dot(hit.normal, -direction)), 5.0f);
+    if (glossy)
+        color = material.albedo * (1.0f - material.metallic)
+                * float3(0.030f, 0.038f, 0.046f)
+            + sheen * pistolSurroundings(hit.position, mirrored, outside,
+                smoothstep(0.97f, 0.995f, max(abs(gun.normal.x),
+                    max(abs(gun.normal.y), abs(gun.normal.z)))));
+    if (outside) {
         // Regolith bounces sunlight up onto the underside.
         color += material.albedo * float3(1.0f, 0.97f, 0.92f)
             * 0.05f * saturate(-hit.normal.y);
         color += shadeSunlight(hit, material, -direction, chrome, game);
     } else for (uint i = 0u; i < 8u; ++i) {
-        color += shadePointLight(hit, material, -direction,
-            roomLight(i, game.effects.x), chrome, game);
+        PointLight light = roomLight(i, game.effects.x);
+        color += shadePointLight(hit, material, -direction, light, chrome,
+            game);
+        if (glossy) {
+            float3 toLight = light.position - hit.position;
+            float distanceSquared = dot(toLight, toLight);
+            color += sheen * light.color * light.power * 0.25f
+                / (4.0f * rangePi * distanceSquared) * exp(16.0f
+                    * (dot(mirrored, toLight) * rsqrt(distanceSquared) - 1.0f));
+        }
     }
     // The command unit's display glows green while locking and red when
     // the lock is complete.
@@ -2987,6 +3140,7 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     SceneHit hit = {sceneRayLimit,
         float3(0.0f), float3(0.0f), 0u, -1, 0u};
     traceScene(hit, furPosition, origin, direction, chrome, game);
+    float depth = hit.distance;
 
     SurfaceMaterial material = surfaceMaterial(hit, crateA, crateB,
         furPosition, game.effects.x, direction, pixelSpread * hit.distance);
@@ -3032,7 +3186,7 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     if (hit.material == 16u) {
         // A soft reflected ceiling light follows the curved cornea as the
         // spider turns, rather than glowing from inside the eye.
-        bool redEyes = hit.variant != uint(SpiderVariant::brown);
+        bool redEyes = blackSpider(SpiderVariant(hit.variant));
         float3 reflected = reflect(direction, hit.normal);
         float glint = pow(max(dot(reflected,
             normalize(float3(-0.3f, 0.85f, -0.4f))), 0.0f), 56.0f);
@@ -3114,9 +3268,11 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
                 ? traceShotgun(toGun * -gun.pivot, toGun * viewDirection)
                 : traceGun(toGun * -gun.pivot, toGun * viewDirection,
                     gun.slide));
-        if (gunHit.part != 0u)
+        if (gunHit.part != 0u) {
             color = shadeGun(gunHit, gun, muzzleLocal, eye, viewRight, viewUp,
                 viewFront, direction, chrome, game);
+            depth = 0.0f;  // the bokeh pass keeps depth 0 sharp
+        }
     }
     if (holdingGun && !launcher && game.view.w > 0.0f) {
         // The flash is drawn in scene light so the bloom pass spreads it.
@@ -3138,28 +3294,39 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         color += float3(1.0f, 0.62f, 0.24f) * flash
             * saturate(game.view.w / (shotgun ? 0.14f : 0.11f)) * 2.5f;
     }
-    // Linear scene light before exposure; the composite pass tone maps it.
-    return float4(color, 1.0f);
+    // Linear scene light before exposure, which the composite pass tone
+    // maps, and view distance for the bokeh pass.
+    return float4(color, depth);
 }
 
 constexpr sampler postSampler(coord::normalized, address::clamp_to_edge,
     filter::linear);
+
+bool effectOn(device const GameState &game, uint effect) {
+    return (uint(game.controls.w) & effect) == 0u;
+}
+
+// Depth of field focused on whatever sits under the crosshair, scaled with
+// the frame so card previews match the full-screen view.
+fragment float4 bokehFragment(ScreenVertex in [[stage_in]],
+    constant ProgramUniforms &u [[buffer(0)]],
+    device const GameState *states [[buffer(1)]],
+    texture2d<float> scene [[texture(1)]]) {
+    float scale = u.resolutionTime.y / 900.0f;
+    float aperture = effectOn(states[0], effectBokeh) ? 5.0f * scale : 0.0f;
+    // One pixel, so an edge under the crosshair never averages two depths.
+    float focus = scene.read(uint2(u.resolutionTime.xy * 0.5f)).a;
+    return pixeltje_postfx::bokeh(scene, in.uv, u.resolutionTime.xy, focus,
+        aperture, 10.0f * scale);
+}
 
 // Horizontal half of a separable Gaussian over the scene's brightest light.
 fragment float4 bloomFragment(ScreenVertex in [[stage_in]],
     constant ProgramUniforms &u [[buffer(0)]],
     texture2d<float> scene [[texture(1)]]) {
     float stride = (u.resolutionTime.y / 220.0f) / u.resolutionTime.x;
-    float3 sum = float3(0.0f);
-    float total = 0.0f;
-    for (int i = -6; i <= 6; ++i) {
-        float weight = exp(-float(i * i) / 12.5f);
-        float3 light = scene.sample(postSampler,
-            in.uv + float2(float(i) * stride, 0.0f)).rgb;
-        sum += max(light - 0.75f, float3(0.0f)) * weight;
-        total += weight;
-    }
-    return float4(sum / total, 1.0f);
+    return float4(pixeltje_postfx::bloomBlur(scene, in.uv,
+        float2(stride, 0.0f), 0.75f), 1.0f);
 }
 
 // Edge luma on a soft roll-off of linear light, so edge detection follows
@@ -3270,6 +3437,21 @@ float3 projectToScreen(device const GameState &game, float2 resolution,
     return float3(resolution * 0.5f + screen, depth);
 }
 
+// A small power bar above a drone or spider: wide and green when full,
+// shrinking and reddening as it runs down to nothing. Height is the world
+// distance from the centre to the top of the body.
+float3 powerBar(float3 color, float2 pixel, device const GameState &game,
+    float2 resolution, float3 centre, float height, float power) {
+    float3 projected = projectToScreen(game, resolution, centre);
+    if (projected.z < 0.5f) return color;
+    float lift = height / projected.z * 1.1f * resolution.y + 9.0f;
+    float2 q = pixel - projected.xy + float2(20.0f, lift);
+    if (q.x < 0.0f || q.x > 40.0f || abs(q.y) > 2.5f) return color;
+    return q.x < 40.0f * power
+        ? float3(saturate(2.0f - 2.0f * power), saturate(2.0f * power), 0.12f)
+        : float3(0.08f, 0.10f, 0.11f);
+}
+
 // Bloom, damage fringing, lens vignette and film grain, then the pixel HUD.
 fragment float4 compositeFragment(ScreenVertex in [[stage_in]],
     constant ProgramUniforms &u [[buffer(0)]],
@@ -3282,20 +3464,15 @@ fragment float4 compositeFragment(ScreenVertex in [[stage_in]],
     float hurtFlash = saturate(game.effects.y / 0.35f);
     float lowHealth = game.progress.w == phasePlaying
         ? saturate(1.0f - game.view.y / 35.0f) : 0.0f;
-    float2 fringe = (in.uv - 0.5f) * (0.007f * hurtFlash + 0.002f * lowHealth);
-    float3 color = float3(scene.sample(postSampler, in.uv + fringe).r,
-        scene.sample(postSampler, in.uv).g,
-        scene.sample(postSampler, in.uv - fringe).b);
-    float stride = (u.resolutionTime.y / 220.0f) / u.resolutionTime.y;
-    float3 glow = float3(0.0f);
-    float total = 0.0f;
-    for (int i = -6; i <= 6; ++i) {
-        float weight = exp(-float(i * i) / 12.5f);
-        glow += bloom.sample(postSampler,
-            in.uv + float2(0.0f, float(i) * stride)).rgb * weight;
-        total += weight;
-    }
-    color = pixeltje_3d::filmicToneMap((color + 0.55f * glow / total) * 1.6f);
+    // Damage fringing stays when the lens fringe is switched off.
+    float fringe = 0.007f * hurtFlash + 0.002f * lowHealth
+        + (effectOn(game, effectAberration) ? 0.012f : 0.0f);
+    float3 color = pixeltje_postfx::chromaticAberration(scene, in.uv, fringe);
+    float3 glow = effectOn(game, effectBloom)
+        ? pixeltje_postfx::bloomBlur(bloom, in.uv,
+            float2(0.0f, 1.0f / 220.0f), 0.0f)
+        : float3(0.0f);
+    color = pixeltje_3d::filmicToneMap((color + 0.55f * glow) * 1.6f);
     float2 lens = (in.uv - 0.5f) * float2(u.resolutionTime.x / u.resolutionTime.y, 1.0f);
     color *= 1.0f - 0.32f * smoothstep(0.35f, 1.0f, length(lens));
     float2 pixel = in.uv * u.resolutionTime.xy;
@@ -3378,26 +3555,27 @@ fragment float4 compositeFragment(ScreenVertex in [[stage_in]],
             }
         }
     }
-    // A damaged drone shows a small power bar above it: wide and green when
-    // full, shrinking and reddening as it runs down to nothing. Drones fly
-    // outside, so the bars show only there.
-    // shortcut: no depth test, so a bar shows through a crater rim; test
-    // against the scene depth if that reads wrong.
-    if (game.progress.w == phasePlaying && !flightCam
-        && outdoors(game.player.xz, 0.0f)) {
-        for (uint i = 0u; i < droneCount; ++i) {
-            float power = game.drones[i].brain.z / droneHealth;
-            if (power <= 0.0f || power >= 1.0f) continue;
-            float3 projected = projectToScreen(game, u.resolutionTime.xy,
-                game.drones[i].pose.xyz);
-            if (projected.z < 0.5f) continue;
-            float lift = 0.3f / projected.z * 1.1f * u.resolutionTime.y + 9.0f;
-            float2 q = pixel - projected.xy + float2(20.0f, lift);
-            if (q.x < 0.0f || q.x > 40.0f || abs(q.y) > 2.5f) continue;
-            color = q.x < 40.0f * power
-                ? float3(saturate(2.0f - 2.0f * power),
-                    saturate(2.0f * power), 0.12f)
-                : float3(0.08f, 0.10f, 0.11f);
+    // Damaged drones and range spiders show a power bar above them. Drones
+    // fly outside, so theirs show only there; a spider's shows while it has
+    // a clear line to the player. The boss keeps its bar at the top.
+    // shortcut: drone bars have no depth test, so one shows through a
+    // crater rim; test against the scene depth if that reads wrong.
+    if (game.progress.w == phasePlaying && !flightCam && reveal <= 0.0f) {
+        if (outdoors(game.player.xz, 0.0f)) {
+            for (uint i = 0u; i < droneCount; ++i) {
+                float power = game.drones[i].brain.z / droneHealth;
+                if (power > 0.0f && power < 1.0f)
+                    color = powerBar(color, pixel, game, u.resolutionTime.xy,
+                        game.drones[i].pose.xyz, 0.3f, power);
+            }
+        }
+        for (uint i = 0u; i < ordinaryEnemyCount; ++i) {
+            float power = game.spiderBar[i];
+            if (power <= 0.0f || power >= 1.0f || game.sightLines[i] == 0u)
+                continue;
+            float scale = spiderTraits(spiderVariantForSlot(i)).scale;
+            color = powerBar(color, pixel, game, u.resolutionTime.xy,
+                game.enemy[i].xyz, 0.6f * scale, power);
         }
     }
     // Hit marker: white for a body hit, orange for the head, red for a kill.
@@ -3680,9 +3858,9 @@ kernel void buildRangeHUD(constant ProgramUniforms &u [[buffer(0)]],
                 centreY + 0.2f * size.y, 15.0f,
                 game.pickups.y == 2u ? float3(0.5f, 1.0f, 0.6f) : gold,
                 1.0f - smoothstep(1.0f, 1.6f, sincePickup));
-        // The north gate prompt follows the third range kill.
-        float sinceGate = game.progress.x >= ordinaryEnemyCount
-            ? game.effects.x - game.fallen[ordinaryEnemyCount - 1u].motion.z
+        // The north gate prompt follows the last range kill.
+        float clearedAt = rangeClearedTime(game);
+        float sinceGate = clearedAt >= 0.0f ? game.effects.x - clearedAt
             : -1.0f;
         if (sinceGate >= 0.0f && sinceGate < 4.0f && game.bossScene.x < 0.0f)
             addCentered(glyphs, count, font, textGateOpen, centreX, 118.0f,

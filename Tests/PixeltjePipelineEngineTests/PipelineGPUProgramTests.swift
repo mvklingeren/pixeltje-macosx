@@ -232,6 +232,7 @@ private let audioVoiceTestSource = """
     voice[0] = 2.0f;
     voice[1] = 1.5f;
     voice[2] = -0.5f;
+    voice[3] = 0.25f;
   }
   vertex float4 fullscreenVertex(uint index [[vertex_id]]) {
     float2 p = float2((index << 1u) & 2u, index & 2u);
@@ -273,6 +274,28 @@ private func audioVoiceTestProgram(bytes: Int = 32, eventWord: Int = 0,
   }
 }
 
+@Test func gpuProgramAudioVoicesLoopAnAssetOrPlayAValidSynth() async throws {
+  let device = try #require(MTLCreateSystemDefaultDevice())
+  let runner = PipelineGPUProgram(commandQueue: try #require(device.makeCommandQueue()))
+  let asset = "\"asset\":\"sfx\""
+  let rotor = "\"synth\":{\"kind\":\"rotor\",\"rotors\":4,\"blades\":2,\"hz\":105}"
+  func program(_ voice: String) -> String {
+    audioVoiceTestProgram().replacingOccurrences(of: "\"word\":4,\(asset)",
+      with: "\"word\":4,\(voice)")
+  }
+  try await runner.validateLiteral(programJSON: program(rotor),
+    source: audioVoiceTestSource)
+  for voice in ["\(asset),\(rotor)", "\"label\":\"none\"",
+    rotor.replacingOccurrences(of: "\"rotors\":4", with: "\"rotors\":9"),
+    rotor.replacingOccurrences(of: "\"hz\":105", with: "\"hz\":4000"),
+    rotor.replacingOccurrences(of: "rotor\"", with: "siren\"")] {
+    await #expect(throws: (any Error).self) {
+      try await runner.validateLiteral(programJSON: program(voice),
+        source: audioVoiceTestSource)
+    }
+  }
+}
+
 @Test func liveGPUProgramReportsCommittedAudioVoices() async throws {
   let examples = URL(fileURLWithPath: #filePath)
     .deletingLastPathComponent().deletingLastPathComponent()
@@ -301,8 +324,8 @@ private func audioVoiceTestProgram(bytes: Int = 32, eventWord: Int = 0,
   await runner.commit(runID: runID)
   #expect(await runner.takeLiveAudioEvents(runID: runID) == [sound, sound])
   let voices = await runner.takeLiveAudioVoices(runID: runID)
-  #expect(voices == [PipelineGPUAudioVoice(nodeID: node.id, slot: 0, url: sound,
-    gain: 1, rate: 1.5, pan: -0.5)])
+  #expect(voices == [PipelineGPUAudioVoice(nodeID: node.id, slot: 0,
+    source: .sound(sound), gain: 1, rate: 1.5, pan: -0.5, drive: 0.25)])
   #expect(await runner.takeLiveAudioVoices(runID: runID).isEmpty)
   await runner.endLivePreview(runID: runID)
 }

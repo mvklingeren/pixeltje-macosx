@@ -1209,7 +1209,8 @@ final class PipelineEditorModel: ObservableObject {
     if document.nodes[index].kind == .trackpad, name == "spaceAction",
       value != .string("primary") && value != .string("secondary") { return }
     if document.nodes[index].kind == .assetCache, name == "slotCount" {
-      guard case .integer(let count) = value, (1...16).contains(count),
+      guard case .integer(let count) = value,
+        PipelineAssetCacheSlots.range.contains(count),
         document.nodes[index].parameters[name] != value else { return }
       var updated = document
       updated.nodes[index].parameters[name] = value

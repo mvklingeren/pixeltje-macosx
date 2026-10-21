@@ -179,9 +179,10 @@ actor PipelineAssetCache {
   static func executor(cache: PipelineAssetCache) -> PipelineNodeExecutor {
     .init(kind: .assetCache, validate: { node in
       let count = node.parameters["slotCount"]?.integerValue ?? 1
-      guard (1...16).contains(count) else {
+      guard PipelineAssetCacheSlots.range.contains(count) else {
         return [.init(severity: .error, code: .invalidParameter,
-          message: "Asset Cache needs 1–16 slots.", nodeID: node.id)]
+          message: "Asset Cache needs 1–\(PipelineAssetCacheSlots.range.upperBound) slots.",
+          nodeID: node.id)]
       }
       return []
     }) { node, inputs, _ in

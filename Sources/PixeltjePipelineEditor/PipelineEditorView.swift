@@ -2256,7 +2256,8 @@ private struct PipelineNodeCard: View {
 
   private var assetSlotCount: Int {
     if case .integer(let count)? = node.parameters["slotCount"] {
-      return Int(min(max(count, 1), 16))
+      return Int(min(max(count, PipelineAssetCacheSlots.range.lowerBound),
+        PipelineAssetCacheSlots.range.upperBound))
     }
     return 1
   }
@@ -2270,7 +2271,9 @@ private struct PipelineNodeCard: View {
     if node.kind == .assetCache {
       VStack(alignment: .leading, spacing: 4) {
         Stepper("Slots: \(assetSlotCount)", value: Binding(
-          get: { assetSlotCount }, set: setAssetSlotCount), in: 1...16)
+          get: { assetSlotCount }, set: setAssetSlotCount),
+          in: Int(PipelineAssetCacheSlots.range.lowerBound)...Int(
+            PipelineAssetCacheSlots.range.upperBound))
           .font(.caption)
           .disabled(!isEditable)
         HStack {

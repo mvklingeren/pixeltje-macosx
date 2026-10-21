@@ -25,7 +25,9 @@ The conversion script is [`../../Scripts/convert-stable-audio-3-small-sfx.py`](.
 It accepts `--checkpoint` for the original publisher snapshot and `--output`
 for a new export directory. Use an isolated Python environment with PyTorch,
 Transformers, safetensors, Apple's `coreai-torch` and `coreai-models`, and the
-publisher's `stable_audio_3` source on `PYTHONPATH`. The export is limited to
-0.25–2-second effects because its denoiser and decoder use an 88-frame latent
-canvas. The decoder's small inference noise is disabled for deterministic
+publisher's `stable_audio_3` source on `PYTHONPATH`. `--max-duration` sets the
+longest effect the export can generate, 11 seconds by default; its denoiser and
+decoder size each clip's latent canvas to the requested duration, so a
+two-second effect still uses 88 frames. The bundled examples link an 11-second
+export. The decoder's small inference noise is disabled for deterministic
 Core AI export.

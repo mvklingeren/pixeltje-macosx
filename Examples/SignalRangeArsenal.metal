@@ -265,8 +265,8 @@ void collectPickups(device GameState &game) {
 
 // MARK: Targets shared by the seeker and the blast
 
-// Target IDs: 1–4 are spider slots + 1, 5–7 sentries + 5 and 8–10 drones
-// + 8; 0 is none.
+// Target IDs: 1–11 are spider slots + 1, 12–14 sentries + 12 and 15–17
+// drones + 15; 0 is none.
 constant uint firstSentryTarget = enemyCount + 1u;
 constant uint firstDroneTarget = enemyCount + sentryCount + 1u;
 constant uint targetCount = enemyCount + sentryCount + droneCount;

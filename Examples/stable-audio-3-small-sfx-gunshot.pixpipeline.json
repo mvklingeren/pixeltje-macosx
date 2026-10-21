@@ -53,8 +53,8 @@
           "reference": {
             "kind": "coreAIModel",
             "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
-            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
-            "contentHash": "3c3ead00ddda0cd08c5ee67f140b16ad740d7885c6ab9d0e0950676fc0203abc",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
             "componentRole": "textEncoder",
             "functionName": "main",
             "familyABI": "stable-audio-3-small-sfx-coreai@1"
@@ -65,8 +65,8 @@
           "reference": {
             "kind": "coreAIModel",
             "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
-            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
-            "contentHash": "faf0fcd4028b833f2d1f5e6197b2a0f4b6f396ad8aa58fb9b199fe7e3f14a8b0",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
             "componentRole": "durationEncoder",
             "functionName": "main",
             "familyABI": "stable-audio-3-small-sfx-coreai@1"
@@ -77,8 +77,8 @@
           "reference": {
             "kind": "coreAIModel",
             "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
-            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
-            "contentHash": "a393376b99a0c532c4c0f8e4d1e38295e0cd3b53ff5d9ee3eb4f91bb6e850efc",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
             "componentRole": "denoiser",
             "functionName": "main",
             "familyABI": "stable-audio-3-small-sfx-coreai@1"
@@ -89,8 +89,8 @@
           "reference": {
             "kind": "coreAIModel",
             "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
-            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
-            "contentHash": "bafbe50f630c9e6dd2477e320a974d90ef2a27f734f9b610b19e1d0f1b4b4698",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
             "componentRole": "audioDecoder",
             "functionName": "main",
             "familyABI": "stable-audio-3-small-sfx-coreai@1"
@@ -101,7 +101,7 @@
           "reference": {
             "kind": "tokenizer",
             "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
-            "packageVersion": "sha256.d11f4a3bbbad14ad60cc2d73823d925c68266516bf1aa806cc7d1a28a07d4163",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
             "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
             "componentRole": "tokenizer",
             "familyABI": "stable-audio-3-small-sfx-coreai@1"

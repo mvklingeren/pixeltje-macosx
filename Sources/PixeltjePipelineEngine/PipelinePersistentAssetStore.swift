@@ -78,7 +78,7 @@ struct PipelinePersistentAssetStore {
     guard let data = try? Data(contentsOf: directory.appendingPathComponent("manifest.json")),
       let manifest = try? JSONDecoder().decode(Manifest.self, from: data),
       manifest.version == 1, manifest.fingerprint == fingerprint,
-      (1...16).contains(manifest.slots.count),
+      PipelineAssetCacheSlots.range.contains(Int64(manifest.slots.count)),
       Set(manifest.slots.map(\.name)).count == manifest.slots.count else {
       return nil
     }

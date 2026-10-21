@@ -18,20 +18,57 @@ public struct PipelineGPUProgramPerformance: Encodable, Sendable {
   public var previewCopySeconds = 0.0
 }
 
+/// A sound the player synthesizes live instead of looping a file, so its
+/// pitch follows the program continuously and it never repeats.
+public struct PipelineGPUAudioSynth: Hashable, Sendable, Decodable {
+  public enum Kind: String, Hashable, Sendable, Decodable {
+    /// Electric multirotor propellers: tonal blade-pass harmonics with the
+    /// beating between slightly unequal motors, motor whine and the
+    /// turbulent air the blades chop.
+    case rotor
+  }
+  public let kind: Kind
+  /// Propellers, 1–8.
+  public let rotors: Int
+  /// Blades per propeller, 2–6.
+  public let blades: Int
+  /// Propeller revolutions per second at playback rate 1, 20–400.
+  public let hz: Float
+
+  public init(kind: Kind, rotors: Int, blades: Int, hz: Float) {
+    self.kind = kind
+    self.rotors = rotors
+    self.blades = blades
+    self.hz = hz
+  }
+
+  var isValid: Bool {
+    (1...8).contains(rotors) && (2...6).contains(blades) && (20...400).contains(hz)
+  }
+}
+
 /// A looping program sound as the last committed frame left it. The program
 /// writes loudness, playback rate and stereo position every frame, so a
 /// moving source can carry distance attenuation and Doppler shift.
 public struct PipelineGPUAudioVoice: Equatable, Sendable {
+  public enum Source: Equatable, Sendable {
+    /// A sound file played as a seamless loop.
+    case sound(URL)
+    case synth(PipelineGPUAudioSynth)
+  }
   public let nodeID: PipelineNodeID
   /// Index into the program's `audioVoices`.
   public let slot: Int
-  public let url: URL
+  public let source: Source
   /// 0 is silent, 1 is the sound's own level.
   public let gain: Float
   /// Playback speed, which also scales pitch: 0.25–4.
   public let rate: Float
   /// -1 is fully left, 1 fully right.
   public let pan: Float
+  /// How hard a synthesized source works, 0–1; it brightens the sound and
+  /// roughens its motors. A looped sound ignores it.
+  public let drive: Float
 }
 
 /// Bounded, declarative Metal passes. Workflow data names functions and fixed
@@ -71,11 +108,13 @@ actor PipelineGPUProgram {
       let word: Int?
       let asset: String
     }
-    /// Four floats from `word`: gain, playback rate, pan and one unused.
+    /// Four floats from `word`: gain, playback rate, pan and drive. A voice
+    /// loops its `asset` or plays its `synth`, never both.
     struct AudioVoice: Decodable {
       let buffer: String
       let word: Int
-      let asset: String
+      let asset: String?
+      let synth: PipelineGPUAudioSynth?
     }
     let version: Int
     let resources: [Resource]
@@ -136,6 +175,8 @@ actor PipelineGPUProgram {
 
   /// Audio buffers are small; events and voices share them by word.
   private static let maximumAudioBufferBytes = 256
+  private static let maximumAudioEvents = 16
+  private static let maximumAudioVoices = 8
 
   private struct FontKey: Hashable {
     let design: String
@@ -409,7 +450,7 @@ actor PipelineGPUProgram {
     let assets = inputs["assets"]?.value(as: PipelineAssetBundle.self)
     var audioAssets: [String: URL] = [:]
     for asset in (definition.audioEvents ?? []).map(\.asset)
-      + (definition.audioVoices ?? []).map(\.asset) {
+      + (definition.audioVoices ?? []).compactMap(\.asset) {
       guard let value = assets?[asset], value.type == .audio,
         let url = value.value(as: URL.self)
           ?? value.value(as: PipelineGeneratedAudio.self)?.fileURL else {
@@ -613,17 +654,25 @@ actor PipelineGPUProgram {
     }
     var audioVoices: [PipelineGPUAudioVoice] = []
     for (slot, voice) in (definition.audioVoices ?? []).enumerated() {
-      guard case .buffer(let buffer)? = working.resources[voice.buffer],
-        let url = audioAssets[voice.asset] else { continue }
+      guard case .buffer(let buffer)? = working.resources[voice.buffer] else { continue }
+      let source: PipelineGPUAudioVoice.Source
+      if let synth = voice.synth {
+        source = .synth(synth)
+      } else if let asset = voice.asset, let url = audioAssets[asset] {
+        source = .sound(url)
+      } else {
+        continue
+      }
       func value(_ index: Int, in range: ClosedRange<Float>, otherwise: Float) -> Float {
         let raw = buffer.contents().load(fromByteOffset: (voice.word + index) * 4,
           as: Float.self)
         return raw.isFinite ? min(max(raw, range.lowerBound), range.upperBound) : otherwise
       }
-      audioVoices.append(.init(nodeID: node.id, slot: slot, url: url,
+      audioVoices.append(.init(nodeID: node.id, slot: slot, source: source,
         gain: value(0, in: 0...1, otherwise: 0),
         rate: value(1, in: 0.25...4, otherwise: 1),
-        pan: value(2, in: -1...1, otherwise: 0)))
+        pan: value(2, in: -1...1, otherwise: 0),
+        drive: value(3, in: 0...1, otherwise: 0)))
     }
     guard case .texture(let output)? = working.resources[definition.output] else {
       throw PipelineEngineError.invalidInvocation("GPU Program output is not a texture.")
@@ -857,7 +906,7 @@ actor PipelineGPUProgram {
       }
     }
     let audioEvents = program.audioEvents ?? []
-    guard audioEvents.count <= 8,
+    guard audioEvents.count <= maximumAudioEvents,
       audioEvents.allSatisfy({ event in
         identifier(event.asset)
           && claimAudioWords(buffer: event.buffer, word: event.word ?? 0, count: 1)
@@ -865,12 +914,17 @@ actor PipelineGPUProgram {
       throw fail("audio events need distinct words of small audio buffers and asset names.")
     }
     let audioVoices = program.audioVoices ?? []
-    guard audioVoices.count <= 4,
+    guard audioVoices.count <= maximumAudioVoices,
       audioVoices.allSatisfy({ voice in
-        identifier(voice.asset)
+        let source = switch (voice.asset, voice.synth) {
+        case (let asset?, nil): identifier(asset)
+        case (nil, let synth?): synth.isValid
+        default: false
+        }
+        return source
           && claimAudioWords(buffer: voice.buffer, word: voice.word, count: 4)
       }) else {
-      throw fail("audio voices need four distinct words of small audio buffers and asset names.")
+      throw fail("audio voices need four distinct words of small audio buffers and either an asset name or a valid synth.")
     }
     guard program.present.contains(where: {
       $0.kind == "render" && $0.target == program.output
