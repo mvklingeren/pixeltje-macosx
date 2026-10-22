@@ -889,6 +889,99 @@ struct MoonSurface {
     }
 };
 
+// ------------------------------------------------------------ terrain maps
+
+// The terrain never changes, so initialize bakes what the views ask of it
+// most often. The bound map holds the highest point of the trace field over
+// each cell, so a ray can skip through clear air with one read per step and
+// evaluate the field only near the ground. The shadow maps hold, for the
+// Earth and the sun, the height below which each column of the plain lies
+// in the terrain's shadow. A fine level covers the settlement and a coarse
+// one the walkable plain; outside both, the field answers as before.
+struct TerrainLevel {
+    float2 origin;  // world x and z of the level's first corner
+    float cell;     // metres per texel
+    uint size;      // texels per side
+    uint offset;    // first texel in the maps
+};
+
+constant TerrainLevel terrainLevels[2] = {
+    {float2(-384.0f, -304.0f), 1.0f, 768u, 0u},
+    {float2(-2048.0f, -2048.0f), 8.0f, 512u, 589824u}};
+constant uint terrainMapTexels = 851968u;   // both levels
+constant uint terrainMapRow = 1024u;        // texels per row of a bake grid
+// The sun's map refreshes one band per tick, all of it every 16 ticks.
+constant uint sunShadowBands = 16u;
+constant uint sunShadowBandTexels = terrainMapTexels / sunShadowBands;
+
+// The highest point of the trace field over the cell under p, or infinity
+// where no level covers p.
+float terrainBound(device const float *bounds, float2 p) {
+    for (uint l = 0u; l < 2u; ++l) {
+        TerrainLevel level = terrainLevels[l];
+        float2 q = (p - level.origin) / level.cell;
+        if (all(q >= 0.0f) && all(q < float(level.size)))
+            return bounds[level.offset + uint(q.y) * level.size + uint(q.x)];
+    }
+    return INFINITY;
+}
+
+// pixeltje_terrain::trace over MoonSurface{moonTraceDetail}, finding the
+// same surface. While the ray clears the bound by half a metre, and by more
+// with distance, the true gap is at least that clearance, so the step takes
+// it without the field. Bounded steps are shorter than exact ones, so the
+// march may take more of them than the field's own 160; each costs one read.
+float traceTerrainBounded(device const float *bounds, float3 origin,
+    float3 direction, float near, float far) {
+    MoonSurface field = {moonTraceDetail};
+    float t = near, previousT = near, previousGap = 0.0f;
+    bool previousExact = false;
+    for (int i = 0; i < 480; ++i) {
+        float3 p = origin + direction * t;
+        float clearance = p.y - terrainBound(bounds, p.xz);
+        bool exact = clearance < 0.5f + 0.01f * t;
+        float gap = clearance;
+        if (exact) {
+            gap = p.y - field(p.xz);
+            if (gap < 0.0f) {
+                if (i == 0) return t;
+                if (!previousExact) {
+                    float3 q = origin + direction * previousT;
+                    previousGap = q.y - field(q.xz);
+                }
+                return mix(previousT, t, previousGap / (previousGap - gap));
+            }
+            if (gap < 0.001f * t) return t;
+        }
+        if (t >= far || (p.y > moonCeiling && direction.y >= 0.0f))
+            return -1.0f;
+        previousT = t;
+        previousGap = gap;
+        previousExact = exact;
+        t = min(t + max(gap * 0.45f, 0.002f + 0.004f * t), far);
+    }
+    return previousExact && previousGap < 0.03f * previousT
+        ? previousT : -1.0f;
+}
+
+// The terrain's soft shadow at p toward a baked light, 0 to 1 like
+// pixeltje_terrain::softShadow, or -1 where no level covers p.
+float terrainMapShadow(device const float2 *map, float3 p) {
+    for (uint l = 0u; l < 2u; ++l) {
+        TerrainLevel level = terrainLevels[l];
+        float2 q = (p.xz - level.origin) / level.cell - 0.5f;
+        if (any(q < 0.0f) || any(q > float(level.size - 1u))) continue;
+        uint2 i = min(uint2(q), uint2(level.size - 2u));
+        float2 f = q - float2(i);
+        uint at = level.offset + i.y * level.size + i.x;
+        float2 column = mix(mix(map[at], map[at + 1u], f.x),
+            mix(map[at + level.size], map[at + level.size + 1u], f.x), f.y);
+        return smoothstep(0.0f, 1.0f,
+            saturate(10.0f * (p.y - column.x) / max(column.y, 0.1f)));
+    }
+    return -1.0f;
+}
+
 // The three stair connectors have six real steps. The same height function
 // positions the camera and the collision surface, so stairs, the moon and
 // the haunted house's porch, floor and stairs are walkable.
@@ -1994,7 +2087,7 @@ float2 footprintSpan(float3 origin, float3 direction) {
 // moon only through the exit, so the terrain march starts where it leaves.
 // Without the base, the moon is traced across its footprint as well.
 void traceOutside(thread SceneHit &hit, float3 origin, float3 direction,
-    bool base) {
+    bool base, device const float *bounds = nullptr) {
     bool inside = base && !outdoors(origin.xz, 0.0f);
     float2 span = footprintSpan(origin, direction);
     if (base && !inside) {
@@ -2014,8 +2107,10 @@ void traceOutside(thread SceneHit &hit, float3 origin, float3 direction,
     float far = base && !inside && span.x > 0.0f && span.x <= span.y
         ? min(hit.distance, span.x) : hit.distance;
     if (near >= far) return;
-    float t = pixeltje_terrain::trace(MoonSurface{moonTraceDetail}, origin,
-        direction, near, far, moonCeiling, 160);
+    float t = bounds
+        ? traceTerrainBounded(bounds, origin, direction, near, far)
+        : pixeltje_terrain::trace(MoonSurface{moonTraceDetail}, origin,
+            direction, near, far, moonCeiling, 160);
     if (t < 0.0f) return;
     float3 p = origin + direction * t;
     float epsilon = 0.02f + 0.002f * t;
@@ -2795,7 +2890,8 @@ float3 regolithBounce(Daylight sun) {
 // shadows.
 float3 shadeDistantLight(SceneHit hit, SurfaceMaterial material,
     float3 viewDirection, ChromePose chrome, device const GameState &game,
-    float3 lightDirection, float3 lightColor, float power) {
+    float3 lightDirection, float3 lightColor, float power,
+    device const float2 *shadowMap = nullptr) {
     if (dot(hit.normal, lightDirection) <= 0.0f) return float3(0.0f);
     float3 origin = hit.position + hit.normal * 0.05f;
     if ((renderBase && (crateBlocksLight(origin, lightDirection, 1.0e4f,
@@ -2804,9 +2900,11 @@ float3 shadeDistantLight(SceneHit hit, SurfaceMaterial material,
             hullRearLower, hullRearUpper)))
         || buildingsBlockLight(origin, lightDirection, 1.0e4f, game))
         return float3(0.0f);
-    float lit = pixeltje_terrain::softShadow(MoonSurface{moonTraceDetail},
-        origin, lightDirection, 0.1f, 600.0f, moonCeiling, 10.0f, 48)
-        * droneShadow(origin, lightDirection, 1.0e4f, game);
+    float terrainLit = shadowMap ? terrainMapShadow(shadowMap, origin) : -1.0f;
+    if (terrainLit < 0.0f)
+        terrainLit = pixeltje_terrain::softShadow(MoonSurface{moonTraceDetail},
+            origin, lightDirection, 0.1f, 600.0f, moonCeiling, 10.0f, 48);
+    float lit = terrainLit * droneShadow(origin, lightDirection, 1.0e4f, game);
     if (lit <= 0.0f) return float3(0.0f);
     PointLight light = {hit.position + lightDirection * 1.0e4f,
         lightColor, power, false};
@@ -2820,15 +2918,113 @@ float3 shadeDistantLight(SceneHit hit, SurfaceMaterial material,
 }
 
 float3 shadeDistantLights(SceneHit hit, SurfaceMaterial material,
-    float3 viewDirection, ChromePose chrome, device const GameState &game) {
+    float3 viewDirection, ChromePose chrome, device const GameState &game,
+    device const float2 *earthShadow = nullptr,
+    device const float2 *sunShadow = nullptr) {
     float3 color = shadeDistantLight(hit, material, viewDirection, chrome,
-        game, earthDirection, earthColor, earthPower);
+        game, earthDirection, earthColor, earthPower, earthShadow);
     Daylight sun = daylight(game.effects.x);
     if (sun.strength > 0.0f)
         color += shadeDistantLight(hit, material, viewDirection, chrome, game,
             sun.direction, sunColor * sunTransmittance(sun),
-            sunPower * sun.strength);
+            sunPower * sun.strength, sunShadow);
     return color;
+}
+
+// ------------------------------------------------------- terrain map baking
+
+// The level and world x and z of texel index of the terrain maps.
+uint terrainTexel(uint index, thread float2 &corner) {
+    uint l = index < terrainLevels[1].offset ? 0u : 1u;
+    TerrainLevel level = terrainLevels[l];
+    uint local = index - level.offset;
+    corner = level.origin + float2(float(local % level.size),
+        float(local / level.size)) * level.cell;
+    return l;
+}
+
+// One column's shadow toward light: the height below which the column is in
+// shadow, and the distance that sets the penumbra. A point at height y is
+// lit by 10 (y - height) / distance, which matches the soft shadow march at
+// the ground and reaches 0 at the hard shadow's edge.
+float2 terrainShadowColumn(float2 centre, float3 light) {
+    MoonSurface field = {moonTraceDetail};
+    float ground = field(centre) + 0.05f;
+    float highest = -INFINITY, highestAt = 600.0f, lit = 1.0f;
+    float t = 0.1f;
+    for (int i = 0; i < 48 && t < 600.0f; ++i) {
+        float3 p = float3(centre.x, ground, centre.y) + light * t;
+        if (p.y > moonCeiling && light.y >= 0.0f) break;
+        float h = field(p.xz);
+        float gap = p.y - h;
+        float shadowHeight = h - light.y * t;
+        if (shadowHeight > highest) {
+            highest = shadowHeight;
+            highestAt = t;
+        }
+        lit = min(lit, 10.0f * gap / t);
+        t += max(gap * 0.5f, 0.05f + 0.02f * t);
+    }
+    if (highest == -INFINITY) return float2(-1.0e6f, 600.0f);
+    float distance = lit > 0.0f ? 10.0f * (ground - highest) / lit : highestAt;
+    return float2(highest, max(distance, 0.1f));
+}
+
+kernel void bakeTerrainBounds(device float *bounds [[buffer(1)]],
+    uint2 id [[thread_position_in_grid]]) {
+    uint index = id.y * terrainMapRow + id.x;
+    if (index >= terrainMapTexels) return;
+    float2 corner;
+    uint l = terrainTexel(index, corner);
+    // Samples every quarter metre in the fine level and every metre in the
+    // coarse one. Between samples the field rises at most 2.5 per metre.
+    uint samples = l == 0u ? 5u : 9u;
+    float spacing = terrainLevels[l].cell / float(samples - 1u);
+    MoonSurface field = {moonTraceDetail};
+    float highest = -INFINITY;
+    for (uint y = 0u; y < samples; ++y)
+        for (uint x = 0u; x < samples; ++x)
+            highest = max(highest,
+                field(corner + float2(float(x), float(y)) * spacing));
+    bounds[index] = highest + 2.5f * spacing * 0.7072f + 0.02f;
+}
+
+kernel void bakeEarthShadows(device float2 *shadows [[buffer(1)]],
+    uint2 id [[thread_position_in_grid]]) {
+    uint index = id.y * terrainMapRow + id.x;
+    if (index >= terrainMapTexels) return;
+    float2 corner;
+    uint l = terrainTexel(index, corner);
+    shadows[index] = terrainShadowColumn(
+        corner + 0.5f * terrainLevels[l].cell, earthDirection);
+}
+
+void bakeSunShadow(uint index, device const GameState &game,
+    device float2 *shadows) {
+    if (index >= terrainMapTexels) return;
+    Daylight sun = daylight(game.effects.x);
+    if (sun.strength <= 0.0f) return;
+    float2 corner;
+    uint l = terrainTexel(index, corner);
+    shadows[index] = terrainShadowColumn(
+        corner + 0.5f * terrainLevels[l].cell, sun.direction);
+}
+
+kernel void bakeSunShadows(device const GameState *states [[buffer(1)]],
+    device float2 *shadows [[buffer(2)]],
+    uint2 id [[thread_position_in_grid]]) {
+    bakeSunShadow(id.y * terrainMapRow + id.x, states[0], shadows);
+}
+
+// The sun moves a quarter turn in ten minutes, so one band per tick keeps
+// its shadows current.
+kernel void refreshSunShadows(constant ProgramUniforms &u [[buffer(0)]],
+    device const GameState *states [[buffer(1)]],
+    device float2 *shadows [[buffer(2)]],
+    uint2 id [[thread_position_in_grid]]) {
+    uint band = u.frameSeed.x % sunShadowBands;
+    bakeSunShadow(band * sunShadowBandTexels + id.y * terrainMapRow + id.x,
+        states[0], shadows);
 }
 
 // The ghost's green light reaches surfaces on its own side of the house's
@@ -3139,14 +3335,14 @@ float ambientOcclusion(SceneHit hit, device const GameState &game) {
 
 void traceScene(thread SceneHit &hit, thread float3 &furPosition,
     float3 origin, float3 direction, ChromePose chrome,
-    device const GameState &game) {
+    device const GameState &game, device const float *bounds = nullptr) {
     // Shots and sight lines always meet the base through traceEnvironment;
     // renderBase only decides whether the view draws it.
     if (renderBase) {
         traceEnvironment(hit, origin, direction, chrome, game);
     } else {
         traceBuildings(hit, origin, direction, game);
-        traceOutside(hit, origin, direction, false);
+        traceOutside(hit, origin, direction, false, bounds);
     }
     for (uint i = 0u; i < enemyCount; ++i) {
         if (!spiderActive(game, i)) continue;
@@ -3702,7 +3898,8 @@ float3 pistolSurroundings(float3 origin, float3 direction, bool outside,
 // the sun and the lanterns on the moon.
 float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
     float3 right, float3 up, float3 front, float3 direction,
-    ChromePose chrome, device const GameState &game) {
+    ChromePose chrome, device const GameState &game,
+    device const float2 *earthShadow, device const float2 *sunShadow) {
     float3 viewPoint = pose.pivot + pose.basis * gun.local;
     float3 viewNormal = pose.basis * gun.normal;
     SceneHit hit = {length(viewPoint), normalize(right * viewNormal.x
@@ -3745,7 +3942,8 @@ float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
         // spreads the same way.
         SurfaceMaterial broad = material;
         broad.roughness = max(material.roughness, 0.45f);
-        color += shadeDistantLights(hit, broad, -direction, chrome, game);
+        color += shadeDistantLights(hit, broad, -direction, chrome, game,
+            earthShadow, sunShadow);
         color += houseOutdoorLighting(hit, material, -direction, chrome, game);
     } else for (uint i = 0u; i < (inHouse ? houseIndoorLightCount : 8u);
         ++i) {
@@ -3786,6 +3984,9 @@ float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
 fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     constant ProgramUniforms &u [[buffer(0)]],
     device const GameState *states [[buffer(1)]],
+    device const float *terrainBounds [[buffer(2)]],
+    device const float2 *earthShadow [[buffer(3)]],
+    device const float2 *sunShadow [[buffer(4)]],
     texture2d<float> crateA [[texture(1)]],
     texture2d<float> crateB [[texture(2)]],
     texture2d<float> impactTexture [[texture(3)]]) {
@@ -3833,7 +4034,8 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     float3 furPosition = float3(0.0f);
     SceneHit hit = {sceneRayLimit,
         float3(0.0f), float3(0.0f), 0u, -1, 0u};
-    traceScene(hit, furPosition, origin, direction, chrome, game);
+    traceScene(hit, furPosition, origin, direction, chrome, game,
+        terrainBounds);
     float depth = hit.distance;
 
     SurfaceMaterial material = surfaceMaterial(hit, crateA, crateB,
@@ -3868,7 +4070,8 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         + material.albedo * (1.0f - material.metallic) * ambient;
     if (drone) color += droneEmission(hit, game);
     if (exterior) {
-        color += shadeDistantLights(hit, material, -direction, chrome, game);
+        color += shadeDistantLights(hit, material, -direction, chrome, game,
+            earthShadow, sunShadow);
         color += houseOutdoorLighting(hit, material, -direction, chrome,
             game);
     } else if (houseIndoors) {
@@ -4026,7 +4229,7 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         if (gunHit.part != 0u) {
             float3 behind = color;
             color = shadeGun(gunHit, gun, muzzleLocal, eye, viewRight, viewUp,
-                viewFront, direction, chrome, game);
+                viewFront, direction, chrome, game, earthShadow, sunShadow);
             if (hand) color += handSheen(gunHit, gun.basis, viewDirection,
                 behind);
             depth = 0.0f;  // the bokeh pass keeps depth 0 sharp
