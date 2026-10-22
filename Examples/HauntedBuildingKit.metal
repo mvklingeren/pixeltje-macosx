@@ -3,12 +3,15 @@
 //
 // A building is written once, in the initialize pass, into the game
 // buffer's HouseModel as convex parts: boxes, some cut by up to four planes
-// into gables, hips, spires and sloping boards, and round logs. Parts are
-// gathered into groups, and groups into building sites. A ray tests a
-// group's parts only when it enters the group's bounds, and a site's first
-// group bounds the whole site, so a ray that misses it skips every group of
-// that site. Adding a building therefore adds parts, not code, to the scene
-// traces in HauntedBuildings.metal.
+// into gables, hips, spires and sloping boards, and round logs, cast-iron
+// rods and columns. Parts are gathered into groups, and groups into building
+// sites. A ray tests a group's parts only when it enters the group's
+// bounds, and a site's first group bounds the whole site, so a ray that
+// misses it skips every group of that site. Adding a building therefore
+// adds parts, not code, to the scene traces in HauntedBuildings.metal.
+// A group can also stand turned about a vertical axis, so a building need
+// not square up with the road: its parts stay as built, and a ray is turned
+// into the group's frame to meet them.
 //
 // A part's style picks its shading: clapboard, battens, slate, trim,
 // stone, brick, cut-out iron and the rest. Styles are shared, so a new
@@ -40,12 +43,31 @@ constant uint houseTimber = 13u;    // a board or beam from addHouseBoard
 constant uint houseLog = 14u;       // a round log from addHouseLog
 constant uint houseGrave = 15u;     // headstones, the tomb, the mausoleums
 constant uint houseCorrugated = 16u; // rusted corrugated iron: shed roofs
-constant uint houseStyleCount = 17u;
+constant uint houseCastIron = 17u;  // rusted cast iron: lamp caps and bases
+constant uint houseCastIronRod = 18u; // a round cast-iron rod from addHouseRod
+constant uint housePlaster = 19u;   // lime render: the mausoleums' pediments
+constant uint housePlasterColumn = 20u; // a round plastered column shaft
+constant uint houseFloor = 21u;     // a floor: boards on top, plaster below
+constant uint houseStair = 22u;     // treads, strings, newels and soffits
+constant uint houseBanister = 23u;  // turned balusters under a handrail (cut out)
+constant uint houseStyleCount = 24u;
+
+// The cut-out styles: rays pass through their openings, and they cast no
+// shadow.
+bool houseCutoutStyle(uint style) {
+    return (style >= houseIron && style <= houseFrieze) || style == houseCandle
+        || style == houseBanister;
+}
 
 bool houseMaterial(uint material) {
     return material >= houseMaterialBase
         && material < houseMaterialBase + houseStyleCount;
 }
+
+// The buildings' wood is oak: warm and dark where its old oil finish
+// holds, paler and drier where the weather has stripped it.
+constant float3 houseOak = float3(0.15f, 0.078f, 0.034f);
+constant float3 houseBareOak = float3(0.2f, 0.122f, 0.062f);
 
 // A repeatable hash in [0, 1) for the buildings' irregularities.
 float houseHash(float seed) {
@@ -162,6 +184,44 @@ void houseWindows(thread HousePart &part, float2 counts, float2 size,
     part.rows = float4(sill, rows, pitch, glow);
 }
 
+// A door leaf hung on a vertical hinge through `hinge`, the foot of its
+// inner back edge. Shut, it runs size.x along `along` and stands size.y
+// tall and size.z thick toward `out`, the side it is knocked on; it swings
+// in, away from `out`, by `angle` radians. Its box is cut by four planes
+// along its faces and edges, so it stays a slab at any angle and a door
+// can be rehung each frame as it swings. A row pitch of -1 marks a leaf,
+// which is patterned along itself from the hinge.
+constant float houseDoorLeafPitch = -1.0f;
+
+HousePart houseDoorLeaf(float3 hinge, float2 along, float2 out, float3 size,
+    float angle, uint style) {
+    float c = cos(angle), s = sin(angle);
+    float3 a = float3(along.x * c - out.x * s, 0.0f, along.y * c - out.y * s);
+    float3 t = float3(out.x * c + along.x * s, 0.0f, out.y * c + along.y * s);
+    float3 tip = hinge + a * size.x, face = hinge + t * size.z;
+    float3 lower = min(min(hinge, tip), min(face, tip + t * size.z));
+    float3 upper = max(max(hinge, tip), max(face, tip + t * size.z));
+    upper.y = hinge.y + size.y;
+    HousePart part = houseBox(lower, upper, style);
+    houseCut(part, -a, hinge);
+    houseCut(part, a, tip);
+    houseCut(part, -t, hinge);
+    houseCut(part, t, face);
+    part.rows.z = houseDoorLeafPitch;
+    return part;
+}
+
+// A street copy scales the pitch with it, so any negative pitch marks one.
+bool houseIsDoorLeaf(device const HousePart &part) {
+    return part.rows.z < 0.0f && uint(part.upper.w) == 4u;
+}
+
+// How far p lies along a leaf from its hinge, and the leaf's width.
+float2 houseDoorLeafSpan(device const HousePart &part, float3 p) {
+    return float2(dot(part.planes[1].xyz, p) + part.planes[0].w,
+        part.planes[0].w + part.planes[1].w);
+}
+
 // Opens a group in the open site.
 void beginHouseGroup(device HouseModel &house) {
     uint g = house.counts.y;
@@ -195,6 +255,98 @@ void growHouseGroup(device HouseModel &house, uint g, HousePart part) {
         group.lower.w);
     house.groups[g].upper = float4(max(group.upper.xyz, part.upper.xyz),
         group.upper.w);
+}
+
+// ------------------------------------------------------------------- turns
+// A turned group keeps its parts axis-aligned in its own frame, which is
+// the world turned about a vertical axis through a pivot: by angle a, it
+// takes the frame's +x toward +z. Its spare fields hold sin a and the
+// pivot's world x and z; a group that is not turned holds zeros. A ray is
+// turned into the frame before it meets the group, and its hit is turned
+// back out. Near the pivot the frame's coordinates are close to the
+// world's, so the patterns of the parts land where they would unturned.
+struct HouseTurn {
+    float sine;
+    float cosine;
+    float2 pivot;
+};
+
+HouseTurn houseGroupTurn(HouseGroup group) {
+    float sine = as_type<float>(group.last.y);
+    return {sine, sqrt(max(1.0f - sine * sine, 0.0f)),
+        float2(as_type<float>(group.last.z), as_type<float>(group.last.w))};
+}
+
+// v turned by the angle whose cosine and sine are turn, taking +x toward +z.
+float2 houseRotate(float2 v, float2 turn) {
+    return float2(turn.x * v.x - turn.y * v.y, turn.y * v.x + turn.x * v.y);
+}
+
+float3 houseTurnPointIn(HouseTurn turn, float3 p) {
+    float2 xz = turn.pivot + houseRotate(p.xz - turn.pivot,
+        float2(turn.cosine, -turn.sine));
+    return float3(xz.x, p.y, xz.y);
+}
+
+float3 houseTurnDirectionIn(HouseTurn turn, float3 v) {
+    float2 xz = houseRotate(v.xz, float2(turn.cosine, -turn.sine));
+    return float3(xz.x, v.y, xz.y);
+}
+
+float3 houseTurnPointOut(HouseTurn turn, float3 p) {
+    float2 xz = turn.pivot + houseRotate(p.xz - turn.pivot,
+        float2(turn.cosine, turn.sine));
+    return float3(xz.x, p.y, xz.y);
+}
+
+float3 houseTurnDirectionOut(HouseTurn turn, float3 v) {
+    float2 xz = houseRotate(v.xz, float2(turn.cosine, turn.sine));
+    return float3(xz.x, v.y, xz.y);
+}
+
+// The turn of the group holding part i: the site holding it names the
+// groups to look through.
+HouseTurn housePartTurn(device const HouseModel &house, uint i) {
+    uint sites = min(house.counts.w, buildingSiteCapacity);
+    for (uint s = 0u; s < sites; ++s) {
+        uint4 site = house.sites[s];
+        if (i < site.z || i >= site.w) continue;
+        uint end = min(site.y, houseGroupCapacity);
+        for (uint g = site.x + 1u; g < end; ++g) {
+            HouseGroup group = house.groups[g];
+            if (i >= uint(group.lower.w) && i < uint(group.upper.w))
+                return houseGroupTurn(group);
+        }
+    }
+    return {0.0f, 1.0f, float2(0.0f)};
+}
+
+// Turns groups [first, end) of the open site about the vertical through
+// pivot, by the angle whose cosine and sine are turn. The site's bounds
+// grow to hold their turned corners.
+void turnHouseGroups(device HouseModel &house, uint first, uint end,
+    float2 turn, float2 pivot) {
+    uint s = house.counts.w;
+    if (s == 0u) return;
+    uint site = house.sites[s - 1u].x;
+    end = min(end, houseGroupCapacity);
+    for (uint g = max(first, site + 1u); g < end; ++g) {
+        house.groups[g].last.yzw = uint3(as_type<uint>(turn.y),
+            as_type<uint>(pivot.x), as_type<uint>(pivot.y));
+        float3 lower = house.groups[g].lower.xyz;
+        float3 upper = house.groups[g].upper.xyz;
+        for (uint k = 0u; k < 4u; ++k) {
+            float2 corner = float2((k & 1u) != 0u ? upper.x : lower.x,
+                (k & 2u) != 0u ? upper.z : lower.z);
+            float2 xz = pivot + houseRotate(corner - pivot, turn);
+            float4 low = house.groups[site].lower;
+            float4 high = house.groups[site].upper;
+            house.groups[site].lower = float4(min(low.xyz,
+                float3(xz.x, lower.y, xz.y)), low.w);
+            house.groups[site].upper = float4(max(high.xyz,
+                float3(xz.x, upper.y, xz.y)), high.w);
+        }
+    }
 }
 
 // Adds a part already in world metres to the open group.
@@ -249,20 +401,35 @@ void addHouseBoard(device HouseModel &house, float3 centre, float3 along,
     addHouseWorldPart(house, part);
 }
 
-// A round log along any direction.
-void addHouseLog(device HouseModel &house, float3 centre, float3 along,
-    float halfLength, float radius) {
+// A round part along any direction: a log, a cast-iron rod or a plastered
+// column.
+HousePart houseRound(float3 centre, float3 along, float halfLength,
+    float radius, uint style) {
     float3 a = normalize(along);
     float3 reach = abs(a) * halfLength
         + sqrt(max(1.0f - a * a, float3(0.0f))) * radius;
-    HousePart part = houseBox(centre - reach, centre + reach, houseLog);
+    HousePart part = houseBox(centre - reach, centre + reach, style);
     part.windows = float4(a, halfLength);
     part.rows = float4(centre, radius);
-    addHouseWorldPart(house, part);
+    return part;
 }
 
-// Entry distance of a ray into a log, or -1. A ray that starts inside the
-// log misses it, as with every other part.
+void addHouseLog(device HouseModel &house, float3 centre, float3 along,
+    float halfLength, float radius) {
+    addHouseWorldPart(house, houseRound(centre, along, halfLength, radius,
+        houseLog));
+}
+
+// A cast-iron rod from one point to another. It runs on past both by half
+// its radius, so the rods of a bent bar meet without a gap.
+void addHouseRod(device HouseModel &house, float3 from, float3 to,
+    float radius) {
+    addHouseWorldPart(house, houseRound(0.5f * (from + to), to - from,
+        0.5f * (distance(from, to) + radius), radius, houseCastIronRod));
+}
+
+// Entry distance of a ray into a log or a rod, or -1. A ray that starts
+// inside it misses it, as with every other part.
 float houseLogHit(device const HousePart &part, float3 origin,
     float3 direction, float limit, thread float3 &normal) {
     float3 a = part.windows.xyz;
@@ -355,11 +522,18 @@ float housePartHit(device const HousePart &part, float3 origin,
     return entry > 1.0e-4f && entry < exit ? entry : -1.0f;
 }
 
-// Entry distance into any part: logs are round, everything else is a cut
-// box.
+// True for the styles traced as round parts.
+bool houseRoundStyle(uint style) {
+    return style == houseLog || style == houseCastIronRod
+        || style == housePlasterColumn;
+}
+
+// Entry distance into any part: logs, rods and columns are round,
+// everything else is a cut box.
 float houseHitPart(device const HousePart &part, float3 origin,
     float3 direction, float limit, thread float3 &normal) {
-    return uint(part.lower.w) == houseLog
+    uint style = uint(part.lower.w);
+    return houseRoundStyle(style)
         ? houseLogHit(part, origin, direction, limit, normal)
         : housePartHit(part, origin, direction, limit, normal);
 }
@@ -412,8 +586,8 @@ float3 houseNail(float3 wood, float2 q, bool hole, float2 down, float blur) {
         + float3(0.05f, 0.032f, 0.02f) * shine, head);
 }
 
-// A board from the timber generator: silvered, weathered grain along its
-// length, rot toward its ends, the odd check, growth rings on its sawn ends,
+// A board from the timber generator: weathered oak grain along its length,
+// rot toward its ends, the odd check, growth rings on its sawn ends,
 // and the nails it was given. A loose clapboard keeps patches of paint.
 SurfaceMaterial houseTimberMaterial(device const HousePart &part, float3 p,
     float3 n, float blur, float3 paint) {
@@ -427,7 +601,7 @@ SurfaceMaterial houseTimberMaterial(device const HousePart &part, float3 p,
     float seed = dot(centre, float3(1.7f, 3.1f, 5.3f));
     float grain = 0.8f + 0.2f * sin(v * 160.0f + 7.0f * smoothNoise(float2(
         u * 1.3f, v * 9.0f + seed)));
-    float3 wood = float3(0.115f, 0.104f, 0.09f) * grain
+    float3 wood = houseBareOak * 0.85f * grain
         * (0.8f + 0.4f * houseHash(seed));
     wood *= 1.0f - 0.45f * smoothstep(halfLength - 0.3f, halfLength, abs(u));
     float checkAt = halfLength * (houseHash(seed + 4.0f) - 0.5f);
@@ -469,7 +643,7 @@ SurfaceMaterial houseTimberMaterial(device const HousePart &part, float3 p,
 }
 
 // A log from the timber generator: deep fissures between corky plates of
-// bark, worn away in patches to silvered wood, a few knots, and sawn ends
+// bark, worn away in patches to bare wood, a few knots, and sawn ends
 // with growth rings, radial checks and the bark's dark rim. Over the fire
 // it is blackened by soot from below.
 SurfaceMaterial houseLogMaterial(device const HousePart &part, float3 p,
@@ -559,6 +733,20 @@ SurfaceMaterial houseCorrugatedMaterial(float3 p, float3 n, float blur) {
         float3(0.0f)};
 }
 
+// Cast iron gone to rust: a brown-black skin flaking to orange-brown rust in
+// blotches, flecked finely until the flecks are smaller than a pixel.
+SurfaceMaterial houseCastIronMaterial(float3 p, float3 n, float blur) {
+    float2 q = abs(n.y) > 0.7f ? p.xz : float2(p.x + p.z, p.y);
+    float rust = smoothstep(0.35f, 0.75f, 0.6f * smoothNoise(q * 7.0f)
+        + 0.4f * smoothNoise(q * 29.0f + 3.1f));
+    float fleck = (hashTile(floor(q * 260.0f)) - 0.5f)
+        * (1.0f - saturate(blur / 0.006f));
+    float3 albedo = mix(float3(0.032f, 0.024f, 0.019f),
+        float3(0.11f, 0.05f, 0.024f), rust) * (1.0f + 0.6f * fleck);
+    return {albedo, mix(0.5f, 0.85f, rust), 0.4f * (1.0f - rust),
+        float3(0.0f)};
+}
+
 // One line of worn engraved letters centred on q = 0, in metres: each
 // letter is a few stems, bars and a bowl, with a gap now and then between
 // words. Returns the groove's coverage.
@@ -581,6 +769,68 @@ float houseLettering(float2 q, float halfWidth, float size, float seed,
     if (fract(key * 23.0f) > 0.75f)
         stroke = min(stroke, abs(length(f * float2(aspect, 1.0f)) - 0.3f));
     return 1.0f - smoothstep(0.07f, 0.07f + blur / size, stroke);
+}
+
+// Lime plaster over brick, in metres: off-white render gone grey and
+// patchy, streaked where rain runs down it, damp and greened near its foot,
+// crazed by hairline cracks, and fallen away here and there to the brick
+// beneath. A column's render wraps round it. A box can carry one engraved
+// line across its front face, set as on the tomb's stone: rows holds its
+// height above the part's foot, half width and letter size, and a negative
+// w moves it to the +z face.
+SurfaceMaterial housePlasterMaterial(device const HousePart &part, float3 p,
+    float3 n, float blur) {
+    bool column = uint(part.lower.w) == housePlasterColumn;
+    float seed = dot(part.lower.xyz, float3(1.3f, 2.9f, 4.7f));
+    float height = p.y - part.lower.y;
+    float2 q;
+    if (column) {
+        float3 d = p - part.rows.xyz;
+        q = float2(part.rows.w * atan2(d.z, d.x), p.y);
+    } else {
+        q = abs(n.y) > 0.5f ? p.xz : float2(abs(n.z) > 0.5f ? p.x : p.z, p.y);
+    }
+    q += float2(seed, 0.0f);
+    float detail = 1.0f - smoothstep(0.004f, 0.02f, blur);
+    float3 render = float3(0.215f, 0.205f, 0.185f)
+        * (0.82f + 0.3f * smoothNoise(q * 0.9f))
+        * (0.92f + 0.16f * smoothNoise(q * 6.0f) * detail);
+    // Rain runs down from the top and leaves dark streaks.
+    float streak = smoothstep(0.45f, 0.85f, smoothNoise(float2(q.x * 7.0f,
+        q.y * 0.45f)) * (0.6f + 0.4f * smoothNoise(float2(q.x * 1.3f, 3.0f))));
+    render *= 1.0f - 0.3f * streak * step(abs(n.y), 0.5f);
+    // Damp rises from the foot and greens it.
+    float damp = (1.0f - smoothstep(0.0f, 0.9f, height))
+        * (0.6f + 0.4f * smoothNoise(q * 2.3f));
+    render = mix(render, float3(0.1f, 0.11f, 0.075f), 0.55f * damp);
+    // Hairline cracks wander across it in a few places.
+    float craze = abs(smoothNoise(q * 1.6f + 7.0f) - 0.5f);
+    float crack = (1.0f - smoothstep(0.004f, 0.004f + blur * 1.6f, craze))
+        * smoothstep(0.55f, 0.7f, smoothNoise(q * 0.5f + 3.0f)) * detail;
+    render *= 1.0f - 0.55f * crack;
+    // Where it has fallen away, brick in Flemish courses shows through
+    // inside a broken, darker edge.
+    float loss = smoothNoise(q * 0.8f + 11.0f)
+        + 0.35f * smoothNoise(q * 4.0f + 5.0f);
+    if (loss > 1.14f) {
+        float course = floor(q.y / 0.075f);
+        float along = q.x + fmod(abs(course), 2.0f) * 0.115f;
+        float mortar = max(houseLines(q.y, 0.075f, 0.01f, blur),
+            houseLines(along, 0.23f, 0.01f, blur));
+        float3 brick = float3(0.085f, 0.042f, 0.03f)
+            * (0.75f + 0.5f * hashTile(float2(floor(along / 0.23f), course)));
+        render = mix(brick, float3(0.07f, 0.065f, 0.058f), mortar);
+    } else if (loss > 1.11f) {
+        render *= 0.6f;
+    }
+    if (!column && abs(n.y) < 0.2f && part.rows.z > 0.0f) {
+        float front = part.rows.w < -0.5f ? 1.0f : -1.0f;
+        if (n.z * front > 0.9f)
+            render *= 1.0f - 0.6f * houseLettering(float2(p.x
+                - 0.5f * (part.lower.x + part.upper.x),
+                height - part.rows.x), part.rows.y, part.rows.z, seed, blur);
+    }
+    return {render, 0.92f, 0.0f, float3(0.0f)};
 }
 
 // ------------------------------------------------------------------ graves

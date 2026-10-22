@@ -1,0 +1,209 @@
+{
+  "width": 960,
+  "height": 540,
+  "views": [
+    {
+      "name": "cottage-approach",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            2.0,
+            30,
+            -2.238
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.08
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cottage-front",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -36,
+            2.0,
+            36,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.3
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cottage-smoke-noon",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -30,
+            2.0,
+            40,
+            -2.428
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.5
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cottage-smoke-dusk",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -30,
+            2.0,
+            40,
+            -2.428
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.5
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            480
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cottage-smoke-night",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -30,
+            2.0,
+            40,
+            -2.428
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.5
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            640
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cottage-back-west",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -62,
+            2.0,
+            82,
+            2.3
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.2
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "name": "street-above-dusk",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            60,
+            -20,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            -0.62
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            420
+          ]
+        }
+      ]
+    }
+  ]
+}

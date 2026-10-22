@@ -10,13 +10,22 @@
 // generator lays real boards and logs: loose clapboards hanging from one
 // nail, the grave crosses and the mantel log.
 //
-// The ground floor is open: a hall with a staircase, a parlour with a
-// fireplace and a coffin, and a dining room. A small graveyard of crosses,
+// All three floors are open. The ground floor has a hall, a parlour with a
+// fireplace and a coffin, and a dining room; the first floor a gallery over
+// the hall, a bedroom and a study; the mansard an attic under its slates,
+// lit through its dormers. A staircase rises through the middle of the
+// house: one wide flight climbs the hall to a half landing under a tall
+// lancet window, two narrower flights turn back from it to the gallery, and
+// from the gallery a flying flight crosses the stairwell to the attic. Oak
+// treads carry a worn runner held by brass rods, and turned balusters,
+// newels and pointed finials line every flight. A small graveyard of crosses,
 // headstones and a tomb surrounds the house, and a large one lies on a
 // fenced plot of its own on either side of the lot, before a mausoleum.
 // Floors, steps, walls and graves for walking come from the same layout
 // constants in straight-line code, so the spider and drone kernels that
-// test walkability never loop over the parts.
+// test walkability never loop over the parts. Spiders keep to the ground
+// floor and the main flight; only the player climbs higher, and their
+// footing and walls depend on how high their feet are.
 //
 // Shooting or punching any window, or knocking on the front doors, wakes the
 // house: its lights go out, a wind rises and blows the curtains about, a
@@ -32,7 +41,14 @@ constant float3 houseOrigin = float3(0.0f, -2.3f, 128.0f);
 constant float houseScale = 2.0f;
 constant float houseFloorY = 0.75f;      // ground floor boards and porch deck
 constant float houseCeilingY = 4.15f;    // ground floor ceiling
-constant float houseEavesY = 7.35f;      // top of the upper storey
+constant float houseUpperFloorY = 4.35f; // first floor boards
+constant float houseEavesY = 7.35f;      // first floor ceiling, top of its walls
+constant float houseAtticFloorY = 7.45f; // attic boards
+constant float houseAtticCeilingY = 9.75f; // attic ceiling, under the mansard's top
+// Storeys part in the middle of the floors between them, so a ceiling
+// belongs to the room under it and a floor to the room over it.
+constant float houseFirstStoreyY = 0.5f * (houseCeilingY + houseUpperFloorY);
+constant float houseAtticStoreyY = 0.5f * (houseEavesY + houseAtticFloorY);
 constant float housePartitionX = 2.2f;   // hall face of the two partitions
 constant float2 houseInnerDoorZ = float2(-2.8f, -0.8f);
 constant float houseInnerDoorHeight = 2.4f;
@@ -44,10 +60,34 @@ constant float housePostX[3] = {1.75f, 5.05f, 8.35f};
 constant uint houseStepCount = 5u;
 constant float houseStepRun = 0.3f;
 constant float houseStepHalfWidth = 1.5f;
-constant uint houseStairCount = 12u;
-constant float houseStairStart = 1.9f;
+// The staircase. Every flight shares one riser and one going. The main
+// flight climbs the hall toward the back from houseStairStart to the half
+// landing; the two returns climb from the landing back toward the front, on
+// either side of it, and reach the first floor at houseStairStart, where the
+// gallery ends. The attic flight rises from the gallery toward the back over
+// the stairwell, through a hole in the attic floor. Tread k (from 1) of a
+// flight stands k risers above the flight's foot.
 constant float houseStairRun = 0.225f;
 constant float houseStairRise = 0.1f;
+constant float houseStairSlope = houseStairRise / houseStairRun;
+constant uint houseStairCount = 17u;      // treads in each flight to the gallery
+constant float houseStairStart = 0.675f;  // foot of the main flight
+constant float houseLandingZ = 4.5f;      // front of the half landing
+constant float houseLandingY = 2.55f;     // houseFloorY + 18 risers
+constant float houseFlightHalfWidth = 1.0f;   // the main flight's treads
+constant float2 houseReturnX = float2(1.2f, 2.2f); // |x| of a return's treads
+constant float houseStringX = 1.12f;      // |x| where the returns' strings begin
+constant uint houseAtticStairCount = 30u;
+constant float houseAtticStairStart = -2.15f;
+constant float houseAtticStairTop = 4.6f; // where the attic flight lands
+constant float houseAtticFlightHalfWidth = 0.92f;
+constant float2 houseAtticHole = float2(1.1f, 2.2f); // half width, front z
+constant float houseSoffitDepth = 0.3f;   // the floating flights, measured up
+constant float houseRailHeight = 0.5f;    // handrail over the nosings
+// A walker steps onto anything up to houseStepUp above their feet and
+// bumps into anything between that and houseHeadHeight.
+constant float houseStepUp = 0.2f;
+constant float houseHeadHeight = 0.9f;
 constant float2 houseLotLower = float2(-15.0f, -17.0f);  // the fence
 constant float2 houseLotUpper = float2(15.0f, 9.0f);
 constant float houseGatePostX = 2.0f;
@@ -71,23 +111,31 @@ float3 houseWorld(float3 local) {
     return houseOrigin + local * houseScale;
 }
 
-// A front door, standing open against a hall wall, as a house-local box:
-// side 0 is the west door, 1 the east.
-void houseFrontDoor(uint side, thread float3 &lower, thread float3 &upper) {
-    float x = side == 0u ? -0.9f : 0.84f;
-    lower = float3(x, houseFloorY, -5.7f);
-    upper = float3(x + 0.06f, houseFloorY + houseDoorHeight, -4.8f);
+// A front door leaf as a house-local part, hung on its jamb at the back of
+// the doorway: side 0 is the west leaf, 1 the east. open runs from 0, shut
+// against its neighbour, to 1, swung in to stand against the hall.
+HousePart houseFrontDoor(uint side, float open) {
+    float s = side == 0u ? 1.0f : -1.0f;
+    return houseDoorLeaf(float3(-s * houseDoorHalfWidth, houseFloorY, -5.7f),
+        float2(s, 0.0f), float2(0.0f, -1.0f),
+        float3(houseDoorHalfWidth, houseDoorHeight, 0.06f),
+        open * 0.5f * M_PI_F, houseTrim);
 }
 
-// Scales a house-local part into the world and adds it to the open group.
-// Window sizes stay in local units; houseWindow measures in them.
-void addHousePart(device HouseModel &house, HousePart part) {
+// A house-local part scaled into the world. Window sizes stay in local
+// units; houseWindow measures in them.
+HousePart houseWorldPart(HousePart part) {
     part.lower.xyz = houseWorld(part.lower.xyz);
     part.upper.xyz = houseWorld(part.upper.xyz);
     for (uint k = 0u; k < 4u; ++k)
         part.planes[k].w = part.planes[k].w * houseScale
             + dot(part.planes[k].xyz, houseOrigin);
-    addHouseWorldPart(house, part);
+    return part;
+}
+
+// Scales a house-local part into the world and adds it to the open group.
+void addHousePart(device HouseModel &house, HousePart part) {
+    addHouseWorldPart(house, houseWorldPart(part));
 }
 
 // Adds a piece of furniture at its real size: its anchor moves with the
@@ -127,9 +175,9 @@ struct HouseWind {
 
 HouseWind houseWind(device const GameState &game);
 
-// Windows with negative glow look into the real ground floor rooms: rays
-// pass through their glass. The others are in solid parts and show a room
-// shaded behind the pane.
+// Windows with negative glow look into the house's real rooms: rays pass
+// through their glass. The others are in solid parts and show a room shaded
+// behind the pane.
 bool houseSeeThrough(device const HousePart &part) {
     return part.rows.w < 0.0f;
 }
@@ -354,6 +402,8 @@ void houseCladdingRelief(thread SceneHit &hit, float3 direction,
     uint style = hit.material - houseMaterialBase;
     float3 face = hit.normal, p = hit.position;
     if (abs(face.y) > 0.5f || houseInteriorPoint(p)) return;
+    // A door leaf may stand at any angle; it is shaded flat.
+    if (houseIsDoorLeaf(part)) return;
     bool zFace = abs(face.z) > 0.5f;
     float lo = zFace ? part.lower.x : part.lower.z;
     float hi = zFace ? part.upper.x : part.upper.z;
@@ -541,37 +591,230 @@ uint houseRoom(float3 p);
 
 // --------------------------------------------------------------- the house
 
-void buildHouseBody(device HouseModel &house) {
-    const float C = houseCeilingY, U = houseEavesY;
+// The mansard leans in by one unit for every 3.2 it rises; the attic's
+// slate walls are houseMansardDepth thick, measured level.
+constant float houseMansardLean = 1.0f / 3.2f;
+constant float houseMansardDepth = 0.3f;
+constant float2 houseMansardReach = float2(8.45f, 6.45f); // at houseEavesY
+
+// The outward direction of side 0 (front, -z), 1 (back, +z), 2 (west, -x)
+// or 3 (east, +x).
+float3 houseSideOut(uint side) {
+    return side == 0u ? float3(0.0f, 0.0f, -1.0f)
+        : (side == 1u ? float3(0.0f, 0.0f, 1.0f)
+            : (side == 2u ? float3(-1.0f, 0.0f, 0.0f)
+                : float3(1.0f, 0.0f, 0.0f)));
+}
+
+// One side of a hollow mansard ring as a sheet between heights height.x and
+// height.y, from span.x to span.y along that side. Its outer face is the
+// slope of a hip whose half extents at yRef are outer (x, z), leaning in by
+// lean for each unit it rises; its inner face reaches inner at yRef and
+// leans in by innerLean. An end that runs to a corner (mitre.x at the
+// negative end, mitre.y at the positive) is mitred against the next side,
+// so the sheets of a ring meet along its hips.
+HousePart houseMansardSheet(uint side, float2 outer, float2 inner,
+    float yRef, float lean, float innerLean, float2 height, float2 span,
+    bool2 mitre, uint style) {
+    const float3 up = float3(0.0f, 1.0f, 0.0f);
+    float3 out = houseSideOut(side);
+    bool alongX = side < 2u;
+    float reach = alongX ? outer.y : outer.x;
+    float depth = alongX ? inner.y : inner.x;
+    float near = min(depth - innerLean * (height.x - yRef),
+        depth - innerLean * (height.y - yRef));
+    float far = max(reach - lean * (height.x - yRef),
+        reach - lean * (height.y - yRef));
+    float2 across = side == 0u || side == 2u ? float2(-far, -near)
+        : float2(near, far);
+    HousePart part = alongX
+        ? houseBox(float3(span.x, height.x, across.x),
+            float3(span.y, height.y, across.y), style)
+        : houseBox(float3(across.x, height.x, span.x),
+            float3(across.y, height.y, span.y), style);
+    houseCut(part, out + up * lean, out * reach + up * yRef);
+    houseCut(part, -(out + up * innerLean), out * depth + up * yRef);
+    for (uint end = 0u; end < 2u; ++end) {
+        if (!(end == 0u ? mitre.x : mitre.y)) continue;
+        float s = end == 0u ? -1.0f : 1.0f;
+        float3 next = alongX ? float3(s, 0.0f, 0.0f) : float3(0.0f, 0.0f, s);
+        houseCut(part, next - out, next * (alongX ? outer.x : outer.y)
+            + out * reach);
+    }
+    return part;
+}
+
+// A sheet of the attic's slate walls, from houseEavesY up to the attic
+// ceiling unless height says otherwise. depth is how far its inner face
+// lies inside the slope.
+HousePart houseAtticWall(uint side, float2 span, bool2 mitre, float2 height,
+    float depth) {
+    return houseMansardSheet(side, houseMansardReach,
+        houseMansardReach - depth, houseEavesY, houseMansardLean,
+        houseMansardLean, height, span, mitre, houseRoof);
+}
+
+// The first floor's walls: clapboard over the belt course, with clear
+// windows into the rooms, and the tall lancet window over the stair landing,
+// which rises from the hall floor to the first floor ceiling.
+void buildHouseUpperWalls(device HouseModel &house) {
+    const float F = houseFloorY, C = houseCeilingY;
+    const float L = houseUpperFloorY, U = houseEavesY;
     beginHouseGroup(house);
-    // The upper storey's underside is the ground floor ceiling.
-    HousePart storey = houseBox(float3(-8.0f, C, -6.0f),
-        float3(8.0f, U, 6.0f), houseSiding);
-    houseWindows(storey, float2(3.0f), float2(1.05f, 2.0f), 0.7f, 1.0f, 0.0f,
-        0.9f);
-    uint storeyIndex = house.counts.x;
-    addHousePart(house, storey);
-    // One loose clapboard on each face, clear of the porch roof and the bay
-    // in front and the belt course and mansard skirt above and below.
-    float2 upper = float2(C + 0.3f, U - 0.3f) * houseScale;
-    addLooseClapboards(house, storeyIndex, float3(0.0f, 0.0f, -1.0f),
-        float2(4.6f, U - 0.3f) * houseScale, float2(-3.4f, 3.4f) * houseScale,
-        1u);
-    addLooseClapboards(house, storeyIndex, float3(0.0f, 0.0f, 1.0f), upper,
-        houseNoSkip, 1u);
-    addLooseClapboards(house, storeyIndex, float3(-1.0f, 0.0f, 0.0f), upper,
-        houseNoSkip, 1u);
-    addLooseClapboards(house, storeyIndex, float3(1.0f, 0.0f, 0.0f), upper,
-        houseNoSkip, 1u);
-    // A belt course starts a hair above the ceiling so the storey stays the
-    // ceiling indoors.
-    addHousePart(house, houseBox(float3(-8.12f, C + 0.0005f, -6.12f),
-        float3(8.12f, C + 0.26f, 6.12f), houseTrim));
-    // A bell-cast mansard: a flared skirt under steep slopes, under a low hip.
-    addHousePart(house, houseHip(float3(-8.85f, U - 0.25f, -6.85f),
-        float3(8.85f, U + 0.35f, 6.85f), float2(0.55f), houseRoof));
-    addHousePart(house, houseHip(float3(-8.45f, U, -6.45f),
-        float3(8.45f, U + 3.2f, 6.45f), float2(1.0f), houseRoof));
+    // The windows' sills stay where the old solid storey had them.
+    const float sill = C + 0.7f - L;
+    HousePart walls[6] = {
+        houseBox(float3(-8.0f, L, -6.0f), float3(-3.0f, U, -5.7f), houseSiding),
+        houseBox(float3(3.0f, L, -6.0f), float3(8.0f, U, -5.7f), houseSiding),
+        houseBox(float3(-8.0f, L, -5.7f), float3(-7.7f, U, 5.7f), houseSiding),
+        houseBox(float3(7.7f, L, -5.7f), float3(8.0f, U, 5.7f), houseSiding),
+        houseBox(float3(-8.0f, L, 5.7f), float3(-housePartitionX, U, 6.0f),
+            houseSiding),
+        houseBox(float3(housePartitionX, L, 5.7f), float3(8.0f, U, 6.0f),
+            houseSiding)};
+    const float3 faces[6] = {float3(0.0f, 0.0f, -1.0f),
+        float3(0.0f, 0.0f, -1.0f), float3(-1.0f, 0.0f, 0.0f),
+        float3(1.0f, 0.0f, 0.0f), float3(0.0f, 0.0f, 1.0f),
+        float3(0.0f, 0.0f, 1.0f)};
+    uint index[6];
+    for (uint i = 0u; i < 6u; ++i) {
+        bool side = i == 2u || i == 3u;
+        houseWindows(walls[i], side ? float2(0.0f, 3.0f) : float2(1.0f, 0.0f),
+            float2(1.05f, 2.0f), sill, 1.0f, 0.0f, -0.9f);
+        index[i] = house.counts.x;
+        addHousePart(house, walls[i]);
+    }
+    // The bay stands in front of the middle of the front wall.
+    addHousePart(house, houseBox(float3(-3.0f, L, -6.0f),
+        float3(3.0f, U, -5.7f), houseSiding));
+    HousePart lancet = houseBox(float3(-housePartitionX, F, 5.7f),
+        float3(housePartitionX, U, 6.0f), houseSiding);
+    houseWindows(lancet, float2(1.0f, 0.0f), float2(1.3f, 3.5f),
+        houseLandingY + 0.4f - F, 1.0f, 0.0f, -1.0f);
+    addHousePart(house, lancet);
+    // One loose clapboard on each face, clear of the porch roof, the belt
+    // course and the mansard skirt.
+    for (uint i = 0u; i < 6u; ++i)
+        addLooseClapboards(house, index[i], faces[i],
+            float2(i < 2u ? 4.6f : L + 0.3f, U - 0.3f) * houseScale,
+            houseNoSkip, 1u);
+    // The belt course rings the house over the floor between the storeys,
+    // broken at the back by the lancet window.
+    const float2 belt = float2(C + 0.0005f, C + 0.26f);
+    addHousePart(house, houseBox(float3(-8.12f, belt.x, -6.12f),
+        float3(8.12f, belt.y, -6.0f), houseTrim));
+    addHousePart(house, houseBox(float3(-8.12f, belt.x, 6.0f),
+        float3(-housePartitionX, belt.y, 6.12f), houseTrim));
+    addHousePart(house, houseBox(float3(housePartitionX, belt.x, 6.0f),
+        float3(8.12f, belt.y, 6.12f), houseTrim));
+    addHousePart(house, houseBox(float3(-8.12f, belt.x, -6.0f),
+        float3(-8.0f, belt.y, 6.0f), houseTrim));
+    addHousePart(house, houseBox(float3(8.0f, belt.x, -6.0f),
+        float3(8.12f, belt.y, 6.0f), houseTrim));
+}
+
+// A dormer's window bay through the attic's slate wall on side `side`: a
+// clear window in its face, cheeks back to the attic wall, a floor and a
+// gabled roof. centre is its middle along the side.
+void addHouseDormer(device HouseModel &house, uint side, float centre) {
+    const float U = houseEavesY;
+    const float3 up = float3(0.0f, 1.0f, 0.0f);
+    float3 out = houseSideOut(side);
+    bool alongX = side < 2u;
+    float s = side == 0u || side == 2u ? -1.0f : 1.0f;
+    // Distances out from the middle of the house, and along the side.
+    float face = alongX ? 6.75f : 8.75f;
+    float back = (alongX ? houseMansardReach.y : houseMansardReach.x)
+        - houseMansardDepth;
+    // A box from `near` to `far` outward and from a to b along the side.
+    float2 head = float2(U + 0.3f, U + 2.15f);
+    HousePart front = alongX
+        ? houseBox(float3(centre - 0.95f, head.x, -face),
+            float3(centre + 0.95f, head.y, -face + 0.15f), houseBattens)
+        : houseBox(float3(min(s * face, s * (face - 0.15f)), head.x,
+            centre - 0.95f), float3(max(s * face, s * (face - 0.15f)),
+            head.y, centre + 0.95f), houseBattens);
+    houseWindows(front, alongX ? float2(1.0f, 0.0f) : float2(0.0f, 1.0f),
+        float2(0.85f, 1.4f), 0.25f, 1.0f, 0.0f, -0.85f);
+    addHousePart(house, front);
+    float inner = alongX ? 5.4f : 7.4f;
+    for (uint c = 0u; c < 2u; ++c) {
+        float a = c == 0u ? centre - 0.95f : centre + 0.8f;
+        float2 depth = float2(min(s * inner, s * (face - 0.15f)),
+            max(s * inner, s * (face - 0.15f)));
+        HousePart cheek = alongX
+            ? houseBox(float3(a, head.x, depth.x), float3(a + 0.15f, head.y,
+                depth.y), houseBattens)
+            : houseBox(float3(depth.x, head.x, a), float3(depth.y, head.y,
+                a + 0.15f), houseBattens);
+        houseCut(cheek, -(out + up * houseMansardLean), out * back
+            + up * U);
+        addHousePart(house, cheek);
+    }
+    float2 sill = float2(min(s * (back - 0.15f), s * face),
+        max(s * (back - 0.15f), s * face));
+    addHousePart(house, alongX
+        ? houseBox(float3(centre - 0.95f, U + 0.25f, sill.x),
+            float3(centre + 0.95f, head.x, sill.y), houseFloor)
+        : houseBox(float3(sill.x, U + 0.25f, centre - 0.95f),
+            float3(sill.y, head.x, centre + 0.95f), houseFloor));
+    // The roof stops at the attic wall, so it stays out of the attic.
+    float2 roof = float2(min(s * (inner + 0.06f), s * (face + 0.2f)),
+        max(s * (inner + 0.06f), s * (face + 0.2f)));
+    addHousePart(house, alongX
+        ? houseGable(float3(centre - 1.15f, head.y, roof.x),
+            float3(centre + 1.15f, U + 3.3f, roof.y), true, houseRoof)
+        : houseGable(float3(roof.x, head.y, centre - 1.15f),
+            float3(roof.y, U + 3.3f, centre + 1.15f), false, houseRoof));
+}
+
+void buildHouseBody(device HouseModel &house) {
+    const float U = houseEavesY, A = houseAtticCeilingY;
+    const float depth = houseMansardDepth;
+    beginHouseGroup(house);
+    // A bell-cast mansard: a flared skirt under steep slopes, under a low
+    // hip. The skirt and the slopes are hollow sheets around the attic, and
+    // the slopes stop at its ceiling, where the solid crown of the hip
+    // begins.
+    for (uint side = 0u; side < 4u; ++side)
+        addHousePart(house, houseMansardSheet(side, float2(8.85f, 6.85f),
+            float2(8.0f, 6.0f), U - 0.25f, 0.55f / 0.6f, 0.0f,
+            float2(U - 0.25f, U + 0.35f), float2(-8.85f, 8.85f),
+            bool2(true), houseRoof));
+    const float2 full = float2(U, A), below = float2(U, U + 0.3f);
+    const float2 above = float2(U + 2.15f, A);
+    // The front slope opens for two dormers. Behind the bay its inner face
+    // stands deeper, so the bay stays inside the slates.
+    addHousePart(house, houseAtticWall(0u, float2(-8.45f, -6.45f),
+        bool2(true, false), full, depth));
+    addHousePart(house, houseAtticWall(0u, float2(-4.55f, 4.55f), bool2(false),
+        full, depth + 0.2f));
+    addHousePart(house, houseAtticWall(0u, float2(6.45f, 8.45f),
+        bool2(false, true), full, depth));
+    for (uint i = 0u; i < 2u; ++i) {
+        float2 span = i == 0u ? float2(-6.45f, -4.55f) : float2(4.55f, 6.45f);
+        addHousePart(house, houseAtticWall(0u, span, bool2(false), below,
+            depth));
+        addHousePart(house, houseAtticWall(0u, span, bool2(false), above,
+            depth));
+    }
+    addHousePart(house, houseAtticWall(1u, float2(-8.45f, 8.45f), bool2(true),
+        full, depth));
+    // The side slopes open for one dormer each.
+    for (uint side = 2u; side < 4u; ++side) {
+        addHousePart(house, houseAtticWall(side, float2(-6.45f, -0.95f),
+            bool2(true, false), full, depth));
+        addHousePart(house, houseAtticWall(side, float2(-0.95f, 0.95f),
+            bool2(false), below, depth));
+        addHousePart(house, houseAtticWall(side, float2(-0.95f, 0.95f),
+            bool2(false), above, depth));
+        addHousePart(house, houseAtticWall(side, float2(0.95f, 6.45f),
+            bool2(false, true), full, depth));
+    }
+    HousePart crown = houseHip(float3(-8.45f, U, -6.45f),
+        float3(8.45f, U + 3.2f, 6.45f), float2(1.0f), houseRoof);
+    crown.lower.y = A;
+    addHousePart(house, crown);
     addHousePart(house, houseHip(float3(-7.45f, U + 3.2f, -5.45f),
         float3(7.45f, U + 4.3f, 5.45f), float2(5.45f), houseRoof));
     // Iron cresting rings the top of the mansard.
@@ -588,7 +831,7 @@ void buildHouseBody(device HouseModel &house) {
     HousePart bay = houseBox(float3(-3.0f, houseFloorY + 3.1f, -7.5f),
         float3(3.0f, U + 2.6f, -6.0f), houseBattens);
     houseWindows(bay, float2(1.0f, 0.0f), float2(1.35f, 2.0f),
-        C + 0.75f - (houseFloorY + 3.1f), 2.0f, 2.85f, 1.15f);
+        houseCeilingY + 0.75f - (houseFloorY + 3.1f), 2.0f, 2.85f, 1.15f);
     addHousePart(house, bay);
     HousePart gable = houseGable(float3(-3.35f, U + 2.6f, -7.85f),
         float3(3.35f, U + 7.0f, -0.6f), true, houseRoof);
@@ -622,28 +865,12 @@ void buildHouseBody(device HouseModel &house) {
             float3(cornerX + 0.22f, U + 5.3f, -5.23f), lean.yx * 1.2f,
             houseRoof));
         // A gabled dormer in the front slope and one in the side slope.
-        float x = s * 5.5f;
-        HousePart dormer = houseBox(float3(x - 0.95f, U + 0.3f, -6.75f),
-            float3(x + 0.95f, U + 2.15f, -4.6f), houseBattens);
-        houseWindows(dormer, float2(1.0f, 0.0f), float2(0.85f, 1.4f), 0.25f,
-            1.0f, 0.0f, 0.85f);
-        addHousePart(house, dormer);
-        addHousePart(house, houseGable(float3(x - 1.15f, U + 2.15f, -6.95f),
-            float3(x + 1.15f, U + 3.3f, -4.6f), true, houseRoof));
-        float inner = s * 6.6f, outer = s * 8.75f, gableOuter = s * 8.95f;
-        HousePart sideDormer = houseBox(
-            float3(min(inner, outer), U + 0.3f, -0.95f),
-            float3(max(inner, outer), U + 2.15f, 0.95f), houseBattens);
-        houseWindows(sideDormer, float2(0.0f, 1.0f), float2(0.85f, 1.4f),
-            0.25f, 1.0f, 0.0f, 0.85f);
-        addHousePart(house, sideDormer);
-        addHousePart(house, houseGable(
-            float3(min(inner, gableOuter), U + 2.15f, -1.15f),
-            float3(max(inner, gableOuter), U + 3.3f, 1.15f), false,
-            houseRoof));
-        // Brick chimneys with stone caps rise through the back of the roof.
+        addHouseDormer(house, 0u, s * 5.5f);
+        addHouseDormer(house, side == 0u ? 2u : 3u, 0.0f);
+        // Brick chimneys with stone caps rise from the attic floor through
+        // the back of the roof.
         float c = s * 6.0f;
-        addHousePart(house, houseBox(float3(c - 0.5f, U + 1.0f, 2.5f),
+        addHousePart(house, houseBox(float3(c - 0.5f, U, 2.5f),
             float3(c + 0.5f, U + 6.3f, 3.5f), houseBrick));
         addHousePart(house, houseBox(float3(c - 0.65f, U + 6.3f, 2.35f),
             float3(c + 0.65f, U + 6.55f, 3.65f), houseStone));
@@ -692,16 +919,18 @@ void addSillCandles(device HouseModel &house, HousePart wall, uint index,
 // The ground floor walls, the partitions either side of the hall and the
 // furniture in the three rooms.
 void buildHouseRooms(device HouseModel &house) {
-    const float F = houseFloorY, C = houseCeilingY;
+    // The walls rise through the floor between the storeys, to the first
+    // floor's boards; the belt course covers the joint outside.
+    const float F = houseFloorY, C = houseCeilingY, L = houseUpperFloorY;
     beginHouseGroup(house);
     HousePart fronts[2], walls[2];
-    uint frontIndex[2], wallIndex[2];
+    uint frontIndex[2], wallIndex[2], backIndex[2];
     for (uint side = 0u; side < 2u; ++side) {
         float s = side == 0u ? -1.0f : 1.0f;
         // The front wall either side of the double doorway.
         HousePart front = houseBox(
             float3(side == 0u ? -8.0f : houseDoorHalfWidth, F, -6.0f),
-            float3(side == 0u ? -houseDoorHalfWidth : 8.0f, C, -5.7f),
+            float3(side == 0u ? -houseDoorHalfWidth : 8.0f, L, -5.7f),
             houseSiding);
         houseWindows(front, float2(2.0f, 0.0f), float2(1.1f, 2.2f), 0.85f,
             1.0f, 0.0f, -1.0f);
@@ -710,45 +939,39 @@ void buildHouseRooms(device HouseModel &house) {
         addHousePart(house, front);
         HousePart wall = houseBox(
             float3(side == 0u ? -8.0f : 7.7f, F, -5.7f),
-            float3(side == 0u ? -7.7f : 8.0f, C, 5.7f), houseSiding);
+            float3(side == 0u ? -7.7f : 8.0f, L, 5.7f), houseSiding);
         houseWindows(wall, float2(0.0f, 2.0f), float2(1.1f, 2.2f), 0.85f,
             1.0f, 0.0f, -1.0f);
         wallIndex[side] = house.counts.x;
         walls[side] = wall;
         addHousePart(house, wall);
+        // The back wall either side of the stair's lancet window.
+        HousePart back = houseBox(
+            float3(side == 0u ? -8.0f : housePartitionX, F, 5.7f),
+            float3(side == 0u ? -housePartitionX : 8.0f, L, 6.0f),
+            houseSiding);
+        houseWindows(back, float2(1.0f, 0.0f), float2(1.1f, 2.2f), 0.85f,
+            1.0f, 0.0f, -0.8f);
+        backIndex[side] = house.counts.x;
+        addHousePart(house, back);
         // Each partition has a doorway toward the front of the house.
         float a = s * housePartitionX, b = s * (housePartitionX + 0.15f);
         float x0 = min(a, b), x1 = max(a, b);
         addHousePart(house, houseBox(float3(x0, F, -5.7f),
-            float3(x1, C, houseInnerDoorZ.x), houseSiding));
+            float3(x1, L, houseInnerDoorZ.x), houseSiding));
         addHousePart(house, houseBox(float3(x0, F, houseInnerDoorZ.y),
-            float3(x1, C, 5.7f), houseSiding));
+            float3(x1, L, 5.7f), houseSiding));
         addHousePart(house, houseBox(
             float3(x0, F + houseInnerDoorHeight, houseInnerDoorZ.x),
-            float3(x1, C, houseInnerDoorZ.y), houseSiding));
-        // The front doors stand open against the hall walls.
-        float3 doorLower, doorUpper;
-        houseFrontDoor(side, doorLower, doorUpper);
-        addHousePart(house, houseBox(doorLower, doorUpper, houseTrim));
-        // Closed stringers flank the hall stairs, their tops following the
-        // handrail.
-        HousePart stringer = houseBox(
-            float3(side == 0u ? -1.12f : 1.0f, F, 1.45f),
-            float3(side == 0u ? -1.0f : 1.12f, F + 1.75f, 5.7f),
-            houseFurniture);
-        houseCut(stringer, float3(0.0f, houseStairRun, -houseStairRise),
-            float3(0.0f, F + houseStairRise + 0.5f, houseStairStart));
-        addHousePart(house, stringer);
+            float3(x1, L, houseInnerDoorZ.y), houseSiding));
+        // The front doors are shut until someone knocks;
+        // buildingsHangDoors swings them open.
+        house.doorParts[side] = house.counts.x;
+        addHousePart(house, houseFrontDoor(side, 0.0f));
     }
     addHousePart(house, houseBox(float3(-houseDoorHalfWidth,
-        F + houseDoorHeight, -6.0f), float3(houseDoorHalfWidth, C, -5.7f),
+        F + houseDoorHeight, -6.0f), float3(houseDoorHalfWidth, L, -5.7f),
         houseSiding));
-    HousePart back = houseBox(float3(-8.0f, F, 5.7f), float3(8.0f, C, 6.0f),
-        houseSiding);
-    houseWindows(back, float2(3.0f, 0.0f), float2(1.1f, 2.2f), 0.85f, 1.0f,
-        0.0f, -0.8f);
-    uint backIndex = house.counts.x;
-    addHousePart(house, back);
     // Loose clapboards hang on the ground floor walls; the porch roof
     // shelters the top of the front.
     float2 clad = float2(F + 0.1f, C - 0.08f) * houseScale;
@@ -758,9 +981,9 @@ void buildHouseRooms(device HouseModel &house) {
             float2(F + 0.1f, F + 2.88f) * houseScale, houseNoSkip, 2u);
         addLooseClapboards(house, wallIndex[side], float3(s, 0.0f, 0.0f),
             clad, houseNoSkip, 3u);
+        addLooseClapboards(house, backIndex[side], float3(0.0f, 0.0f, 1.0f),
+            clad, houseNoSkip, 2u);
     }
-    addLooseClapboards(house, backIndex, float3(0.0f, 0.0f, 1.0f), clad,
-        houseNoSkip, 3u);
 
     // Parlour: a brick fireplace under a thick log mantel, and a coffin on a
     // bier.
@@ -796,12 +1019,6 @@ void buildHouseRooms(device HouseModel &house) {
     addHouseProp(house, houseBox(float3(7.05f, F, 4.7f),
         float3(7.7f, F + 2.2f, 5.3f), houseFurniture), float3(7.7f, F, 5.0f));
 
-    // The hall stairs climb toward a landing under the back window.
-    for (uint k = 1u; k <= houseStairCount; ++k)
-        addHousePart(house, houseBox(float3(-1.0f, F,
-            houseStairStart + houseStairRun * float(k - 1u)),
-            float3(1.0f, F + houseStairRise * float(k), 5.7f),
-            houseFurniture));
     // Lanterns hang on rods over the hall and the dining table; the lamps
     // houseIndoorLight places light the rooms from inside them.
     for (uint i = 0u; i < 2u; ++i) {
@@ -819,6 +1036,292 @@ void buildHouseRooms(device HouseModel &house) {
     addSillCandles(house, fronts[1], frontIndex[1], 0.0f, true, -5.7f, 1.0f);
     addSillCandles(house, walls[0], wallIndex[0], 1.0f, false, -7.7f, 1.0f);
     addSillCandles(house, walls[1], wallIndex[1], 0.0f, false, 7.7f, -1.0f);
+}
+
+// ---------------------------------------------------------------- staircase
+
+// The band from a to b out from the middle of the house, on the west
+// (s = -1) or east (s = 1) side.
+float2 houseSideBand(float s, float a, float b) {
+    return s < 0.0f ? float2(-b, -a) : float2(a, b);
+}
+
+// A tread of the staircase. Its runner lies down the flight's middle at x =
+// centre, `runner` to either side, and the flight rises toward +z (rising
+// 1) or toward -z (rising -1).
+HousePart houseTread(float3 lower, float3 upper, float centre, float runner,
+    float rising) {
+    HousePart part = houseBox(lower, upper, houseStair);
+    part.windows = float4(centre, runner, rising, 0.0f);
+    return part;
+}
+
+// Keeps a raked part of a flight between two lines at the stairs' pitch:
+// `top` and `bottom` above the line through the treads' front lower edges,
+// which starts at foot (height, z) and rises toward +z (rising 1) or -z.
+// The top plane is cut first.
+void houseRake(thread HousePart &part, float rising, float2 foot, float top,
+    float bottom) {
+    const float k = houseStairSlope;
+    houseCut(part, float3(0.0f, 1.0f, -rising * k),
+        float3(0.0f, foot.x + top, foot.y));
+    houseCut(part, float3(0.0f, -1.0f, rising * k),
+        float3(0.0f, foot.x + bottom, foot.y));
+}
+
+// A newel post on the footprint from lower to upper (x, z), from height y0
+// to y1, under a moulded cap and a pointed finial.
+void addHouseNewel(device HouseModel &house, float2 lower, float2 upper,
+    float y0, float y1) {
+    addHousePart(house, houseBox(float3(lower.x, y0, lower.y),
+        float3(upper.x, y1, upper.y), houseStair));
+    addHousePart(house, houseBox(float3(lower.x - 0.02f, y1, lower.y - 0.02f),
+        float3(upper.x + 0.02f, y1 + 0.05f, upper.y + 0.02f), houseStair));
+    addHousePart(house, houseSpire(float3(lower.x + 0.01f, y1 + 0.05f,
+        lower.y + 0.01f), float3(upper.x - 0.01f, y1 + 0.25f,
+        upper.y - 0.01f), float2(0.0f), houseStair));
+}
+
+// A lantern on a rod from a ceiling at height y over (x, z).
+void addHouseHangingLantern(device HouseModel &house, float2 at, float y) {
+    addHousePart(house, houseBox(float3(at.x - 0.015f, y - 0.6f,
+        at.y - 0.015f), float3(at.x + 0.015f, y, at.y + 0.015f), houseTrim));
+    addHousePart(house, houseBox(float3(at.x - 0.16f, y - 1.02f,
+        at.y - 0.16f), float3(at.x + 0.16f, y - 0.6f, at.y + 0.16f),
+        houseLantern));
+}
+
+// From the hall to the gallery: the main flight's solid treads on the hall
+// floor between closed strings, the half landing under the lancet window,
+// and the two returns floating on soffits between the main flight and the
+// partitions, with balustrades on their open sides.
+void buildHouseStairs(device HouseModel &house) {
+    const float F = houseFloorY, L = houseUpperFloorY;
+    const float run = houseStairRun, rise = houseStairRise;
+    const float S = houseStairStart, Z = houseLandingZ, Y = houseLandingY;
+    const float D = houseSoffitDepth, rail = houseRailHeight;
+    const float W = houseFlightHalfWidth;
+    beginHouseGroup(house);
+    for (uint k = 1u; k <= houseStairCount; ++k)
+        addHousePart(house, houseTread(float3(-W, F, S + run * float(k - 1u)),
+            float3(W, F + rise * float(k), S + run * float(k)), 0.0f, 0.62f,
+            1.0f));
+    addHousePart(house, houseBox(float3(-W, F, Z), float3(W, Y - D, 5.7f),
+        houseStair));
+    addHousePart(house, houseTread(float3(-housePartitionX, Y - D, Z),
+        float3(housePartitionX, Y, 5.7f), 0.0f, 0.62f, 1.0f));
+    for (uint side = 0u; side < 2u; ++side) {
+        float s = side == 0u ? -1.0f : 1.0f;
+        float2 band = houseSideBand(s, W, houseStringX);
+        HousePart string = houseBox(float3(band.x, F, S),
+            float3(band.y, Y + 0.2f, Z), houseStair);
+        houseCut(string, float3(0.0f, 1.0f, -houseStairSlope),
+            float3(0.0f, F + rise + 0.08f, S));
+        addHousePart(house, string);
+        float x = s * 0.5f * (W + houseStringX);
+        HousePart rails = houseBox(float3(x - 0.025f, F + rise, S + 0.14f),
+            float3(x + 0.025f, Y + rail + 0.2f, Z - 0.1f), houseBanister);
+        houseRake(rails, 1.0f, float2(F, S), rise + rail, rise + 0.05f);
+        addHousePart(house, rails);
+
+        // The return on this side climbs back toward the front.
+        band = houseSideBand(s, houseReturnX.x, houseReturnX.y);
+        float centre = s * 0.5f * (houseReturnX.x + houseReturnX.y);
+        for (uint k = 1u; k <= houseStairCount; ++k)
+            addHousePart(house, houseTread(
+                float3(band.x, Y + rise * float(k - 1u), Z - run * float(k)),
+                float3(band.y, Y + rise * float(k), Z - run * float(k - 1u)),
+                centre, 0.3f, -1.0f));
+        HousePart soffit = houseBox(float3(band.x, Y - D - 0.01f, S),
+            float3(band.y, L, Z), houseStair);
+        houseRake(soffit, -1.0f, float2(Y, Z), 0.0f, -D);
+        soffit.windows.w = 1.0f;
+        addHousePart(house, soffit);
+        band = houseSideBand(s, houseStringX, houseReturnX.x);
+        string = houseBox(float3(band.x, Y - D - 0.01f, S),
+            float3(band.y, L + 0.2f, Z), houseStair);
+        houseRake(string, -1.0f, float2(Y, Z), rise + 0.08f, -D);
+        addHousePart(house, string);
+        x = s * 0.5f * (houseStringX + houseReturnX.x);
+        rails = houseBox(float3(x - 0.025f, Y + rise, S + 0.1f),
+            float3(x + 0.025f, L + rail + 0.2f, Z - 0.12f), houseBanister);
+        houseRake(rails, -1.0f, float2(Y, Z), rise + rail, rise + 0.05f);
+        addHousePart(house, rails);
+
+        // Newels at the foot, at the landing, where the main flight's
+        // string meets the return's, and at the gallery, where the post
+        // hangs below the floor.
+        band = houseSideBand(s, 0.98f, 1.14f);
+        addHouseNewel(house, float2(band.x, S - 0.16f), float2(band.y, S),
+            F, F + 0.8f);
+        band = houseSideBand(s, 0.98f, 1.24f);
+        addHouseNewel(house, float2(band.x, Z - 0.1f), float2(band.y,
+            Z + 0.12f), F, Y + 0.75f);
+        band = houseSideBand(s, 1.08f, 1.24f);
+        addHouseNewel(house, float2(band.x, 0.6f), float2(band.y, 0.76f),
+            Y - D + (Z - 0.76f) * houseStairSlope - 0.05f, L + 0.75f);
+    }
+    // Between the gallery newels a railing guards the gallery's edge, under
+    // the attic flight.
+    addHousePart(house, houseBox(float3(-1.08f, L, 0.65f),
+        float3(1.08f, L + rail, 0.7f), houseBanister));
+}
+
+// The first floor: its boards around the stairwell, the partitions either
+// side of the gallery with doorways over the ones below, a bedroom with a
+// four-poster under a dust sheet, a study, and lanterns over the stairwell
+// and in each room.
+void buildHouseUpperRooms(device HouseModel &house) {
+    const float C = houseCeilingY, L = houseUpperFloorY, U = houseEavesY;
+    beginHouseGroup(house);
+    addHousePart(house, houseBox(float3(-7.7f, C, -5.7f),
+        float3(7.7f, L, houseStairStart), houseFloor));
+    for (uint side = 0u; side < 2u; ++side) {
+        float s = side == 0u ? -1.0f : 1.0f;
+        float2 band = houseSideBand(s, housePartitionX, 7.7f);
+        addHousePart(house, houseBox(float3(band.x, C, houseStairStart),
+            float3(band.y, L, 5.7f), houseFloor));
+        band = houseSideBand(s, housePartitionX, housePartitionX + 0.15f);
+        addHousePart(house, houseBox(float3(band.x, L, -5.7f),
+            float3(band.y, U, houseInnerDoorZ.x), houseSiding));
+        addHousePart(house, houseBox(float3(band.x, L, houseInnerDoorZ.y),
+            float3(band.y, U, 5.7f), houseSiding));
+        addHousePart(house, houseBox(
+            float3(band.x, L + houseInnerDoorHeight, houseInnerDoorZ.x),
+            float3(band.y, U, houseInnerDoorZ.y), houseSiding));
+    }
+    // The bedroom: the bed's head against the west wall.
+    const float3 bedAt = float3(-7.1f, L, 2.0f);
+    HousePart sheet = houseBox(bedAt + float3(-1.06f, 0.1f, -0.99f),
+        bedAt + float3(1.09f, 0.66f, 0.99f), houseFurniture);
+    sheet.windows.x = 1.0f;
+    addHouseProp(house, sheet, bedAt);
+    addHouseProp(house, houseBox(bedAt + float3(-1.15f, 0.0f, -0.95f),
+        bedAt + float3(-1.06f, 1.5f, 0.95f), houseFurniture), bedAt);
+    for (uint i = 0u; i < 4u; ++i) {
+        float2 c = float2((i & 1u) != 0u ? 1.06f : -1.1f,
+            (i & 2u) != 0u ? 0.95f : -0.95f);
+        addHouseProp(house, houseBox(bedAt + float3(c.x - 0.05f, 0.0f,
+            c.y - 0.05f), bedAt + float3(c.x + 0.05f, 2.3f, c.y + 0.05f),
+            houseFurniture), bedAt);
+    }
+    addHouseProp(house, houseBox(bedAt + float3(-1.15f, 2.22f, -1.0f),
+        bedAt + float3(1.11f, 2.34f, 1.0f), houseFurniture), bedAt);
+    const float3 wardrobeAt = float3(-2.95f, L, 5.7f);
+    addHouseProp(house, houseBox(wardrobeAt + float3(-0.6f, 0.0f, -0.62f),
+        wardrobeAt + float3(0.6f, 2.3f, 0.0f), houseFurniture), wardrobeAt);
+    // The study: a desk under the front window, a bookcase and a shrouded
+    // armchair.
+    const float3 deskAt = float3(5.5f, L, -4.5f);
+    addHouseProp(house, houseBox(deskAt + float3(-0.75f, 0.72f, -0.4f),
+        deskAt + float3(0.75f, 0.78f, 0.4f), houseFurniture), deskAt);
+    for (uint i = 0u; i < 2u; ++i) {
+        float x = i == 0u ? -0.55f : 0.55f;
+        addHouseProp(house, houseBox(deskAt + float3(x - 0.2f, 0.0f, -0.38f),
+            deskAt + float3(x + 0.2f, 0.72f, 0.38f), houseFurniture), deskAt);
+    }
+    const float3 shelvesAt = float3(7.7f, L, 1.5f);
+    HousePart shelves = houseBox(shelvesAt + float3(-0.38f, 0.0f, -0.9f),
+        shelvesAt + float3(0.0f, 2.2f, 0.9f), houseFurniture);
+    shelves.windows.x = 2.0f;
+    addHouseProp(house, shelves, shelvesAt);
+    const float3 chairAt = float3(4.8f, L, 2.6f);
+    HousePart chair = houseBox(chairAt + float3(-0.45f, 0.0f, -0.42f),
+        chairAt + float3(0.45f, 0.95f, 0.42f), houseFurniture);
+    chair.windows.x = 1.0f;
+    addHouseProp(house, chair, chairAt);
+    const float2 lanterns[4] = {float2(-1.66f, 2.6f), float2(1.66f, 2.6f),
+        float2(-5.0f, 0.0f), float2(5.0f, 0.0f)};
+    for (uint i = 0u; i < 4u; ++i)
+        addHouseHangingLantern(house, lanterns[i], U);
+}
+
+// The flying flight from the gallery to the attic, crossing the stairwell
+// on its soffit between closed strings, with a balustrade on each side.
+void buildHouseAtticStairs(device HouseModel &house) {
+    const float L = houseUpperFloorY, U = houseEavesY;
+    const float run = houseStairRun, rise = houseStairRise;
+    const float S = houseAtticStairStart, T = houseAtticStairTop;
+    const float D = houseSoffitDepth, rail = houseRailHeight;
+    const float W = houseAtticFlightHalfWidth;
+    beginHouseGroup(house);
+    for (uint k = 1u; k <= houseAtticStairCount; ++k)
+        addHousePart(house, houseTread(float3(-W, L + rise * float(k - 1u),
+            S + run * float(k - 1u)), float3(W, L + rise * float(k),
+            S + run * float(k)), 0.0f, 0.5f, 1.0f));
+    HousePart soffit = houseBox(float3(-W, L + 0.001f, S), float3(W, U, T),
+        houseStair);
+    houseRake(soffit, 1.0f, float2(L, S), 0.0f, -D);
+    soffit.windows.w = 1.0f;
+    addHousePart(house, soffit);
+    for (uint side = 0u; side < 2u; ++side) {
+        float s = side == 0u ? -1.0f : 1.0f;
+        float2 band = houseSideBand(s, W, 1.0f);
+        HousePart string = houseBox(float3(band.x, L + 0.001f, S),
+            float3(band.y, U + 0.25f, T), houseStair);
+        houseRake(string, 1.0f, float2(L, S), rise + 0.08f, -D);
+        addHousePart(house, string);
+        float x = s * 0.96f;
+        HousePart rails = houseBox(float3(x - 0.025f, L + rise, S + 0.14f),
+            float3(x + 0.025f, houseAtticFloorY + rail + 0.2f, T - 0.06f),
+            houseBanister);
+        houseRake(rails, 1.0f, float2(L, S), rise + rail, rise + 0.05f);
+        addHousePart(house, rails);
+        band = houseSideBand(s, 0.9f, 1.06f);
+        addHouseNewel(house, float2(band.x, S - 0.16f), float2(band.y, S),
+            L, L + 0.8f);
+        band = houseSideBand(s, 0.9f, 1.22f);
+        addHouseNewel(house, float2(band.x, T - 0.08f), float2(band.y,
+            T + 0.08f), U - 0.3f, houseAtticFloorY + 0.8f);
+    }
+}
+
+// The attic: its boards around the stairwell, a railing round the
+// stairwell, a lantern, and old trunks, a crate and shrouded furniture.
+void buildHouseAttic(device HouseModel &house) {
+    const float U = houseEavesY, L = houseAtticFloorY;
+    const float rail = houseRailHeight;
+    const float2 hole = houseAtticHole;
+    const float back = houseAtticStairTop;
+    beginHouseGroup(house);
+    addHousePart(house, houseBox(float3(-8.15f, U, -6.15f),
+        float3(8.15f, L, hole.y), houseFloor));
+    addHousePart(house, houseBox(float3(-8.15f, U, back),
+        float3(8.15f, L, 6.15f), houseFloor));
+    for (uint side = 0u; side < 2u; ++side) {
+        float s = side == 0u ? -1.0f : 1.0f;
+        float2 band = houseSideBand(s, hole.x, 8.15f);
+        addHousePart(house, houseBox(float3(band.x, U, hole.y),
+            float3(band.y, L, back), houseFloor));
+        float x = s * 1.13f;
+        addHousePart(house, houseBox(float3(x - 0.025f, L, hole.y + 0.05f),
+            float3(x + 0.025f, L + rail, back - 0.08f), houseBanister));
+        band = houseSideBand(s, 1.06f, 1.2f);
+        addHouseNewel(house, float2(band.x, hole.y - 0.1f),
+            float2(band.y, hole.y + 0.04f), L, L + 0.75f);
+    }
+    addHousePart(house, houseBox(float3(-1.13f, L, hole.y - 0.055f),
+        float3(1.13f, L + rail, hole.y - 0.005f), houseBanister));
+    addHouseHangingLantern(house, float2(0.0f, -1.0f), houseAtticCeilingY);
+    const float3 trunkAt = float3(-5.2f, L, 3.6f);
+    addHouseProp(house, houseBox(trunkAt + float3(-0.45f, 0.0f, -0.28f),
+        trunkAt + float3(0.45f, 0.5f, 0.28f), houseFurniture), trunkAt);
+    const float3 chestAt = float3(-6.6f, L, -1.8f);
+    addHouseProp(house, houseBox(chestAt + float3(-0.28f, 0.0f, -0.45f),
+        chestAt + float3(0.28f, 0.45f, 0.45f), houseFurniture), chestAt);
+    const float3 crateAt = float3(-3.2f, L, -4.6f);
+    addHouseProp(house, houseBox(crateAt + float3(-0.35f, 0.0f, -0.35f),
+        crateAt + float3(0.35f, 0.7f, 0.35f), houseFurniture), crateAt);
+    const float3 tableAt = float3(4.6f, L, -2.6f);
+    HousePart table = houseBox(tableAt + float3(-0.55f, 0.0f, -0.45f),
+        tableAt + float3(0.55f, 1.05f, 0.45f), houseFurniture);
+    table.windows.x = 1.0f;
+    addHouseProp(house, table, tableAt);
+    const float3 mirrorAt = float3(3.8f, L, 4.8f);
+    HousePart mirror = houseBox(mirrorAt + float3(-0.3f, 0.0f, -0.25f),
+        mirrorAt + float3(0.3f, 1.7f, 0.25f), houseFurniture);
+    mirror.windows.x = 1.0f;
+    addHouseProp(house, mirror, mirrorAt);
 }
 
 // Foundation, porch deck and steps, posts, arches, railings and roof.
@@ -1173,7 +1676,12 @@ void buildHouseYards(device HouseModel &house) {
 // The house, its lot and both graveyard plots, into the open site.
 void buildHouse(device HouseModel &house) {
     buildHouseBody(house);
+    buildHouseUpperWalls(house);
     buildHouseRooms(house);
+    buildHouseUpperRooms(house);
+    buildHouseStairs(house);
+    buildHouseAtticStairs(house);
+    buildHouseAttic(house);
     buildHousePorch(house);
     buildHouseFence(house);
     buildHouseGraveyard(house);
@@ -1192,6 +1700,23 @@ float2 housePorchBay(float x) {
             0.5f * (housePostX[1] - housePostX[0]));
     return float2(side * 0.5f * (housePostX[1] + housePostX[2]),
         0.5f * (housePostX[2] - housePostX[1]));
+}
+
+// Height of p over a balustrade's foot, and in `height` the balustrade's
+// whole height there, in house-local units. A raked balustrade follows its
+// flight between two cutting planes, its handrail's and then its foot's; a
+// level one fills its box.
+float houseBanisterHeight(device const HousePart &part, float3 p,
+    thread float &height) {
+    if (uint(part.upper.w) >= 2u) {
+        float4 top = part.planes[0], foot = part.planes[1];
+        float above = (foot.w - dot(foot.xyz, p)) / max(-foot.y, 1.0e-3f);
+        float below = (top.w - dot(top.xyz, p)) / max(top.y, 1.0e-3f);
+        height = (above + below) / houseScale;
+        return above / houseScale;
+    }
+    height = (part.upper.y - part.lower.y) / houseScale;
+    return (p.y - part.lower.y) / houseScale;
 }
 
 // True where a ray passes through a cut-out panel's openings. Patterns are
@@ -1215,6 +1740,20 @@ bool houseCutoutOpen(uint style, device const HousePart &part, float3 p) {
     float along = (alongX ? p.x - part.lower.x : p.z - part.lower.z)
         / houseScale;
     float h = (p.y - part.lower.y) / houseScale;
+    if (style == houseBanister) {
+        // Turned balusters, two to a tread, between a shoe rail and the
+        // handrail: a vase over a slim neck, with a ring at each end.
+        float height;
+        h = houseBanisterHeight(part, p, height);
+        if (h > height - 0.09f || h < 0.06f) return false;
+        float cell = abs(fract(along / 0.1125f) - 0.5f) * 0.1125f;
+        float t = saturate((h - 0.06f) / (height - 0.15f));
+        float width = 0.011f + 0.009f * sin(t * rangePi)
+            + 0.007f * exp(-(t - 0.3f) * (t - 0.3f) * 60.0f)
+            + 0.006f * (exp(-t * t * 900.0f)
+                + exp(-(t - 1.0f) * (t - 1.0f) * 900.0f));
+        return cell > width;
+    }
     if (style == houseIron) {
         // Spear-topped bars between two rails, a heavier post every 2.4
         // units, and bars bent out of line here and there.
@@ -1310,7 +1849,54 @@ float houseLotBlend(float2 p) {
     return smoothstep(0.0f, 18.0f, length(outside) * houseScale);
 }
 
-// The floor, porch, steps and hall stairs under p, or ground elsewhere.
+// The flights in house-local units: the top of the tread over z, counting
+// the floor or landing a flight arrives at as its last tread; the underside
+// of a floating flight; and the top of the handrail beside it.
+float houseMainFlightTop(float z) {
+    float k = floor((z - houseStairStart) / houseStairRun) + 1.0f;
+    return houseFloorY + houseStairRise
+        * clamp(k, 1.0f, float(houseStairCount + 1u));
+}
+
+float houseMainRail(float z) {
+    return houseFloorY + houseStairRise + houseRailHeight
+        + (z - houseStairStart) * houseStairSlope;
+}
+
+float houseReturnTop(float z) {
+    float k = floor((houseLandingZ - z) / houseStairRun) + 1.0f;
+    return houseLandingY + houseStairRise
+        * clamp(k, 1.0f, float(houseStairCount + 1u));
+}
+
+float houseReturnSoffit(float z) {
+    return houseLandingY - houseSoffitDepth
+        + (houseLandingZ - z) * houseStairSlope;
+}
+
+float houseReturnRail(float z) {
+    return houseLandingY + houseStairRise + houseRailHeight
+        + (houseLandingZ - z) * houseStairSlope;
+}
+
+float houseAtticFlightTop(float z) {
+    float k = floor((z - houseAtticStairStart) / houseStairRun) + 1.0f;
+    return houseUpperFloorY + houseStairRise
+        * clamp(k, 1.0f, float(houseAtticStairCount + 1u));
+}
+
+float houseAtticFlightSoffit(float z) {
+    return max(houseUpperFloorY, houseUpperFloorY - houseSoffitDepth
+        + (z - houseAtticStairStart) * houseStairSlope);
+}
+
+float houseAtticRail(float z) {
+    return houseUpperFloorY + houseStairRise + houseRailHeight
+        + (z - houseAtticStairStart) * houseStairSlope;
+}
+
+// The floor, porch, steps, main flight and landing under p, or ground
+// elsewhere: what a walker on the ground floor stands on.
 float houseStand(float2 p, float ground) {
     float2 local = houseLocal(p);
     float stepsFront = housePorchFront - houseStepRun * float(houseStepCount);
@@ -1323,11 +1909,8 @@ float houseStand(float2 p, float ground) {
         return max(ground, floorY - 0.125f * houseScale * k);
     }
     if (local.y >= -6.15f && abs(local.x) > 8.15f) return ground;
-    if (abs(local.x) < 1.0f && local.y >= houseStairStart) {
-        float k = min(floor((local.y - houseStairStart) / houseStairRun) + 1.0f,
-            float(houseStairCount));
-        return floorY + houseStairRise * houseScale * k;
-    }
+    if (abs(local.x) < houseFlightHalfWidth && local.y >= houseStairStart)
+        return houseOrigin.y + houseMainFlightTop(local.y) * houseScale;
     return floorY;
 }
 
@@ -1350,7 +1933,7 @@ constant float4 houseObstacles[houseObstacleCount] = {
     float4(-0.9f, -5.7f, -0.84f, -4.8f), float4(0.84f, -5.7f, 0.9f, -4.8f),
     float4(-7.7f, -1.25f, -6.95f, 1.25f), float4(-4.775f, 2.3f, -4.425f, 3.3f),
     float4(4.45f, -0.6f, 5.55f, 0.6f), float4(7.375f, 4.85f, 7.7f, 5.15f),
-    float4(-1.12f, 1.45f, -1.0f, 5.7f), float4(1.0f, 1.45f, 1.12f, 5.7f),
+    float4(-1.12f, 0.675f, -1.0f, 4.62f), float4(1.0f, 0.675f, 1.12f, 4.62f),
     float4(-8.47f, -9.47f, -8.23f, -9.23f), float4(-5.17f, -9.47f, -4.93f, -9.23f),
     float4(-1.87f, -9.47f, -1.63f, -9.23f), float4(1.63f, -9.47f, 1.87f, -9.23f),
     float4(4.93f, -9.47f, 5.17f, -9.23f), float4(8.23f, -9.47f, 8.47f, -9.23f),
@@ -1419,12 +2002,26 @@ bool houseGroundHolds(float2 p) {
         && all(local <= houseGroundUpper + 1.0f);
 }
 
-// Inside the ground floor rooms, between floor and ceiling.
+// Inside the house's rooms: the ground and first floors between the hall
+// floor and the first floor ceiling, the attic within its slate walls, and
+// the dormers' window bays off it.
 bool houseInteriorPoint(float3 p) {
     float3 local = houseLocal(p);
     float margin = 0.02f / houseScale;
-    return abs(local.x) < 7.7f + margin && abs(local.z) < 5.7f + margin
-        && local.y > houseFloorY - margin && local.y < houseCeilingY + margin;
+    float2 a = abs(local.xz);
+    if (a.x < 7.7f + margin && a.y < 5.7f + margin
+        && local.y > houseFloorY - margin && local.y < houseEavesY + margin)
+        return true;
+    if (local.y < houseEavesY - margin
+        || local.y > houseAtticCeilingY + margin) return false;
+    float lean = (local.y - houseEavesY) * houseMansardLean;
+    float2 wall = houseMansardReach - houseMansardDepth - lean + margin;
+    if (a.x < wall.x && a.y < wall.y) return true;
+    if (local.y < houseEavesY + 0.3f - margin
+        || local.y > houseEavesY + 2.15f + margin) return false;
+    return (abs(a.x - 5.5f) < 0.8f + margin && local.z < -5.4f
+            && local.z > -6.6f - margin)
+        || (a.y < 0.8f + margin && a.x > 7.4f && a.x < 8.6f + margin);
 }
 
 bool houseUnderRoof(float2 p) {
@@ -1432,11 +2029,271 @@ bool houseUnderRoof(float2 p) {
     return abs(local.x) < 7.7f && abs(local.y) < 5.7f;
 }
 
-// 0 for the hall, 1 for the parlour, 2 for the dining room.
+// Rooms by storey: 0 the hall, 1 the parlour, 2 the dining room; 3 the
+// gallery and the stairwell over the hall, 4 the bedroom, 5 the study; 6
+// the attic. A room's storey is its number over 3, and the halls (and the
+// attic) are the multiples of 3.
 uint houseRoom(float3 p) {
-    float x = houseLocal(p).x;
-    return x < -housePartitionX - 0.075f ? 1u
-        : (x > housePartitionX + 0.075f ? 2u : 0u);
+    float3 local = houseLocal(p);
+    if (local.y >= houseAtticStoreyY) return 6u;
+    uint storey = local.y < houseFirstStoreyY ? 0u : 3u;
+    float x = local.x;
+    return storey + (x < -housePartitionX - 0.075f ? 1u
+        : (x > housePartitionX + 0.075f ? 2u : 0u));
+}
+
+// In the stairwell between the partitions, open from the hall floor to the
+// first floor ceiling, or in the attic flight's hole through the floor over
+// it.
+bool houseInStairwell(float3 local) {
+    return abs(local.x) < housePartitionX + 0.01f
+        && local.z > houseStairStart - 0.01f && local.y < houseEavesY + 0.01f;
+}
+
+bool houseInAtticStairs(float3 local) {
+    return abs(local.x) < houseAtticHole.x + 0.1f
+        && local.z > houseAtticHole.y - 0.1f
+        && local.z < houseAtticStairTop + 0.1f;
+}
+
+// How much of a lamp in room lightRoom reaches local, in room `room`. A
+// room's own lamps light it fully, and a hall's lamps spill a little into
+// the rooms beside it. Through the stairwell the halls of neighbouring
+// storeys light each other.
+float houseLightShare(uint lightRoom, uint room, float3 local) {
+    if (lightRoom == room) return 1.0f;
+    uint a = lightRoom / 3u, b = room / 3u;
+    bool halls = lightRoom % 3u == 0u && room % 3u == 0u;
+    if (a == b) return lightRoom % 3u == 0u || room % 3u == 0u ? 0.12f : 0.0f;
+    if (!halls || max(a, b) - min(a, b) != 1u) return 0.0f;
+    bool open = min(a, b) == 0u ? houseInStairwell(local)
+        : houseInAtticStairs(local);
+    return open ? 0.35f : 0.0f;
+}
+
+// The floor and ceiling heights of the storey around local: the stairwell
+// is one storey from the hall floor to the first floor ceiling.
+float2 houseStoreyBand(float3 local) {
+    if (houseInStairwell(local)) return float2(houseFloorY, houseEavesY);
+    if (local.y < houseFirstStoreyY)
+        return float2(houseFloorY, houseCeilingY);
+    if (local.y < houseAtticStoreyY)
+        return float2(houseUpperFloorY, houseEavesY);
+    return float2(houseAtticFloorY, houseAtticCeilingY);
+}
+
+// --------------------------------------------------------------- upstairs
+// Only the player climbs above the ground floor. Their footing, walls and
+// headroom inside the house's body depend on the height of their feet: a
+// floor or tread is footing while it lies within houseStepUp of them, and a
+// solid is in the way where it overlaps the band from there up to their
+// head. The flights and floors are measured here from the layout; the
+// walls, railings and furniture upstairs are listed in houseBlocks.
+
+// The house's body, walls included, with a little room around it.
+bool houseBodyHolds(float2 p) {
+    float2 local = houseLocal(p);
+    return abs(local.x) < 8.6f && abs(local.y) < 6.4f;
+}
+
+void houseOffer(thread float &best, float top, float reach) {
+    if (top <= reach) best = max(best, top);
+}
+
+// What a walker at p with feet at foot stands on, in world height: the
+// highest floor, tread or landing they can step onto. ground is the
+// terrain's height.
+float houseStandFrom(float2 p, float ground, float foot) {
+    float stand = houseStand(p, ground);
+    if (!houseBodyHolds(p)) return stand;
+    float2 local = houseLocal(p);
+    float x = abs(local.x), z = local.y;
+    float reach = (foot - houseOrigin.y) / houseScale + houseStepUp;
+    float best = (stand - houseOrigin.y) / houseScale;
+    if (x <= housePartitionX && z >= houseLandingZ && z <= 5.7f)
+        houseOffer(best, houseLandingY, reach);
+    if (x >= houseStringX && x <= houseReturnX.y && z >= houseStairStart
+        && z <= houseLandingZ)
+        houseOffer(best, houseReturnTop(z), reach);
+    if (x <= 7.7f && abs(z) <= 5.7f
+        && (x >= housePartitionX || z <= houseStairStart))
+        houseOffer(best, houseUpperFloorY, reach);
+    if (x <= 1.0f && z >= houseAtticStairStart && z <= houseAtticStairTop)
+        houseOffer(best, houseAtticFlightTop(z), reach);
+    if (x <= 8.15f && abs(z) <= 6.15f && (x >= houseAtticHole.x
+            || z <= houseAtticHole.y || z >= houseAtticStairTop))
+        houseOffer(best, houseAtticFloorY, reach);
+    return houseOrigin.y + best * houseScale;
+}
+
+// True when local lies within pad of the rectangle (x0, z0, x1, z1); q is
+// the rectangle's nearest point.
+bool houseNear(float2 local, float4 rect, float pad, thread float2 &q) {
+    q = clamp(local, rect.xy, rect.zw);
+    return all(abs(local - q) <= float2(pad));
+}
+
+// True when a solid from bottom to top overlaps a walker's band.
+bool houseSpans(float bottom, float top, float2 band) {
+    return top > band.x && bottom < band.y;
+}
+
+// True when a floor, flight, string or landing within pad of local is in
+// the way of a walker whose body fills band (house-local heights). East
+// and west mirror each other, so each side's parts are tested on the east.
+bool houseStructureBlocks(float2 local, float pad, float2 band) {
+    float2 q;
+    const float S = houseStairStart, Z = houseLandingZ;
+    const float T = houseAtticStairTop, R = houseAtticStairStart;
+    const float W = houseAtticFlightHalfWidth;
+    float2 east = float2(abs(local.x), local.y);
+    // The main flight stands solid on the hall floor.
+    if (houseNear(local, float4(-houseFlightHalfWidth, S,
+            houseFlightHalfWidth, 5.7f), pad, q)
+        && houseMainFlightTop(q.y) > band.x) return true;
+    if (houseNear(local, float4(-housePartitionX, Z, housePartitionX, 5.7f),
+            pad, q) && houseSpans(houseLandingY - houseSoffitDepth,
+            houseLandingY, band)) return true;
+    if (houseNear(east, float4(houseFlightHalfWidth, S, houseStringX, 4.62f),
+            pad, q) && houseSpans(houseFloorY, houseMainRail(q.y), band))
+        return true;
+    // The returns, their strings and balustrades.
+    if (houseNear(east, float4(houseStringX, S, houseReturnX.x, Z), pad, q)
+        && houseSpans(houseReturnSoffit(q.y), houseReturnRail(q.y), band))
+        return true;
+    if (houseNear(east, float4(houseReturnX.x, S, houseReturnX.y, Z), pad, q)
+        && houseSpans(houseReturnSoffit(q.y), houseReturnTop(q.y), band))
+        return true;
+    // The first floor around the stairwell.
+    if ((houseNear(east, float4(0.0f, -5.7f, 7.7f, S), pad, q)
+            || houseNear(east, float4(housePartitionX, S, 7.7f, 5.7f), pad, q))
+        && houseSpans(houseCeilingY, houseUpperFloorY, band)) return true;
+    // The attic flight, and its strings and balustrades.
+    if (houseNear(local, float4(-W, R, W, T), pad, q)
+        && houseSpans(houseAtticFlightSoffit(q.y), houseAtticFlightTop(q.y),
+            band)) return true;
+    if (houseNear(east, float4(W, R, 1.0f, T), pad, q)
+        && houseSpans(houseAtticFlightSoffit(q.y), houseAtticRail(q.y), band))
+        return true;
+    // The attic floor around its stairwell, and the attic ceiling.
+    if ((houseNear(east, float4(0.0f, -6.15f, 8.15f, houseAtticHole.y), pad, q)
+            || houseNear(east, float4(0.0f, T, 8.15f, 6.15f), pad, q)
+            || houseNear(east, float4(houseAtticHole.x, houseAtticHole.y,
+                8.15f, T), pad, q))
+        && houseSpans(houseEavesY, houseAtticFloorY, band)) return true;
+    return houseNear(east, float4(0.0f, -6.3f, 8.3f, 6.3f), pad, q)
+        && houseSpans(houseAtticCeilingY, houseAtticCeilingY + 10.0f, band);
+}
+
+// The upstairs walls, railings, newels and furniture as boxes, in
+// house-local x/z and heights; each matches a part buildHouse makes.
+struct HouseBlock {
+    float4 rect;     // x0, z0, x1, z1
+    float2 height;   // bottom, top
+};
+
+constant uint houseBlockCount = 40u;
+constant HouseBlock houseBlocks[houseBlockCount] = {
+    // The first floor's outer walls and partitions.
+    {float4(-8.0f, -6.0f, 8.0f, -5.7f), float2(4.15f, 7.35f)},
+    {float4(-8.0f, 5.7f, 8.0f, 6.0f), float2(4.15f, 7.35f)},
+    {float4(-8.0f, -6.0f, -7.7f, 6.0f), float2(4.15f, 7.35f)},
+    {float4(7.7f, -6.0f, 8.0f, 6.0f), float2(4.15f, 7.35f)},
+    {float4(-2.35f, -5.7f, -2.2f, -2.8f), float2(4.15f, 7.35f)},
+    {float4(-2.35f, -0.8f, -2.2f, 5.7f), float2(4.15f, 7.35f)},
+    {float4(2.2f, -5.7f, 2.35f, -2.8f), float2(4.15f, 7.35f)},
+    {float4(2.2f, -0.8f, 2.35f, 5.7f), float2(4.15f, 7.35f)},
+    // The gallery's railing and the newels of the staircase.
+    {float4(-1.08f, 0.62f, 1.08f, 0.73f), float2(4.35f, 4.85f)},
+    {float4(-1.14f, 0.515f, -0.98f, 0.675f), float2(0.75f, 1.85f)},
+    {float4(0.98f, 0.515f, 1.14f, 0.675f), float2(0.75f, 1.85f)},
+    {float4(-1.24f, 4.4f, -0.98f, 4.62f), float2(0.75f, 3.6f)},
+    {float4(0.98f, 4.4f, 1.24f, 4.62f), float2(0.75f, 3.6f)},
+    {float4(-1.24f, 0.6f, -1.08f, 0.76f), float2(3.85f, 5.4f)},
+    {float4(1.08f, 0.6f, 1.24f, 0.76f), float2(3.85f, 5.4f)},
+    {float4(-1.06f, -2.31f, -0.9f, -2.15f), float2(4.35f, 5.45f)},
+    {float4(0.9f, -2.31f, 1.06f, -2.15f), float2(4.35f, 5.45f)},
+    // The bedroom's bed and wardrobe; the study's desk, bookcase and chair.
+    {float4(-7.675f, 1.5f, -6.545f, 2.5f), float2(4.35f, 5.6f)},
+    {float4(-3.25f, 5.39f, -2.65f, 5.7f), float2(4.35f, 5.5f)},
+    {float4(5.125f, -4.7f, 5.875f, -4.3f), float2(4.35f, 4.75f)},
+    {float4(7.51f, 1.05f, 7.7f, 1.95f), float2(4.35f, 5.45f)},
+    {float4(4.575f, 2.39f, 5.025f, 2.81f), float2(4.35f, 4.85f)},
+    // The attic's slate walls, kept clear of where they lean in.
+    {float4(-8.3f, -6.3f, -7.75f, 6.3f), float2(7.35f, 9.75f)},
+    {float4(7.75f, -6.3f, 8.3f, 6.3f), float2(7.35f, 9.75f)},
+    {float4(-8.3f, -6.3f, 8.3f, -5.6f), float2(7.35f, 9.75f)},
+    {float4(-8.3f, 5.75f, 8.3f, 6.3f), float2(7.35f, 9.75f)},
+    // The railing round the attic stairwell, its newels and the attic
+    // flight's top newels.
+    {float4(-1.2f, 2.1f, -1.06f, 4.68f), float2(7.45f, 8.25f)},
+    {float4(1.06f, 2.1f, 1.2f, 4.68f), float2(7.45f, 8.25f)},
+    {float4(-1.2f, 2.1f, 1.2f, 2.24f), float2(7.45f, 8.25f)},
+    {float4(-1.22f, 4.52f, -0.9f, 4.68f), float2(7.05f, 8.55f)},
+    {float4(0.9f, 4.52f, 1.22f, 4.68f), float2(7.05f, 8.55f)},
+    // The chimneys rise through the attic.
+    {float4(-6.5f, 2.5f, -5.5f, 3.5f), float2(7.35f, 9.75f)},
+    {float4(5.5f, 2.5f, 6.5f, 3.5f), float2(7.35f, 9.75f)},
+    // Trunks, a crate and shrouded furniture in the attic.
+    {float4(-5.425f, 3.46f, -4.975f, 3.74f), float2(7.45f, 7.7f)},
+    {float4(-6.74f, -2.025f, -6.46f, -1.575f), float2(7.45f, 7.7f)},
+    {float4(-3.375f, -4.775f, -3.025f, -4.425f), float2(7.45f, 7.8f)},
+    {float4(4.325f, -2.825f, 4.875f, -2.375f), float2(7.45f, 7.98f)},
+    {float4(3.65f, 4.675f, 3.95f, 4.925f), float2(7.45f, 8.3f)},
+    // The lanterns over the stairwell hang clear of heads on the returns.
+    {float4(-1.82f, 2.44f, -1.5f, 2.76f), float2(6.33f, 7.35f)},
+    {float4(1.5f, 2.44f, 1.82f, 2.76f), float2(6.33f, 7.35f)}
+};
+
+bool houseBlocksBand(float2 local, float pad, float2 band) {
+    for (uint i = 0u; i < houseBlockCount; ++i) {
+        HouseBlock block = houseBlocks[i];
+        if (all(local > block.rect.xy - pad) && all(local < block.rect.zw + pad)
+            && houseSpans(block.height.x, block.height.y, band)) return true;
+    }
+    return false;
+}
+
+// True when something upstairs, on the staircase or in the attic keeps a
+// walker at p with feet at foot out. The ground floor's walls and furniture
+// are buildingsBlocked's.
+bool houseBlockedAbove(float2 p, float foot) {
+    float2 local = houseLocal(p);
+    float h = (foot - houseOrigin.y) / houseScale;
+    float2 band = float2(h + houseStepUp, h + houseHeadHeight);
+    float pad = housePlayerPad / houseScale;
+    return houseStructureBlocks(local, pad, band)
+        || houseBlocksBand(local, pad, band);
+}
+
+void houseOfferCeiling(thread float &ceiling, float bottom, float above) {
+    if (bottom >= above) ceiling = min(ceiling, bottom);
+}
+
+// The underside of the lowest floor, flight or landing over a walker at p
+// with feet at foot, in world height; very high where there is none.
+float houseCeilingOver(float2 p, float foot) {
+    if (!houseBodyHolds(p)) return 1.0e9f;
+    float2 local = houseLocal(p);
+    float x = abs(local.x), z = local.y;
+    float above = (foot - houseOrigin.y) / houseScale + 0.5f;
+    float ceiling = 1.0e4f;
+    if (x <= 7.7f && abs(z) <= 5.7f
+        && (x >= housePartitionX || z <= houseStairStart))
+        houseOfferCeiling(ceiling, houseCeilingY, above);
+    if (x <= housePartitionX && z >= houseLandingZ && z <= 5.7f)
+        houseOfferCeiling(ceiling, houseLandingY - houseSoffitDepth, above);
+    if (x >= houseStringX && x <= houseReturnX.y && z >= houseStairStart
+        && z <= houseLandingZ)
+        houseOfferCeiling(ceiling, houseReturnSoffit(z), above);
+    if (x <= 1.0f && z >= houseAtticStairStart && z <= houseAtticStairTop)
+        houseOfferCeiling(ceiling, houseAtticFlightSoffit(z), above);
+    if (x <= 8.15f && abs(z) <= 6.15f && (x >= houseAtticHole.x
+            || z <= houseAtticHole.y || z >= houseAtticStairTop))
+        houseOfferCeiling(ceiling, houseEavesY, above);
+    if (x <= 8.3f && abs(z) <= 6.3f)
+        houseOfferCeiling(ceiling, houseAtticCeilingY, above);
+    return houseOrigin.y + ceiling * houseScale;
 }
 
 // ------------------------------------------------------------------ lights
@@ -1457,14 +2314,17 @@ PointLight houseOutdoorLight(uint index, float time) {
         false};
 }
 
-// The hall chandelier, the parlour fire and candles, the dining
-// chandelier. Each lights only its own room.
-constant uint houseIndoorLightCount = 4u;
+// The hall lantern, the parlour fire and candles, the dining lantern; the
+// two lanterns over the stairwell, the bedroom's and the study's; the
+// attic's. Each lights its own room, and a little of the rooms
+// houseLightShare opens onto it.
+constant uint houseIndoorLightCount = 9u;
 
 // Powers grow with the square of the scale, so the larger rooms are lit as
 // brightly.
 PointLight houseIndoorLight(uint index, float time, thread uint &room) {
     const float F = houseFloorY, area = houseScale * houseScale;
+    const float U = houseEavesY;
     if (index == 0u) {
         room = 0u;
         return {houseWorld(float3(0.0f, houseCeilingY - 0.85f, -2.0f)),
@@ -1483,9 +2343,29 @@ PointLight houseIndoorLight(uint index, float time, thread uint &room) {
             float3(1.0f, 0.62f, 0.3f), 25.0f * area * houseFlicker(time, 2.1f, 0.15f),
             false};
     }
-    room = 2u;
-    return {houseWorld(float3(5.0f, houseCeilingY - 0.9f, 0.0f)),
-        float3(1.0f, 0.66f, 0.34f), 200.0f * area * houseFlicker(time, 5.5f, 0.08f),
+    if (index == 3u) {
+        room = 2u;
+        return {houseWorld(float3(5.0f, houseCeilingY - 0.9f, 0.0f)),
+            float3(1.0f, 0.66f, 0.34f), 200.0f * area * houseFlicker(time, 5.5f, 0.08f),
+            false};
+    }
+    if (index < 6u) {
+        room = 3u;
+        float x = index == 4u ? -1.66f : 1.66f;
+        return {houseWorld(float3(x, U - 0.85f, 2.6f)),
+            float3(1.0f, 0.7f, 0.4f),
+            150.0f * area * houseFlicker(time, 6.1f + x, 0.07f), false};
+    }
+    if (index < 8u) {
+        room = index == 6u ? 4u : 5u;
+        float x = index == 6u ? -5.0f : 5.0f;
+        return {houseWorld(float3(x, U - 0.85f, 0.0f)),
+            float3(1.0f, 0.64f, 0.32f),
+            230.0f * area * houseFlicker(time, 7.7f + x, 0.09f), false};
+    }
+    room = 6u;
+    return {houseWorld(float3(0.0f, houseAtticCeilingY - 0.85f, -1.0f)),
+        float3(1.0f, 0.6f, 0.28f), 280.0f * area * houseFlicker(time, 9.3f, 0.14f),
         false};
 }
 
@@ -1633,8 +2513,20 @@ bool houseGhostLight(device const GameState &game, bool indoors,
     return true;
 }
 
+// The house sleeps through the day. A shot through a window, a punch or a
+// knock wakes it only once the afternoon is getting dark: from
+// houseWakeAfter seconds into a match, when the sun has sunk about halfway
+// and the plain has lost half its light. Without the day-night transition
+// it is always night, and the house wakes at once.
+constant float houseWakeAfter = 0.5f * dayNightDuration;
+
+bool houseCanWake(device const GameState &game) {
+    return !enableDayNightTransition || game.effects.x >= houseWakeAfter;
+}
+
 // The ghost waits in the hall, at head height.
 void houseWake(device GameState &game) {
+    if (!houseCanWake(game)) return;
     game.house.haunt = float4(game.effects.x,
         houseWorld(float3(0.0f, houseFloorY, -3.0f))
             + float3(0.0f, houseGhostHeight, 0.0f));
@@ -1725,12 +2617,20 @@ void advanceHaunt(device GameState &game, device RangeAudio &audio,
 float houseAmbientOcclusion(float3 p) {
     float3 local = houseLocal(p);
     uint room = houseRoom(p);
-    float x0 = room == 1u ? -7.7f : (room == 2u ? housePartitionX + 0.15f
-        : -housePartitionX);
-    float x1 = room == 1u ? -housePartitionX - 0.15f
-        : (room == 2u ? 7.7f : housePartitionX);
-    float3 below = local - float3(x0, houseFloorY, -5.7f);
-    float3 above = float3(x1, houseCeilingY, 5.7f) - local;
+    float3 lower, upper;
+    if (room == 6u) {
+        lower = float3(-7.9f, houseAtticFloorY, -5.9f);
+        upper = float3(7.9f, houseAtticCeilingY, 5.9f);
+    } else {
+        uint side = room % 3u;
+        float2 band = houseStoreyBand(local);
+        lower = float3(side == 1u ? -7.7f : (side == 2u
+            ? housePartitionX + 0.15f : -housePartitionX), band.x, -5.7f);
+        upper = float3(side == 1u ? -housePartitionX - 0.15f
+            : (side == 2u ? 7.7f : housePartitionX), band.y, 5.7f);
+    }
+    float3 below = local - lower;
+    float3 above = upper - local;
     float faces[6] = {below.x, above.x, below.y, above.y, below.z, above.z};
     float occlusion = 1.0f;
     for (uint face = 0u; face < 6u; ++face) {
@@ -1853,7 +2753,7 @@ float3 houseRoomBehind(HouseWindow w, device const HousePart &part,
 
 // Old clapboards in metres, wide and 30 cm to the weather: butt joints fall
 // at random, a few boards have split, rotted away or hang loose, paint has
-// peeled back to grey wood, and the boards are nailed near their ends and
+// worn back to bare oak, and the boards are nailed near their ends and
 // to the odd stud, through their lower edge; here and there a nail has
 // rusted away and left its hole. houseCladdingRelief gives them depth; the
 // shadow under each lap and the darker butt edge are shaded here. gone
@@ -1873,12 +2773,12 @@ float3 houseClapboards(HouseBoardCell cell, float s, float y, float seed,
     float joint = houseLines(cell.along, cell.run, 0.01f, blur);
     float3 wood = paint * (0.78f + 0.44f * cell.pick) * shade
         * (1.0f - 0.6f * joint);
-    // Peeling paint bares weathered grey grain.
+    // Where the finish has worn away the bare oak's grain shows.
     float peel = smoothstep(0.6f, 0.68f, smoothNoise(float2(s * 1.9f,
         y * 2.7f + seed)) + 0.25f * smoothNoise(float2(s * 7.0f, y * 9.0f)));
     float grain = 0.85f + 0.15f * sin(s * 47.0f + 6.0f
         * smoothNoise(float2(s * 2.0f, cell.course)));
-    wood = mix(wood, float3(0.15f, 0.14f, 0.125f) * grain * shade, peel);
+    wood = mix(wood, houseBareOak * grain * shade, peel);
     if (cell.pick > 0.93f) {
         // A split runs along the board.
         float crack = abs(lap - 0.5f - 0.15f * sin(s * 2.3f + cell.pick * 9.0f));
@@ -1920,7 +2820,7 @@ float3 houseBattenBoards(float s, float y, float seed, float blur,
     float3 wood;
     if (present && offset <= houseBattenHalfWidth + 0.001f) {
         wood = mix(paint * (0.95f + 0.2f * pick),
-            float3(0.15f, 0.14f, 0.125f) * grain, 0.7f * peel);
+            houseBareOak * grain, 0.7f * peel);
         float row = round(y / 0.5f);
         float key = hashTile(float2(k * 1.7f + row, seed + 29.0f));
         float2 q = float2(s - centre, y - row * 0.5f);
@@ -1932,7 +2832,7 @@ float3 houseBattenBoards(float s, float y, float seed, float blur,
         float shadow = present ? 0.62f + 0.38f * smoothstep(0.0f, 0.06f,
             offset - houseBattenHalfWidth) : 1.0f;
         wood = mix(paint * (0.8f + 0.25f * board),
-            float3(0.15f, 0.14f, 0.125f) * grain, peel) * shadow;
+            houseBareOak * grain, peel) * shadow;
     }
     return wood * (1.0f - 0.25f * smoothstep(0.7f, 0.9f,
         smoothNoise(float2(s * 0.8f, y * 0.2f))));
@@ -1969,8 +2869,9 @@ SurfaceMaterial houseGlassPane(HouseWindow w, device const HousePart &part,
 // Headstones, the tomb and the mausoleums, in metres. A headstone is grey
 // or dark slate, streaked and blotched with lichen, dirty near the ground,
 // and engraved with a cross over three lines of lettering. The tomb and the
-// mausoleums are pale ashlar under stone roof slabs, with a worn
-// inscription over the door, and their doorways are dark; a sick glow stirs
+// mausoleums are pale ashlar under stone roof slabs (the mausoleums'
+// columns, entablature and pediment are plaster), with a worn inscription
+// over the door, and their doorways are dark; a sick glow stirs
 // in them while the house is haunted.
 SurfaceMaterial houseGraveMaterial(device const HousePart &part, float3 p,
     float3 n, float blur, HouseHaunting mood, float time) {
@@ -2029,10 +2930,12 @@ SurfaceMaterial houseGraveMaterial(device const HousePart &part, float3 p,
         stone *= (0.85f + 0.3f * hashTile(float2(floor(along / 0.7f), course)))
             * (1.0f - 0.55f * mortar);
         // A line over the tomb's door, or the one a mausoleum's part
-        // carries.
+        // carries on its front: the -z face, or the +z face of a copy
+        // turned about, which marks the line's part with a negative w.
         float centre = 0.5f * (part.lower.x + part.upper.x);
         bool carved = part.rows.z > 0.0f;
-        if (n.z < -0.9f && (carved || (part.upper.x - part.lower.x > 2.0f
+        float front = part.rows.w < -0.5f ? 1.0f : -1.0f;
+        if (n.z * front > 0.9f && (carved || (part.upper.x - part.lower.x > 2.0f
                 && height > 2.42f && height < 2.66f && part.rows.w > 0.5f)))
             stone *= 1.0f - 0.6f * houseLettering(float2(p.x - centre,
                 carved ? p.y - part.lower.y - part.rows.x : height - 2.54f),
@@ -2045,28 +2948,33 @@ SurfaceMaterial houseGraveMaterial(device const HousePart &part, float3 p,
     return {stone, 0.9f, 0.0f, float3(0.0f)};
 }
 
-// The rooms' walls, s along the wall and y above the floor in metres: a
-// skirting board and panelled wainscot under a dado rail; damask paper
-// with gilt rosettes on an ogee lattice, ochre in the hall, oxblood in the
-// parlour and bottle green in the dining room; a picture rail, a gilt
+// The rooms' walls, s along the wall and y above the floor in metres, in a
+// storey `height` metres tall: a skirting board and panelled wainscot under
+// a dado rail; damask paper with gilt rosettes on an ogee lattice, ochre in
+// the hall and up the stairwell, oxblood in the parlour, bottle green in
+// the dining room, faded rose in the bedroom and slate blue in the study;
+// over the ceiling of a storey, a plaster band; a picture rail, a gilt
 // palmette frieze and a dentilled plaster cornice. The paper is old: its
 // seams are dark and some have lifted and curled back to the plaster, damp
 // has stained it in tide marks, it is torn away to plaster and lath in
 // places and spotted with mould low down, and pale patches show where
 // pictures hung. On walls without windows crooked portraits still hang
 // within span, their eyes lit green while the house is haunted.
-SurfaceMaterial houseWallpaper(float s, float y, uint room, float seed,
-    bool portraits, float2 span, float blur, HouseHaunting mood, float time) {
+SurfaceMaterial houseWallpaper(float s, float y, float height, uint room,
+    float seed, bool portraits, float2 span, float blur, HouseHaunting mood,
+    float time) {
     const float3 wood = float3(0.07f, 0.04f, 0.025f);
     const float3 plaster = float3(0.25f, 0.23f, 0.2f);
     const float3 gold = float3(0.3f, 0.21f, 0.075f);
-    const float height = (houseCeilingY - houseFloorY) * houseScale;
     float3 ground = room == 1u ? float3(0.12f, 0.022f, 0.028f)
         : (room == 2u ? float3(0.028f, 0.062f, 0.042f)
-            : float3(0.105f, 0.072f, 0.034f));
+            : (room == 4u ? float3(0.088f, 0.046f, 0.056f)
+                : (room == 5u ? float3(0.026f, 0.046f, 0.064f)
+                    : float3(0.105f, 0.072f, 0.034f))));
     float3 flock = ground * float3(0.42f, 0.36f, 0.4f);
     // Fine pattern fades to its mean once it is smaller than a pixel.
     float detail = saturate(1.0f - blur / 0.012f);
+    if (y > height) return {plaster * 0.8f, 0.9f, 0.0f, float3(0.0f)};
     if (y < 0.2f)
         return {wood * 0.6f * (1.6f - 0.6f * smoothstep(0.01f, 0.01f + blur,
             abs(y - 0.17f))), 0.5f, 0.0f, float3(0.0f)};
@@ -2241,12 +3149,273 @@ SurfaceMaterial houseWallpaper(float s, float y, uint room, float seed,
     return {albedo, roughness, metallic, float3(0.0f)};
 }
 
+// Floor and deck boards in metres, staggered at their ends. Outside they
+// are warped, weathered oak, with uneven gaps and the odd board rotted
+// through; the attic's are wide, rough and grey with dust. Dark blots with
+// tide lines show where water dried, and dust gathers toward the walls.
+SurfaceMaterial houseBoards(float3 metres, float3 local, float blur,
+    bool inside, bool attic) {
+    float width = attic ? 0.24f : 0.15f;
+    float across = metres.x + (inside ? 0.0f
+        : 0.02f * sin(metres.z * 0.7f + floor(metres.x / 0.15f)));
+    float plank = floor(across / width);
+    float run = metres.z + 2.4f * hashTile(float2(plank, 3.0f));
+    float pick = hashTile(float2(plank, floor(run / 2.4f)));
+    float joint = max(houseLines(across, width, inside
+            ? (attic ? 0.012f : 0.008f) : 0.01f + 0.02f * pick, blur),
+        houseLines(run, 2.4f, 0.008f, blur));
+    float tone = 0.8f + 0.4f * pick;
+    float3 wood = attic ? houseBareOak * 0.5f
+        : (inside ? float3(0.09f, 0.055f, 0.034f) : houseBareOak * 0.55f);
+    float3 albedo = wood * tone * (1.0f - 0.6f * joint);
+    float roughness = attic ? 0.85f : (inside ? 0.45f : 0.8f);
+    if (!inside || attic) {
+        albedo *= 0.8f + 0.2f * sin(run * 31.0f + 5.0f
+            * smoothNoise(float2(across * 4.0f, run)));
+        if (!inside && pick > 0.96f) albedo = float3(0.008f);
+    }
+    float blot = smoothNoise(metres.xz * 0.55f + 3.0f)
+        + 0.5f * smoothNoise(metres.xz * 2.1f + 11.0f);
+    float stain = smoothstep(0.98f, 1.06f, blot);
+    float tide = 1.0f - smoothstep(0.0f, 0.025f, abs(blot - 0.99f));
+    albedo *= (1.0f - 0.5f * stain) * (1.0f - 0.3f * tide);
+    roughness = mix(roughness, 0.9f, stain);
+    if (inside) {
+        float2 reach = attic ? float2(7.9f, 5.9f) : float2(7.7f, 5.7f);
+        float2 wall = min(local.xz + reach, reach - local.xz) * houseScale;
+        float dust = 1.0f - smoothstep(0.0f, 0.9f, min(wall.x, wall.y));
+        albedo = mix(albedo, float3(0.11f, 0.1f, 0.09f),
+            (attic ? 0.25f : 0.0f) + 0.4f * dust);
+    }
+    return {albedo, roughness, 0.0f, float3(0.0f)};
+}
+
+// The attic's bare timber, in metres: rough sawn sarking boards laid level
+// across the rafters, which stand every 60 cm along its slate walls, or
+// across the joists of its ceiling; grey with dust, stained where the
+// slates let rain in, and hung with cobwebs high in its corners.
+SurfaceMaterial houseAtticBoards(float3 p, float3 n, float blur,
+    bool ceiling) {
+    float3 metres = p - houseOrigin;
+    float2 q = ceiling ? metres.xz
+        : float2(abs(n.z) > abs(n.x) ? metres.x : metres.z, metres.y);
+    float course = floor(q.y / 0.18f);
+    float seam = houseLines(q.y, 0.18f, 0.012f, blur);
+    float pick = hashTile(float2(course, floor((q.x + 3.0f
+        * hashTile(float2(course, 7.0f))) / 3.2f)));
+    float grain = 0.8f + 0.2f * sin(q.x * 31.0f + 5.0f
+        * smoothNoise(float2(q.x * 0.7f, q.y * 9.0f)));
+    float3 wood = houseBareOak * 0.5f * (0.75f + 0.5f * pick) * grain
+        * (1.0f - 0.55f * seam);
+    float rafter = 1.0f - smoothstep(0.04f, 0.04f + blur,
+        abs(fract(q.x / 0.6f) - 0.5f) * 0.6f);
+    wood = mix(wood, houseBareOak * 0.3f * grain, rafter);
+    float dust = smoothstep(0.35f, 0.8f, smoothNoise(metres.xz * 0.8f
+        + metres.y));
+    wood = mix(wood, float3(0.075f, 0.07f, 0.064f), 0.35f * dust);
+    float stain = smoothstep(1.0f, 1.1f, smoothNoise(q * 0.5f + 5.0f)
+        + 0.4f * smoothNoise(q * 2.3f));
+    wood *= 1.0f - 0.45f * stain;
+    float high = 1.0f - smoothstep(0.0f, 0.9f,
+        (houseAtticCeilingY - houseLocal(p).y) * houseScale);
+    float web = high * smoothstep(0.55f, 0.8f, smoothNoise(q * 1.7f + 9.0f))
+        * (0.6f + 0.4f * smoothNoise(q * 23.0f));
+    wood = mix(wood, float3(0.16f, 0.16f, 0.15f), 0.5f * web);
+    return {wood, 0.92f, 0.0f, float3(0.0f)};
+}
+
+// A floor between storeys, in metres: boards on top, a water-stained
+// plaster ceiling below, and a beaded oak fascia where its edge shows in a
+// stairwell. Outside, under a dormer's sill, it is painted trim.
+SurfaceMaterial houseFloorMaterial(float3 p, float3 n, float3 local,
+    float blur, bool inside) {
+    float3 metres = p - houseOrigin;
+    if (!inside)
+        return {float3(0.045f, 0.038f, 0.034f), 0.7f, 0.0f, float3(0.0f)};
+    if (n.y > 0.5f)
+        return houseBoards(metres, local, blur, true,
+            local.y > houseAtticStoreyY);
+    if (n.y < -0.5f) {
+        float stain = smoothstep(0.55f, 0.8f, smoothNoise(p.xz * 0.6f));
+        return {float3(0.24f, 0.22f, 0.19f) * (1.0f - 0.3f * stain), 0.9f,
+            0.0f, float3(0.0f)};
+    }
+    float bead = houseLines(metres.y, 0.1f, 0.012f, blur);
+    return {houseOak * 0.85f * (1.0f - 0.35f * bead), 0.45f, 0.0f,
+        float3(0.0f)};
+}
+
+// The staircase, in metres: dark oak polished by a century of hands and
+// feet, paler where the treads' nosings wear. Down the treads runs a
+// wine-red carpet with a black border, a gold line and a lozenge on every
+// step, worn to its backing over the nosings and held at the back of each
+// tread by a brass rod. Under the floating flights, plaster panels lie in
+// oak frames.
+SurfaceMaterial houseStairMaterial(device const HousePart &part, float3 p,
+    float3 n, float blur) {
+    float3 metres = p - houseOrigin;
+    float3 size = part.upper.xyz - part.lower.xyz;
+    bool longZ = size.z >= size.x;
+    float u = longZ ? metres.z : metres.x;
+    float v = abs(n.y) > 0.5f ? (longZ ? metres.x : metres.z) : metres.y;
+    float grain = 0.82f + 0.18f * sin(v * 140.0f + 7.0f
+        * smoothNoise(float2(u * 0.9f, v * 11.0f)));
+    float3 oak = float3(0.062f, 0.032f, 0.017f) * grain
+        * (0.85f + 0.3f * smoothNoise(float2(u * 0.4f, v * 3.0f)));
+    if (part.windows.w > 0.5f) {
+        // A soffit: its sides are the flight's strings.
+        if (n.y > -0.2f) return {oak, 0.4f, 0.0f, float3(0.0f)};
+        float side = 0.5f * size.x
+            - abs(p.x - 0.5f * (part.lower.x + part.upper.x));
+        float frame = max(1.0f - smoothstep(0.1f, 0.1f + blur, side),
+            houseLines(metres.z * 1.094f, 1.2f, 0.14f, blur));
+        float stain = smoothstep(0.55f, 0.85f,
+            smoothNoise(float2(p.x, metres.z) * 0.7f));
+        float3 plaster = float3(0.16f, 0.15f, 0.13f) * (1.0f - 0.3f * stain);
+        return {mix(plaster, oak * 1.2f, frame), mix(0.9f, 0.45f, frame), 0.0f,
+            float3(0.0f)};
+    }
+    float rising = part.windows.z;
+    float runner = part.windows.y * houseScale;
+    if (runner <= 0.0f || abs(rising) < 0.5f)
+        return {oak, 0.38f, 0.0f, float3(0.0f)};
+    float riseMetres = houseStairRise * houseScale;
+    bool tread = n.y > 0.5f;
+    bool riser = !tread && n.z * rising < -0.5f
+        && p.y > part.upper.y - riseMetres - 0.002f;
+    if (!tread && !riser) return {oak, 0.38f, 0.0f, float3(0.0f)};
+    float across = metres.x - part.windows.x * houseScale;
+    // Distances from the nosing, over the tread or down the riser, and
+    // from the corner behind the tread, where the rod lies.
+    float nose = tread
+        ? (rising > 0.0f ? p.z - part.lower.z : part.upper.z - p.z)
+        : part.upper.y - p.y;
+    float back = tread
+        ? (rising > 0.0f ? part.upper.z - p.z : p.z - part.lower.z)
+        : p.y - (part.upper.y - riseMetres);
+    float rod = 1.0f - smoothstep(0.009f, 0.009f + blur, abs(back - 0.02f));
+    if (abs(across) < runner + 0.035f && rod > 0.5f)
+        return {float3(0.42f, 0.3f, 0.12f) * (0.6f + 0.5f
+            * smoothNoise(float2(across * 9.0f, u))), 0.35f, 1.0f,
+            float3(0.0f)};
+    if (abs(across) < runner) {
+        float edge = runner - abs(across);
+        // Up the flight, over treads and risers alike.
+        float up = (rising > 0.0f ? metres.z : -metres.z) + metres.y;
+        float3 carpet = float3(0.13f, 0.013f, 0.02f);
+        float2 q = float2(abs(across) / max(runner - 0.1f, 0.05f),
+            (fract(up / 0.65f) - 0.5f) * 0.65f / 0.22f);
+        float lozenge = abs(q.x) + abs(q.y);
+        float soft = 4.0f * blur / 0.22f;
+        float motif = 1.0f - smoothstep(0.5f, 0.5f + soft, lozenge);
+        float outline = 1.0f - smoothstep(0.035f, 0.035f + soft,
+            abs(lozenge - 0.6f));
+        carpet = mix(carpet, float3(0.03f, 0.008f, 0.01f), 0.8f * motif);
+        carpet = mix(carpet, float3(0.24f, 0.15f, 0.05f), outline);
+        float border = 1.0f - smoothstep(0.07f, 0.07f + blur, edge);
+        float line = 1.0f - smoothstep(0.006f, 0.006f + blur,
+            abs(edge - 0.085f));
+        carpet = mix(carpet, float3(0.018f, 0.007f, 0.007f), border);
+        carpet = mix(carpet, float3(0.26f, 0.17f, 0.05f), line);
+        carpet *= 0.85f + 0.3f * mix(smoothNoise(float2(across, up) * 60.0f),
+            0.5f, saturate(blur / 0.01f));
+        float wear = (1.0f - smoothstep(0.0f, 0.1f, nose))
+            * smoothstep(0.1f, 0.5f, edge / runner)
+            * (0.55f + 0.45f * smoothNoise(float2(across * 6.0f, up * 3.0f)));
+        carpet = mix(carpet, float3(0.085f, 0.068f, 0.05f), 0.75f * wear);
+        if (tread)
+            carpet = mix(carpet, float3(0.08f, 0.072f, 0.064f),
+                0.35f * (1.0f - smoothstep(0.0f, 0.06f, back)));
+        return {carpet, 0.95f, 0.0f, float3(0.0f)};
+    }
+    oak = mix(oak, houseBareOak * 0.75f,
+        0.6f * (1.0f - smoothstep(0.0f, 0.05f, nose)));
+    return {oak, 0.32f, 0.0f, float3(0.0f)};
+}
+
+// A balustrade's oak, in metres: a dark, polished handrail worn pale on
+// top by hands, a shoe rail, and turned balusters ringed at their necks.
+SurfaceMaterial houseBanisterMaterial(device const HousePart &part, float3 p,
+    float3 n, float blur) {
+    float height;
+    float h = houseBanisterHeight(part, p, height);
+    float3 metres = p - houseOrigin;
+    float u = metres.x + metres.z;
+    float grain = 0.82f + 0.18f * sin(metres.y * 60.0f + u * 3.0f
+        + 6.0f * smoothNoise(float2(u * 2.0f, metres.y * 5.0f)));
+    float3 oak = float3(0.06f, 0.031f, 0.017f) * grain;
+    if (h > height - 0.09f) {
+        float worn = saturate(n.y) * smoothNoise(float2(u * 1.5f, 3.0f));
+        return {mix(oak * 0.85f, houseBareOak * 0.7f, 0.5f * worn), 0.22f,
+            0.0f, float3(0.0f)};
+    }
+    if (h < 0.06f) return {oak * 0.9f, 0.35f, 0.0f, float3(0.0f)};
+    float t = (h - 0.06f) / max(height - 0.15f, 0.05f);
+    float rings = max(exp(-(t - 0.08f) * (t - 0.08f) * 2500.0f),
+        exp(-(t - 0.92f) * (t - 0.92f) * 2500.0f));
+    return {oak * (0.85f + 0.35f * rings), 0.3f, 0.0f, float3(0.0f)};
+}
+
+// A bookcase's face, in metres: shelves of old books, cloth and leather
+// spines in dark reds, greens and browns with gilt bands, gapped here and
+// there; the rest of it is wood.
+SurfaceMaterial houseBookcase(device const HousePart &part, float3 p,
+    float3 n, float blur, float3 wood) {
+    float3 size = part.upper.xyz - part.lower.xyz;
+    bool alongZ = size.z > size.x;
+    SurfaceMaterial plain = {wood, 0.4f, 0.0f, float3(0.0f)};
+    if (abs(alongZ ? n.x : n.z) < 0.5f) return plain;
+    float s = alongZ ? p.z - part.lower.z : p.x - part.lower.x;
+    float span = alongZ ? size.z : size.x;
+    float y = p.y - part.lower.y;
+    float shelf = floor(y / 0.36f);
+    float inShelf = y - shelf * 0.36f - 0.03f;
+    if (s < 0.04f || s > span - 0.04f || inShelf < 0.0f || y < 0.08f
+        || y > size.y - 0.06f) return plain;
+    float along = s + shelf * 0.17f;
+    float cell = floor(along / 0.045f);
+    float pick = hashTile(float2(cell, shelf + 11.0f));
+    float tall = 0.2f + 0.11f * hashTile(float2(cell, shelf + 13.0f));
+    if (pick < 0.08f || inShelf > tall)
+        return {float3(0.008f), 0.9f, 0.0f, float3(0.0f)};
+    float3 cloth = pick < 0.35f ? float3(0.07f, 0.012f, 0.012f)
+        : (pick < 0.6f ? float3(0.02f, 0.04f, 0.022f)
+            : (pick < 0.85f ? float3(0.06f, 0.035f, 0.018f)
+                : float3(0.03f, 0.03f, 0.04f)));
+    float top = tall - inShelf;
+    float gilt = max(1.0f - smoothstep(0.004f, 0.004f + blur,
+        abs(top - 0.03f)), 1.0f - smoothstep(0.004f, 0.004f + blur,
+        abs(top - 0.05f)));
+    cloth = mix(cloth, float3(0.2f, 0.14f, 0.05f), 0.7f * gilt);
+    cloth *= 1.0f - 0.5f * houseLines(along, 0.045f, 0.004f, blur);
+    return {cloth, 0.75f, 0.0f, float3(0.0f)};
+}
+
+// A dust sheet thrown over furniture, in metres: grey-white linen whose
+// folds hang down its sides, greyer with dust on top.
+SurfaceMaterial houseDustSheet(float3 p, float3 n) {
+    float3 metres = p - houseOrigin;
+    float s = metres.x + metres.z;
+    float folds = abs(n.y) > 0.5f
+        ? 0.9f + 0.1f * smoothNoise(metres.xz * 4.0f)
+        : 0.72f + 0.28f * (0.5f + 0.5f * sin(s * 23.0f + 4.0f
+            * smoothNoise(float2(s, metres.y) * 2.0f)));
+    float3 linen = float3(0.2f, 0.195f, 0.18f) * folds;
+    if (n.y > 0.5f) linen = mix(linen, float3(0.12f, 0.115f, 0.105f), 0.4f);
+    return {linen, 0.95f, 0.0f, float3(0.0f)};
+}
+
 SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
     device const GameState &game, float time, float pixelWidth,
     float3 direction) {
     uint index = min(hit.variant, houseCapacity - 1u);
     device const HousePart &part = game.house.parts[index];
     uint style = hit.material - houseMaterialBase;
+    // A turned building is shaded in its own frame, where it was built.
+    HouseTurn turn = housePartTurn(game.house, index);
+    hit.position = houseTurnPointIn(turn, hit.position);
+    hit.normal = houseTurnDirectionIn(turn, hit.normal);
+    direction = houseTurnDirectionIn(turn, direction);
     float3 p = hit.position, n = hit.normal;
     float3 local = houseLocal(p);
     float3 metres = p - houseOrigin;
@@ -2255,7 +3424,7 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
     bool zFace = abs(n.z) > 0.5f;
     float s = zFace ? p.x : p.z;
     const float3 trim = float3(0.045f, 0.038f, 0.034f);
-    const float3 paint = float3(0.13f, 0.115f, 0.12f);
+    const float3 paint = houseOak;
     const float3 iron = float3(0.02f, 0.02f, 0.022f);
     HouseHaunting mood = houseHaunting(game);
     HouseWind wind = houseWind(game);
@@ -2275,14 +3444,35 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
         s = zFace ? p.x : p.z;
         float lo = zFace ? part.lower.x : part.lower.z;
         float hi = zFace ? part.upper.x : part.upper.z;
+        if (houseIsDoorLeaf(part)) {
+            // A plank door's boards run along it from the hinge, whichever
+            // way it has swung.
+            float2 span = houseDoorLeafSpan(part, p);
+            s = span.x;
+            lo = 0.0f;
+            hi = span.y;
+        }
         HouseWindow w = houseWindow(part, index, p, face, blur, wind);
+        if (inside && local.y > houseAtticStoreyY) {
+            // The dormers' bays are bare boards, and sacking hangs at their
+            // windows.
+            SurfaceMaterial boards = houseAtticBoards(p, face, blur, false);
+            float folds = 0.6f + 0.4f * w.fold;
+            float3 albedo = mix(boards.albedo, houseBareOak * 0.4f, w.frame);
+            albedo = mix(albedo, float3(0.075f, 0.062f, 0.045f) * folds,
+                w.drape + w.glass);
+            return {albedo, 0.92f, 0.0f, float3(0.0f)};
+        }
         if (inside) {
             // Wallpaper between wainscot and cornice; curtains are drawn
             // across the windows.
             float3 wood = float3(0.07f, 0.04f, 0.025f);
-            SurfaceMaterial paper = houseWallpaper(s, storeyY, houseRoom(p),
-                float(index) * 3.1f, part.windows.x + part.windows.y < 0.5f,
-                float2(lo, hi), blur, mood, time);
+            float2 band = houseStoreyBand(local);
+            SurfaceMaterial paper = houseWallpaper(s,
+                (local.y - band.x) * houseScale, (band.y - band.x) * houseScale,
+                houseRoom(p), float(index) * 3.1f,
+                part.windows.x + part.windows.y < 0.5f, float2(lo, hi), blur,
+                mood, time);
             // Seen through glass the trace passes on; what is shaded here
             // is the frame and the curtains, tied back at the sides or
             // blowing loose.
@@ -2338,9 +3528,20 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
     if (style == houseLog) return houseLogMaterial(part, p, n, blur, inside);
     if (style == houseGrave)
         return houseGraveMaterial(part, p, n, blur, mood, time);
+    if (style == housePlaster || style == housePlasterColumn)
+        return housePlasterMaterial(part, p, n, blur);
     if (style == houseCorrugated) return houseCorrugatedMaterial(p, n, blur);
+    if (style == houseCastIron || style == houseCastIronRod)
+        return houseCastIronMaterial(p, n, blur);
+
+    if (style == houseFloor)
+        return houseFloorMaterial(p, n, local, blur, inside);
+    if (style == houseStair) return houseStairMaterial(part, p, n, blur);
+    if (style == houseBanister)
+        return houseBanisterMaterial(part, p, n, blur);
 
     if (style == houseRoof) {
+        if (inside) return houseAtticBoards(p, n, blur, n.y < -0.5f);
         if (n.y < -0.5f) {
             // Soffits under the eaves, with brackets every 60 cm.
             float bracket = houseLines(p.x + p.z, 0.6f, 0.06f, blur);
@@ -2379,20 +3580,23 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
 
     if (style == houseTrim || style == houseRailing || style == houseFrieze) {
         float3 size = part.upper.xyz - part.lower.xyz;
-        // Weathered paint: grain shows through, worn to grey on edges and
-        // in patches.
+        // A door leaf's grain runs along it, whichever way it has swung.
+        bool leaf = houseIsDoorLeaf(part);
+        float2 span = houseDoorLeafSpan(part, p);
+        if (leaf) s = span.x;
+        // Weathered paint: grain shows through, worn to bare oak on edges
+        // and in patches.
         float2 grainAt = abs(n.y) > 0.5f ? p.xz : float2(s, p.y);
         float grain = 0.8f + 0.2f * sin(grainAt.y * 23.0f + 7.0f
             * smoothNoise(grainAt * float2(2.0f, 0.5f)));
         float worn = smoothstep(0.58f, 0.72f, smoothNoise(grainAt * 2.1f
             + float2(index)));
         float3 albedo = mix(trim * (0.8f + 0.4f * smoothNoise(float2(s * 3.0f,
-            p.y * 0.4f))), float3(0.12f, 0.11f, 0.1f) * grain, worn);
-        // The open doors carry three raised panels.
-        if (size.y > 2.0f * houseScale && size.x < 0.1f * houseScale
-            && abs(n.x) > 0.5f) {
-            float2 d = float2(p.z - part.lower.z, p.y - part.lower.y);
-            float panel = max(houseLines(d.x - 0.12f, size.z - 0.24f, 0.04f,
+            p.y * 0.4f))), houseBareOak * 0.8f * grain, worn);
+        // The front doors carry three raised panels on each broad face.
+        if (leaf && abs(dot(n, part.planes[3].xyz)) > 0.5f) {
+            float2 d = float2(span.x, p.y - part.lower.y);
+            float panel = max(houseLines(d.x - 0.12f, span.y - 0.24f, 0.04f,
                 blur), houseLines(d.y - 0.12f, (size.y - 0.24f) / 3.0f, 0.04f,
                 blur));
             albedo *= 1.0f - 0.45f * panel;
@@ -2405,46 +3609,13 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
             bool deck = local.z < -6.15f || (abs(local.x) < 8.15f
                 && abs(local.z) < 6.15f);
             if (inside || (deck && local.y > 0.05f)) {
-                // Floor and deck boards, staggered at their ends. Outside
-                // they are warped and grey, with uneven gaps and the odd
-                // board rotted through.
-                float across = metres.x + (inside ? 0.0f
-                    : 0.02f * sin(metres.z * 0.7f + floor(metres.x / 0.15f)));
-                float plank = floor(across / 0.15f);
-                float run = metres.z + 2.4f * hashTile(float2(plank, 3.0f));
-                float pick = hashTile(float2(plank, floor(run / 2.4f)));
-                float joint = max(houseLines(across, 0.15f,
-                    inside ? 0.008f : 0.01f + 0.02f * pick, blur),
-                    houseLines(run, 2.4f, 0.008f, blur));
-                float tone = 0.8f + 0.4f * pick;
-                float3 wood = inside ? float3(0.09f, 0.055f, 0.034f)
-                    : float3(0.07f, 0.064f, 0.058f);
-                float3 albedo = wood * tone * (1.0f - 0.6f * joint);
-                float roughness = inside ? 0.45f : 0.8f;
-                if (!inside) {
-                    albedo *= 0.8f + 0.2f * sin(run * 31.0f + 5.0f
-                        * smoothNoise(float2(across * 4.0f, run)));
-                    if (pick > 0.96f) albedo = float3(0.008f);
-                }
-                // Stains: dark blots with tide lines where water dried,
-                // and dust gathered toward the walls.
-                float blot = smoothNoise(metres.xz * 0.55f + 3.0f)
-                    + 0.5f * smoothNoise(metres.xz * 2.1f + 11.0f);
-                float stain = smoothstep(0.98f, 1.06f, blot);
-                float tide = 1.0f - smoothstep(0.0f, 0.025f,
-                    abs(blot - 0.99f));
-                albedo *= (1.0f - 0.5f * stain) * (1.0f - 0.3f * tide);
-                roughness = mix(roughness, 0.9f, stain);
-                if (inside) {
-                    float2 wall = min(local.xz + float2(7.7f, 5.7f),
-                        float2(7.7f, 5.7f) - local.xz) * houseScale;
-                    float dust = 1.0f - smoothstep(0.0f, 0.9f,
-                        min(wall.x, wall.y));
-                    albedo = mix(albedo, float3(0.11f, 0.1f, 0.09f), 0.4f * dust);
-                }
+                SurfaceMaterial boards = houseBoards(metres, local, blur,
+                    inside, false);
+                float3 albedo = boards.albedo;
+                float roughness = boards.roughness;
                 // A long runner rug down the hall.
-                float2 rug = abs(local.xz - float2(0.0f, -2.0f))
-                    - float2(1.25f, 2.9f);
+                float2 rug = abs(local.xz - float2(0.0f, -2.25f))
+                    - float2(1.25f, 2.65f);
                 if (inside && max(rug.x, rug.y) < 0.0f) {
                     float border = smoothstep(-0.2f, -0.17f, max(rug.x, rug.y));
                     float line = 1.0f - smoothstep(0.012f,
@@ -2491,7 +3662,7 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
 
     if (style == houseBrick) {
         float storeyY = local.y - houseFloorY;
-        if (inside && n.x > 0.5f) {
+        if (inside && n.x > 0.5f && houseRoom(p) == 1u) {
             // The firebox: an arched opening with a stone surround, logs on
             // glowing embers, and tongues of flame that lick upward, yellow
             // at their roots and red at their tips.
@@ -2555,14 +3726,9 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
         float3 size = part.upper.xyz - part.lower.xyz;
         float3 wood = float3(0.055f, 0.028f, 0.018f)
             * (0.85f + 0.3f * smoothNoise(float2(s * 6.0f, p.y * 1.5f)));
-        // Stairs: a red runner up the treads and risers.
-        if (abs(local.x) < 1.0f && local.z > houseStairStart - 0.01f
-            && size.x > 1.5f) {
-            if (abs(local.x) < 0.55f)
-                return {float3(0.15f, 0.018f, 0.024f), 0.95f, 0.0f,
-                    float3(0.0f)};
-            return {wood, 0.4f, 0.0f, float3(0.0f)};
-        }
+        if (part.windows.x > 1.5f)
+            return houseBookcase(part, p, n, blur, wood);
+        if (part.windows.x > 0.5f) return houseDustSheet(p, n);
         // The tall clock's face.
         if (size.y > 2.0f && n.x < -0.5f) {
             float2 q = float2(p.z - 0.5f * (part.lower.z + part.upper.z),
@@ -2602,7 +3768,9 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
         float2 rim = min(face, 1.0f - face);
         if (abs(n.y) > 0.5f || rim.x < 0.12f || rim.y < 0.1f)
             return {iron, 0.5f, 0.6f, float3(0.0f)};
-        float level = houseFlicker(time, part.lower.x, 0.12f) * mood.dim;
+        // rows.w brightens a lantern; it is 1 unless its builder sets it.
+        float level = houseFlicker(time, part.lower.x, 0.12f) * mood.dim
+            * part.rows.w;
         return {float3(0.05f, 0.04f, 0.03f), 0.2f, 0.0f,
             float3(1.0f, 0.62f, 0.28f) * 1.4f * level};
     }

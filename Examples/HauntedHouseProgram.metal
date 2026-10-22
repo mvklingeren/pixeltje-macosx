@@ -12,8 +12,17 @@ using namespace metal;
 // quadcopter drones hover and fire back with laser rifles once shot at. The
 // sun has set: a full Earth lights the plain, and a flagstone path leads
 // from the exit to a procedurally built Victorian haunted house whose ground
-// floor is open. The hand, pistol, double-barrel shotgun and launcher are
-// on keys 1 to 4 everywhere; the hand punches, and knocks on doors.
+// floor is open. An asphalt street lit by lantern posts crosses the path,
+// with copies of the cottage, barn and shed along it, each standing a few
+// degrees off square with the road. The player
+// starts outside on that path, facing the house.
+// The hand, pistol, double-barrel shotgun and launcher are on keys 1 to 4
+// everywhere; the hand punches, and knocks on doors. enableDrones and
+// renderBase below switch the drones and the drawn base off for now. With
+// enableDayNightTransition, each match starts at noon instead and the sun
+// sets over its first ten minutes, ending in this night; the house sleeps
+// through the bright half of the afternoon and wakes to shots only once it
+// is getting dark.
 
 // Spider slots: two brown range spiders, the ambush spider, seven dark brown
 // hoppers, then the boss. Every slot before the boss runs the same AI.
@@ -72,8 +81,43 @@ constant float3 earthDirection = float3(-0.4019f, 0.309f, 0.8619f);
 constant float earthPower = 1.76e9f;      // irradiance 1.4 from 10 km away
 constant float3 earthColor = float3(0.78f, 0.86f, 1.0f);
 constant float earthRadius = 0.028f;      // drawn 1.6°, larger than life
+// Day into night. With enableDayNightTransition each match starts at lunar
+// noon: the sun stands high behind the path, lights the plain and the
+// houses and outshines the stars, then sinks toward the plain left of the
+// house and sets just before dayNightDuration seconds have passed, leaving
+// the earthlit night above. Set it false to keep the night from the start.
+constant bool enableDayNightTransition = true;
+// With the transition on, an Earth-like atmosphere hangs over the moon until
+// night: a soft blue sky, skylight in the shadows, haze over the distance, a
+// sun that reddens as it sets and a twilight that fades to black. Set it
+// false for the airless black sky of the real moon.
+constant bool enableAtmosphere = true;
+constant float dayNightDuration = 600.0f;  // noon to night, in seconds
+// The sun's path is a great circle from its highest point, 68° up, to the
+// horizon point where it sets, 18° left of the house seen from the start.
+// The two directions are perpendicular.
+constant float3 sunNoonDirection = float3(0.3487f, 0.9303f, -0.1134f);
+constant float3 sunsetDirection = float3(0.309f, 0.0f, 0.951f);
+constant float sunIrradiance = 3.2f;
+constant float sunPower = 4.02e9f;        // sunIrradiance from 10 km away
+constant float3 sunColor = float3(1.0f, 0.97f, 0.92f);
+constant float sunRadius = 0.012f;        // drawn 1.4°, larger than life
 constant uint droneCount = 3u;
 constant uint laserCount = 6u;
+// Switched off for now: the drones neither fly, sound, shoot nor show, and
+// nothing can hit or lock onto them. Set true to bring them back.
+constant bool enableDrones = false;
+// Whether the view draws the base: its rooms, corridors, props, exit and
+// outer shell. Off for now, so the moon runs on across its footprint. It
+// only changes what is drawn; shots, sight lines, lasers and the walker
+// still meet the base, and the spiders, sentries and pickups inside it
+// still show.
+constant bool renderBase = false;
+// The player starts outside on the flagstone path, a few metres south of
+// the exit door, facing the haunted house. The trackpad's centre looks
+// along spawnYaw; a yaw of 0 would look north at the base.
+constant float2 spawnGround = float2(0.0f, 26.0f);
+constant float spawnYaw = 3.14159265f;
 
 // A Javelin-style launcher joins the hand, the pistol and the shotgun. Keys
 // 1 to 4 pick the hand, pistol, shotgun and launcher; X swaps back to the
@@ -190,7 +234,9 @@ struct LaserBolt {
 // voices layer the wind loop at different rates for the night, and the
 // haunt voice plays it as the gale that blows while the house is haunted.
 // The ghost voice loops the ghost's moan from wherever the ghost flies.
-// Each knuckle rap on a door and each punch that lands is one event.
+// Each knuckle rap on a door and each punch that lands is one event, and
+// so is each door a knock swings open: the cottage's creaks, the house's
+// big pair groans.
 struct RangeAudio {
     uint shot;
     uint scare;
@@ -204,9 +250,12 @@ struct RangeAudio {
     float4 windVoice[2];
     float4 hauntWind;
     float4 ghostVoice;
+    uint cottageDoor;
+    uint houseDoors;
+    uint2 unused;
 };
 
-static_assert(sizeof(RangeAudio) == 144,
+static_assert(sizeof(RangeAudio) == 160,
     "The audio words must match the program's audioEvents and audioVoices");
 
 constant uint hudCapacity = 96u;
@@ -242,8 +291,8 @@ struct HouseGroup {
     uint4 last;             // the last group these bounds enclose, unused
 };
 
-constant uint houseCapacity = 1024u;
-constant uint houseGroupCapacity = 64u;
+constant uint houseCapacity = 1536u;
+constant uint houseGroupCapacity = 72u;
 constant uint buildingSiteCapacity = 8u;
 
 constant uint houseCandleCapacity = 4u;
@@ -256,6 +305,12 @@ struct HouseModel {
     // offsets stay put when a capacity changes.
     float4 haunt;
     float4 hauntMotion;
+    // The doors a knock opens: when the house's pair and the cottage's door
+    // begin to swing open (negative while shut), and 1 in z and w once
+    // each has sounded. Then the parts that hold the house's west and east
+    // leaves and the cottage's door, which buildingsHangDoors rehangs.
+    float4 doors;
+    uint4 doorParts;
     float4 candles[houseCandleCapacity];  // flame XYZ, room
     uint4 sites[buildingSiteCapacity];    // first and end group, first and
                                           // end part; site 0 is the house
@@ -439,6 +494,7 @@ PointLight roomLight(uint index, float time) {
 #include "HauntedMausoleum.metal"
 #include "HauntedShed.metal"
 #include "HauntedCottage.metal"
+#include "HauntedStreet.metal"
 #include "HauntedBuildings.metal"
 
 float stairHeight(float2 point);
@@ -587,7 +643,8 @@ void gunCapsule(thread GunHit &hit, float3 origin, float3 direction,
 #include "SignalRangeArsenal.metal"
 
 void resetGame(device GameState &game, uint seed) {
-    game.player = float4(0.0f, 1.55f, 12.0f, 0.0f);
+    game.player = float4(spawnGround.x, 1.55f + stairHeight(spawnGround),
+        spawnGround.y, spawnYaw);
     game.view = float4(0.0f, 100.0f, 0.0f, 0.0f);
     game.effects = float4(0.0f);
     game.sceneTransition = float4(0.0f);
@@ -664,6 +721,7 @@ void resetGame(device GameState &game, uint seed) {
     }
     game.pickups = uint4(0u);
     houseQuiet(game);
+    buildingsShutDoors(game);
 }
 
 kernel void initializeRange(constant ProgramUniforms &u [[buffer(0)]],
@@ -887,6 +945,18 @@ bool walkable(float2 point) {
         && abs(z) <= roomLimit;
 }
 
+// The player alone climbs the haunted house's upper floors: inside its body
+// their footing and walls depend on how high their feet are, at foot.
+float playerGround(float2 point, float foot) {
+    if (!houseBodyHolds(point)) return stairHeight(point);
+    return buildingsStandFrom(point, moonHeight(point, moonTraceDetail), foot);
+}
+
+bool playerWalkable(float2 point, float foot) {
+    if (!houseBodyHolds(point)) return walkable(point);
+    return !buildingsBlockedFrom(point, foot);
+}
+
 // Where a spider body may stand: the walkable floor clear of the props. The
 // pad is the larger of the two range spiders' prop clearances.
 bool npcPathPointClear(float2 point) {
@@ -1048,11 +1118,9 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     float dt = clamp(u.pointer.w > 0.0f ? u.pointer.w : u.resolutionTime.w,
         0.0f, 0.10f);
     uint action = uint(u.pointer.z);
-    uint jumpAction = uint(u.movement.z);
     // Action keys act on the tick they go down.
     uint keys = uint(u.movement.w);
     uint pressed = keys & ~uint(game.controls.x);
-    game.controls.x = float(keys);
     if ((pressed & keyV) != 0u)
         game.controls.y = game.controls.y > 0.5f ? 0.0f : 1.0f;
     // Keys 7, 8 and 9 are consecutive bits, in the order of the effect bits.
@@ -1090,6 +1158,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
         }
     }
     if (game.progress.w != phasePlaying) {
+        game.controls.x = float(keys);
         // A requested restart happens in the restartRange tick pass.
         if (!restartRequested(game, action) && game.progress.w == phaseWon
             && game.effects.x - game.sceneTransition.x >= 2.0f) {
@@ -1113,7 +1182,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     game.look.zw = mix(game.look.zw,
         dt > 0.0f ? clamp(turn / dt, float2(-4.0f), float2(4.0f)) : float2(0.0f),
         1.0f - exp(-dt * 10.0f));
-    game.player.w = baseYaw + game.recoil.y;
+    game.player.w = baseYaw + spawnYaw + game.recoil.y;
     game.view.x = basePitch + game.recoil.x;
     bool cutscene = bossCutscene(game);
 
@@ -1141,6 +1210,25 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
             game.weapon.y = reloadDuration;
         }
     }
+}
+
+// Movement and footing run after the controls and clocks update, and before
+// enemies sense the player. Keeping the house's storey-aware collision out
+// of advanceRange lets each tick pass compile independently.
+kernel void advancePlayer(constant ProgramUniforms &u [[buffer(0)]],
+    device GameState *states [[buffer(1)]],
+    device RangeAudio *audio [[buffer(3)]],
+    uint id [[thread_position_in_grid]]) {
+    if (id != 0u) return;
+    device GameState &game = states[0];
+    if (game.progress.w != phasePlaying) return;
+    float dt = clamp(u.pointer.w > 0.0f ? u.pointer.w : u.resolutionTime.w,
+        0.0f, 0.10f);
+    uint jumpAction = uint(u.movement.z);
+    uint keys = uint(u.movement.w);
+    uint pressed = keys & ~uint(game.controls.x);
+    game.controls.x = float(keys);
+    bool cutscene = bossCutscene(game);
 
     float2 move = clamp(u.movement.xy, float2(-1.0f), float2(1.0f));
     if (cutscene) move = float2(0.0f);
@@ -1156,7 +1244,9 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     }
     float speed = game.bossScene.y > 0.0f ? 1.75f : 4.6f;
     float2 previousPosition = game.player.xz;
-    bool wasGrounded = game.player.y <= 1.55f + stairHeight(previousPosition)
+    float foot = game.player.y - 1.55f;
+    bool wasGrounded = game.player.y
+        <= 1.55f + playerGround(previousPosition, foot)
         + (onJumpPad(previousPosition) ? jumpPadHeight : 0.0f) + 0.001f;
     // Q and E dodge sideways in a quick burst on top of walking.
     uint dodgeKeys = pressed & (keyQ | keyE);
@@ -1173,13 +1263,15 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     float2 next = previousPosition + (game.motion.xy + game.dodge.xy) * dt;
     // Resolve axes independently so a diagonal approach slides along a wall.
     float2 position = previousPosition;
-    if (walkable(float2(next.x, position.y))) {
+    if (playerWalkable(float2(next.x, position.y), foot)
+        && !buildingsDoorsBar(game, float2(next.x, position.y))) {
         position.x = next.x;
     } else {
         game.motion.x = 0.0f;
         game.dodge.x = 0.0f;
     }
-    if (walkable(float2(position.x, next.y))) {
+    if (playerWalkable(float2(position.x, next.y), foot)
+        && !buildingsDoorsBar(game, float2(position.x, next.y))) {
         position.y = next.y;
     } else {
         game.motion.y = 0.0f;
@@ -1225,7 +1317,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
         }
     }
     bool overJumpPad = onJumpPad(next);
-    float groundY = 1.55f + stairHeight(next)
+    float groundY = 1.55f + playerGround(next, foot)
         + (overJumpPad ? jumpPadHeight : 0.0f);
     // On the moon, feet follow the ground downhill instead of skipping off it.
     if (outside && wasGrounded && game.effects.w <= 0.0f
@@ -1254,9 +1346,10 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
         game.player.y = northernCeilingY - 0.35f;
         game.effects.w = min(game.effects.w, 0.0f);
     }
-    // A jump from the haunted house's stair landing meets its ceiling.
-    float houseHeadroom = houseOrigin.y + houseCeilingY * houseScale - 0.25f;
-    if (houseUnderRoof(next) && game.player.y > houseHeadroom) {
+    // A jump in the haunted house meets the ceiling, floor or flight over
+    // the player.
+    float houseHeadroom = buildingsCeilingOver(next, foot) - 0.25f;
+    if (game.player.y > houseHeadroom) {
         game.player.y = houseHeadroom;
         game.effects.w = min(game.effects.w, 0.0f);
     }
@@ -1550,12 +1643,34 @@ bool landPunch(device GameState &game, ShotTrace trace, float3 eye,
     return true;
 }
 
+// The doors a knock opens swing on their own time, each sounding as it
+// starts to move: the cottage's creaks, the house's pair groans. The
+// house's doors also burst open for its ghost when the green glow snaps
+// on, if nobody knocked them open first.
+void swingDoors(device GameState &game, device RangeAudio &audio) {
+    float time = game.effects.x;
+    if (houseHauntAge(game) >= houseGreenOn && game.house.doors.x < 0.0f)
+        game.house.doors.x = time;
+    float4 doors = game.house.doors;
+    if (doors.x >= 0.0f && time >= doors.x && doors.z < 0.5f) {
+        audio.houseDoors += 1u;
+        game.house.doors.z = 1.0f;
+    }
+    if (doors.y >= 0.0f && time >= doors.y && doors.w < 0.5f) {
+        audio.cottageDoor += 1u;
+        game.house.doors.w = 1.0f;
+    }
+    buildingsHangDoors(game);
+}
+
 // The hand swings in its own tick pass after fireRange, for the compile-time
 // reason fireRange gives: its reach is traced like a shot. A click while a
-// door is the nearest thing within knocking reach knocks: three raps, and
-// the first on the house's front doors wakes it. Any other click punches,
-// and the punch strikes when the fist arrives. Clicks while the hand is
-// lowered, raised or mid-swing are spent, as a gun spends them.
+// door is the nearest thing within knocking reach knocks: three raps; the
+// first on the house's front doors wakes it, and the last opens the
+// house's or the cottage's door. Any other click punches, and the punch
+// strikes when the fist arrives. Clicks while the hand is lowered, raised
+// or mid-swing are spent, as a gun spends them. The doors swing here too,
+// whatever is held.
 kernel void swingHand(constant ProgramUniforms &u [[buffer(0)]],
     device GameState *states [[buffer(1)]],
     device RangeAudio *audio [[buffer(3)]],
@@ -1563,6 +1678,7 @@ kernel void swingHand(constant ProgramUniforms &u [[buffer(0)]],
     if (id != 0u) return;
     device GameState &game = states[0];
     if (game.progress.w != phasePlaying) return;
+    swingDoors(game, audio[0]);
     if (!holdingHand(game) || game.arsenal.x != heldHand) {
         game.hand = float4(-100.0f, 0.0f, 0.0f, 0.0f);
         return;
@@ -1570,7 +1686,8 @@ kernel void swingHand(constant ProgramUniforms &u [[buffer(0)]],
     float3 eye = game.player.xyz + eyeOffset(game);
     float3 aim = pixeltje_3d::forward(game.player.w, game.view.x);
     uint door;
-    float doorDistance = buildingsDoorCrossing(eye, aim, handKnockReach, door);
+    float doorDistance = buildingsDoorCrossing(game.house, eye, aim,
+        handKnockReach, door);
     float age = handSwingAge(game);
     // While idle, w names the door in reach for the HUD's prompt.
     if (age < 0.0f) game.hand.w = armsReady(game) ? float(door) : 0.0f;
@@ -1603,6 +1720,8 @@ kernel void swingHand(constant ProgramUniforms &u [[buffer(0)]],
         if (struck == 0u && uint(game.hand.w) == doorOfHouse
             && game.house.haunt.x < 0.0f)
             houseWake(game);
+        if (struck + 1u == handRaps)
+            buildingsOpenDoor(game, uint(game.hand.w));
     }
 }
 
@@ -1873,10 +1992,12 @@ float2 footprintSpan(float3 origin, float3 direction) {
 // From outside, the shell hides the rooms except through the exit opening,
 // and the moon is traced up to the shell. From inside, a ray reaches the
 // moon only through the exit, so the terrain march starts where it leaves.
-void traceOutside(thread SceneHit &hit, float3 origin, float3 direction) {
-    bool inside = !outdoors(origin.xz, 0.0f);
+// Without the base, the moon is traced across its footprint as well.
+void traceOutside(thread SceneHit &hit, float3 origin, float3 direction,
+    bool base) {
+    bool inside = base && !outdoors(origin.xz, 0.0f);
     float2 span = footprintSpan(origin, direction);
-    if (!inside) {
+    if (base && !inside) {
         for (uint block = 0u; block < 2u; ++block) {
             float3 normal;
             float t = rayBox(origin, direction,
@@ -1890,7 +2011,7 @@ void traceOutside(thread SceneHit &hit, float3 origin, float3 direction) {
         }
     }
     float near = inside ? span.y : 0.0f;
-    float far = !inside && span.x > 0.0f && span.x <= span.y
+    float far = base && !inside && span.x > 0.0f && span.x <= span.y
         ? min(hit.distance, span.x) : hit.distance;
     if (near >= far) return;
     float t = pixeltje_terrain::trace(MoonSurface{moonTraceDetail}, origin,
@@ -1898,8 +2019,10 @@ void traceOutside(thread SceneHit &hit, float3 origin, float3 direction) {
     if (t < 0.0f) return;
     float3 p = origin + direction * t;
     float epsilon = 0.02f + 0.002f * t;
-    // Fine relief fades out before it shrinks below a pixel and aliases.
-    float grain = 1.0f - smoothstep(0.06f, 0.2f, epsilon);
+    // Fine relief fades out before it shrinks below a pixel and aliases,
+    // and stays off the street's asphalt.
+    float grain = (1.0f - smoothstep(0.06f, 0.2f, epsilon))
+        * (1.0f - buildingsPaved(p.xz));
     hit = {t, pixeltje_terrain::normal(MoonSurface{moonShadeDetail, grain},
         p.xz, epsilon), p, 40u, -1, 0u};
 }
@@ -1971,7 +2094,7 @@ void traceEnvironment(thread SceneHit &hit, float3 origin,
     traceExit(hit, origin, direction, game);
     traceBuildings(hit, origin, direction, game);
     // Last, so the terrain march stops at the nearest other surface.
-    traceOutside(hit, origin, direction);
+    traceOutside(hit, origin, direction, true);
 }
 
 float hashTile(float2 p) {
@@ -2405,6 +2528,13 @@ SurfaceMaterial surfaceMaterial(SceneHit hit,
             ground = mix(soil * 0.8f, flag, path.y);
             rock = 0.0f;
         }
+        // The street's asphalt, over the flagstones where the road crosses
+        // the path, and dusted with soil at its edges.
+        float4 paving = buildingsPaving(p, pixelWidth);
+        if (paving.w > 0.0f) {
+            ground = mix(ground, paving.xyz, paving.w);
+            rock *= 1.0f - paving.w;
+        }
         return {ground, mix(0.97f, 0.8f, rock), 0.0f, float3(0.0f)};
     }
     if (hit.material == 41u) return shellMaterial(hit, pixelWidth);
@@ -2571,10 +2701,10 @@ float3 shadePointLight(SceneHit hit, SurfaceMaterial material,
 // The lobe and surge are milder than measured lunar values, so the plain
 // with the sun behind you is not blown out to white.
 float3 regolithReflectance(float3 normal, float3 viewDirection,
-    float3 albedo) {
-    float mu0 = max(dot(normal, earthDirection), 0.0f);
+    float3 albedo, float3 lightDirection) {
+    float mu0 = max(dot(normal, lightDirection), 0.0f);
     float mu = max(dot(normal, viewDirection), 0.0f);
-    float cosPhase = clamp(dot(earthDirection, viewDirection), -1.0f, 1.0f);
+    float cosPhase = clamp(dot(lightDirection, viewDirection), -1.0f, 1.0f);
     const float asymmetry = 0.2f;
     float lobe = (1.0f - asymmetry * asymmetry) / pow(1.0f
         + asymmetry * asymmetry - 2.0f * asymmetry * cosPhase, 1.5f);
@@ -2584,32 +2714,121 @@ float3 regolithReflectance(float3 normal, float3 viewDirection,
         * lobe * (1.0f + surge);
 }
 
-// The Earth is a point light 10 km away, so room-light shading serves it.
-// The shell, the haunted buildings and the terrain cast its shadows.
-float3 shadeEarthlight(SceneHit hit, SurfaceMaterial material,
-    float3 viewDirection, ChromePose chrome, device const GameState &game) {
-    if (dot(hit.normal, earthDirection) <= 0.0f) return float3(0.0f);
+// Where the sun stands `elapsed` seconds into the match. Strength is 1 while
+// its disc is clear of the horizon and fades to 0 as it sets; it is 0
+// throughout when the day-night transition is off.
+struct Daylight {
+    float3 direction;
+    float strength;
+};
+
+Daylight daylight(float elapsed) {
+    if (!enableDayNightTransition) return {sunsetDirection, 0.0f};
+    // Noon is a quarter turn above the sunset point. The sun's height, and
+    // so the light it puts on level ground, falls evenly over the duration
+    // and runs a little past the horizon, so the disc is fully down at the
+    // end.
+    float angle = asin(mix(1.0f, -0.1f,
+        saturate(elapsed / dayNightDuration)));
+    float3 direction = cos(angle) * sunsetDirection
+        + sin(angle) * sunNoonDirection;
+    return {direction, smoothstep(-sunRadius, sunRadius, direction.y)};
+}
+
+bool atmosphereOn() {
+    return enableDayNightTransition && enableAtmosphere;
+}
+
+// How much daylight the air still scatters: 1 by day, falling through
+// twilight to 0 when the sun is about 5° below the horizon.
+float atmosphereDay(Daylight sun) {
+    return atmosphereOn() ? smoothstep(-0.09f, 0.12f, sun.direction.y) : 0.0f;
+}
+
+// The sunlight left after its path through the air: white overhead, gold
+// and then red as the sun nears the horizon and its path lengthens.
+float3 sunTransmittance(Daylight sun) {
+    if (!atmosphereOn()) return float3(1.0f);
+    float airMass = 1.0f / (max(sun.direction.y, 0.0f) + 0.06f);
+    return exp(-float3(0.02f, 0.06f, 0.16f) * max(airMass - 1.0f, 0.0f));
+}
+
+// The sky's colour in `direction`: deep blue overhead, paler toward the
+// horizon and bright around the sun. As the sun gets low the horizon on its
+// side warms to orange, and after it sets the sky deepens to black.
+float3 atmosphereSky(float3 direction, Daylight sun) {
+    float day = atmosphereDay(sun);
+    if (day <= 0.0f) return float3(0.0f);
+    float height = sun.direction.y;
+    float horizon = pow(1.0f - saturate(direction.y), 3.0f);
+    float3 sky = mix(float3(0.045f, 0.12f, 0.36f),
+        float3(0.26f, 0.38f, 0.58f), horizon);
+    float facing = dot(direction, sun.direction);
+    float side = pow(saturate(0.5f + 0.5f * facing), 3.0f);
+    float low = 1.0f - smoothstep(-0.02f, 0.3f, height);
+    sky = mix(sky, float3(0.95f, 0.42f, 0.14f),
+        low * horizon * (0.25f + 0.75f * side));
+    // Light scattered forward around the sun, coloured by its path.
+    sky += sunColor * sunTransmittance(sun) * sun.strength
+        * (0.5f * pow(saturate(facing), 48.0f)
+            + 0.12f * pow(saturate(facing), 6.0f));
+    // Twilight fades the sky away from the sun first.
+    return sky * day * day * mix(1.0f, 0.4f + 0.6f * side, low);
+}
+
+// The light the whole sky sheds on a surface facing straight up.
+float3 atmosphereSkyLight(Daylight sun) {
+    return atmosphereSky(normalize(float3(0.0f, 0.6f, 0.8f)), sun);
+}
+
+// How brightly the plain lights what faces it, in units of the earthshine
+// it bounces at night. The sun's share follows its irradiance on level
+// ground, relative to the Earth's.
+float3 regolithBounce(Daylight sun) {
+    float sunShare = sunIrradiance * saturate(sun.direction.y) * sun.strength
+        / (1.4f * earthDirection.y);
+    return earthColor + sunColor * sunTransmittance(sun) * sunShare;
+}
+
+// The Earth and the sun are point lights 10 km away, so room-light shading
+// serves them. The shell, the haunted buildings and the terrain cast their
+// shadows.
+float3 shadeDistantLight(SceneHit hit, SurfaceMaterial material,
+    float3 viewDirection, ChromePose chrome, device const GameState &game,
+    float3 lightDirection, float3 lightColor, float power) {
+    if (dot(hit.normal, lightDirection) <= 0.0f) return float3(0.0f);
     float3 origin = hit.position + hit.normal * 0.05f;
-    if (crateBlocksLight(origin, earthDirection, 1.0e4f,
+    if ((renderBase && (crateBlocksLight(origin, lightDirection, 1.0e4f,
             hullFrontLower, hullFrontUpper)
-        || crateBlocksLight(origin, earthDirection, 1.0e4f,
-            hullRearLower, hullRearUpper)
-        || buildingsBlockLight(origin, earthDirection, 1.0e4f, game))
+        || crateBlocksLight(origin, lightDirection, 1.0e4f,
+            hullRearLower, hullRearUpper)))
+        || buildingsBlockLight(origin, lightDirection, 1.0e4f, game))
         return float3(0.0f);
     float lit = pixeltje_terrain::softShadow(MoonSurface{moonTraceDetail},
-        origin, earthDirection, 0.1f, 600.0f, moonCeiling, 10.0f, 48)
-        * droneShadow(origin, earthDirection, 1.0e4f, game);
+        origin, lightDirection, 0.1f, 600.0f, moonCeiling, 10.0f, 48)
+        * droneShadow(origin, lightDirection, 1.0e4f, game);
     if (lit <= 0.0f) return float3(0.0f);
-    PointLight earth = {hit.position + earthDirection * 1.0e4f,
-        earthColor, earthPower, false};
+    PointLight light = {hit.position + lightDirection * 1.0e4f,
+        lightColor, power, false};
     if (hit.material == 40u) {
-        float3 irradiance = earthColor * earthPower
-            / (4.0f * rangePi * 1.0e8f);
-        return lit * irradiance
-            * regolithReflectance(hit.normal, viewDirection, material.albedo);
+        float3 irradiance = lightColor * power / (4.0f * rangePi * 1.0e8f);
+        return lit * irradiance * regolithReflectance(hit.normal,
+            viewDirection, material.albedo, lightDirection);
     }
-    return lit * shadePointLight(hit, material, viewDirection, earth, chrome,
+    return lit * shadePointLight(hit, material, viewDirection, light, chrome,
         game);
+}
+
+float3 shadeDistantLights(SceneHit hit, SurfaceMaterial material,
+    float3 viewDirection, ChromePose chrome, device const GameState &game) {
+    float3 color = shadeDistantLight(hit, material, viewDirection, chrome,
+        game, earthDirection, earthColor, earthPower);
+    Daylight sun = daylight(game.effects.x);
+    if (sun.strength > 0.0f)
+        color += shadeDistantLight(hit, material, viewDirection, chrome, game,
+            sun.direction, sunColor * sunTransmittance(sun),
+            sunPower * sun.strength);
+    return color;
 }
 
 // The ghost's green light reaches surfaces on its own side of the house's
@@ -2623,8 +2842,9 @@ float3 houseGhostLighting(SceneHit hit, SurfaceMaterial material,
     return shadePointLight(hit, material, viewDirection, ghost, chrome, game);
 }
 
-// The haunted buildings' lanterns light what is near them outside. They cast
-// no shadows; the house's own walls face away from them.
+// The haunted buildings' lanterns and the street lamps light what is near
+// them outside. They cast no shadows; the house's own walls face away from
+// them.
 float3 houseOutdoorLighting(SceneHit hit, SurfaceMaterial material,
     float3 viewDirection, ChromePose chrome, device const GameState &game) {
     float3 color = float3(0.0f);
@@ -2638,24 +2858,37 @@ float3 houseOutdoorLighting(SceneHit hit, SurfaceMaterial material,
         color += shadePointLight(hit, material, viewDirection, light, chrome,
             game);
     }
+    uint2 lamps = buildingsStreetLampsNear(hit.position);
+    float dim = lamps.y > lamps.x ? houseHaunting(game).dim : 0.0f;
+    for (uint i = lamps.x; i < lamps.y; ++i) {
+        PointLight light = buildingsStreetLamp(i, game, dim);
+        float reach = distance(light.position, hit.position)
+            / buildingsStreetLampReach;
+        if (reach >= 1.0f) continue;
+        float window = 1.0f - reach * reach * reach * reach;
+        light.power *= window * window;
+        color += shadePointLight(hit, material, viewDirection, light, chrome,
+            game);
+    }
     color += houseGhostLighting(hit, material, viewDirection, chrome, game,
         false);
     return color;
 }
 
 // Each room of the house is lit by its own lamps; the doorways let a little
-// of the neighbouring rooms' light through.
+// of the neighbouring rooms' light through, and the stairwell joins the
+// halls of the storeys.
 float3 houseIndoorLighting(SceneHit hit, SurfaceMaterial material,
     float3 viewDirection, ChromePose chrome, device const GameState &game) {
     float3 color = float3(0.0f);
     uint room = houseRoom(hit.position);
+    float3 local = houseLocal(hit.position);
     for (uint i = 0u; i < houseIndoorLightCount; ++i) {
         uint lightRoom;
         PointLight light = houseHauntedIndoorLight(i, game, lightRoom);
-        if (lightRoom != room) {
-            if (room != 0u && lightRoom != 0u) continue;
-            light.power *= 0.12f;
-        }
+        float share = houseLightShare(lightRoom, room, local);
+        if (share <= 0.0f) continue;
+        light.power *= share;
         color += shadePointLight(hit, material, viewDirection, light, chrome,
             game);
     }
@@ -2710,9 +2943,26 @@ float3 earthDisc(float3 direction, float pixelAngle, thread float &coverage) {
     return color * coverage + halo;
 }
 
+// The sun's disc and the glare it leaves on the lens. Terrain in
+// front of it hides it as it sets; coverage hides the stars behind it.
+float3 sunDisc(float3 direction, float pixelAngle, Daylight sun,
+    thread float &coverage) {
+    coverage = 0.0f;
+    if (sun.strength <= 0.0f) return float3(0.0f);
+    // Measured from the chord, which stays precise at small angles.
+    float angle = 2.0f * asin(min(0.5f * distance(direction, sun.direction),
+        1.0f));
+    float edge = max(pixelAngle, 0.002f);
+    coverage = 1.0f - smoothstep(sunRadius - edge, sunRadius + edge, angle);
+    float glare = 0.5f * exp(-angle / 0.025f) + 0.015f * exp(-angle / 0.15f);
+    return sunColor * sunTransmittance(sun)
+        * (30.0f * coverage + glare * sun.strength);
+}
+
 // An airless black sky with fixed stars. Stars are point sources, so each
-// is drawn about one pixel (pixelAngle radians) wide.
-float3 spaceSky(float3 direction, float pixelAngle) {
+// is drawn about one pixel (pixelAngle radians) wide. In daylight the lit
+// plain outshines them: visibility fades them out.
+float3 spaceSky(float3 direction, float pixelAngle, float visibility) {
     float3 color = float3(0.0f);
     // Stars sit in equal-angle cells on the six faces of a cube, which has
     // no pole or seam to stretch them. Each face-local frame is a signed axis
@@ -2739,7 +2989,8 @@ float3 spaceSky(float3 direction, float pixelAngle) {
     float2 t = tan((cell + 0.5f) * cellAngle);
     float solidAngle = (1.0f + t.x * t.x) * (1.0f + t.y * t.y)
         * pow(1.0f + dot(t, t), -1.5f);
-    if (pixeltje_terrain::hash(key, 71.0f) > 0.14f * solidAngle)
+    if (visibility <= 0.0f
+        || pixeltje_terrain::hash(key, 71.0f) > 0.14f * solidAngle)
         return color;
     // Centres stay a quarter cell from the edges, and the width is capped so
     // four sigma fits there even in the narrowest (0.71×) cells: no star is
@@ -2759,7 +3010,8 @@ float3 spaceSky(float3 direction, float pixelAngle) {
             temperature * 2.0f)
         : mix(float3(1.0f, 0.96f, 0.90f), float3(0.74f, 0.84f, 1.0f),
             temperature * 2.0f - 1.0f);
-    return color + tint * flux * exp(-0.5f * d * d / (sigma * sigma));
+    return color + visibility * tint * flux
+        * exp(-0.5f * d * d / (sigma * sigma));
 }
 
 // The latest shot lights the room twice: from the muzzle while the flash
@@ -2888,7 +3140,14 @@ float ambientOcclusion(SceneHit hit, device const GameState &game) {
 void traceScene(thread SceneHit &hit, thread float3 &furPosition,
     float3 origin, float3 direction, ChromePose chrome,
     device const GameState &game) {
-    traceEnvironment(hit, origin, direction, chrome, game);
+    // Shots and sight lines always meet the base through traceEnvironment;
+    // renderBase only decides whether the view draws it.
+    if (renderBase) {
+        traceEnvironment(hit, origin, direction, chrome, game);
+    } else {
+        traceBuildings(hit, origin, direction, game);
+        traceOutside(hit, origin, direction, false);
+    }
     for (uint i = 0u; i < enemyCount; ++i) {
         if (!spiderActive(game, i)) continue;
         SpiderHit spider = traceSpider(origin, direction, game.enemy[i].xyz,
@@ -3416,13 +3675,16 @@ SurfaceMaterial gunMaterial(GunHit hit) {
 
 // What the pistol mirrors from `origin`: indoors the tiled floor below, dark
 // walls around the horizon and a dim ceiling; on the moon earthlit regolith
-// under a black sky. Lamps and the Earth add their own highlights. `detail`
-// is 0 on curved edges, where the grout would alias.
+// under a black sky, brighter by day and under the blue sky while there is
+// one. Lamps, the Earth and the sun add their own highlights. `detail` is 0
+// on curved edges, where the grout would alias.
 // shortcut: the floor is the plane y = 0, so stairs mirror as flat tiles.
 float3 pistolSurroundings(float3 origin, float3 direction, bool outside,
-    float detail) {
-    if (outside) return earthColor * 0.08f
-        * smoothstep(0.04f, -0.04f, direction.y);
+    float detail, Daylight sun) {
+    if (outside) return regolithBounce(sun) * 0.08f
+            * smoothstep(0.04f, -0.04f, direction.y)
+        + atmosphereSky(direction, sun)
+            * smoothstep(-0.04f, 0.04f, direction.y);
     float3 wall = float3(0.035f, 0.04f, 0.048f);
     if (direction.y >= 0.0f) return mix(wall, float3(0.014f, 0.016f, 0.02f),
         smoothstep(0.0f, 0.5f, direction.y));
@@ -3436,8 +3698,8 @@ float3 pistolSurroundings(float3 origin, float3 direction, bool outside,
 }
 
 // The viewmodel is lit by the same lights as the scene it moves through: the
-// room lights in the base, the lamps in the haunted house, and the Earth and
-// the lanterns on the moon.
+// room lights in the base, the lamps in the haunted house, and the Earth,
+// the sun and the lanterns on the moon.
 float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
     float3 right, float3 up, float3 front, float3 direction,
     ChromePose chrome, device const GameState &game) {
@@ -3452,6 +3714,8 @@ float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
             : (gun.part >= 6u ? shotgunMaterial(gun) : gunMaterial(gun)));
     bool inHouse = houseInteriorPoint(eye);
     bool outside = outdoors(eye.xz, 0.0f) && !inHouse;
+    Daylight sun = daylight(game.effects.x);
+    float3 bounce = regolithBounce(sun);
     float3 color = material.albedo * (1.0f - material.metallic)
             * float3(0.030f, 0.038f, 0.046f)
         + material.albedo * material.metallic
@@ -3468,16 +3732,20 @@ float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
                 * float3(0.030f, 0.038f, 0.046f)
             + sheen * pistolSurroundings(hit.position, mirrored, outside,
                 smoothstep(0.97f, 0.995f, max(abs(gun.normal.x),
-                    max(abs(gun.normal.y), abs(gun.normal.z)))));
+                    max(abs(gun.normal.y), abs(gun.normal.z)))), sun);
     if (outside) {
-        // Regolith bounces earthshine up onto the underside.
-        color += material.albedo * earthColor * 0.02f
+        // Regolith bounces earthshine and sunlight up onto the underside.
+        color += material.albedo * bounce * 0.02f
             * saturate(-hit.normal.y);
+        color += material.albedo * (1.0f - material.metallic)
+            * atmosphereSkyLight(sun) * 0.5f
+            * saturate(0.5f + 0.5f * hit.normal.y);
         // The Earth is a broad disc, not a point: its glint on the polished
-        // slide spreads instead of burning a white spot.
+        // slide spreads instead of burning a white spot. The sun's glint
+        // spreads the same way.
         SurfaceMaterial broad = material;
         broad.roughness = max(material.roughness, 0.45f);
-        color += shadeEarthlight(hit, broad, -direction, chrome, game);
+        color += shadeDistantLights(hit, broad, -direction, chrome, game);
         color += houseOutdoorLighting(hit, material, -direction, chrome, game);
     } else for (uint i = 0u; i < (inHouse ? houseIndoorLightCount : 8u);
         ++i) {
@@ -3485,7 +3753,9 @@ float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
         PointLight light = inHouse
             ? houseHauntedIndoorLight(i, game, lightRoom)
             : roomLight(i, game.effects.x);
-        if (inHouse && lightRoom != houseRoom(eye)) light.power *= 0.12f;
+        if (inHouse)
+            light.power *= houseLightShare(lightRoom, houseRoom(eye),
+                houseLocal(eye));
         color += shadePointLight(hit, material, -direction, light, chrome,
             game);
         if (glossy) {
@@ -3582,18 +3852,23 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     bool houseIndoors = house && houseInteriorPoint(hit.position);
     bool exterior = hit.material == 40u || hit.material == 41u || drone
         || (house && !houseIndoors);
-    // The moon has no sky light, only earthshine bounced off the plain,
-    // which reaches slopes, boulder sides and walls more than ground or
-    // roofs facing the sky. The house's rooms keep a warm glow.
+    // The airless moon has no sky light, only earthshine and sunlight
+    // bounced off the plain, which reach slopes, boulder sides and walls more
+    // than ground or roofs facing the sky. While there is an atmosphere, its
+    // blue sky lights what faces it too, most of all ground and roofs. The
+    // house's rooms keep a warm glow.
+    Daylight sun = daylight(game.effects.x);
     float3 ambient = exterior
-        ? earthColor * (0.004f + 0.045f * (1.0f - hit.normal.y))
+        ? regolithBounce(sun) * (0.004f + 0.045f * (1.0f - hit.normal.y))
+            + atmosphereSkyLight(sun) * 0.5f
+                * saturate(0.5f + 0.5f * hit.normal.y)
         : (houseIndoors ? float3(0.014f, 0.01f, 0.007f)
             : float3(0.030f, 0.038f, 0.046f));
     float3 color = material.emission
         + material.albedo * (1.0f - material.metallic) * ambient;
     if (drone) color += droneEmission(hit, game);
     if (exterior) {
-        color += shadeEarthlight(hit, material, -direction, chrome, game);
+        color += shadeDistantLights(hit, material, -direction, chrome, game);
         color += houseOutdoorLighting(hit, material, -direction, chrome,
             game);
     } else if (houseIndoors) {
@@ -3606,7 +3881,15 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         float pixelAngle = 1.0f / (lensFocal * u.resolutionTime.y);
         float earth;
         float3 disc = earthDisc(direction, pixelAngle, earth);
-        color = spaceSky(direction, pixelAngle) * (1.0f - earth) + disc;
+        float sunCover;
+        disc += sunDisc(direction, pixelAngle, sun, sunCover);
+        // Daylight outshines the stars; a sky outshines them until night.
+        float daylit = atmosphereOn()
+            ? smoothstep(0.0f, 0.1f, atmosphereDay(sun))
+            : sun.strength * smoothstep(-0.02f, 0.15f, sun.direction.y);
+        float stars = (1.0f - earth) * (1.0f - sunCover) * (1.0f - daylit);
+        color = spaceSky(direction, pixelAngle, stars) + disc
+            + atmosphereSky(direction, sun);
     }
     color += shadeShotLights(hit, material, -direction, chrome, game);
     color += shadeOrdnanceLights(hit, material, -direction, chrome, game);
@@ -3669,10 +3952,15 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         || hit.material == sentrySensorMaterial
         || (drone && droneFlying(game, hit.variant))))
         color += float3(0.6f) * max(dot(hit.normal, -direction), 0.25f);
-    // There is no haze in vacuum.
+    // There is no haze in vacuum. With an atmosphere, the distance outside
+    // fades toward the sky behind it, less as the daylight goes.
     if (!exterior && hit.material != 0u)
         color = mix(color, float3(0.0f), 1.0f - exp(-hit.distance * 0.008f));
-    // The ground floor's windows are real glass: what lies beyond was traced
+    else if (exterior && atmosphereOn())
+        color = mix(color, atmosphereSky(normalize(float3(direction.x,
+                max(direction.y, 0.02f), direction.z)), sun),
+            (1.0f - exp(-hit.distance / 2200.0f)) * atmosphereDay(sun));
+    // The house's room windows are real glass: what lies beyond was traced
     // through them, and the pane tints, smears and reflects it.
     float3 paneNormal;
     HouseWindow pane;
@@ -3682,6 +3970,13 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         color = houseThroughGlass(color, pane, paneNormal, direction,
             origin + direction * paneDistance, houseInteriorPoint(origin));
     color = houseGhostOverlay(color, origin, direction, hit.distance, game);
+    // Chimney smoke catches the Earth's and the sun's light, the sky's, and
+    // what the plain bounces up.
+    float3 smokeLight = (earthColor * 1.4f + sunColor * sunTransmittance(sun)
+            * sunIrradiance * sun.strength) / rangePi
+        + atmosphereSkyLight(sun) * 0.5f + regolithBounce(sun) * 0.03f;
+    color = buildingsSmoke(color, origin, direction, hit.distance, game,
+        smokeLight);
     color = shadeGlassBox(color, origin, direction, hit.distance,
         crateA, crateB, chrome, game, pixelSpread);
     color = shadeShot(color, origin, direction, hit.distance, game);

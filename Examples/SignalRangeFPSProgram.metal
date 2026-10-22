@@ -67,6 +67,7 @@ constant float3 sunDirection = float3(-0.8494f, 0.2199f, 0.4797f);
 constant float sunPower = 5.03e9f;        // irradiance 4 from 10 km away
 constant uint droneCount = 3u;
 constant uint laserCount = 6u;
+constant bool enableDrones = true;
 
 // A Javelin-style launcher joins the pistol and the shotgun: 2 raises it,
 // 1 returns to the gun for where you stand, X swaps between them.

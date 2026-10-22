@@ -60,7 +60,9 @@ constant float openShedCrateTop[openShedCrateCount] = {1.1f, 0.9f, 0.8f, 1.3f};
 // Where the walker cannot go, in the yard's frame as lower and upper
 // corners: the barn's west, east and north walls, its south wall either
 // side of the doorway with a door leaf before each part, the shed's back
-// wall and ends, its posts, and its crates as openShedCrates sets them.
+// wall and ends, its posts, and its crates as openShedCrates sets them. The
+// barn's come first, so its copies on the street can use them alone.
+constant uint barnObstacleCount = 5u;
 constant uint shedObstacleCount = 19u;
 constant float4 shedObstacles[shedObstacleCount] = {
     float4(barnX - barnHalfSpan - 0.1f, barnZ - barnHalfLength - 0.1f,

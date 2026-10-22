@@ -1,6 +1,9 @@
 // Signal Range quadcopter drones: flight, the laser rifle they turn on the
 // player once shot at, their navigation lights, and the hover sound.
-// Included by SignalRangeFPSProgram.metal after shared game state.
+// Included by SignalRangeFPSProgram.metal and HauntedHouseProgram.metal
+// after shared game state. The including program sets droneCount and
+// enableDrones; with enableDrones false the drones never fly, sound or
+// show, and nothing can strike them.
 //
 // Flight follows a real multirotor. Rotors only push along the body's up
 // axis, so a drone moves sideways by tilting toward where it wants to go:
@@ -47,7 +50,7 @@ bool droneMaterial(uint material) {
 }
 
 bool droneFlying(device const GameState &game, uint index) {
-    return game.drones[index].pose.w > 0.0f;
+    return enableDrones && game.drones[index].pose.w > 0.0f;
 }
 
 // Each drone keeps station south of the exit until it is shot at.
@@ -194,6 +197,7 @@ DroneHit traceDrone(float3 origin, float3 direction, Drone drone,
 // Living drones and wrecks are part of the scene; the variant names the drone.
 void traceDrones(thread SceneHit &hit, float3 origin, float3 direction,
     device const GameState &game) {
+    if (!enableDrones) return;
     for (uint i = 0u; i < droneCount; ++i) {
         DroneHit drone = traceDrone(origin, direction, game.drones[i],
             hit.distance);
@@ -224,6 +228,7 @@ int traceDroneShot(float3 origin, float3 direction,
 float droneShadow(float3 origin, float3 direction, float lightDistance,
     device const GameState &game) {
     float lit = 1.0f;
+    if (!enableDrones) return lit;
     for (uint i = 0u; i < droneCount; ++i) {
         float3 centre = game.drones[i].pose.xyz;
         if (distance(origin, centre) < droneBoundingRadius) continue;
@@ -241,7 +246,7 @@ float droneShadow(float3 origin, float3 direction, float lightDistance,
 void damageDrone(device GameState &game, uint index, float3 shotDirection,
     float amount, device RangeAudio &audio) {
     device Drone &drone = game.drones[index];
-    if (drone.pose.w <= 0.0f) return;
+    if (!droneFlying(game, index)) return;
     drone.pose.w -= amount;
     drone.attitude.z = 0.2f;
     drone.velocity.xyz += shotDirection * 1.2f;
@@ -551,7 +556,8 @@ kernel void advanceDrones(constant ProgramUniforms &u [[buffer(0)]],
     device GameState &game = states[0];
     float dt = clamp(u.pointer.w > 0.0f ? u.pointer.w : u.resolutionTime.w,
         0.0f, 0.10f);
-    bool playing = game.progress.w == phasePlaying;
+    // Disabled drones stay parked and silent.
+    bool playing = enableDrones && game.progress.w == phasePlaying;
     if (playing) {
         for (uint i = 0u; i < droneCount; ++i) flyDrone(game, i, dt, audio[0]);
         advanceLasers(game, dt);
