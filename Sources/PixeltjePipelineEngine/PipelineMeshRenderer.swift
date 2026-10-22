@@ -4,6 +4,7 @@ import IOSurface
 import Metal
 import PixeltjePipelineDomain
 import simd
+import Synchronization
 
 /// Guards array and row-stride arithmetic without imposing a product resolution cap.
 struct PipelineMetalRenderSize {
@@ -281,7 +282,7 @@ actor PipelineMeshRenderer {
         throw PipelineEngineError.invalidInvocation(
           "Metal Render source must contain 1 to 1,048,576 UTF-8 bytes.")
       }
-      return supplied
+      return PipelineMetalLibraries.resolving(supplied)
     }
     guard let fileName, !fileName.isEmpty,
       !fileName.contains("/"), !fileName.contains("\\"),
@@ -289,6 +290,58 @@ actor PipelineMeshRenderer {
       let root = sourceMediaRoot else {
       throw PipelineEngineError.invalidInvocation(
         "Metal Render Source File must be a .metal filename beside the workflow.")
+    }
+    let key = root.standardizedFileURL.path + "\n" + fileName
+    if let cached = sourceCache.withLock({ $0[key] }),
+      cached.stamps.allSatisfy({ fileStamp($0.path) == $0.stamp }) {
+      return cached.source
+    }
+    var stamps: [(path: String, stamp: FileStamp)] = []
+    let source = try siblingMetalSource(named: fileName, in: root, stamps: &stamps)
+    let expanded = try expandSiblingMetalIncludes(in: source, root: root,
+      stamps: &stamps)
+    let resolved = PipelineMetalLibraries.resolving(expanded)
+    sourceCache.withLock { cache in
+      if cache.count >= 16 { cache.removeAll() }
+      cache[key] = CachedSource(stamps: stamps, source: resolved)
+    }
+    return resolved
+  }
+
+  /// What a source file looked like when it was read. A live loop asks for
+  /// its shader every frame; it reads and expands the files again only when
+  /// one of them changed.
+  private struct FileStamp: Equatable, Sendable {
+    let size: Int64
+    let modifiedSeconds: Int
+    let modifiedNanoseconds: Int
+    let fileNumber: UInt64
+  }
+
+  private struct CachedSource: Sendable {
+    let stamps: [(path: String, stamp: FileStamp)]
+    let source: String
+  }
+
+  private static let sourceCache = Mutex<[String: CachedSource]>([:])
+
+  /// The file at path itself, not a symbolic link's target, so a relinked
+  /// name reads as changed too.
+  private static func fileStamp(_ path: String) -> FileStamp? {
+    var info = stat()
+    guard lstat(path, &info) == 0 else { return nil }
+    return FileStamp(size: Int64(info.st_size),
+      modifiedSeconds: info.st_mtimespec.tv_sec,
+      modifiedNanoseconds: info.st_mtimespec.tv_nsec,
+      fileNumber: UInt64(info.st_ino))
+  }
+
+  private static func siblingMetalSource(named fileName: String, in root: URL,
+    stamps: inout [(path: String, stamp: FileStamp)]) throws -> String {
+    guard !fileName.isEmpty, !fileName.contains("/"), !fileName.contains("\\"),
+      fileName != ".", fileName != "..", fileName.hasSuffix(".metal") else {
+      throw PipelineEngineError.invalidInvocation(
+        "Metal Render includes must name a .metal file beside the workflow.")
     }
     let resolvedRoot = root.resolvingSymlinksInPath().standardizedFileURL
     let url = root.appendingPathComponent(fileName).resolvingSymlinksInPath()
@@ -303,6 +356,14 @@ actor PipelineMeshRenderer {
       throw PipelineEngineError.invalidInvocation(
         "Metal Render source file must contain 1 to 1,048,576 UTF-8 bytes.")
     }
+    // Stamped before reading, so a change during the read shows next time.
+    for path in [root.appendingPathComponent(fileName).path, url.path] {
+      guard let stamp = fileStamp(path) else {
+        throw PipelineEngineError.invalidInvocation(
+          "Metal Render source file \(fileName) is missing or outside the workflow folder.")
+      }
+      stamps.append((path, stamp))
+    }
     let data = try Data(contentsOf: url)
     guard !data.isEmpty, data.count <= 1_048_576,
       let source = String(data: data, encoding: .utf8) else {
@@ -310,6 +371,37 @@ actor PipelineMeshRenderer {
         "Metal Render source file must contain 1 to 1,048,576 UTF-8 bytes.")
     }
     return source
+  }
+
+  private static func expandSiblingMetalIncludes(in source: String, root: URL,
+    stamps: inout [(path: String, stamp: FileStamp)]) throws -> String {
+    var lines: [String] = []
+    for line in source.split(separator: "\n", omittingEmptySubsequences: false) {
+      let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard trimmed.hasPrefix("#include \"") else {
+        lines.append(String(line))
+        continue
+      }
+      guard trimmed.hasSuffix("\"") else {
+        throw PipelineEngineError.invalidInvocation(
+          "Metal Render has a malformed local include.")
+      }
+      let fileName = String(trimmed.dropFirst(10).dropLast())
+      let included = try siblingMetalSource(named: fileName, in: root, stamps: &stamps)
+      guard !included.split(separator: "\n").contains(where: {
+        $0.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("#include \"")
+      }) else {
+        throw PipelineEngineError.invalidInvocation(
+          "Metal Render local includes cannot include another file.")
+      }
+      lines.append(included)
+    }
+    let expanded = lines.joined(separator: "\n")
+    guard expanded.utf8.count <= 1_048_576 else {
+      throw PipelineEngineError.invalidInvocation(
+        "Metal Render source and includes exceed 1,048,576 UTF-8 bytes.")
+    }
+    return expanded
   }
 
   private static func previewSize(from invocation: PipelineInvocation) throws

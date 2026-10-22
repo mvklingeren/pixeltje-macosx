@@ -4,6 +4,17 @@ import PixeltjePipelineDomain
 enum BuiltInPipelineNodeExecutors {
   static let all: [PipelineNodeExecutor] = [
     PipelineNodeExecutor(kind: .controlStart) { _, _, _ in PipelineNodeResult() },
+    PipelineNodeExecutor(kind: .sceneSwitch) { _, inputs, _ in
+      guard let active = inputs["__activeScene"]?.value(as: Int64.self),
+        let image = inputs["scene\(active)"] else {
+        throw PipelineEngineError.planningFailed(
+          "Scene Switch needs the active scene's image.")
+      }
+      return PipelineNodeResult(outputs: [
+        "image": image,
+        "activeScene": PipelineNodeValue(active, type: .integer),
+      ])
+    },
     PipelineNodeExecutor(kind: .controlLoop) { _, _, context in
       let callIndex = try context.invocation.integer(
         for: PipelineInvocation.loopCallIndexKey, default: 0)
@@ -166,6 +177,12 @@ enum BuiltInPipelineNodeExecutors {
         throw PipelineEngineError.invalidInvocation(
           "Trackpad action count must be between 0 and 16,777,215.")
       }
+      let secondaryActionCount = try context.invocation.integer(
+        for: PipelineInvocation.trackpadSecondaryActionCountKey, default: 0)
+      guard (0...16_777_215).contains(secondaryActionCount) else {
+        throw PipelineEngineError.invalidInvocation(
+          "Trackpad secondary action count must be between 0 and 16,777,215.")
+      }
       return PipelineNodeResult(outputs: [
         "x": PipelineNodeValue(try coordinate("x", key: PipelineInvocation.trackpadXKey),
           type: .number),
@@ -174,6 +191,28 @@ enum BuiltInPipelineNodeExecutors {
         "engaged": PipelineNodeValue(engaged, type: .boolean),
         "engagedAtCall": PipelineNodeValue(Double(engagedAtCall), type: .number),
         "actionCount": PipelineNodeValue(Double(actionCount), type: .number),
+        "secondaryActionCount": PipelineNodeValue(Double(secondaryActionCount), type: .number),
+      ])
+    },
+    PipelineNodeExecutor(kind: .directionPad) { _, _, context in
+      func axis(_ key: String) throws -> Double {
+        let value = try context.invocation.number(for: key, default: 0)
+        guard value.isFinite, (-1...1).contains(value) else {
+          throw PipelineEngineError.invalidInvocation(
+            "WASD Pad axes must be finite numbers from -1 to 1.")
+        }
+        return value
+      }
+      let keys = try context.invocation.number(
+        for: PipelineInvocation.directionPadKeysKey, default: 0)
+      guard PipelineDirectionPadKeys.isValidMask(keys) else {
+        throw PipelineEngineError.invalidInvocation(
+          "WASD Pad keys must be an integer bitmask from 0 to \(PipelineDirectionPadKeys.allMask).")
+      }
+      return PipelineNodeResult(outputs: [
+        "x": PipelineNodeValue(try axis(PipelineInvocation.directionPadXKey), type: .number),
+        "y": PipelineNodeValue(try axis(PipelineInvocation.directionPadYKey), type: .number),
+        "keys": PipelineNodeValue(keys, type: .number),
       ])
     },
     PipelineNodeExecutor(kind: .textSplit) { node, inputs, _ in

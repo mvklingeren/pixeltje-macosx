@@ -7,6 +7,7 @@ import PixeltjePipelineFLUX2Runtime
 import PixeltjePipelineResourceLinking
 import PixeltjePipelineSegmentationRuntime
 import PixeltjePipelineSDXSRuntime
+import PixeltjePipelineStableAudioRuntime
 import PixeltjePipelineTextRuntime
 import PixeltjePipelineTrainingRuntime
 import Testing
@@ -20,6 +21,7 @@ import Testing
   let fluxRunner = FLUX2KleinPipelineRunner()
   let flux9BRunner = FLUX2Klein9BSplitRunner()
   let textRunner = CoreAITextPipelineRunner()
+  let audioRunner = StableAudio3Runner()
   let sam31Runner = SAM31PipelineRunner()
   let trainingWorker = ModelTrainingWorker()
   let engine = PixeltjePipelineEngine(
@@ -29,6 +31,7 @@ import Testing
       CoreAITextPipelineFamily.makeCompositeNodeDescriptor(),
       SAM31PipelineFamily.descriptor(),
       SDXSPipelineFamily.descriptor(),
+      StableAudio3Family.descriptor(),
     ],
     additionalNodeExecutors: BaseTestSetPipelineFamily.makeNodeExecutors()
       + [PipelineNodeExecutor(kind: .zImageGenerate,
@@ -47,6 +50,7 @@ import Testing
         },
         FLUX2KleinPipelineFamily.makeNodeExecutor(runner: fluxRunner),
         FLUX2Klein9BSplitFamily.executor(runner: flux9BRunner),
+        StableAudio3Family.executor(runner: audioRunner),
         CoreAITextPipelineFamily.makeNodeExecutor(runner: textRunner),
         SAM31PipelineFamily.executor(runner: sam31Runner),
         ModelTrainingRuntime.executor(worker: trainingWorker),

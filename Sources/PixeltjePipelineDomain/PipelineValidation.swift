@@ -1,5 +1,11 @@
 import Foundation
 
+/// The slot counts an Asset Cache node accepts. The validator, the editor
+/// and the engine's cache and persistent store all check against it.
+public enum PipelineAssetCacheSlots {
+  public static let range: ClosedRange<Int64> = 1...64
+}
+
 public enum PipelineDiagnosticSeverity: String, Codable, Sendable {
   case warning
   case error
@@ -222,8 +228,22 @@ public enum PipelineGraphValidator {
         } else {
           1
         }
-        if !(1...16).contains(slotCount) {
-          add(.error, .invalidParameter, "Asset Cache needs 1–16 slots.",
+        if !PipelineAssetCacheSlots.range.contains(slotCount) {
+          add(.error, .invalidParameter,
+            "Asset Cache needs 1–\(PipelineAssetCacheSlots.range.upperBound) slots.",
+            nodeID: node.id)
+        }
+      }
+      if node.kind.rawValue == "control.sceneSwitch" {
+        let count: Int64 = if case .integer(let value)? = node.parameters["sceneCount"] {
+          value
+        } else { 2 }
+        let initial: Int64 = if case .integer(let value)? = node.parameters["initialScene"] {
+          value
+        } else { 0 }
+        if !(2...8).contains(count) || !(0..<count).contains(initial) {
+          add(.error, .invalidParameter,
+            "Scene Switch needs 2–8 scenes and an initial scene in that range.",
             nodeID: node.id)
         }
       }

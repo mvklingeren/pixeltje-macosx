@@ -1,0 +1,48 @@
+{
+  "width": 960,
+  "height": 540,
+  "views": [
+    {
+      "name": "launcher-locked-on-spider",
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 12, -0.4434] },
+        { "buffer": "game", "offset": 16, "floats": [-0.0535] },
+        { "buffer": "game", "offset": 8768, "floats": [2, 1, 2, 0] },
+        { "buffer": "game", "offset": 8800, "floats": [1, 0, 4, 1, 1, 1, 0, 0] }
+      ]
+    },
+    {
+      "name": "east-sentry-charging",
+      "writes": [
+        { "buffer": "game", "floats": [38, 2.45, -5, 1.249] },
+        { "buffer": "game", "offset": 16, "floats": [-0.016] },
+        { "buffer": "game", "offset": 9136, "floats": [-1.893, 0.0, 1, 0.5] }
+      ]
+    },
+    {
+      "name": "sentry-closeup",
+      "writes": [
+        { "buffer": "game", "floats": [46.5, 2.45, -6.5, 1.0] },
+        { "buffer": "game", "offset": 16, "floats": [-0.08] },
+        { "buffer": "game", "offset": 9136, "floats": [-1.0, -0.05, 1, -1] }
+      ]
+    },
+    {
+      "name": "flight-cam",
+      "writes": [
+        { "buffer": "game", "offset": 560, "floats": [5] },
+        { "buffer": "game", "offset": 8864, "floats": [-2, 3, 4, 4, -14.6, -5.14, -23.35, 1] }
+      ]
+    },
+    {
+      "name": "blast",
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 12, 0.18] },
+        { "buffer": "game", "offset": 16, "floats": [-0.05] },
+        { "buffer": "game", "offset": 560, "floats": [5] },
+        { "buffer": "game", "offset": 8832, "floats": [0, 0] },
+        { "buffer": "game", "offset": 8912, "floats": [3, 0.5, -4, 4.92] }
+      ]
+    }
+  ]
+}

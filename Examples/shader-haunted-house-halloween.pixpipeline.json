@@ -1,0 +1,2787 @@
+{
+  "connections": [
+    {
+      "id": "primitive-int.value->render.width",
+      "input": {
+        "nodeID": "render",
+        "port": "width"
+      },
+      "output": {
+        "nodeID": "primitive-int",
+        "port": "value"
+      }
+    },
+    {
+      "id": "primitive-int-2.value->render.height",
+      "input": {
+        "nodeID": "render",
+        "port": "height"
+      },
+      "output": {
+        "nodeID": "primitive-int-2",
+        "port": "value"
+      }
+    },
+    {
+      "id": "program-text.value->render.program",
+      "input": {
+        "nodeID": "render",
+        "port": "program"
+      },
+      "output": {
+        "nodeID": "program-text",
+        "port": "value"
+      }
+    },
+    {
+      "id": "shader-text.value->render.sourceFile",
+      "input": {
+        "nodeID": "render",
+        "port": "sourceFile"
+      },
+      "output": {
+        "nodeID": "shader-text",
+        "port": "value"
+      }
+    },
+    {
+      "id": "trackpad.x->render.pointerX",
+      "input": {
+        "nodeID": "render",
+        "port": "pointerX"
+      },
+      "output": {
+        "nodeID": "trackpad",
+        "port": "x"
+      }
+    },
+    {
+      "id": "trackpad.y->render.pointerY",
+      "input": {
+        "nodeID": "render",
+        "port": "pointerY"
+      },
+      "output": {
+        "nodeID": "trackpad",
+        "port": "y"
+      }
+    },
+    {
+      "id": "trackpad.actionCount->render.actionCount",
+      "input": {
+        "nodeID": "render",
+        "port": "actionCount"
+      },
+      "output": {
+        "nodeID": "trackpad",
+        "port": "actionCount"
+      }
+    },
+    {
+      "id": "trackpad.secondaryActionCount->render.secondaryActionCount",
+      "input": {
+        "nodeID": "render",
+        "port": "secondaryActionCount"
+      },
+      "output": {
+        "nodeID": "trackpad",
+        "port": "secondaryActionCount"
+      }
+    },
+    {
+      "id": "direction-pad.x->render.moveX",
+      "input": {
+        "nodeID": "render",
+        "port": "moveX"
+      },
+      "output": {
+        "nodeID": "direction-pad",
+        "port": "x"
+      }
+    },
+    {
+      "id": "direction-pad.y->render.moveY",
+      "input": {
+        "nodeID": "render",
+        "port": "moveY"
+      },
+      "output": {
+        "nodeID": "direction-pad",
+        "port": "y"
+      }
+    },
+    {
+      "id": "prompt-amber.prompt->generate-amber.prompt",
+      "input": {
+        "nodeID": "generate-amber",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-amber",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-amber.seed->generate-amber.seed",
+      "input": {
+        "nodeID": "generate-amber",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-amber",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-amber.image->texture-cache.asset0",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset0"
+      },
+      "output": {
+        "nodeID": "generate-amber",
+        "port": "image"
+      }
+    },
+    {
+      "id": "prompt-cobalt.prompt->generate-cobalt.prompt",
+      "input": {
+        "nodeID": "generate-cobalt",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-cobalt",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-cobalt.seed->generate-cobalt.seed",
+      "input": {
+        "nodeID": "generate-cobalt",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-cobalt",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-cobalt.image->texture-cache.asset1",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset1"
+      },
+      "output": {
+        "nodeID": "generate-cobalt",
+        "port": "image"
+      }
+    },
+    {
+      "id": "prompt-impact.prompt->generate-impact.prompt",
+      "input": {
+        "nodeID": "generate-impact",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-impact",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-impact.seed->generate-impact.seed",
+      "input": {
+        "nodeID": "generate-impact",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-impact",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-impact.image->texture-cache.asset2",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset2"
+      },
+      "output": {
+        "nodeID": "generate-impact",
+        "port": "image"
+      }
+    },
+    {
+      "id": "texture-cache.assets->render.assets",
+      "input": {
+        "nodeID": "render",
+        "port": "assets"
+      },
+      "output": {
+        "nodeID": "texture-cache",
+        "port": "assets"
+      }
+    },
+    {
+      "id": "render.image->scene-switch.scene0",
+      "input": {
+        "nodeID": "scene-switch",
+        "port": "scene0"
+      },
+      "output": {
+        "nodeID": "render",
+        "port": "image"
+      }
+    },
+    {
+      "id": "render.sceneRequest->scene-switch.request0",
+      "input": {
+        "nodeID": "scene-switch",
+        "port": "request0"
+      },
+      "output": {
+        "nodeID": "render",
+        "port": "sceneRequest"
+      }
+    },
+    {
+      "id": "triangle-render.image->scene-switch.scene1",
+      "input": {
+        "nodeID": "scene-switch",
+        "port": "scene1"
+      },
+      "output": {
+        "nodeID": "triangle-render",
+        "port": "image"
+      }
+    },
+    {
+      "id": "triangle-render.sceneRequest->scene-switch.request1",
+      "input": {
+        "nodeID": "scene-switch",
+        "port": "request1"
+      },
+      "output": {
+        "nodeID": "triangle-render",
+        "port": "sceneRequest"
+      }
+    },
+    {
+      "id": "scene-switch.image->output.image",
+      "input": {
+        "nodeID": "output",
+        "port": "image"
+      },
+      "output": {
+        "nodeID": "scene-switch",
+        "port": "image"
+      }
+    },
+    {
+      "id": "triangle-source.value->triangle-render.sourceFile",
+      "input": {
+        "nodeID": "triangle-render",
+        "port": "sourceFile"
+      },
+      "output": {
+        "nodeID": "triangle-source",
+        "port": "value"
+      }
+    },
+    {
+      "id": "triangle-program.value->triangle-render.program",
+      "input": {
+        "nodeID": "triangle-render",
+        "port": "program"
+      },
+      "output": {
+        "nodeID": "triangle-program",
+        "port": "value"
+      }
+    },
+    {
+      "id": "primitive-int.value->triangle-render.width",
+      "input": {
+        "nodeID": "triangle-render",
+        "port": "width"
+      },
+      "output": {
+        "nodeID": "primitive-int",
+        "port": "value"
+      }
+    },
+    {
+      "id": "primitive-int-2.value->triangle-render.height",
+      "input": {
+        "nodeID": "triangle-render",
+        "port": "height"
+      },
+      "output": {
+        "nodeID": "primitive-int-2",
+        "port": "value"
+      }
+    },
+    {
+      "id": "trackpad.actionCount->triangle-render.actionCount",
+      "input": {
+        "nodeID": "triangle-render",
+        "port": "actionCount"
+      },
+      "output": {
+        "nodeID": "trackpad",
+        "port": "actionCount"
+      }
+    },
+    {
+      "id": "prompt-gunshot.prompt->generate-gunshot.prompt",
+      "input": {
+        "nodeID": "generate-gunshot",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-gunshot",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-gunshot.seed->generate-gunshot.seed",
+      "input": {
+        "nodeID": "generate-gunshot",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-gunshot",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-gunshot.audio->texture-cache.asset3",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset3"
+      },
+      "output": {
+        "nodeID": "generate-gunshot",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-scare.prompt->generate-scare.prompt",
+      "input": {
+        "nodeID": "generate-scare",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-scare",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-scare.seed->generate-scare.seed",
+      "input": {
+        "nodeID": "generate-scare",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-scare",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-scare.audio->texture-cache.asset4",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset4"
+      },
+      "output": {
+        "nodeID": "generate-scare",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-launch.prompt->generate-launch.prompt",
+      "input": {
+        "nodeID": "generate-launch",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-launch",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-launch.seed->generate-launch.seed",
+      "input": {
+        "nodeID": "generate-launch",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-launch",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-launch.audio->texture-cache.asset5",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset5"
+      },
+      "output": {
+        "nodeID": "generate-launch",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-shotgun.prompt->generate-shotgun.prompt",
+      "input": {
+        "nodeID": "generate-shotgun",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-shotgun",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-shotgun.seed->generate-shotgun.seed",
+      "input": {
+        "nodeID": "generate-shotgun",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-shotgun",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-shotgun.audio->texture-cache.asset6",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset6"
+      },
+      "output": {
+        "nodeID": "generate-shotgun",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-laser.prompt->generate-laser.prompt",
+      "input": {
+        "nodeID": "generate-laser",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-laser",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-laser.seed->generate-laser.seed",
+      "input": {
+        "nodeID": "generate-laser",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-laser",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-laser.audio->texture-cache.asset7",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset7"
+      },
+      "output": {
+        "nodeID": "generate-laser",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-drone-down.prompt->generate-drone-down.prompt",
+      "input": {
+        "nodeID": "generate-drone-down",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-drone-down",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-drone-down.seed->generate-drone-down.seed",
+      "input": {
+        "nodeID": "generate-drone-down",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-drone-down",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-drone-down.audio->texture-cache.asset8",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset8"
+      },
+      "output": {
+        "nodeID": "generate-drone-down",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "direction-pad.keys->render.keys",
+      "input": {
+        "nodeID": "render",
+        "port": "keys"
+      },
+      "output": {
+        "nodeID": "direction-pad",
+        "port": "keys"
+      }
+    },
+    {
+      "id": "prompt-wind.prompt->generate-wind.prompt",
+      "input": {
+        "nodeID": "generate-wind",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-wind",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-wind.seed->generate-wind.seed",
+      "input": {
+        "nodeID": "generate-wind",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-wind",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-wind.audio->texture-cache.asset9",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset9"
+      },
+      "output": {
+        "nodeID": "generate-wind",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-ghost.prompt->generate-ghost.prompt",
+      "input": {
+        "nodeID": "generate-ghost",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-ghost",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-ghost.seed->generate-ghost.seed",
+      "input": {
+        "nodeID": "generate-ghost",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-ghost",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-ghost.audio->texture-cache.asset10",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset10"
+      },
+      "output": {
+        "nodeID": "generate-ghost",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-knock.prompt->generate-knock.prompt",
+      "input": {
+        "nodeID": "generate-knock",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-knock",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-knock.seed->generate-knock.seed",
+      "input": {
+        "nodeID": "generate-knock",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-knock",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-knock.audio->texture-cache.asset11",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset11"
+      },
+      "output": {
+        "nodeID": "generate-knock",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-punch.prompt->generate-punch.prompt",
+      "input": {
+        "nodeID": "generate-punch",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-punch",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-punch.seed->generate-punch.seed",
+      "input": {
+        "nodeID": "generate-punch",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-punch",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-punch.audio->texture-cache.asset12",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset12"
+      },
+      "output": {
+        "nodeID": "generate-punch",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-cottage-door.prompt->generate-cottage-door.prompt",
+      "input": {
+        "nodeID": "generate-cottage-door",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-cottage-door",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-cottage-door.seed->generate-cottage-door.seed",
+      "input": {
+        "nodeID": "generate-cottage-door",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-cottage-door",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-cottage-door.audio->texture-cache.asset13",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset13"
+      },
+      "output": {
+        "nodeID": "generate-cottage-door",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-house-doors.prompt->generate-house-doors.prompt",
+      "input": {
+        "nodeID": "generate-house-doors",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-house-doors",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-house-doors.seed->generate-house-doors.seed",
+      "input": {
+        "nodeID": "generate-house-doors",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-house-doors",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-house-doors.audio->texture-cache.asset14",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset14"
+      },
+      "output": {
+        "nodeID": "generate-house-doors",
+        "port": "audio"
+      }
+    }
+  ],
+  "controlConnections": [
+    {
+      "id": "output.completed->loop.completed",
+      "input": {
+        "nodeID": "loop",
+        "port": "completed"
+      },
+      "output": {
+        "nodeID": "output",
+        "port": "completed"
+      }
+    },
+    {
+      "id": "loop.repeat->start.again",
+      "input": {
+        "nodeID": "start",
+        "port": "again"
+      },
+      "output": {
+        "nodeID": "loop",
+        "port": "repeat"
+      }
+    }
+  ],
+  "exposedParameters": [],
+  "id": "org.pixeltje.examples.haunted-house-halloween",
+  "mode": "generic",
+  "name": "Haunted House · Signal Range at Night",
+  "nodes": [
+    {
+      "executionState": "enabled",
+      "id": "start",
+      "kind": "control.start",
+      "parameters": {},
+      "resources": {},
+      "title": "Start / Next Frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "shader-text",
+      "kind": "primitive.filePath",
+      "parameters": {
+        "mode": "relative",
+        "path": "HauntedHouseProgram.metal"
+      },
+      "resources": {},
+      "title": "Signal Range game shader"
+    },
+    {
+      "executionState": "enabled",
+      "id": "render",
+      "kind": "gpu.program",
+      "parameters": {
+        "framesPerSecond": {
+          "$type": "number",
+          "value": 30
+        },
+        "seed": {
+          "$type": "integer",
+          "value": 7421
+        }
+      },
+      "resources": {},
+      "title": "Signal Range · GPU simulation + 3D scene"
+    },
+    {
+      "executionState": "enabled",
+      "id": "output",
+      "kind": "output.image",
+      "parameters": {
+        "filenamePrefix": "signal-range-fps",
+        "format": "png"
+      },
+      "resources": {},
+      "title": "Game frame"
+    },
+    {
+      "executionState": "enabled",
+      "id": "loop",
+      "kind": "control.loop",
+      "parameters": {
+        "autoPause": false,
+        "delayMilliseconds": {
+          "$type": "integer",
+          "value": 0
+        },
+        "feedback": "none",
+        "limitHz": {
+          "$type": "integer",
+          "value": 30
+        },
+        "maxCalls": {
+          "$type": "integer",
+          "value": -1
+        },
+        "seedStrategy": "fixed"
+      },
+      "resources": {},
+      "title": "Live game loop · 30 Hz"
+    },
+    {
+      "executionState": "enabled",
+      "id": "note",
+      "kind": "edit.markdownNote",
+      "parameters": {
+        "text": "# Haunted House · Signal Range at Night\nThis is Signal Range after sunset. The sun has gone down, and a full Earth hangs low over the plain beside a haunted house's spire, lighting the moon with cool earthshine. With enableDayNightTransition set in HauntedHouseProgram.metal, as it is now, each match starts at noon instead: the sun stands high under a soft blue sky, lights the plain and the houses and outshines the stars, then sinks toward the horizon left of the house. It reddens as it goes, warms the horizon to orange and sets a little after nine minutes; the twilight fades, and by ten minutes the earthlit night has fallen. Set it false to start in the night, or set enableAtmosphere false for the black sky of the airless moon by day. A flagstone path leads from the base exit to the house: a two-storey Victorian with a bell-cast mansard roof, dormers, a steep front gable, a leaning belfry spire, chimneys, a wraparound porch with sagging arches and turned balusters, and an iron fence with lanterns on the gate posts. The ground floor is open: walk up the porch steps to the double doors, which stay shut until you knock, and through them into a hall with a staircase you can climb, a parlour with a crackling fire and a coffin, and a dining room. Its windows glow. No two are alike, a few are boarded up, and someone watches the path from the bay's upper window. Crosses lean over the graves in the lot, between weathered headstones and a stone tomb with an iron gate. Beyond the lot's side fences, a large graveyard fills a fenced plot of its own on either side: rows of crosses and headstones flank a flagstone aisle that runs from a lantern-lit gate, its iron leaves standing open, to a mausoleum at the back: a Greek revival tomb of pale limestone with solid round columns and an inscribed entablature and pediment, all three rendered in weathered lime plaster that has fallen away to brick in places, under a cross, its doorway barred in iron. Halfway along the path from the base, a smaller haunted house stands to the west at the end of a short drive, a few degrees off square with the road: two storeys under a steep slate roof whose gables jut over the walls, a catslide lean-to, two dormers, a chimney leaning off its gable with wood smoke drifting from its pot, and a lantern over its plank door, which a knock creaks open on a dark lobby. Its copies along the street, the barns and the open shed each stand a little turned and set back by their own distance, so the street does not line up like a grid. The houses' and sheds' woodwork is weathered oak. Behind the house, a gate in the lot's back fence opens onto a yard with two sheds under rusted corrugated iron: a closed barn, whose sliding door stands half open on a bare hall where earthlight falls through holes in the roof, and a half-open shed on posts with crates stacked against its back wall.\n\n**Wake the house:** The house sleeps through the bright afternoon. From five minutes into a match, when the sun has sunk about halfway and the light is going, shoot or punch any of its windows, the bay window with the ghost behind it or another, or knock on its front doors; before then, and always at the cottage's windows, it stays asleep. With enableDayNightTransition off it is night from the start, and the house wakes at once. The lamps, candles, lanterns and fire sputter and go out with the scare sound. In the dark a wind fades in and tears the curtains loose: they billow across every window and fall back in gusts, rippling down their edges. Then, with no fade, a poison green glow snaps on through the rooms, the windows, the fire, the cottage's windows and the doorways of the tomb and the mausoleums, lighting the waving curtains from behind, and the ghost leaves its window. A second later it bursts out of the front doors, which fly open for it if nobody has knocked them open, a semi-transparent sheet with hollow eyes, sweeps down the porch steps and flies at you, moaning, gathering speed. When it reaches you it vanishes with a jolt and the scare sound again, or after eight seconds of flight if it cannot, and the house settles: the wind fades out, the curtains fall still and the lamps come back; then it can be woken again. The wind is one 11-second Stable Audio 3 clip that loops seamlessly: two voices play it as the night wind outdoors, and a third, slower voice plays it as the haunting's gale, loudest near the house and from its side. The ghost's moan is a second 11-second loop, played by one more voice from the ghost itself while it is out: it fades with distance, pans between the ears, rises in pitch as the ghost rushes at you and is muffled by the walls between you. An 11-second clip needs a Stable Audio 3 Small SFX export made with --max-duration 11, the converter's default; every sound in this graph links that export.\n\nThe buildings are generated when the program initializes, as about 1,040 convex parts made with HauntedBuildingKit.metal: boxes cut by sloping planes into gables, hips, spires, roof sheets, headstones and a tapered coffin, and round logs, rods and columns. A building can stand turned about a vertical axis; a ray is turned into its frame to meet its parts, so the cottage and the street's copies stand off square at no cost in parts. The house and its graveyards come from HauntedHouse.metal, where a single houseScale constant sets their size, the mausoleums from HauntedMausoleum.metal, the barn and the shed from HauntedShed.metal and the cottage from HauntedCottage.metal; HauntedBuildings.metal traces, shadows and walks them all, and skips every building a ray does not come near. The outer walls are clad in wide clapboards and board and batten traced in relief, with real depth under each lap; boards are split or rotted away, nails and empty nail holes show sparingly near their ends, and a timber generator hangs a few loose clapboards from their last nail in front of the gaps they left. The same generator lays the boards of the grave crosses and the thick round log over the fireplace. Slate, brick and the windows are shaded onto the parts, and the rooms are papered in damask, ochre in the hall, oxblood in the parlour and green in the dining room, under a gilt frieze, with lifting seams, damp stains, torn patches and crooked portraits. The floors, steps, walls and graves you walk against come from the same layout constants; the plots' graves are set out on a grid, so walking finds each one by arithmetic.\n\n## Signal Range\nTwo spiders patrol the starting arena, unaware of you, and a third ambushes you in the northern room. Clear all three to unlock the northern route, then enter the boss arena and defeat the giant black spider. A spider notices you when you walk into its view or come close, and a gunshot within earshot alerts it through walls; an alerted spider rouses its neighbours and hunts you. Spiders move along a waypoint network that is generated afresh for every match: an unaware spider walks a random patrol of its room along it, pausing now and then to look around, and an alerted spider that loses sight of you runs the network's shortest route to you, through doorways, up the stairs and out onto the moon. Range spiders run in quick surges that briefly outpace you. Before it bites, a spider coils back and rears with its fangs spread, shuddering for a moment, then leaps at you, drives down onto its fangs and slams you backwards with a jolt of the view. Back away while it rears, or shoot it to cancel the bite and shove it back. Half a second after each bite it can strike again. A body hit deals one point and a head hit two, so a range spider, with five points, falls to five body hits or three headshots; the boss has fourteen points. Once hit, a range spider you can see carries a small power bar above it that runs down from wide and green to small and red, and empties to nothing as it falls. The crosshair flashes a white marker for a body hit, orange for a headshot and red for a kill. Defeated spiders collapse and remain on the floor. Top left: health bar and value. Four squares at the top right: defeated spiders. Bottom right: the held weapon's name and ammunition: rounds left in the pistol's twelve-round magazine, which reloads by itself in 1.6 seconds when empty or early with R, the shotgun's shells, or the launcher's rockets. The hand shows only its name. Below the spider squares, three squares count destroyed sentries. NORTH GATE OPEN appears after the third range kill, and the boss's name and red bar appear during the fight. Red screen edges and a red arc around the crosshair show damage and the direction it came from; the edges pulse at low health. A green VICTORY banner ends the match; two seconds later Scene Switch starts the spinning triangle. A red YOU DIED banner means defeat.\n\n**Map and boss reveal:** The starting arena and its northern, eastern and western rooms keep their existing materials, objects, stairways and jump pads. Crates, the chrome cube and the glass box block both you and the spiders. Entering the northern room plays its scare sound once per visit; on the first visit a spider drops from the dark ceiling ahead of you. Once the three range spiders are down, a steel gate opens at the far north end of the terrazzo room. A short corridor leads into a wide, dark steel boss chamber. Crossing the arena threshold drops a sliding gate behind you. Across the room, a second blast door rises; a super-sized black spider walks out of its staging bay, then that door closes. A brief closeup follows the emerging spider. Movement and shooting resume after the doors close. The player cannot retreat through the sealed entrance. The boss has a red health bar. The existing generated crate and impact textures, three cached sounds, chrome cube, glass box, room scare and jump pads remain part of the range. Link the compatible Klein and Stable Audio 3 Core AI packages if the graph asks for models.\n\n**Boss fight:** The giant has a fixed-heading rush. It sights your position once, pauses briefly, then sprints along that line to strike. It does not steer during the run, so strafing can dodge it. Between rushes it throws a visible web cloth toward your last position. The cloth travels through the air, lands on the floor and lingers; walking into it slows movement temporarily. It expires after a few seconds. Below half health the boss is enraged: its eyes glow, its pause before a rush shortens, it charges faster, and each throw lands two cloths, one on you and one where you are heading. Defeat the boss to finish the match.\n\n**Controls:** Run the workflow with Save generated images to disk turned off, then open the Scene Switch full-screen preview. Focus the preview and hold W/S to walk forward/back, A/D to strafe. Tap Q or E to dodge sideways in a quick burst (about 1.7 m, every 0.85 s, on the ground). Press 1 for the hand, 2 for the pistol, 3 for the shotgun and 4 for the launcher, indoors and out; X swaps back to the weapon held before, R reloads early and V toggles the missile flight cam. The WASD Pad's keys output carries these held keys to the GPU Program's keys input as a bitmask (Q 1, E 2, R 4, C 8, V 16, X 32, Z 64, digits 1–9 from 128 upward). Move the pointer into the full-screen preview to capture and hide the cursor. Move the mouse or swipe the trackpad to aim without clicking; left/right keeps turning even at the screen edge, and up/down changes pitch. Escape closes the preview and restores the cursor. Only WASD and the Q/E dodge move the player. Movement accelerates and brakes quickly, with less control in the air. Left click fires and plays the cached gunshot when a shot passes the fire cooldown; with the hand out it punches, or knocks on a door within reach. Press Space, J, or right click to jump. Step onto either northern jump pad for an automatic launch and its cached sound; landing on one launches again. The Trackpad card has an Action 2 button for jumping and its Spacebar setting selects Action 2. Movement releases when the preview loses focus. After victory, wait for the triangle scene; click there to return to a fresh match. Click after defeat to restart.\n\n**Rendering:** SignalRangeFPSProgram.metal ray traces the five main rooms, connecting corridors, two sliding boss doors, staging bay, jump pads, crates, chrome cube, glass box, three range spiders, giant boss and airborne or landed web cloths. SignalRangeSpider.metal contains shared articulated geometry, materials and spider behaviour. NPCPathNetwork.metal is a reusable include for any GPU Program: it generates a waypoint graph from a list of room rectangles and doorway joins, routes it toward one goal and steers patrolling or hunting NPCs along it. The boss uses the black spider silhouette at much larger scale, with red eyes and a separate fixed-heading attack. SignalRangeCeilingLamps.metal defines two reusable ceiling armatures, a pendant with an opaque dome shade and a flush bulkhead with a frosted glass dome; two pendants and one bulkhead light the starting arena. SignalRangeTLBox.metal defines the northern ceiling fixture. A held pistol is ray traced in view space, lit by the room lights and its own muzzle flash. It sways behind turns, bobs with each step, kicks on every shot and dips out of view to reload. Recoil climbs with rapid fire and recovers by itself. Head bob, a dip on landing and camera shake from hits and the boss's rush move only the view. The same spider geometry serves drawing and hit detection. Shots show depth-aware tracers, impact flashes and generated strike textures. Spider hits spray yellow-green particles. Floor and wall materials are procedural; point lights and GGX reflections shade the scene. Each shot briefly lights the room from the muzzle and from its spark at the impact. Every spider, living or fallen, casts a soft shadow from its body. Floors darken where they meet walls, in corners and around crates, the cube and spiders. The present phase renders the scene to an HDR texture with view distance in alpha, smooths its edges, pulls the autofocus toward the crosshair, applies bokeh depth of field, blurs its brightest light into a bloom texture, then composites with a lens vignette, film grain, a slight lens fringe and stronger red-blue fringing when you are hurt. A final pass draws the HUD text with the macOS system font. Start at 1440 × 900 and 30 Hz; adjust Width, Height and Loop rate if needed. The game runs in the Pipeline Editor.\n\n**Post effects:** The game shader opts into the shared `pixeltje:postfx-v1` library. Bokeh depth of field works like a real lens. Autofocus pulls onto whatever sits under the crosshair over about a third of a second, and everything else blurs by its distance from that focus plane: focus on something close and the room behind it melts away, focus far and the distance stays sharp while only nearby things soften. The held weapon stays sharp. Bloom spreads the brightest light, and a slight lens fringe splits colour toward the frame edges. Press 7, 8 or 9 to switch bokeh, bloom or the lens fringe off and on again; the choice survives a restart, and damage fringing stays either way.\n\n**Exit to the moon:** You start outside on the flagstone path, facing the haunted house, with the base behind you. A green light marks an exit door in the starting arena's south wall. It rises as you or a spider comes near and joins the arena to a lunar surface outside the base. The base is not drawn for now: `renderBase` in HauntedHouseProgram.metal switches its rooms and shell back on, and its walls still stop you and your shots while it is hidden. The moon around it: dark maria in warm brown and blue-grey between pale highlands, brighter crater walls, craters of three sizes, fields of boulders and stones you can climb over, a ring of distant highlands, a black sky with stars and a low sun that casts long, hard shadows. You can walk anywhere within 1.5 km, around the base's outer shell, a clad station with steel ribs, lit ribbon windows, an orange band and hazard stripes at the exit, and over crater rims, and spiders that follow you keep hunting outside. The match rules are unchanged; head in through the door to finish the range. The landscape uses the Pixeltje procedural terrain library (`// pixeltje:terrain-v1`), which any GPU Program can opt into.\n\n**Drones and the shotgun:** The drones are switched off for now; set `enableDrones` to true in HauntedHouseProgram.metal to bring them back. When on, three quadcopter drones keep station a few metres above the plain south of the exit, every few seconds climbing or sinking to a new height and holding there to scan the area. They fly like real multirotors: rotors only push along the body, so a drone tilts toward where it wants to go, overshoots slightly and settles, and gusts keep it from hanging perfectly still. Each carries a steady red and a blinking blue navigation light, faint spinning rotor discs and a laser rifle under its nose, and casts a shadow in the low sun. A drone ignores you until you shoot one. Then it and every drone in radio range turn hostile: they circle you at standoff range, the rifle's emitter glows red for a moment, and a red laser bolt flies at you. Bolts travel at a finite speed and lead your movement, so strafing dodges them; each one that reaches you costs nine health. A drone takes three pistol hits, and each shotgun pellet drains only a quarter of one, so a barrel takes part of its power. Once hit, a small power bar above it runs down from wide and green to small and red, and empties to nothing as the drone is shot down. Shot down, its lights go out, sparks burst, its motors spin down and it tumbles onto the regolith. The double-barrel shotgun is on 3, indoors and out. Each click fires one barrel, right then left, as a cone of eight pellets; with both spent, the gun breaks open and reloads by itself in 2.3 seconds. Red shells at the bottom right show what is loaded. The shotgun has its own Stable Audio blast; the drones have a Stable Audio laser shot and crash, and a rotor sound the editor synthesizes live: four two-blade propellers whose blade-pass harmonics beat against each other as the motors drift slightly apart, a faint brushless motor whine and the turbulent air the blades chop. The rotor sound is spatial: it fades and dulls with distance, pans between the ears, rises in pitch and level with rotor thrust, climbing when a drone punches upward, sagging as it descends and running higher while it tilts and cruises, turns harsher and rougher when the motors work hard, and carries a Doppler shift from both the drone's and your motion, so a drone sweeping past audibly drops in pitch. GPU Program voices do this: the shader writes each drone's gain, playback rate, pan and drive every frame, using SignalRangeDoppler.metal, and the editor's rotor synthesizer plays with those settings. The flight, rifle and lights live in SignalRangeDrone.metal, the shotgun and the weapon switch in SignalRangeShotgun.metal and the hand in SignalRangeHand.metal.\n\n**Javelin launcher:** Press 4 to shoulder a fire-and-forget launcher. Switching between the hand, pistol, shotgun and launcher lowers one and raises the other, during which nothing fires. Raised and loaded, the seeker shows corner marks for its field around the crosshair. Keep a spider, sentry or flying drone inside that field and brackets close on it; after a second they turn red, LOCKED appears and the command unit's display glows red. A locked missile ejects, lights its motor, climbs above the target where the ceiling allows (it stays low through 3.5 m doorways) and dives onto it; without a lock it flies straight. The blast deals up to six points to spiders (a locked top-attack dive 40% more to its target, the boss's hide only 60%), up to eight to sentries and up to three hits to drones, falls off over 4.5 m, wakes nearby spiders, and also hurts and throws you if you stand too close. One missile flies at a time; the launcher holds one round and reloads from the reserve in 2.4 seconds. You start with five rockets and can carry seven. With the flight cam on (the default; V toggles it, and FLIGHT CAM above the ammunition dims when off) the view cuts to the missile's white-hot seeker feed while it flies, with living targets glowing, and lingers on the blast; TOP ATTACK or DIRECT names the mode. You keep moving while you watch. The launch uses the jump-pad whoosh and the blast the shotgun's boom.\n\n**The hand:** Press 1 for the bare right hand, a gloved fist held up in a guard. A click punches: a moment later the fist arrives and strikes whatever lies within 2.1 m of the eye under the crosshair. A spider, sentry or drone takes a blow like a pistol round's, one point or three on a sentry's red eye, and a spider is shoved back out of its bite; a window of the house shatters into its haunting, and anything solid thuds. A punch that lands stops short with a jolt of the view and the white hit marker. With a door within 1.8 m under the crosshair, KNOCK appears below it and a click knocks instead: the fist lifts upright and raps three times. The doors are the house's two front doors, the cottage's plank door, reached from the foot of its step, and the barn's two sliding leaves; knocking on the house's doors wakes it once the afternoon is getting dark. The house's doors and the cottage's start shut and stay shut, and the house's keep you out, until you knock: after the third rap the latch gives and the door swings open, then stays open until the match restarts. The cottage's door creaks in on a dark lobby with a two-second Stable Audio creak; the house's tall, heavy pair swing into the hall with a louder three-second groan, clank and boom. Each rap plays a Stable Audio knock and each landed punch a Stable Audio punch, both one-second clips in the asset cache.\n\n**Sentries and supplies:** Sentry turrets on tripods guard the east and west rooms and the far corner of the northern room; nothing on the moon shoots at you except the drones. Each sweeps toward its room's entrance until it sees you within 34 m, then tracks you more slowly than a strafe can cross its view up close. Before every shot its red eye pulses and a red laser charges for 0.75 seconds; the violet plasma bolt then flies straight at 21 m/s and deals nine points, so a sidestep after the tell dodges it. A sentry has six points: pistol hits on the armour deal one, hits on the red sensor eye three, and a rocket within about 1.5 m destroys it. Destroyed sentries slump, scorch and spark, and stay solid. Sentries are optional; the boss still ends the match. Two orange-banded rocket caches (east room, the corridor before the boss arena) add two rockets each, and two medkits with a green cross (west room, northern room) restore 40 health; each is taken once by walking into it, and a short MEDKIT or ROCKETS notice confirms it. SignalRangeArsenal.metal holds the seeker, missile, blast, sentries, bolts and pickups; their tick passes (advanceOrdnance, advanceSentries) run after the drones.\n\n**Scene handoff:** Signal Range writes scene index 1 to its dedicated GPU request buffer after the victory pause. Scene Switch displays the completed winning frame, then runs only the triangle program on the next Loop call. The triangle writes index 0 when clicked. Each program keeps its own GPU state while inactive; both use the same Trackpad action counter. A stopped or failed frame does not commit a scene change."
+      },
+      "resources": {},
+      "title": "How to play"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 1440
+        }
+      },
+      "resources": {},
+      "title": "Output width"
+    },
+    {
+      "executionState": "enabled",
+      "id": "primitive-int-2",
+      "kind": "primitive.int",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 900
+        }
+      },
+      "resources": {},
+      "title": "Output height"
+    },
+    {
+      "executionState": "enabled",
+      "id": "program-text",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": "{\"version\":2,\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":262144},{\"name\":\"terrainBounds\",\"kind\":\"buffer\",\"bytes\":3407872},{\"name\":\"earthShadow\",\"kind\":\"buffer\",\"bytes\":6815744},{\"name\":\"sunShadow\",\"kind\":\"buffer\",\"bytes\":6815744},{\"name\":\"display\",\"kind\":\"texture\"},{\"name\":\"sceneColor\",\"kind\":\"texture\"},{\"name\":\"antialiased\",\"kind\":\"texture\"},{\"name\":\"focused\",\"kind\":\"texture\"},{\"name\":\"crateATexture\",\"kind\":\"inputTexture\",\"input\":\"asset0\"},{\"name\":\"crateBTexture\",\"kind\":\"inputTexture\",\"input\":\"asset1\"},{\"name\":\"impactTexture\",\"kind\":\"inputTexture\",\"input\":\"asset2\"},{\"name\":\"route\",\"kind\":\"buffer\",\"bytes\":4},{\"name\":\"audio\",\"kind\":\"buffer\",\"bytes\":160},{\"name\":\"hudFont\",\"kind\":\"systemFont\",\"design\":\"monospaced\",\"weight\":\"semibold\",\"strings\":[\"HEALTH\",\"SPIDERS\",\"BROODMOTHER\",\"ENRAGED\",\"RELOADING\",\"NORTH GATE OPEN\",\"VICTORY\",\"THE RANGE IS CLEAR\",\"YOU DIED\",\"CLICK TO RESTART\",\"0\",\"1\",\"2\",\"3\",\"4\",\"5\",\"6\",\"7\",\"8\",\"9\",\"PISTOL\",\"SHOTGUN\",\"JAVELIN\",\"LOCKING\",\"LOCKED\",\"FLIGHT CAM\",\"TOP ATTACK\",\"DIRECT\",\"SENTRIES\",\"MEDKIT\",\"ROCKETS\",\"HAND\",\"KNOCK\"]}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"bakeTerrainBounds\",\"threads\":[1024,832],\"buffers\":{\"1\":\"terrainBounds\"}},{\"kind\":\"compute\",\"function\":\"bakeEarthShadows\",\"threads\":[1024,832],\"buffers\":{\"1\":\"earthShadow\"}},{\"kind\":\"compute\",\"function\":\"bakeSunShadows\",\"threads\":[1024,832],\"buffers\":{\"1\":\"game\",\"2\":\"sunShadow\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"2\":\"route\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"advancePlayer\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"senseSpiders\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"advanceEnemies\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"restartRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"fireRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"swingHand\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"advanceDrones\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"advanceOrdnance\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"advanceSentries\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"refreshSunShadows\",\"threads\":[1024,52],\"buffers\":{\"1\":\"game\",\"2\":\"sunShadow\"}}],\"present\":[{\"kind\":\"compute\",\"function\":\"buildRangeHUD\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"2\":\"hudFont\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"rangeFragment\",\"target\":\"sceneColor\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\",\"2\":\"terrainBounds\",\"3\":\"earthShadow\",\"4\":\"sunShadow\"},\"fragmentTextures\":{\"1\":\"crateATexture\",\"2\":\"crateBTexture\",\"3\":\"impactTexture\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"antialiasFragment\",\"target\":\"antialiased\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentTextures\":{\"1\":\"sceneColor\"}},{\"kind\":\"compute\",\"function\":\"focusLens\",\"threads\":[1],\"buffers\":{\"1\":\"game\"},\"textures\":{\"1\":\"antialiased\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"bokehFragment\",\"target\":\"focused\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"antialiased\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"bloomFragment\",\"target\":\"sceneColor\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentTextures\":{\"1\":\"focused\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"compositeFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"focused\",\"2\":\"sceneColor\"}},{\"kind\":\"render\",\"vertex\":\"rangeHUDVertex\",\"fragment\":\"rangeHUDFragment\",\"target\":\"display\",\"load\":\"load\",\"blend\":\"alpha\",\"vertexCount\":6,\"instanceCount\":96,\"vertexBuffers\":{\"1\":\"hudFont\",\"2\":\"game\"},\"fragmentBuffers\":{\"1\":\"hudFont\"}}],\"swaps\":[],\"output\":\"display\",\"sceneRequestBuffer\":\"route\",\"audioEvents\":[{\"buffer\":\"audio\",\"word\":0,\"asset\":\"asset3\"},{\"buffer\":\"audio\",\"word\":1,\"asset\":\"asset4\"},{\"buffer\":\"audio\",\"word\":2,\"asset\":\"asset5\"},{\"buffer\":\"audio\",\"word\":3,\"asset\":\"asset6\"},{\"buffer\":\"audio\",\"word\":4,\"asset\":\"asset7\"},{\"buffer\":\"audio\",\"word\":5,\"asset\":\"asset8\"},{\"buffer\":\"audio\",\"word\":6,\"asset\":\"asset11\"},{\"buffer\":\"audio\",\"word\":7,\"asset\":\"asset12\"},{\"buffer\":\"audio\",\"word\":36,\"asset\":\"asset13\"},{\"buffer\":\"audio\",\"word\":37,\"asset\":\"asset14\"}],\"audioVoices\":[{\"buffer\":\"audio\",\"word\":8,\"synth\":{\"kind\":\"rotor\",\"rotors\":4,\"blades\":2,\"hz\":105}},{\"buffer\":\"audio\",\"word\":12,\"synth\":{\"kind\":\"rotor\",\"rotors\":4,\"blades\":2,\"hz\":105}},{\"buffer\":\"audio\",\"word\":16,\"synth\":{\"kind\":\"rotor\",\"rotors\":4,\"blades\":2,\"hz\":105}},{\"buffer\":\"audio\",\"word\":20,\"asset\":\"asset9\"},{\"buffer\":\"audio\",\"word\":24,\"asset\":\"asset9\"},{\"buffer\":\"audio\",\"word\":28,\"asset\":\"asset9\"},{\"buffer\":\"audio\",\"word\":32,\"asset\":\"asset10\"}]}"
+      },
+      "resources": {},
+      "title": "Game state and render passes"
+    },
+    {
+      "executionState": "enabled",
+      "id": "trackpad",
+      "kind": "input.trackpad",
+      "parameters": {
+        "engaged": true,
+        "engagedAtCall": {
+          "$type": "integer",
+          "value": 340
+        },
+        "spaceAction": "secondary",
+        "x": {
+          "$type": "number",
+          "value": 0.5005309725068307
+        },
+        "y": {
+          "$type": "number",
+          "value": 0.5285082726168792
+        }
+      },
+      "resources": {},
+      "title": "Look around · fire and jump"
+    },
+    {
+      "executionState": "enabled",
+      "id": "direction-pad",
+      "kind": "input.directionPad",
+      "parameters": {},
+      "resources": {},
+      "title": "WASD movement"
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-amber",
+      "kind": "input.prompt",
+      "parameters": {
+        "value": "Flat 2D square albedo swatch of weathered amber painted steel, mottled pigment, small paint chips and fine scratches distributed evenly across the entire surface, orthographic material scan under uniform diffuse light. No crate, box, cube, panel outline, corner, frame, rivets, perspective, lettering or cast shadow."
+      },
+      "resources": {},
+      "title": "Amber cargo crate material prompt"
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-amber",
+      "kind": "input.seed",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 7422
+        }
+      },
+      "resources": {},
+      "title": "Amber cargo crate fixed seed"
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-amber",
+      "kind": "coreai.flux2KleinGenerate",
+      "parameters": {
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        },
+        "height": {
+          "$type": "integer",
+          "value": 1024
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 4
+        },
+        "width": {
+          "$type": "integer",
+          "value": 1024
+        }
+      },
+      "resources": {
+        "denoiser": {
+          "reference": {
+            "componentRole": "denoiser",
+            "contentHash": "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI": "flux2-klein-4b-coreai@2",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion": "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state": "linked"
+        },
+        "textEncoder": {
+          "reference": {
+            "componentRole": "textEncoder",
+            "contentHash": "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI": "flux2-klein-4b-coreai@2",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion": "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state": "linked"
+        },
+        "vaeDecoder": {
+          "reference": {
+            "componentRole": "vae",
+            "contentHash": "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI": "flux2-klein-4b-coreai@2",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion": "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state": "linked"
+        }
+      },
+      "title": "Amber cargo crate · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-cobalt",
+      "kind": "input.prompt",
+      "parameters": {
+        "value": "Flat 2D square albedo swatch of worn cobalt blue painted steel, subtle pale geometric stencil fragments, small scuffs and chips distributed evenly across the entire surface, orthographic material scan under uniform diffuse light. No crate, box, cube, panel outline, corner, frame, rivets, perspective, readable text or cast shadow."
+      },
+      "resources": {},
+      "title": "Cobalt cargo crate material prompt"
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-cobalt",
+      "kind": "input.seed",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 7423
+        }
+      },
+      "resources": {},
+      "title": "Cobalt cargo crate fixed seed"
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-cobalt",
+      "kind": "coreai.flux2KleinGenerate",
+      "parameters": {
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        },
+        "height": {
+          "$type": "integer",
+          "value": 1024
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 4
+        },
+        "width": {
+          "$type": "integer",
+          "value": 1024
+        }
+      },
+      "resources": {
+        "denoiser": {
+          "reference": {
+            "componentRole": "denoiser",
+            "contentHash": "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI": "flux2-klein-4b-coreai@2",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion": "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state": "linked"
+        },
+        "textEncoder": {
+          "reference": {
+            "componentRole": "textEncoder",
+            "contentHash": "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI": "flux2-klein-4b-coreai@2",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion": "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state": "linked"
+        },
+        "vaeDecoder": {
+          "reference": {
+            "componentRole": "vae",
+            "contentHash": "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI": "flux2-klein-4b-coreai@2",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion": "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state": "linked"
+        }
+      },
+      "title": "Cobalt cargo crate · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-impact",
+      "kind": "input.prompt",
+      "parameters": {
+        "value": "Square front-facing material texture of one small realistic ballistic impact, centered dark charred puncture with irregular chipped paint and stone rim, fine radial hairline cracks, subtle soot and metallic flecks, high-frequency surface detail, neutral gray tones with a wide plain neutral margin, flat evenly lit orthographic view, no perspective, no object, no border, no text, no cast shadow"
+      },
+      "resources": {},
+      "title": "Detailed bullet impact material prompt"
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-impact",
+      "kind": "input.seed",
+      "parameters": {
+        "value": {
+          "$type": "integer",
+          "value": 7424
+        }
+      },
+      "resources": {},
+      "title": "Bullet impact fixed seed"
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-impact",
+      "kind": "coreai.flux2KleinGenerate",
+      "parameters": {
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        },
+        "height": {
+          "$type": "integer",
+          "value": 1024
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 4
+        },
+        "width": {
+          "$type": "integer",
+          "value": 1024
+        }
+      },
+      "resources": {
+        "denoiser": {
+          "reference": {
+            "componentRole": "denoiser",
+            "contentHash": "f7c6a96fcbe246e6dcc4cb8e2ae69e729f3ed1f2d2021a608287b68a08651734",
+            "familyABI": "flux2-klein-4b-coreai@2",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion": "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state": "linked"
+        },
+        "textEncoder": {
+          "reference": {
+            "componentRole": "textEncoder",
+            "contentHash": "4eec45b9a29b0b74de0785caac53b2ef6471e69b6b820bb28cb2bb2c2c950b90",
+            "familyABI": "flux2-klein-4b-coreai@2",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion": "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state": "linked"
+        },
+        "vaeDecoder": {
+          "reference": {
+            "componentRole": "vae",
+            "contentHash": "ef484823686809e6c7a67eea1b608902cab9d6ba4c08dc88df3ea8c557bbdd17",
+            "familyABI": "flux2-klein-4b-coreai@2",
+            "functionName": "main",
+            "kind": "coreAIModel",
+            "packageID": "coreai.black-forest-labs.flux2-klein-4b",
+            "packageVersion": "sha256.7f59425a07ad5ac6eb4fb753402c58455a05bf73f1d83313478a26d3dc76be25"
+          },
+          "state": "linked"
+        }
+      },
+      "title": "Bullet impact · FLUX.2 Klein 4B"
+    },
+    {
+      "executionState": "enabled",
+      "id": "texture-cache",
+      "kind": "cache.assets",
+      "parameters": {
+        "keepBetweenRuns": true,
+        "slotCount": {
+          "$type": "integer",
+          "value": 15
+        }
+      },
+      "resources": {},
+      "title": "Klein materials and twelve sounds · asset cache"
+    },
+    {
+      "id": "triangle-source",
+      "kind": "primitive.filePath",
+      "title": "Spinning triangle Metal source",
+      "parameters": {
+        "mode": "relative",
+        "path": "SpinningTriangleProgram.metal"
+      }
+    },
+    {
+      "id": "triangle-program",
+      "kind": "primitive.string",
+      "title": "Triangle state and render passes",
+      "parameters": {
+        "value": "{\"version\":1,\"resources\":[{\"name\":\"state\",\"kind\":\"buffer\",\"bytes\":16},{\"name\":\"route\",\"kind\":\"buffer\",\"bytes\":4},{\"name\":\"display\",\"kind\":\"texture\"}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeTriangle\",\"threads\":[1],\"buffers\":{\"1\":\"state\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceTriangle\",\"threads\":[1],\"buffers\":{\"1\":\"state\",\"2\":\"route\"}}],\"present\":[{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"triangleFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"state\"}}],\"swaps\":[],\"output\":\"display\",\"sceneRequestBuffer\":\"route\"}"
+      }
+    },
+    {
+      "id": "triangle-render",
+      "kind": "gpu.program",
+      "title": "Spinning triangle · GPU program",
+      "parameters": {
+        "framesPerSecond": {
+          "$type": "number",
+          "value": 30
+        },
+        "seed": {
+          "$type": "integer",
+          "value": 7421
+        }
+      }
+    },
+    {
+      "id": "scene-switch",
+      "kind": "control.sceneSwitch",
+      "title": "Signal Range → Triangle",
+      "parameters": {
+        "sceneCount": {
+          "$type": "integer",
+          "value": 2
+        },
+        "initialScene": {
+          "$type": "integer",
+          "value": 0
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-gunshot",
+      "kind": "input.prompt",
+      "title": "Gunshot sound prompt",
+      "parameters": {
+        "value": "A single loud gunshot fired outdoors, sharp crack and short natural echo, no speech or music"
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-gunshot",
+      "kind": "input.seed",
+      "title": "Gunshot fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 1234
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-gunshot",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Gunshot sound · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 2
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-scare",
+      "kind": "input.prompt",
+      "title": "Northern room scare sound prompt",
+      "parameters": {
+        "value": "A sudden frightening horror sound effect in an empty concrete room: a sharp metallic shriek over a deep impact boom, brief rattling echo, abrupt start and quick decay, no voices or music"
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-scare",
+      "kind": "input.seed",
+      "title": "Scare sound fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 5678
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-scare",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Scare sound · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 2
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-launch",
+      "kind": "input.prompt",
+      "title": "Jump pad launch sound prompt",
+      "parameters": {
+        "value": "A single short science-fiction jump pad launch sound effect: springy mechanical thump followed by a bright rising electronic whoosh and quick airy tail, no voices or music"
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-launch",
+      "kind": "input.seed",
+      "title": "Jump pad launch fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 9012
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-launch",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Jump pad launch sound · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 1
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-shotgun",
+      "kind": "input.prompt",
+      "title": "Double-barrel shotgun blast sound prompt",
+      "parameters": {
+        "value": "A single powerful double-barrel shotgun blast fired outdoors: deep booming report with a sharp crack and a brief rolling echo, no reloading or shell sounds, no voices or music"
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-shotgun",
+      "kind": "input.seed",
+      "title": "Double-barrel shotgun blast fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 3456
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-shotgun",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Double-barrel shotgun blast sound · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 2
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-laser",
+      "kind": "input.prompt",
+      "title": "Drone laser rifle shot sound prompt",
+      "parameters": {
+        "value": "A single short science-fiction laser rifle shot: bright electric zap with a quick descending pitch sweep and a crisp sizzling tail, no explosion, no voices or music"
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-laser",
+      "kind": "input.seed",
+      "title": "Drone laser rifle shot fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 7890
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-laser",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Drone laser rifle shot sound · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 1
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-drone-down",
+      "kind": "input.prompt",
+      "title": "Drone shot down sound prompt",
+      "parameters": {
+        "value": "A small drone being shot down: a sharp electrical pop and crackle of sparks, propellers sputtering to a stop, then a light plastic and metal crash onto the ground, no voices or music"
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-drone-down",
+      "kind": "input.seed",
+      "title": "Drone shot down fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 1357
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-drone-down",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Drone shot down sound · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 2
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-wind",
+      "kind": "input.prompt",
+      "title": "Haunted house wind loop sound prompt",
+      "parameters": {
+        "value": "Continuous eerie night wind howling around an old wooden house, steady ambience at a constant level for the whole clip: low moaning drone with hollow whistling through cracks and loose shutters, gusts swelling and easing but never dying away, seamless background loop, no voices, music, rain or thunder"
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-wind",
+      "kind": "input.seed",
+      "title": "Wind loop fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 1313
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-wind",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Haunted house wind loop sound · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 11
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-ghost",
+      "kind": "input.prompt",
+      "title": "Ghost moan loop sound prompt",
+      "parameters": {
+        "value": "Continuous spooky ghost moaning, a hollow ethereal wail that swells and sinks slowly in pitch with breathy whooshing and a long ghostly reverb tail, steady level for the whole clip, seamless loop, no words, music, footsteps or wind gusts"
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-ghost",
+      "kind": "input.seed",
+      "title": "Ghost moan loop fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 1031
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-ghost",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Ghost moan loop sound · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 11
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-knock",
+      "kind": "input.prompt",
+      "title": "Door knock sound prompt",
+      "parameters": {
+        "value": "A single firm knuckle knock on a solid old wooden door: one short dry wooden rap with a hollow body, close and clean, no second knock, no echo, no voices or music"
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-knock",
+      "kind": "input.seed",
+      "title": "Door knock fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 2468
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-knock",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Door knock sound · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 1
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-punch",
+      "kind": "input.prompt",
+      "title": "Punch sound prompt",
+      "parameters": {
+        "value": "A single hard punch landing: a gloved fist striking with a short dull meaty thud and a slap of leather, close and dry, no whoosh, no voices or music"
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-punch",
+      "kind": "input.seed",
+      "title": "Punch fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 8642
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-punch",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Punch sound · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 1
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-cottage-door",
+      "kind": "input.prompt",
+      "title": "Cottage door opening sound prompt",
+      "parameters": {
+        "value": "An old wooden plank door slowly creaking open on rusty iron hinges: a latch click, then one long dry wooden creak that rises in pitch, close and clean, quiet room, no knocking, no voices or music"
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-cottage-door",
+      "kind": "input.seed",
+      "title": "Cottage door opening fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 1357
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-cottage-door",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Cottage door opening sound · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 2
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-house-doors",
+      "kind": "input.prompt",
+      "title": "Haunted house doors opening sound prompt",
+      "parameters": {
+        "value": "A massive heavy oak double door of an old haunted mansion swinging open, loud: a heavy iron latch clank, a deep groaning creak of huge rusted hinges and a booming thud as the doors hit the walls, echoing in a large empty hall, no knocking, no voices or music"
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-house-doors",
+      "kind": "input.seed",
+      "title": "Haunted house doors opening fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 8642
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-house-doors",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Haunted house doors opening sound · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 3
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    }
+  ],
+  "presentation": {
+    "groups": [],
+    "nodePositions": {
+      "direction-pad": {
+        "x": 798,
+        "y": 885
+      },
+      "loop": {
+        "x": 2180,
+        "y": 540
+      },
+      "note": {
+        "x": 80,
+        "y": 610
+      },
+      "output": {
+        "x": 2180,
+        "y": 210
+      },
+      "primitive-int": {
+        "x": 730,
+        "y": 130
+      },
+      "primitive-int-2": {
+        "x": 730,
+        "y": 280
+      },
+      "program-text": {
+        "x": 80,
+        "y": 30
+      },
+      "render": {
+        "x": 1085,
+        "y": 100
+      },
+      "shader-text": {
+        "x": 82,
+        "y": 325
+      },
+      "start": {
+        "x": 2180,
+        "y": 410
+      },
+      "trackpad": {
+        "x": 740,
+        "y": 470
+      },
+      "prompt-amber": {
+        "x": 100,
+        "y": 1110
+      },
+      "seed-amber": {
+        "x": 100,
+        "y": 1320
+      },
+      "generate-amber": {
+        "x": 400,
+        "y": 1110
+      },
+      "prompt-cobalt": {
+        "x": 860,
+        "y": 1110
+      },
+      "seed-cobalt": {
+        "x": 860,
+        "y": 1320
+      },
+      "generate-cobalt": {
+        "x": 1160,
+        "y": 1110
+      },
+      "texture-cache": {
+        "x": 1690,
+        "y": 1150
+      },
+      "prompt-impact": {
+        "x": 100,
+        "y": 1590
+      },
+      "seed-impact": {
+        "x": 100,
+        "y": 1800
+      },
+      "generate-impact": {
+        "x": 400,
+        "y": 1590
+      },
+      "triangle-source": {
+        "x": 100,
+        "y": 900
+      },
+      "triangle-program": {
+        "x": 100,
+        "y": 1040
+      },
+      "triangle-render": {
+        "x": 1085,
+        "y": 800
+      },
+      "scene-switch": {
+        "x": 1820,
+        "y": 220
+      },
+      "prompt-gunshot": {
+        "x": 860,
+        "y": 1590
+      },
+      "seed-gunshot": {
+        "x": 860,
+        "y": 1800
+      },
+      "generate-gunshot": {
+        "x": 1160,
+        "y": 1590
+      },
+      "prompt-scare": {
+        "x": 860,
+        "y": 2050
+      },
+      "seed-scare": {
+        "x": 860,
+        "y": 2260
+      },
+      "generate-scare": {
+        "x": 1160,
+        "y": 2050
+      },
+      "prompt-launch": {
+        "x": 860,
+        "y": 2510
+      },
+      "seed-launch": {
+        "x": 860,
+        "y": 2720
+      },
+      "generate-launch": {
+        "x": 1160,
+        "y": 2510
+      },
+      "prompt-shotgun": {
+        "x": 860,
+        "y": 2970
+      },
+      "seed-shotgun": {
+        "x": 860,
+        "y": 3180
+      },
+      "generate-shotgun": {
+        "x": 1160,
+        "y": 2970
+      },
+      "prompt-laser": {
+        "x": 860,
+        "y": 3430
+      },
+      "seed-laser": {
+        "x": 860,
+        "y": 3640
+      },
+      "generate-laser": {
+        "x": 1160,
+        "y": 3430
+      },
+      "prompt-drone-down": {
+        "x": 860,
+        "y": 4350
+      },
+      "seed-drone-down": {
+        "x": 860,
+        "y": 4560
+      },
+      "generate-drone-down": {
+        "x": 1160,
+        "y": 4350
+      },
+      "prompt-wind": {
+        "x": 860,
+        "y": 4810
+      },
+      "seed-wind": {
+        "x": 860,
+        "y": 5020
+      },
+      "generate-wind": {
+        "x": 1160,
+        "y": 4810
+      },
+      "prompt-ghost": {
+        "x": 860,
+        "y": 5270
+      },
+      "seed-ghost": {
+        "x": 860,
+        "y": 5480
+      },
+      "generate-ghost": {
+        "x": 1160,
+        "y": 5270
+      },
+      "prompt-knock": {
+        "x": 860,
+        "y": 5730
+      },
+      "seed-knock": {
+        "x": 860,
+        "y": 5940
+      },
+      "generate-knock": {
+        "x": 1160,
+        "y": 5730
+      },
+      "prompt-punch": {
+        "x": 860,
+        "y": 6190
+      },
+      "seed-punch": {
+        "x": 860,
+        "y": 6400
+      },
+      "generate-punch": {
+        "x": 1160,
+        "y": 6190
+      },
+      "prompt-cottage-door": {
+        "x": 860,
+        "y": 6650
+      },
+      "seed-cottage-door": {
+        "x": 860,
+        "y": 6860
+      },
+      "generate-cottage-door": {
+        "x": 1160,
+        "y": 6650
+      },
+      "prompt-house-doors": {
+        "x": 860,
+        "y": 7110
+      },
+      "seed-house-doors": {
+        "x": 860,
+        "y": 7320
+      },
+      "generate-house-doors": {
+        "x": 1160,
+        "y": 7110
+      }
+    },
+    "nodeSizes": {
+      "note": {
+        "height": 440,
+        "width": 500
+      },
+      "program-text": {
+        "height": 225,
+        "width": 610
+      },
+      "render": {
+        "height": 575,
+        "width": 660
+      },
+      "shader-text": {
+        "height": 160,
+        "width": 400
+      },
+      "trackpad": {
+        "height": 360,
+        "width": 300
+      },
+      "triangle-render": {
+        "width": 620,
+        "height": 520
+      },
+      "triangle-program": {
+        "width": 610,
+        "height": 225
+      }
+    },
+    "viewportOrigin": {
+      "x": 259.07641861736033,
+      "y": 61.42721964153789
+    },
+    "viewportScale": 0.603094482421875
+  },
+  "primaryOutputNodeIDs": [
+    "output"
+  ],
+  "requirements": {
+    "familyABIs": [],
+    "minimumEngineVersion": 1
+  },
+  "schemaVersion": 2
+}

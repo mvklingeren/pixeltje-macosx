@@ -1,9 +1,354 @@
 import Foundation
 import IOSurface
+import Metal
 import PixeltjePipelineBaseTestSetRuntime
 import PixeltjePipelineDomain
 @testable import PixeltjePipelineEngine
+import PixeltjePipelineFLUX2Runtime
+import PixeltjePipelineStableAudioRuntime
 import Testing
+
+@Test func abyssalTreasureSystemFontCompilesAndPreparesOutlines() async throws {
+  let examples = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent().deletingLastPathComponent()
+    .deletingLastPathComponent().appendingPathComponent("Examples", isDirectory: true)
+  let document = try PipelineJSON.decode(Data(contentsOf:
+    examples.appendingPathComponent("shader-abyssal-treasure-3d.pixpipeline.json")))
+  let program = try #require(document.nodes.first { $0.id.rawValue == "program-text" }?
+    .parameters["value"]?.stringValue)
+  let source = try String(contentsOf:
+    examples.appendingPathComponent("AbyssalTreasureProgram.metal"), encoding: .utf8)
+  let device = try #require(MTLCreateSystemDefaultDevice())
+  let queue = try #require(device.makeCommandQueue())
+  let runner = PipelineGPUProgram(commandQueue: queue)
+  try await runner.validateLiteral(programJSON: program, source: source)
+
+  let prepared = try PipelineSystemFont.prepare(design: "monospaced", weight: "medium",
+    strings: ["LEVEL CLEAR", "OXYGEN EMPTY", "0", "8"])
+  #expect(prepared.bytes.count > 100)
+  #expect(prepared.fingerprint.contains(prepared.resolvedName))
+  #expect(prepared.fingerprint == (try PipelineSystemFont.prepare(design: "monospaced",
+    weight: "medium", strings: ["LEVEL CLEAR", "OXYGEN EMPTY", "0", "8"])).fingerprint)
+
+  let image = try PipelineImageInput(width: 1, height: 1,
+    rgba: [0.32, 0.48, 0.54, 1])
+  let pixel = PipelineNodeValue(image, type: .image)
+  let assets = PipelineAssetBundle(values: [
+    "asset0": pixel, "asset1": pixel, "asset2": pixel,
+    "asset3": pixel, "asset4": pixel,
+  ])
+  let inputs: [String: PipelineNodeValue] = [
+    "program": .init(program, type: .string),
+    "sourceFile": .init("AbyssalTreasureProgram.metal", type: .string),
+    "assets": .init(assets, type: .assetBundle),
+    "width": .init(Int64(320), type: .integer),
+    "height": .init(Int64(200), type: .integer),
+  ]
+  let node = try #require(document.nodes.first { $0.id.rawValue == "render" })
+  let savedRunID = UUID()
+  let savedContext = PipelineNodeExecutionContext(semanticSHA256: "font-test",
+    invocation: .init(values: [PipelineInvocation.loopCallIndexKey: .integer(0)]),
+    sourceMediaRoot: examples, packageRootsByID: [:], nodeIndex: 0,
+    nodeCount: 1, progress: { _ in }, runID: savedRunID)
+  let executor = PipelineGPUProgram.executor(runner: runner)
+  let savedOutput = try await executor.execute(node, inputs: inputs, context: savedContext)
+  let saved = try #require(savedOutput.outputs["image"]?.value(as: PipelineImageInput.self))
+  #expect(saved.width == 320 && saved.height == 200)
+
+  let liveRunID = UUID()
+  await runner.beginLivePreview(runID: liveRunID, nodeID: node.id)
+  await runner.setPerformanceCapture(runID: liveRunID)
+  let liveContext = PipelineNodeExecutionContext(semanticSHA256: "font-test",
+    invocation: .init(values: [PipelineInvocation.loopCallIndexKey: .integer(0)]),
+    sourceMediaRoot: examples, packageRootsByID: [:], nodeIndex: 0,
+    nodeCount: 1, progress: { _ in }, runID: liveRunID)
+  try await runner.captureLivePreview(node: node, inputs: inputs,
+    context: liveContext)
+  #expect(await runner.livePreview(runID: liveRunID) != nil)
+  let performance = try #require(runner.takePerformance(runID: liveRunID))
+  #expect(performance.previewCopySeconds == 0)
+  await runner.endLivePreview(runID: liveRunID)
+}
+
+@Test func sceneSwitchRunsOnlyActiveGPUProgramAndCommitsRequests() async throws {
+  func id(_ value: String) -> PipelineNodeID { .init(rawValue: value) }
+  let source = """
+  #include <metal_stdlib>
+  using namespace metal;
+  struct Uniforms {
+    float4 resolutionTime; uint4 frameSeed;
+    float4 parameters0; float4 parameters1; float4 parameters2; float4 parameters3;
+    float4 pointer; float4 movement;
+  };
+  kernel void tick(constant Uniforms &u [[buffer(0)]],
+    device uint *counter [[buffer(1)]], device uint *request [[buffer(2)]],
+    uint index [[thread_position_in_grid]]) {
+    if (index != 0) return;
+    counter[0] += 1;
+    if (counter[0] == 2) request[0] = uint(u.parameters0.x);
+  }
+  vertex float4 fullscreenVertex(uint index [[vertex_id]]) {
+    float2 p = float2((index << 1u) & 2u, index & 2u);
+    return float4(p * 2.0f - 1.0f, 0.0f, 1.0f);
+  }
+  fragment float4 sceneFragment(float4 position [[position]],
+    constant Uniforms &u [[buffer(0)]],
+    device const uint *counter [[buffer(1)]]) {
+    return float4(u.parameters0.y, float(counter[0]) * 0.1f, 0.0f, 1.0f);
+  }
+  """
+  let program = """
+  {"version":1,"resources":[{"name":"counter","kind":"buffer","bytes":4},
+  {"name":"request","kind":"buffer","bytes":4},
+  {"name":"display","kind":"texture"}],"initialize":[],
+  "tick":[{"kind":"compute","function":"tick","threads":[1],
+  "buffers":{"1":"counter","2":"request"}}],
+  "present":[{"kind":"render","vertex":"fullscreenVertex",
+  "fragment":"sceneFragment","target":"display","load":"clear",
+  "vertexCount":3,"fragmentBuffers":{"1":"counter"}}],
+  "swaps":[],"output":"display","sceneRequestBuffer":"request",
+  "parameters":["target","tint"]}
+  """
+  func node(_ name: String, _ kind: PipelineNodeKind,
+    _ parameters: [String: PipelineValue] = [:]) -> PipelineNode {
+    .init(id: id(name), kind: kind, parameters: parameters)
+  }
+  func edge(_ source: String, _ output: String,
+    _ target: String, _ input: String) -> PipelineConnection {
+    .init(output: .init(nodeID: id(source), port: output),
+      input: .init(nodeID: id(target), port: input))
+  }
+  let document = PipelineDocument(id: .init(rawValue: "scene-switch-test"),
+    name: "Scene switch test", mode: .textToImage,
+    nodes: [
+      node("source", .primitiveString, ["value": .string(source)]),
+      node("program", .primitiveString, ["value": .string(program)]),
+      node("params0", .primitiveString,
+        ["value": .string("{\"target\":1,\"tint\":0.8}")]),
+      node("params1", .primitiveString,
+        ["value": .string("{\"target\":0,\"tint\":0.2}")]),
+      node("gpu0", .gpuProgram,
+        ["width": .integer(4), "height": .integer(4)]),
+      node("gpu1", .gpuProgram,
+        ["width": .integer(4), "height": .integer(4)]),
+      node("switch", .sceneSwitch,
+        ["sceneCount": .integer(2), "initialScene": .integer(0)]),
+      node("output", .imageOutput),
+    ],
+    connections: [
+      edge("source", "value", "gpu0", "source"),
+      edge("source", "value", "gpu1", "source"),
+      edge("program", "value", "gpu0", "program"),
+      edge("program", "value", "gpu1", "program"),
+      edge("params0", "value", "gpu0", "parameters"),
+      edge("params1", "value", "gpu1", "parameters"),
+      edge("gpu0", "image", "switch", "scene0"),
+      edge("gpu0", "sceneRequest", "switch", "request0"),
+      edge("gpu1", "image", "switch", "scene1"),
+      edge("gpu1", "sceneRequest", "switch", "request1"),
+      edge("switch", "image", "output", "image"),
+    ])
+  let engine = try PixeltjePipelineEngine.makeDefault(
+    additionalNodeExecutors: BaseTestSetPipelineFamily.makeNodeExecutors())
+  #expect((await engine.validate(document)).isValid)
+
+  let runID = UUID()
+  func frame(_ index: Int64) async throws -> PipelineGeneratedImage {
+    let result = try await engine.execute(document, packageRootsByID: [:],
+      invocation: .init(values: [
+        PipelineInvocation.loopCallIndexKey: .integer(index),
+        PipelineInvocation.gpuProgramDeferredCommitKey: .boolean(true),
+      ]), traceRunID: runID)
+    return try #require(result.image)
+  }
+  let first = try await frame(0)
+  #expect(abs(first.planarRGB[0] - 0.8) < 0.02)
+  await engine.commitGPUProgramFrame(runID: runID)
+  let win = try await frame(1)
+  #expect(abs(win.planarRGB[16] - 0.2) < 0.02)
+  await engine.discardGPUProgramFrame(runID: runID)
+  #expect(try await frame(1) == win)
+  await engine.commitGPUProgramFrame(runID: runID)
+  let secondScene = try await frame(2)
+  #expect(abs(secondScene.planarRGB[0] - 0.2) < 0.02)
+  #expect(abs(secondScene.planarRGB[16] - 0.1) < 0.02)
+  await engine.commitGPUProgramFrame(runID: runID)
+  _ = try await frame(3)
+  await engine.commitGPUProgramFrame(runID: runID)
+  let resumed = try await frame(4)
+  #expect(abs(resumed.planarRGB[0] - 0.8) < 0.02)
+  #expect(abs(resumed.planarRGB[16] - 0.3) < 0.02)
+
+  let liveRunID = UUID()
+  await engine.beginLiveMetalPreview(runID: liveRunID, nodeID: id("switch"))
+  var firstSceneRed: Data?
+  for index in Int64(0)...2 {
+    let output = try await engine.updateLiveMetalPreviewState(document,
+      runID: liveRunID, nodeID: id("switch"), packageRootsByID: [:],
+      invocation: .init(values: [PipelineInvocation.loopCallIndexKey: .integer(index)]))
+    #expect(output.image == nil)
+    let preview = try #require(await engine.liveMetalPreview(runID: liveRunID))
+    #expect(preview.width == 4 && preview.height == 4)
+    #expect(IOSurfaceLock(preview.surface, .readOnly, nil) == 0)
+    let red = Data(bytes: IOSurfaceGetBaseAddress(preview.surface), count: 2)
+    IOSurfaceUnlock(preview.surface, .readOnly, nil)
+    if index == 0 { firstSceneRed = red }
+    if index == 2 { #expect(red != firstSceneRed) }
+  }
+  await engine.endLiveMetalPreview(runID: liveRunID)
+}
+
+@Test func signalRangeSceneSwitchExampleValidatesBothMetalPrograms() async throws {
+  let examples = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent().deletingLastPathComponent()
+    .deletingLastPathComponent().appendingPathComponent("Examples", isDirectory: true)
+  let document = try PipelineJSON.decode(Data(contentsOf:
+    examples.appendingPathComponent("shader-signal-range-fps.pixpipeline.json")))
+  let fluxRunner = FLUX2KleinPipelineRunner()
+  let audioRunner = StableAudio3Runner()
+  let engine = try PixeltjePipelineEngine.makeDefault(
+    additionalNodeDescriptors: [FLUX2KleinPipelineFamily.makeCompositeNodeDescriptor(),
+      StableAudio3Family.descriptor()],
+    additionalNodeExecutors: BaseTestSetPipelineFamily.makeNodeExecutors()
+      + [FLUX2KleinPipelineFamily.makeNodeExecutor(runner: fluxRunner),
+        StableAudio3Family.executor(runner: audioRunner)])
+  let report = await engine.validate(document, sourceMediaRoot: examples)
+  #expect(report.isValid, "\(report.diagnostics)")
+}
+
+private let audioVoiceTestSource = """
+  #include <metal_stdlib>
+  using namespace metal;
+  struct Uniforms {
+    float4 resolutionTime; uint4 frameSeed;
+    float4 parameters0; float4 parameters1; float4 parameters2; float4 parameters3;
+    float4 pointer; float4 movement;
+  };
+  kernel void tick(constant Uniforms &u [[buffer(0)]],
+    device uint *audio [[buffer(1)]], uint index [[thread_position_in_grid]]) {
+    if (index != 0) return;
+    audio[0] = 2u;
+    device float *voice = (device float *)(audio + 4);
+    voice[0] = 2.0f;
+    voice[1] = 1.5f;
+    voice[2] = -0.5f;
+    voice[3] = 0.25f;
+  }
+  vertex float4 fullscreenVertex(uint index [[vertex_id]]) {
+    float2 p = float2((index << 1u) & 2u, index & 2u);
+    return float4(p * 2.0f - 1.0f, 0.0f, 1.0f);
+  }
+  fragment float4 audioFragment(float4 position [[position]]) {
+    return float4(0.2f, 0.3f, 0.4f, 1.0f);
+  }
+  """
+
+private func audioVoiceTestProgram(bytes: Int = 32, eventWord: Int = 0,
+  voiceWord: Int = 4) -> String {
+  """
+  {"version":1,"resources":[{"name":"audio","kind":"buffer","bytes":\(bytes)},
+  {"name":"display","kind":"texture"}],"initialize":[],
+  "tick":[{"kind":"compute","function":"tick","threads":[1],
+  "buffers":{"1":"audio"}}],
+  "present":[{"kind":"render","vertex":"fullscreenVertex",
+  "fragment":"audioFragment","target":"display","load":"clear","vertexCount":3}],
+  "swaps":[],"output":"display",
+  "audioEvents":[{"buffer":"audio","word":\(eventWord),"asset":"sfx"}],
+  "audioVoices":[{"buffer":"audio","word":\(voiceWord),"asset":"sfx"}]}
+  """
+}
+
+@Test func gpuProgramAudioEventsAndVoicesShareWordsWithoutOverlap() async throws {
+  let device = try #require(MTLCreateSystemDefaultDevice())
+  let runner = PipelineGPUProgram(commandQueue: try #require(device.makeCommandQueue()))
+  try await runner.validateLiteral(programJSON: audioVoiceTestProgram(),
+    source: audioVoiceTestSource)
+  // A voice needs four words of its own, inside a small buffer.
+  for program in [audioVoiceTestProgram(voiceWord: 0),
+    audioVoiceTestProgram(voiceWord: 5), audioVoiceTestProgram(bytes: 30),
+    audioVoiceTestProgram(bytes: 512)] {
+    await #expect(throws: PipelineEngineError.self) {
+      try await runner.validateLiteral(programJSON: program,
+        source: audioVoiceTestSource)
+    }
+  }
+}
+
+@Test func gpuProgramAcceptsUpToTheResourceLimit() async throws {
+  let device = try #require(MTLCreateSystemDefaultDevice())
+  let runner = PipelineGPUProgram(commandQueue: try #require(device.makeCommandQueue()))
+  func program(resources count: Int) -> String {
+    let buffers = (1..<count).map { "{\"name\":\"b\($0)\",\"kind\":\"buffer\",\"bytes\":4}" }
+    return audioVoiceTestProgram().replacingOccurrences(
+      of: "{\"name\":\"display\",\"kind\":\"texture\"}",
+      with: (["{\"name\":\"display\",\"kind\":\"texture\"}"] + buffers.dropFirst())
+        .joined(separator: ","))
+  }
+  try await runner.validateLiteral(
+    programJSON: program(resources: PipelineGPUProgram.maximumResources),
+    source: audioVoiceTestSource)
+  await #expect(throws: PipelineEngineError.self) {
+    try await runner.validateLiteral(
+      programJSON: program(resources: PipelineGPUProgram.maximumResources + 1),
+      source: audioVoiceTestSource)
+  }
+}
+
+@Test func gpuProgramAudioVoicesLoopAnAssetOrPlayAValidSynth() async throws {
+  let device = try #require(MTLCreateSystemDefaultDevice())
+  let runner = PipelineGPUProgram(commandQueue: try #require(device.makeCommandQueue()))
+  let asset = "\"asset\":\"sfx\""
+  let rotor = "\"synth\":{\"kind\":\"rotor\",\"rotors\":4,\"blades\":2,\"hz\":105}"
+  func program(_ voice: String) -> String {
+    audioVoiceTestProgram().replacingOccurrences(of: "\"word\":4,\(asset)",
+      with: "\"word\":4,\(voice)")
+  }
+  try await runner.validateLiteral(programJSON: program(rotor),
+    source: audioVoiceTestSource)
+  for voice in ["\(asset),\(rotor)", "\"label\":\"none\"",
+    rotor.replacingOccurrences(of: "\"rotors\":4", with: "\"rotors\":9"),
+    rotor.replacingOccurrences(of: "\"hz\":105", with: "\"hz\":4000"),
+    rotor.replacingOccurrences(of: "rotor\"", with: "siren\"")] {
+    await #expect(throws: (any Error).self) {
+      try await runner.validateLiteral(programJSON: program(voice),
+        source: audioVoiceTestSource)
+    }
+  }
+}
+
+@Test func liveGPUProgramReportsCommittedAudioVoices() async throws {
+  let examples = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent().deletingLastPathComponent()
+    .deletingLastPathComponent().appendingPathComponent("Examples", isDirectory: true)
+  let sound = examples.appendingPathComponent("BaseTestSet/two-tone.wav")
+  let device = try #require(MTLCreateSystemDefaultDevice())
+  let runner = PipelineGPUProgram(commandQueue: try #require(device.makeCommandQueue()))
+  let node = PipelineNode(id: .init(rawValue: "voices"), kind: .gpuProgram)
+  let inputs: [String: PipelineNodeValue] = [
+    "program": .init(audioVoiceTestProgram(), type: .string),
+    "source": .init(audioVoiceTestSource, type: .string),
+    "assets": .init(PipelineAssetBundle(values: [
+      "sfx": PipelineNodeValue(sound, type: .audio),
+    ]), type: .assetBundle),
+    "width": .init(Int64(4), type: .integer),
+    "height": .init(Int64(4), type: .integer),
+  ]
+  let runID = UUID()
+  let context = PipelineNodeExecutionContext(semanticSHA256: "audio-voice-test",
+    invocation: .init(values: [PipelineInvocation.loopCallIndexKey: .integer(0)]),
+    sourceMediaRoot: examples, packageRootsByID: [:], nodeIndex: 0,
+    nodeCount: 1, progress: { _ in }, runID: runID)
+  await runner.beginLivePreview(runID: runID, nodeID: node.id)
+  _ = try await runner.captureLivePreview(node: node, inputs: inputs, context: context)
+  #expect(await runner.takeLiveAudioVoices(runID: runID).isEmpty)
+  await runner.commit(runID: runID)
+  #expect(await runner.takeLiveAudioEvents(runID: runID) == [sound, sound])
+  let voices = await runner.takeLiveAudioVoices(runID: runID)
+  #expect(voices == [PipelineGPUAudioVoice(nodeID: node.id, slot: 0,
+    source: .sound(sound), gain: 1, rate: 1.5, pan: -0.5, drive: 0.25)])
+  #expect(await runner.takeLiveAudioVoices(runID: runID).isEmpty)
+  await runner.endLivePreview(runID: runID)
+}
 
 @Test func flurryFilePathValidatesAgainstWorkflowFolder() async throws {
   let examples = URL(fileURLWithPath: #filePath)
@@ -347,4 +692,79 @@ import Testing
   let attack = try await frame(1, x: 0.5, y: 0.5,
     actionCount: 1, runID: attackRun)
   #expect(attack.planarRGB != idle.planarRGB)
+}
+
+private let sharedStateTestSource = """
+  #include <metal_stdlib>
+  using namespace metal;
+  struct U { float4 a; uint4 frame; float4 p[4]; float4 b; float4 c; };
+  struct V { float4 position [[position]]; float2 uv; };
+  kernel void fillTable(device float4 *table [[buffer(1)]]) {
+    table[0] = float4(0.25f, 0.5f, 0.75f, 1.0f);
+  }
+  kernel void step(device uint *state [[buffer(1)]]) { state[0] += 1u; }
+  vertex V screen(uint id [[vertex_id]]) {
+    float2 uv = float2((id << 1) & 2, id & 2);
+    return {float4(uv * 2.0f - 1.0f, 0.0f, 1.0f), uv};
+  }
+  fragment float4 paint(V in [[stage_in]], device const float4 *table [[buffer(1)]],
+    device const uint *state [[buffer(2)]]) {
+    return table[0] * float(state[0] % 5u) / 4.0f;
+  }
+  fragment float4 show(V in [[stage_in]], texture2d<float> scratch [[texture(1)]]) {
+    return scratch.read(uint2(in.position.xy));
+  }
+  """
+
+private let sharedStateTestProgram = """
+  {"version":1,"resources":[{"name":"table","kind":"buffer","bytes":16},
+  {"name":"state","kind":"buffer","bytes":4},{"name":"scratch","kind":"texture"},
+  {"name":"display","kind":"texture"}],
+  "initialize":[{"kind":"compute","function":"fillTable","threads":[1],
+  "buffers":{"1":"table"}}],
+  "tick":[{"kind":"compute","function":"step","threads":[1],"buffers":{"1":"state"}}],
+  "present":[{"kind":"render","vertex":"screen","fragment":"paint","target":"scratch",
+  "load":"clear","vertexCount":3,"fragmentBuffers":{"1":"table","2":"state"}},
+  {"kind":"render","vertex":"screen","fragment":"show","target":"display",
+  "load":"clear","vertexCount":3,"fragmentTextures":{"1":"scratch"}}],
+  "swaps":[],"output":"display"}
+  """
+
+@Test func gpuProgramFramesShareOnlyStateTheyCannotChange() async throws {
+  let device = try #require(MTLCreateSystemDefaultDevice())
+  let runner = PipelineGPUProgram(commandQueue: try #require(device.makeCommandQueue()))
+  let node = PipelineNode(id: .init(rawValue: "program"), kind: .gpuProgram,
+    parameters: ["framesPerSecond": .number(30), "seed": .integer(1)])
+  let inputs: [String: PipelineNodeValue] = [
+    "program": .init(sharedStateTestProgram, type: .string),
+    "source": .init(sharedStateTestSource, type: .string),
+    "width": .init(Int64(8), type: .integer),
+    "height": .init(Int64(8), type: .integer),
+  ]
+  let executor = PipelineGPUProgram.executor(runner: runner)
+  let runID = UUID()
+  func frame(_ index: Int64) async throws -> [Float] {
+    let context = PipelineNodeExecutionContext(semanticSHA256: "shared-state",
+      invocation: .init(values: [PipelineInvocation.loopCallIndexKey: .integer(index)]),
+      sourceMediaRoot: nil, packageRootsByID: [:], nodeIndex: 0,
+      nodeCount: 1, progress: { _ in }, runID: runID)
+    let output = try await executor.execute(node, inputs: inputs, context: context)
+    return try #require(output.outputs["image"]?.value(as: PipelineImageInput.self)).rgba
+  }
+  let first = try await frame(0)
+  await runner.commit(runID: runID)
+  let shared = try await runner.sharedResourceNames(programJSON: sharedStateTestProgram)
+  #expect(shared.readOnly == ["table"])
+  #expect(shared.scratch == ["scratch"])
+
+  // A discarded frame leaves no trace in the state the next attempt starts from.
+  let second = try await frame(1)
+  #expect(second != first)
+  await runner.discard(runID: runID)
+  #expect(try await frame(1) == second)
+  await runner.commit(runID: runID)
+  let third = try await frame(2)
+  #expect(third != second)
+  // Three ticks: the table's colour at 3/4, premultiplied by its alpha.
+  #expect(abs(third[0] - 0.25 * 0.75 * 0.75) < 0.002)
 }

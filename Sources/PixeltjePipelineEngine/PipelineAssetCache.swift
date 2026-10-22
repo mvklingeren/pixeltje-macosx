@@ -20,6 +20,8 @@ public struct PipelineAssetBundle: Sendable {
 /// File-backed audio is copied so a changed source file cannot silently change
 /// a cached value.
 actor PipelineAssetCache {
+  private let persistentStore: PipelinePersistentAssetStore?
+  private var documentID: String?
   private var runID: UUID?
   private var fingerprintsByNodeID: [PipelineNodeID: String] = [:]
   private var retainedNodeIDs: Set<PipelineNodeID> = []
@@ -29,6 +31,11 @@ actor PipelineAssetCache {
   private var copiedAudio: [PipelineNodeID: [URL]] = [:]
   private var byteCount = 0
   private var temporaryDirectory: URL?
+  private var restoredNodeIDs: Set<PipelineNodeID> = []
+
+  init(persistentDirectory: URL? = nil) {
+    persistentStore = persistentDirectory.map(PipelinePersistentAssetStore.init(root:))
+  }
 
   deinit {
     if let temporaryDirectory {
@@ -36,14 +43,32 @@ actor PipelineAssetCache {
     }
   }
 
-  func begin(runID: UUID, fingerprintsByNodeID: [PipelineNodeID: String],
+  func begin(runID: UUID, documentID: String,
+    fingerprintsByNodeID: [PipelineNodeID: String],
     retainedNodeIDs: Set<PipelineNodeID>) {
-    guard self.runID != runID || self.fingerprintsByNodeID != fingerprintsByNodeID
+    guard self.runID != runID || self.documentID != documentID
+      || self.fingerprintsByNodeID != fingerprintsByNodeID
       || self.retainedNodeIDs != retainedNodeIDs else { return }
     let kept = Set(bundles.keys).intersection(retainedNodeIDs).filter {
+      self.documentID == documentID &&
       bundleFingerprints[$0] == fingerprintsByNodeID[$0]
     }
     removeBundles(except: Set(kept))
+    restoredNodeIDs.removeAll()
+    if let persistentStore {
+      for nodeID in retainedNodeIDs.subtracting(kept) {
+        guard let fingerprint = fingerprintsByNodeID[nodeID],
+          let restored = persistentStore.load(documentID: documentID,
+            nodeID: nodeID, fingerprint: fingerprint) else { continue }
+        guard byteCount + restored.bytes <= 134_217_728 else { continue }
+        bundles[nodeID] = restored.bundle
+        bundleFingerprints[nodeID] = fingerprint
+        bundleBytes[nodeID] = restored.bytes
+        byteCount += restored.bytes
+        restoredNodeIDs.insert(nodeID)
+      }
+    }
+    self.documentID = documentID
     self.runID = runID
     self.fingerprintsByNodeID = fingerprintsByNodeID
     self.retainedNodeIDs = retainedNodeIDs
@@ -57,11 +82,24 @@ actor PipelineAssetCache {
 
   func contains(_ nodeID: PipelineNodeID) -> Bool { bundles[nodeID] != nil }
 
-  func clear(_ nodeID: PipelineNodeID) {
-    removeBundles(except: Set(bundles.keys).subtracting([nodeID]))
+  func takeRestoredPreviewFlag(_ nodeID: PipelineNodeID) -> Bool {
+    restoredNodeIDs.remove(nodeID) != nil
   }
 
-  func clearAll() { clear() }
+  func clear(_ nodeID: PipelineNodeID, documentID: String? = nil) {
+    removeBundles(except: Set(bundles.keys).subtracting([nodeID]))
+    restoredNodeIDs.remove(nodeID)
+    if let documentID = documentID ?? self.documentID {
+      persistentStore?.clear(documentID: documentID, nodeID: nodeID)
+    }
+  }
+
+  func clearAll() {
+    if let documentID { persistentStore?.clear(documentID: documentID) }
+    clearInMemory()
+  }
+
+  func clearInMemory() { clearInMemoryState() }
 
   static func preview(nodeID: PipelineNodeID, slot: String,
     value: PipelineNodeValue, graphSHA256: String) -> PipelineAssetPreview? {
@@ -106,7 +144,7 @@ actor PipelineAssetCache {
         semanticPipelineSHA256: graphSHA256, alpha: alpha))
   }
 
-  private func clear() {
+  private func clearInMemoryState() {
     bundles.removeAll()
     bundleFingerprints.removeAll()
     bundleBytes.removeAll()
@@ -119,6 +157,8 @@ actor PipelineAssetCache {
     runID = nil
     fingerprintsByNodeID = [:]
     retainedNodeIDs.removeAll()
+    restoredNodeIDs.removeAll()
+    documentID = nil
   }
 
   private func removeBundles(except kept: Set<PipelineNodeID>) {
@@ -139,9 +179,10 @@ actor PipelineAssetCache {
   static func executor(cache: PipelineAssetCache) -> PipelineNodeExecutor {
     .init(kind: .assetCache, validate: { node in
       let count = node.parameters["slotCount"]?.integerValue ?? 1
-      guard (1...16).contains(count) else {
+      guard PipelineAssetCacheSlots.range.contains(count) else {
         return [.init(severity: .error, code: .invalidParameter,
-          message: "Asset Cache needs 1–16 slots.", nodeID: node.id)]
+          message: "Asset Cache needs 1–\(PipelineAssetCacheSlots.range.upperBound) slots.",
+          nodeID: node.id)]
       }
       return []
     }) { node, inputs, _ in
@@ -232,6 +273,11 @@ actor PipelineAssetCache {
     bundleBytes[nodeID] = bytes
     if !copies.isEmpty { copiedAudio[nodeID] = copies }
     byteCount += bytes
+    if retainedNodeIDs.contains(nodeID), let documentID,
+      let fingerprint = fingerprintsByNodeID[nodeID] {
+      persistentStore?.save(bundle, documentID: documentID,
+        nodeID: nodeID, fingerprint: fingerprint)
+    }
     committed = true
     return bundle
   }

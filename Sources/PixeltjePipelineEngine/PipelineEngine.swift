@@ -101,10 +101,20 @@ public actor PixeltjePipelineEngine {
   private var cachedPreparedPipeline: PreparedPipeline?
   private var cachedAssetFingerprintGraphSHA256: String?
   private var cachedAssetFingerprints: [PipelineNodeID: String] = [:]
+  private struct SceneSwitchSession {
+    let runID: UUID?
+    let graphSHA256: String
+    let nextCallIndex: Int64
+    let activeScene: Int
+    let sceneFrames: [Int64]
+  }
+  private var committedSceneSwitches: [PipelineNodeID: SceneSwitchSession] = [:]
+  private var pendingSceneSwitches: [PipelineNodeID: SceneSwitchSession] = [:]
 
   public init(
     device: any MTLDevice,
     commandQueue: any MTLCommandQueue,
+    persistentAssetCacheDirectory: URL? = nil,
     additionalNodeDescriptors: [PipelineNodeDescriptor] = [],
     additionalNodeExecutors: [PipelineNodeExecutor] = []
   ) {
@@ -121,7 +131,8 @@ public actor PixeltjePipelineEngine {
     self.gpuProgram = gpuProgram
     let imageCache = PipelineImageCache()
     self.imageCache = imageCache
-    let assetCache = PipelineAssetCache()
+    let assetCache = PipelineAssetCache(
+      persistentDirectory: persistentAssetCacheDirectory)
     self.assetCache = assetCache
     let zImagePipeline = ZImageCoreAIPipeline(commandQueue: commandQueue)
     let imageClassifier = PipelineCoreAIImageClassifier(commandQueue: commandQueue)
@@ -141,6 +152,7 @@ public actor PixeltjePipelineEngine {
 
   /// A CLI host can run model-free node graphs without Metal.
   public init(
+    persistentAssetCacheDirectory: URL? = nil,
     additionalNodeDescriptors: [PipelineNodeDescriptor] = [],
     additionalNodeExecutors: [PipelineNodeExecutor] = []
   ) {
@@ -155,7 +167,8 @@ public actor PixeltjePipelineEngine {
     gpuProgram = nil
     let imageCache = PipelineImageCache()
     self.imageCache = imageCache
-    let assetCache = PipelineAssetCache()
+    let assetCache = PipelineAssetCache(
+      persistentDirectory: persistentAssetCacheDirectory)
     self.assetCache = assetCache
     self.registry = registry
     var nativeExecutors = Dictionary(
@@ -167,6 +180,7 @@ public actor PixeltjePipelineEngine {
   }
 
   public static func makeDefault(
+    persistentAssetCacheDirectory: URL? = nil,
     additionalNodeDescriptors: [PipelineNodeDescriptor] = [],
     additionalNodeExecutors: [PipelineNodeExecutor] = []
   ) throws -> PixeltjePipelineEngine {
@@ -176,6 +190,7 @@ public actor PixeltjePipelineEngine {
     return PixeltjePipelineEngine(
       device: device,
       commandQueue: commandQueue,
+      persistentAssetCacheDirectory: persistentAssetCacheDirectory,
       additionalNodeDescriptors: additionalNodeDescriptors,
       additionalNodeExecutors: additionalNodeExecutors)
   }
@@ -209,9 +224,11 @@ public actor PixeltjePipelineEngine {
   /// Updates only the transient pointer used by a direct GPU Program preview.
   /// Saved and replayed graph calls continue to use their invocation values.
   public func updateLiveGPUProgramPointer(runID: UUID, nodeID: PipelineNodeID,
-    revision: UInt64, x: Double, y: Double, actionCount: Int) async {
+    revision: UInt64, x: Double, y: Double, actionCount: Int,
+    secondaryActionCount: Int = 0) async {
     await gpuProgram?.updateLivePointer(runID: runID, nodeID: nodeID,
-      revision: revision, x: x, y: y, actionCount: actionCount)
+      revision: revision, x: x, y: y, actionCount: actionCount,
+      secondaryActionCount: secondaryActionCount)
   }
 
   public func liveMetalPreview(runID: UUID) async throws -> PipelineMetalPreviewFrame? {
@@ -234,6 +251,21 @@ public actor PixeltjePipelineEngine {
     }
     let selected = selectedOutputNode(in: document)
     let terminalInputs = document.connections.filter { $0.input.nodeID == selected?.id }
+    let previewNode = document.nodes.first { $0.id == nodeID }
+    let directMetal = previewNode.map {
+      $0.kind == .renderMetal || $0.kind == .gpuProgram
+    } ?? false
+    let switchedMetal = previewNode?.kind == .sceneSwitch
+      && (0..<Int(previewNode?.parameters["sceneCount"]?.integerValue ?? 2))
+        .allSatisfy { index in
+          document.connections.contains { connection in
+            connection.input == .init(nodeID: nodeID, port: "scene\(index)")
+              && connection.output.port == "image"
+              && document.nodes.contains {
+                $0.id == connection.output.nodeID && $0.kind == .gpuProgram
+              }
+          }
+        }
     guard meshRenderer != nil || gpuProgram != nil,
       let output = selected, output.kind == .imageOutput,
       document.connections.contains(where: {
@@ -244,20 +276,26 @@ public actor PixeltjePipelineEngine {
         $0.output == .init(nodeID: nodeID, port: "image")
           && $0.input.port == "image"
       }),
-      document.nodes.contains(where: {
-        $0.id == nodeID && ($0.kind == .renderMetal || $0.kind == .gpuProgram)
-          && $0.executionState == .enabled
-      }) else {
+      previewNode?.executionState == .enabled,
+      directMetal || switchedMetal else {
       throw PipelineEngineError.invalidInvocation(
-        "Live Metal preview requires a direct Metal Render or GPU Program to Image Output graph.")
+        "Live Metal preview needs a direct Metal node or Scene Switch to Image Output.")
     }
     let prepared = try prepare(document)
-    let previewOutput = try await executeNodeGraph(prepared, sourceMediaRoot: sourceMediaRoot,
-      packageRootsByID: packageRootsByID, invocation: invocation,
-      progress: progress, trace: nil, traceRunID: runID, traceCall: 1,
-      livePreviewTarget: (runID, nodeID))
-    await gpuProgram?.commit(runID: runID)
-    return previewOutput
+    do {
+      let previewOutput = try await executeNodeGraph(prepared,
+        sourceMediaRoot: sourceMediaRoot,
+        packageRootsByID: packageRootsByID, invocation: invocation,
+        progress: progress, trace: nil, traceRunID: runID, traceCall: 1,
+        livePreviewTarget: (runID, nodeID))
+      await gpuProgram?.commit(runID: runID)
+      commitSceneSwitches(runID: runID)
+      return previewOutput
+    } catch {
+      await gpuProgram?.discard(runID: runID)
+      discardSceneSwitches(runID: runID)
+      throw error
+    }
   }
 
   public func endLiveMetalPreview(runID: UUID) async {
@@ -267,12 +305,28 @@ public actor PixeltjePipelineEngine {
     await assetCache.end(runID: runID)
   }
 
-  public func clearCachedAssets(for nodeID: PipelineNodeID) async {
-    await assetCache.clear(nodeID)
+  /// Audio requested by the last successfully committed live GPU frame.
+  public func takeLiveMetalAudioEvents(runID: UUID) async -> [URL] {
+    await gpuProgram?.takeLiveAudioEvents(runID: runID) ?? []
+  }
+
+  /// Looping GPU Program voices of the frames committed since the last call;
+  /// empty when no program with voices ran.
+  public func takeLiveMetalAudioVoices(runID: UUID) async -> [PipelineGPUAudioVoice] {
+    await gpuProgram?.takeLiveAudioVoices(runID: runID) ?? []
+  }
+
+  public func clearCachedAssets(for nodeID: PipelineNodeID,
+    documentID: PipelineID? = nil) async {
+    await assetCache.clear(nodeID, documentID: documentID?.rawValue)
   }
 
   public func clearAllCachedAssets() async {
     await assetCache.clearAll()
+  }
+
+  public func discardCachedAssetsInMemory() async {
+    await assetCache.clearInMemory()
   }
 
   public func executionProfile(for document: PipelineDocument) -> PipelineExecutionProfile? {
@@ -380,26 +434,46 @@ public actor PixeltjePipelineEngine {
         "Workflow-family ABIs are no longer executable; use native node graphs.")
     }
     let prepared = try prepare(document)
-    let output = try await executeNodeGraph(
-      prepared,
-      sourceMediaRoot: sourceMediaRoot,
-      packageRootsByID: packageRootsByID,
-      invocation: invocation,
-      progress: progress,
-      trace: trace, traceRunID: traceRunID, traceCall: traceCall)
-    if invocation[PipelineInvocation.gpuProgramDeferredCommitKey] != .boolean(true) {
-      await gpuProgram?.commit(runID: traceRunID)
+    do {
+      let output = try await executeNodeGraph(
+        prepared,
+        sourceMediaRoot: sourceMediaRoot,
+        packageRootsByID: packageRootsByID,
+        invocation: invocation,
+        progress: progress,
+        trace: trace, traceRunID: traceRunID, traceCall: traceCall)
+      if invocation[PipelineInvocation.gpuProgramDeferredCommitKey] != .boolean(true) {
+        await gpuProgram?.commit(runID: traceRunID)
+        commitSceneSwitches(runID: traceRunID)
+      }
+      return output
+    } catch {
+      await gpuProgram?.discard(runID: traceRunID)
+      discardSceneSwitches(runID: traceRunID)
+      throw error
     }
-    return output
   }
 
   /// Called by a host after saving and publishing the frame from a deferred run.
   public func commitGPUProgramFrame(runID: UUID) async {
     await gpuProgram?.commit(runID: runID)
+    commitSceneSwitches(runID: runID)
   }
 
   public func discardGPUProgramFrame(runID: UUID) async {
     await gpuProgram?.discard(runID: runID)
+    discardSceneSwitches(runID: runID)
+  }
+
+  private func commitSceneSwitches(runID: UUID?) {
+    for (nodeID, session) in pendingSceneSwitches where session.runID == runID {
+      committedSceneSwitches[nodeID] = session
+      pendingSceneSwitches[nodeID] = nil
+    }
+  }
+
+  private func discardSceneSwitches(runID: UUID?) {
+    pendingSceneSwitches = pendingSceneSwitches.filter { $0.value.runID != runID }
   }
 
   public func validate(_ document: PipelineDocument) -> PipelineValidationReport {
@@ -753,10 +827,49 @@ public actor PixeltjePipelineEngine {
     return kinds.count == 1 ? kinds.first ?? .none : .none
   }
 
-  private func executionNodeIDs(in document: PipelineDocument) -> Set<PipelineNodeID> {
+  private func sceneSwitchSelections(
+    _ prepared: PreparedPipeline, invocation: PipelineInvocation,
+    runID: UUID?
+  ) throws -> (callIndex: Int64, scenes: [PipelineNodeID: Int],
+    frames: [PipelineNodeID: [Int64]]) {
+    let callIndex = try invocation.integer(
+      for: PipelineInvocation.loopCallIndexKey, default: 0)
+    guard callIndex >= 0 else {
+      throw PipelineEngineError.invalidInvocation(
+        "Scene Switch call index must be non-negative.")
+    }
+    var scenes: [PipelineNodeID: Int] = [:]
+    var frames: [PipelineNodeID: [Int64]] = [:]
+    let relevant = executionNodeIDs(in: prepared.document)
+    for node in prepared.document.nodes where node.kind == .sceneSwitch
+      && node.executionState == .enabled && relevant.contains(node.id) {
+      let initial = Int(node.parameters["initialScene"]?.integerValue ?? 0)
+      if callIndex == 0 {
+        scenes[node.id] = initial
+        frames[node.id] = [Int64](repeating: 0,
+          count: Int(node.parameters["sceneCount"]?.integerValue ?? 2))
+      } else if let saved = committedSceneSwitches[node.id],
+        saved.runID == runID,
+        saved.graphSHA256 == prepared.semanticSHA256,
+        saved.nextCallIndex == callIndex {
+        scenes[node.id] = saved.activeScene
+        frames[node.id] = saved.sceneFrames
+      } else {
+        throw PipelineEngineError.invalidInvocation(
+          "Scene Switch needs sequential Loop calls; restart at call zero.")
+      }
+    }
+    return (Int64(callIndex), scenes, frames)
+  }
+
+  private func executionNodeIDs(
+    in document: PipelineDocument,
+    activeScenes: [PipelineNodeID: Int] = [:]
+  ) -> Set<PipelineNodeID> {
     if let output = selectedOutputNode(in: document) {
       return includingCacheStoreAncestors(
-        executionNodeIDs(for: output, in: document), in: document)
+        executionNodeIDs(for: output, in: document,
+          activeScenes: activeScenes), in: document)
     }
     // Without a result sink, evaluate the connected work and discard its
     // transient values. Unconnected output sinks cannot consume any value.
@@ -787,7 +900,8 @@ public actor PixeltjePipelineEngine {
 
   private func reachableNodeIDs(
     from outputID: PipelineNodeID, in document: PipelineDocument,
-    stopAtCacheStores: Bool = false
+    stopAtCacheStores: Bool = false,
+    activeScenes: [PipelineNodeID: Int] = [:]
   ) -> Set<PipelineNodeID> {
     let incoming = Dictionary(grouping: document.connections, by: \.input.nodeID)
     let nodes = Dictionary(uniqueKeysWithValues: document.nodes.map { ($0.id, $0) })
@@ -800,20 +914,29 @@ public actor PixeltjePipelineEngine {
           (node.parameters["mode"]?.stringValue ?? "store") == "store") {
         continue
       }
-      pending.append(contentsOf: (incoming[nodeID] ?? []).map(\.output.nodeID))
+      let edges = (incoming[nodeID] ?? []).filter { edge in
+        guard let active = activeScenes[nodeID],
+          nodes[nodeID]?.kind == .sceneSwitch else { return true }
+        return edge.input.port == "scene\(active)"
+          || edge.input.port == "request\(active)"
+      }
+      pending.append(contentsOf: edges.map(\.output.nodeID))
     }
     return reachable
   }
 
   private func executionNodeIDs(
-    for output: PipelineNode, in document: PipelineDocument
+    for output: PipelineNode, in document: PipelineDocument,
+    activeScenes: [PipelineNodeID: Int] = [:]
   ) -> Set<PipelineNodeID> {
-    var reachable = reachableNodeIDs(from: output.id, in: document)
+    var reachable = reachableNodeIDs(from: output.id, in: document,
+      activeScenes: activeScenes)
     // Preview sinks are observable graph results even when they do not feed
     // the primary output. Their producers must run in the same evaluation.
     for preview in document.nodes where preview.executionState == .enabled
       && (preview.kind == .imagePreview || preview.kind == .videoPreview) {
-      reachable.formUnion(reachableNodeIDs(from: preview.id, in: document))
+      reachable.formUnion(reachableNodeIDs(from: preview.id, in: document,
+        activeScenes: activeScenes))
     }
     return reachable
   }
@@ -832,6 +955,9 @@ public actor PixeltjePipelineEngine {
     let document = prepared.document
     let outputNode = selectedOutputNode(in: document)
     let runID = traceRunID ?? UUID()
+    let switchState = try sceneSwitchSelections(prepared,
+      invocation: invocation, runID: traceRunID)
+    let activeScenes = switchState.scenes
     await imageCache.begin(runID: runID, graphSHA256: prepared.semanticSHA256)
     let retainedAssetNodes = Set(document.nodes.filter {
       $0.kind == .assetCache && $0.executionState == .enabled
@@ -848,10 +974,11 @@ public actor PixeltjePipelineEngine {
       cachedAssetFingerprintGraphSHA256 = prepared.semanticSHA256
       cachedAssetFingerprints = assetCacheFingerprints
     }
-    await assetCache.begin(runID: runID,
+    await assetCache.begin(runID: runID, documentID: document.id.rawValue,
       fingerprintsByNodeID: assetCacheFingerprints,
       retainedNodeIDs: retainedAssetNodes)
-    let baseReachable = executionNodeIDs(in: document)
+    let baseReachable = executionNodeIDs(in: document,
+      activeScenes: activeScenes)
     let cacheNodes = document.nodes.filter { $0.kind == .imageCache &&
       $0.executionState == .enabled }
     let stores = Dictionary(uniqueKeysWithValues: cacheNodes.filter {
@@ -866,22 +993,24 @@ public actor PixeltjePipelineEngine {
       guard let writer = stores[key] else {
         throw PipelineEngineError.planningFailed("Image Cache has no store for \(key).")
       }
-      preflight.formUnion(reachableNodeIDs(from: writer, in: document))
+      preflight.formUnion(reachableNodeIDs(from: writer, in: document,
+        activeScenes: activeScenes))
     }
     for node in document.nodes where node.kind == .assetCache
       && node.executionState == .enabled && baseReachable.contains(node.id) {
       if !(await assetCache.contains(node.id)) {
-        preflight.formUnion(reachableNodeIDs(from: node.id, in: document))
+        preflight.formUnion(reachableNodeIDs(from: node.id, in: document,
+          activeScenes: activeScenes))
       }
     }
     var mainReachable: Set<PipelineNodeID> = []
     if let outputNode {
       mainReachable = reachableNodeIDs(from: outputNode.id, in: document,
-        stopAtCacheStores: true)
+        stopAtCacheStores: true, activeScenes: activeScenes)
       for preview in document.nodes where preview.executionState == .enabled &&
         (preview.kind == .imagePreview || preview.kind == .videoPreview) {
         mainReachable.formUnion(reachableNodeIDs(from: preview.id, in: document,
-          stopAtCacheStores: true))
+          stopAtCacheStores: true, activeScenes: activeScenes))
       }
     } else {
       mainReachable = baseReachable
@@ -921,6 +1050,9 @@ public actor PixeltjePipelineEngine {
       var inputs: [String: PipelineNodeValue] = [:]
       for connection in incoming[nodeID] ?? [] {
         if assetCacheIsFilled { break }
+        if let active = activeScenes[nodeID], node.kind == .sceneSwitch,
+          connection.input.port != "scene\(active)",
+          connection.input.port != "request\(active)" { continue }
         guard let value = values[connection.output] else {
           if descriptor.input(named: connection.input.port)?.isRequired == false {
             continue
@@ -935,14 +1067,28 @@ public actor PixeltjePipelineEngine {
         }
         inputs[connection.input.port] = value
       }
+      if let active = activeScenes[nodeID], node.kind == .sceneSwitch {
+        inputs["__activeScene"] = PipelineNodeValue(Int64(active), type: .integer)
+      }
       await progress(.init(
         stage: .generating, message: node.title ?? node.kind.rawValue,
         completedUnitCount: index, totalUnitCount: ordered.count,
         activeNodeIDs: [nodeID]))
       try Task.checkCancellation()
+      var nodeInvocation = invocation
+      if node.kind == .gpuProgram,
+        let owner = activeScenes.first(where: { entry in
+          document.connections.contains {
+            $0.output == .init(nodeID: nodeID, port: "image")
+              && $0.input == .init(nodeID: entry.key,
+                port: "scene\(entry.value)")
+          }
+        }), let frame = switchState.frames[owner.key]?[owner.value] {
+        nodeInvocation.values[PipelineInvocation.loopCallIndexKey] = .integer(frame)
+      }
       let context = PipelineNodeExecutionContext(
         semanticSHA256: prepared.semanticSHA256,
-        invocation: invocation,
+        invocation: nodeInvocation,
         sourceMediaRoot: sourceMediaRoot,
         packageRootsByID: packageRootsByID,
         nodeIndex: index,
@@ -952,12 +1098,44 @@ public actor PixeltjePipelineEngine {
         requestedOutputPorts: Set(document.connections.filter {
           $0.output.nodeID == nodeID
         }.map(\.output.port)), document: document)
+      if let target = livePreviewTarget,
+        let active = activeScenes[target.nodeID],
+        node.kind == .gpuProgram,
+        document.connections.contains(where: {
+          $0.output == .init(nodeID: nodeID, port: "image")
+            && $0.input == .init(nodeID: target.nodeID,
+              port: "scene\(active)")
+        }) {
+        guard let gpuProgram else {
+          throw PipelineEngineError.invalidInvocation("GPU preview needs a Metal device.")
+        }
+        let request = try await gpuProgram.captureLivePreview(node: node,
+          inputs: inputs, context: context)
+        let switchNode = nodes[target.nodeID]!
+        let count = Int(switchNode.parameters["sceneCount"]?.integerValue ?? 2)
+        guard request == -1 || (0..<Int64(count)).contains(request) else {
+          throw PipelineEngineError.invalidInvocation(
+            "Scene Switch request must be -1 or a connected scene index.")
+        }
+        var frames = switchState.frames[target.nodeID]!
+        frames[active] += 1
+        pendingSceneSwitches[target.nodeID] = SceneSwitchSession(
+          runID: traceRunID, graphSHA256: prepared.semanticSHA256,
+          nextCallIndex: switchState.callIndex + 1,
+          activeScene: request == -1 ? active : Int(request),
+          sceneFrames: frames)
+        await progress(.init(stage: .completed,
+          message: "Scene Switch preview ready.",
+          completedUnitCount: ordered.count,
+          totalUnitCount: ordered.count))
+        return .none
+      }
       if let livePreviewTarget, nodeID == livePreviewTarget.nodeID {
         if node.kind == .gpuProgram {
           guard let gpuProgram else {
             throw PipelineEngineError.invalidInvocation("GPU preview needs a Metal device.")
           }
-          try await gpuProgram.captureLivePreview(node: node,
+          _ = try await gpuProgram.captureLivePreview(node: node,
             inputs: inputs, context: context)
         } else {
           guard let meshRenderer else {
@@ -996,6 +1174,21 @@ public actor PixeltjePipelineEngine {
           }
           values[.init(nodeID: nodeID, port: port)] = value
         }
+        if node.kind == .sceneSwitch, let active = activeScenes[nodeID] {
+          let count = Int(node.parameters["sceneCount"]?.integerValue ?? 2)
+          let request = inputs["request\(active)"]?.value(as: Int64.self) ?? -1
+          guard request == -1 || (0..<Int64(count)).contains(request) else {
+            throw PipelineEngineError.invalidInvocation(
+              "Scene Switch request must be -1 or a connected scene index.")
+          }
+          var frames = switchState.frames[nodeID]!
+          frames[active] += 1
+          pendingSceneSwitches[nodeID] = SceneSwitchSession(
+            runID: traceRunID, graphSHA256: prepared.semanticSHA256,
+            nextCallIndex: switchState.callIndex + 1,
+            activeScene: request == -1 ? active : Int(request),
+            sceneFrames: frames)
+        }
         for connection in document.connections where connection.output.nodeID == nodeID
           && nodes[connection.input.nodeID]?.kind == .assetCache {
           guard let value = result.outputs[connection.output.port], value.type == .image,
@@ -1008,7 +1201,10 @@ public actor PixeltjePipelineEngine {
             completedUnitCount: index + 1, totalUnitCount: ordered.count,
             assetPreview: assetPreview, activeNodeIDs: [nodeID]))
         }
-        if node.kind == .assetCache, !assetCacheIsFilled,
+        let publishRestoredAssetPreview = node.kind == .assetCache
+          ? await assetCache.takeRestoredPreviewFlag(nodeID) : false
+        if node.kind == .assetCache,
+          (!assetCacheIsFilled || publishRestoredAssetPreview),
           let bundle = result.outputs["assets"]?.value(as: PipelineAssetBundle.self) {
           for (slot, value) in bundle.values.sorted(by: { $0.key < $1.key }) {
             guard let assetPreview = PipelineAssetCache.preview(nodeID: nodeID,

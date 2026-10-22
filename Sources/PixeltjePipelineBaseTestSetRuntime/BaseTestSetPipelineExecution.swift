@@ -1084,6 +1084,10 @@ private extension Value {
       if let latent = wrapped.value(as: PipelineLatent.self) { return .latent(latent) }
     case .schedule:
       if let schedule = wrapped.value(as: [Double].self) { return .schedule(schedule) }
+    case .audio:
+      if let audio = wrapped.value(as: PipelineGeneratedAudio.self) {
+        return .audio(audio.fileURL)
+      }
     default: break
     }
     throw BaseTestSetError.invalid(

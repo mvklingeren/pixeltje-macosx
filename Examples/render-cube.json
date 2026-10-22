@@ -50,21 +50,47 @@
       "executionState": "enabled"
     },
     {
-      "id": "spin",
-      "kind": "math.expression",
-      "title": "Spin: 5 degrees per frame",
+      "id": "angle",
+      "kind": "primitive.float",
+      "title": "Starting Y angle: 35 degrees",
       "parameters": {
-        "expression": "a*5"
+        "value": {
+          "$type": "number",
+          "value": 35
+        }
       },
       "resources": {},
       "executionState": "enabled"
     },
     {
-      "id": "offset",
-      "kind": "math.expression",
-      "title": "Starting Y angle: 35 degrees",
+      "id": "timeline",
+      "kind": "control.timeline",
+      "title": "Ease one revolution",
       "parameters": {
-        "expression": "a+35"
+        "frameCount": {
+          "$type": "integer",
+          "value": 72
+        },
+        "framesPerSecond": {
+          "$type": "number",
+          "value": 30
+        },
+        "tracks": [
+          {
+            "path": "",
+            "interpolation": "easeInOut",
+            "keyframes": [
+              {
+                "frame": { "$type": "integer", "value": 0 },
+                "value": { "$type": "number", "value": 35 }
+              },
+              {
+                "frame": { "$type": "integer", "value": 71 },
+                "value": { "$type": "number", "value": 395 }
+              }
+            ]
+          }
+        ]
       },
       "resources": {},
       "executionState": "enabled"
@@ -171,12 +197,13 @@
     {
       "id": "loop",
       "kind": "control.loop",
-      "title": "Spin until Cancel",
+      "title": "Repeat eased revolutions",
       "parameters": {
         "maxCalls": {
           "$type": "integer",
-          "value": -1
+          "value": 72
         },
+        "autoRepeat": true,
         "delayMilliseconds": {
           "$type": "integer",
           "value": 33
@@ -193,7 +220,7 @@
       "kind": "edit.markdownNote",
       "title": "How it works",
       "parameters": {
-        "text": "# Spinning cube\nRun Pipeline (Command-Return) to spin; Cancel stops the loop. Eight XYZ vertices and twelve counterclockwise triangles define a unit cube. Mesh from Vertices computes flat face normals. Each frame uses rotation Y = 35 + callIndex * 5 degrees with a fixed 25-degree X tilt. Camera Matrices looks from (0,0,4) toward the origin. Metal Render uses projection × view × world and outputs a transparent, antialiased sRGB image plus a separate coverage mask. Image Preview updates each frame; Image Output saves PNG frames. The 33 ms delay starts after rendering and saving, so this is workflow animation, not guaranteed 30 fps playback. Loop is Infinite by default; set Max calls to 72 for one revolution."
+        "text": "# Spinning cube\nRun Pipeline (Command-Return) to spin; Cancel stops the loop. Eight XYZ vertices and twelve counterclockwise triangles define a unit cube. Mesh from Vertices computes flat face normals. Timeline eases Y rotation from 35 to 395 degrees over 72 frames; Loop auto-repeats that cycle. A fixed 25-degree X tilt remains. Camera Matrices looks from (0,0,4) toward the origin. Metal Render uses projection × view × world and outputs a transparent, antialiased sRGB image plus a separate coverage mask. Image Preview updates each frame; Image Output saves PNG frames. The 33 ms delay starts after rendering and saving, so this is workflow animation, not guaranteed 30 fps playback. Turn off Auto repeat to stop after one revolution."
       },
       "resources": {},
       "executionState": "enabled"
@@ -234,32 +261,21 @@
       }
     },
     {
-      "id": "loop.callIndex->spin.a",
+      "id": "angle.value->timeline.value",
       "output": {
-        "nodeID": "loop",
-        "port": "callIndex"
+        "nodeID": "angle",
+        "port": "value"
       },
       "input": {
-        "nodeID": "spin",
-        "port": "a"
+        "nodeID": "timeline",
+        "port": "value"
       }
     },
     {
-      "id": "spin.number->offset.a",
+      "id": "timeline.value->world.rotationY",
       "output": {
-        "nodeID": "spin",
-        "port": "number"
-      },
-      "input": {
-        "nodeID": "offset",
-        "port": "a"
-      }
-    },
-    {
-      "id": "offset.number->world.rotationY",
-      "output": {
-        "nodeID": "offset",
-        "port": "number"
+        "nodeID": "timeline",
+        "port": "value"
       },
       "input": {
         "nodeID": "world",
@@ -412,11 +428,11 @@
         "x": 0,
         "y": 440
       },
-      "spin": {
+      "angle": {
         "x": 320,
         "y": 440
       },
-      "offset": {
+      "timeline": {
         "x": 320,
         "y": 600
       },

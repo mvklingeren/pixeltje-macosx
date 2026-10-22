@@ -1,0 +1,179 @@
+{
+  "width": 960,
+  "height": 540,
+  "views": [
+    {
+      "name": "mausoleum-aisle-east",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [48, -0.75, 100, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.06] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "mausoleum-front-east",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [48, -0.75, 124, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.2] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "mausoleum-door-east",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [48.6, -0.75, 132.5, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.12] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "mausoleum-quarter-west",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-37, -0.75, 127, -2.44] },
+        { "buffer": "game", "offset": 16, "floats": [0.12] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "mausoleum-above-east",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [62, 14, 120, -2.53] },
+        { "buffer": "game", "offset": 16, "floats": [-0.45] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "mausoleum-haunted-east",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [48.6, -0.75, 132.5, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.12] },
+        { "buffer": "game", "offset": 560, "floats": [100] },
+        { "buffer": "game", "offset": 9552, "floats": [97.2, 0, 0.95, 122] }
+      ]
+    },
+    {
+      "name": "yard-from-back-gate",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [0, -0.75, 150, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.08] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "barn-door",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-20, -0.75, 148, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.14] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "barn-inside",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-22, -0.75, 161, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.3] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "open-shed-front",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [8, -0.75, 168, 1.5708] },
+        { "buffer": "game", "offset": 16, "floats": [0.1] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "open-shed-inside",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [19, -0.75, 164, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.15] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "yard-above",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [0, 30, 128, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [-0.5] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "house-from-yard",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [0, -0.75, 162, 0.0] },
+        { "buffer": "game", "offset": 16, "floats": [0.2] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "cottage-approach",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [0, 2.0, 30, -2.159] },
+        { "buffer": "game", "offset": 16, "floats": [0.06] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "cottage-front",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-36, 2.0, 40, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.15] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "cottage-porch",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-35, 2.0, 46, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.22] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "cottage-chimney-west",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-50, 2.0, 46, 2.214] },
+        { "buffer": "game", "offset": 16, "floats": [0.2] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "cottage-back",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-26, 2.0, 66, -0.833] },
+        { "buffer": "game", "offset": 16, "floats": [0.15] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "cottage-haunted",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-36, 2.0, 42, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.15] },
+        { "buffer": "game", "offset": 560, "floats": [100] },
+        { "buffer": "game", "offset": 9552, "floats": [97.2, 0, 0.95, 122] }
+      ]
+    }
+  ]
+}

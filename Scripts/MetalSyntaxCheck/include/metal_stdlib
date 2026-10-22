@@ -1,0 +1,63 @@
+// Stands in for <metal_stdlib> when check.py parses a GPU Program shader as
+// C++ for OpenCL. It covers the Metal syntax and library the example shaders
+// use, for syntax and type checking only; nothing here runs. Extend it when a
+// shader that compiles with Apple's Metal compiler fails here, and keep that
+// shader's previous revision compiling cleanly as the reference.
+#pragma once
+#define device __global
+#define thread __private
+// Metal's constant space maps to __global: OpenCL cannot copy a struct out of
+// __constant through an implicit copy constructor.
+#define constant __global const
+#define local local_
+#define global global_
+#define private private_
+#define kernel
+#define vertex
+#define fragment
+
+template <class T, class U> inline T as_type(U u) { return __builtin_bit_cast(T, u); }
+inline float saturate(float x) { return clamp(x, 0.0f, 1.0f); }
+inline float2 saturate(float2 x) { return clamp(x, 0.0f, 1.0f); }
+inline float3 saturate(float3 x) { return clamp(x, 0.0f, 1.0f); }
+inline float4 saturate(float4 x) { return clamp(x, 0.0f, 1.0f); }
+inline float abs(float x) { return fabs(x); }
+inline float2 abs(float2 x) { return fabs(x); }
+inline float3 abs(float3 x) { return fabs(x); }
+inline float4 abs(float4 x) { return fabs(x); }
+inline float fract(float x) { return x - floor(x); }
+inline float2 fract(float2 x) { return x - floor(x); }
+inline float3 fract(float3 x) { return x - floor(x); }
+inline float4 fract(float4 x) { return x - floor(x); }
+inline float3 reflect(float3 i, float3 n) { return i - 2.0f * dot(n, i) * n; }
+struct float2x2 {
+  float2 c[2];
+  float2x2(float2 a, float2 b) { c[0] = a; c[1] = b; }
+  float2x2(float a, float b, float d, float e) { c[0] = (float2)(a, b); c[1] = (float2)(d, e); }
+  float2 operator[](int i) const { return c[i]; }
+};
+inline float2x2 operator/(float2x2 m, float s) { return float2x2(m.c[0] / s, m.c[1] / s); }
+inline float2 operator*(float2x2 m, float2 v) { return m.c[0] * v.x + m.c[1] * v.y; }
+struct float3x3 {
+  float3 c[3];
+  float3x3() {}
+  float3x3(float3 a, float3 b, float3 d) { c[0] = a; c[1] = b; c[2] = d; }
+  float3 operator[](int i) const { return c[i]; }
+};
+inline float3 operator*(float3x3 m, float3 v) { return m.c[0] * v.x + m.c[1] * v.y + m.c[2] * v.z; }
+inline float3x3 transpose(float3x3 m) {
+  return float3x3((float3)(m.c[0].x, m.c[1].x, m.c[2].x),
+    (float3)(m.c[0].y, m.c[1].y, m.c[2].y), (float3)(m.c[0].z, m.c[1].z, m.c[2].z));
+}
+namespace coord { enum E { normalized }; }
+namespace address { enum E { clamp_to_edge, repeat }; }
+namespace filter { enum E { linear, nearest }; }
+namespace mip_filter { enum E { linear, nearest }; }
+struct max_anisotropy { constexpr max_anisotropy(int) {} };
+struct sampler { template <class... A> constexpr sampler(A...) {} };
+struct gradient2d { gradient2d(float2, float2) {} };
+template <class T> struct texture2d {
+  float4 sample(sampler, float2) const;
+  float4 sample(sampler, float2, gradient2d) const;
+};
+namespace metal {}

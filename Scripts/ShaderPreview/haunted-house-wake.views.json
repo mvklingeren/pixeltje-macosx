@@ -1,0 +1,85 @@
+{
+  "width": 960,
+  "height": 540,
+  "views": [
+    {
+      "name": "front-quiet",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [0, 0.5, 78, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.12] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "front-0.8s-lights-out",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [0, 0.5, 78, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.12] },
+        { "buffer": "game", "offset": 560, "floats": [100] },
+        { "buffer": "game", "offset": 9552, "floats": [99.2, 0, 0.95, 122] }
+      ]
+    },
+    {
+      "name": "front-1.9s-wind-in-the-dark",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [0, 0.5, 78, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.12] },
+        { "buffer": "game", "offset": 560, "floats": [100] },
+        { "buffer": "game", "offset": 9552, "floats": [98.1, 0, 0.95, 122] }
+      ]
+    },
+    {
+      "name": "front-2.6s-green-on",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [0, 0.5, 78, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.12] },
+        { "buffer": "game", "offset": 560, "floats": [100] },
+        { "buffer": "game", "offset": 9552, "floats": [97.4, 0, 0.95, 122] }
+      ]
+    },
+    {
+      "name": "ground-windows-2.8s",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-6, 0.6, 102, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.08] },
+        { "buffer": "game", "offset": 560, "floats": [100] },
+        { "buffer": "game", "offset": 9552, "floats": [97.2, 0, 0.95, 122] }
+      ]
+    },
+    {
+      "name": "ground-windows-3.2s",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-6, 0.6, 102, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.08] },
+        { "buffer": "game", "offset": 560, "floats": [100.4] },
+        { "buffer": "game", "offset": 9552, "floats": [97.2, 0, 0.95, 122] }
+      ]
+    },
+    {
+      "name": "upper-windows-2.8s",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [6, 1.5, 96, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.32] },
+        { "buffer": "game", "offset": 560, "floats": [100] },
+        { "buffer": "game", "offset": 9552, "floats": [97.2, 0, 0.95, 122] }
+      ]
+    },
+    {
+      "name": "parlour-inside-2.8s",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-10, 0.75, 125, 0] },
+        { "buffer": "game", "offset": 16, "floats": [0.05] },
+        { "buffer": "game", "offset": 560, "floats": [100] },
+        { "buffer": "game", "offset": 9552, "floats": [97.2, 0, 0.95, 122] }
+      ]
+    }
+  ]
+}

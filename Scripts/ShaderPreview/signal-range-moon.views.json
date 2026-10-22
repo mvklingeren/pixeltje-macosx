@@ -1,0 +1,41 @@
+{
+  "width": 960,
+  "height": 540,
+  "views": [
+    {
+      "name": "exit-door",
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 12, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0] }
+      ]
+    },
+    {
+      "name": "moon-south",
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 25, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [-0.05] }
+      ]
+    },
+    {
+      "name": "moon-sun-behind",
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 25, 1.5708] },
+        { "buffer": "game", "offset": 16, "floats": [-0.05] }
+      ]
+    },
+    {
+      "name": "moon-into-sun",
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 25, -1.5708] },
+        { "buffer": "game", "offset": 16, "floats": [0.05] }
+      ]
+    },
+    {
+      "name": "base-shell",
+      "writes": [
+        { "buffer": "game", "floats": [0, 6, 45, 0] },
+        { "buffer": "game", "offset": 16, "floats": [-0.05] }
+      ]
+    }
+  ]
+}

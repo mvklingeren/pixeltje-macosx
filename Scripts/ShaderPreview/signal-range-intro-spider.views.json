@@ -1,0 +1,17 @@
+{
+  "width": 1152,
+  "height": 720,
+  "views": [
+    { "name": "drop-1.2s", "frames": 12, "pointer": [0.5, 0.5, 0, 0.1] },
+    { "name": "bounce-2.0s", "frames": 20, "pointer": [0.5, 0.5, 0, 0.1] },
+    { "name": "eye-crosshair-3.0s", "frames": 30, "pointer": [0.5, 0.5, 0, 0.1] },
+    { "name": "blink-3.8s", "frames": 38, "pointer": [0.5, 0.5, 0, 0.1] },
+    { "name": "stare-4.6s", "frames": 46, "pointer": [0.5, 0.5, 0, 0.1] },
+    { "name": "creep-6.0s", "frames": 60, "pointer": [0.5, 0.5, 0, 0.1] },
+    { "name": "creep-pause-7.7s", "frames": 77, "pointer": [0.5, 0.5, 0, 0.1] },
+    { "name": "creep-low-9.2s", "frames": 92, "pointer": [0.5, 0.5, 0, 0.1] },
+    { "name": "exit-10.0s", "frames": 100, "pointer": [0.5, 0.5, 0, 0.1] },
+    { "name": "thread-fade-11.0s", "frames": 110, "pointer": [0.5, 0.5, 0, 0.1] },
+    { "name": "gone-12.0s", "frames": 120, "pointer": [0.5, 0.5, 0, 0.1] }
+  ]
+}

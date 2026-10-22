@@ -1,0 +1,325 @@
+{
+  "width": 960,
+  "height": 540,
+  "views": [
+    {
+      "name": "minute-00",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            26,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.06
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "minute-01",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            26,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.06
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            60.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "minute-02",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            26,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.06
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            120.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "minute-03",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            26,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.06
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            180.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "minute-04",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            26,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.06
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            240.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "minute-05",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            26,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.06
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            300.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "minute-06",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            26,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.06
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            360.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "minute-07",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            26,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.06
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            420.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "minute-08",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            26,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.06
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            480.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "minute-09",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            26,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.06
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            540.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "minute-10",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            26,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.06
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            600.0
+          ]
+        }
+      ]
+    }
+  ]
+}

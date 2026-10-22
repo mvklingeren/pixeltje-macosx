@@ -31,6 +31,28 @@ DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer xcrun swift test
 Keep this override local to the command unless the maintainer explicitly wants
 to change the machine-wide `xcode-select` setting.
 
+### Metal shader compiler
+
+The Metal compiler for the macOS 27 Xcode beta is installed in an Apple-managed
+cryptex mount, separate from `XcodeDefault.xctoolchain`. On this machine it is:
+
+```text
+/private/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v27.1.5237.12.FCakB8/Metal.xctoolchain/usr/bin/metal
+```
+
+The versioned mount name may change after a toolchain update. Rediscover it with
+`find /private/var/run/com.apple.security.cryptexd/mnt -path '*/Metal.xctoolchain/usr/bin/metal' -print`.
+`xcrun metal` can report a missing Metal Toolchain even while this compiler is
+mounted. Invoke the mounted compiler directly, and put its Clang module cache
+in a writable location when running inside Codex's sandbox. For example:
+
+```sh
+/private/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v27.1.5237.12.FCakB8/Metal.xctoolchain/usr/bin/metal \
+  -c -std=metal3.2 -target air64-apple-macos27.0 \
+  -fmodules-cache-path=/private/tmp/pixeltje-metal-module-cache \
+  Examples/SignalRangeFPSProgram.metal -o /private/tmp/SignalRangeFPSProgram.air
+```
+
 ### SwiftPM builds in the Codex sandbox
 
 SwiftPM cannot compile the package manifest in Codex's default workspace
@@ -136,6 +158,46 @@ existing nodes are insufficient. A general request for a new workflow does
 not grant permission to add node kinds. An explicit instruction to implement
 an already proposed node kind does grant that permission.
 
+### GPU Program compile time
+
+Metal compiles each GPU Program kernel and render pipeline the first time it
+runs and then caches the result, so a warm reload says nothing about cost.
+Cold compile time grows far faster than kernel complexity: one added feature
+can turn seconds into many minutes, and every shader edit and every other
+machine pays it again. Signal Range crossed that cliff three times:
+
+- Its single tick kernel took 132 s once the fur-coated spider hit test joined
+  the spider AI. Split into movement and shooting passes, they compiled in
+  0.5 s and 0.3 s.
+- Restarting a match from `advanceRange` pulled the path-network generator
+  into the per-frame tick, which then took over 90 s. As its own pass the
+  restart compiles in 0.1 s.
+- Each spider's line-of-sight scene trace, in the same loop body as the new
+  route following, made the spider AI take about a minute. Tracing the sight
+  lines in their own pass and storing one flag per spider brought the AI to
+  4.4 s, with the sensing pass at 0.1 s.
+
+In every case the expensive pattern was heavy work combined in one loop body
+or one kernel. Each part compiled in seconds on its own, and the same helpers
+in straight-line code compiled quickly.
+
+- Keep one concern per kernel. When a tick kernel grows, split it at a natural
+  seam into ordered tick passes; passes run in order over the same buffers, so
+  behaviour is unchanged.
+- Never reach one-time work from a per-frame kernel. Procedural generation,
+  graph or route-network building and full resets belong in the initialize
+  pass, or in a dedicated tick pass that acts only when the state asks for it.
+- Keep scene traces and other heavy queries out of loops that also do heavy
+  decision work. Run the queries in an earlier pass and store their results
+  in the state for the decision pass to read.
+- Measure the cold compile of every pipeline you add or change before you
+  finish. Make each entry point's code unique so the cache misses, for example
+  with a never-true early return that compares `thread_position_in_grid` or
+  the fragment position against a random constant, then time
+  `makeComputePipelineState` and `makeRenderPipelineState` on the resolved
+  source. Treat more than about 10 s for one pipeline as a defect, and report
+  the timings.
+
 ## Visual verification
 
 Visual inspection of the running application is always done by the human
@@ -143,11 +205,73 @@ maintainer, never by an agent. Do not use computer use, screen capture,
 AppleScript or System Events, accessibility clicking, or any other UI automation
 to look at or drive this app.
 
-Agents verify their work with `swift build`, code reading, and the tests chosen
-by the maintainer under the test execution preference above.
+Agents verify their work with `swift build`, code reading, offline render
+previews where they apply (below), and the tests chosen by the maintainer under
+the test execution preference above.
 When a change needs to be seen, say how to launch it (for example
 `swift run PixeltjeMacApp "/path/to/photo.RAF"`) and what to look at, then leave
 the looking to the maintainer.
+
+### Offline render previews
+
+Rendering shader source offscreen with the preview harness is not inspection
+of the running application, and agents are expected to do it. Whenever you add
+or change pixel-producing code that can run without the app (GPU Program
+shaders in `Examples/*.metal`, the opt-in Metal libraries, and the example
+pipelines built on them), render the old and the new source from the same
+views, look at the images, and tune before reporting. Show the maintainer the
+before/after pair. Their look at the running app remains the final check,
+because these renders skip live input, the editor's presentation, and any node
+upstream of the GPU Program other than primitives.
+
+The harness lives in [`Scripts/ShaderPreview`](Scripts/ShaderPreview/). It
+reads a workflow's `gpu.program` node and its primitive inputs, resolves the
+source through the engine's own `PipelineMetalLibraries` and
+`PipelineSystemFont` code, runs `initialize`, `tick` and `present` the way
+`PipelineGPUProgram` does, and writes one PNG per view. A views file lists the
+views. Each one sets how many frames to tick, pointer and movement input,
+parameter overrides, and raw writes into state buffers. Writes land after the
+ticks, so a view can place the camera or set game state such as a target that
+has been shot. The format is documented at the top of
+[`main.swift`](Scripts/ShaderPreview/main.swift), and
+[`fps-3d-starter.views.json`](Scripts/ShaderPreview/fps-3d-starter.views.json)
+is a worked example:
+
+```sh
+git show HEAD:Examples/FPS3DStarterProgram.metal > "$scratch/old.metal"
+Scripts/ShaderPreview/render-preview.sh Examples/shader-fps-3d-starter.pixpipeline.json \
+  Scripts/ShaderPreview/fps-3d-starter.views.json "$scratch/preview" \
+  --before "$scratch/old.metal"
+```
+
+- With `--before`, each PNG shows the old source on the left and the current
+  source on the right.
+- Open each PNG with the Read tool so it appears inline in the session.
+- Write images to the session scratchpad, never into the repository.
+- Commit a views file next to the harness when a workflow is worth previewing
+  again.
+- The script builds with the Xcode beta toolchain unless `DEVELOPER_DIR` is
+  set, and rebuilds only when its sources change. In Codex's sandbox it needs
+  the same escalation as a SwiftPM build.
+- A shader compile error surfaces here and doubles as the shader's build
+  check.
+- Generated image inputs render as mid grey unless the views file maps their
+  asset port to an image. Audio events and looping audio voices are ignored.
+- Use `--node` when a workflow has more than one GPU Program.
+
+Where Apple's Metal compiler is unavailable, such as in a Linux agent
+container, `Scripts/MetalSyntaxCheck/check.py <Shader.metal>` parses a shader
+with its libraries and includes as C++ for OpenCL through a Metal shim, and
+evaluates its static asserts. Run it on the shader's previous revision
+(`--rev`) as well, so remaining errors belong to the change. It is a syntax and
+type check only: still say that the shader was not built with Metal, rendered
+or run.
+
+Choose views that exercise the change: the default start, a close-up, the angle
+that shows a new effect such as a cast shadow or halo, and each relevant game
+state. Place cameras by reasoning about scene coordinates, then confirm the
+framing in the image. An effect too weak to see in any view counts as a
+finding, not a pass.
 
 ## Toolbar containers
 

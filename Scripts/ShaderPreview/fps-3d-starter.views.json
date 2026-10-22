@@ -1,0 +1,22 @@
+{
+  "width": 960,
+  "height": 540,
+  "views": [
+    {
+      "name": "start",
+      "writes": [{ "buffer": "game", "floats": [0, 1.6, 5, 0, 0, 0, 0, 1] }]
+    },
+    {
+      "name": "near-orb",
+      "writes": [{ "buffer": "game", "floats": [-2.5, 1.6, -1.5, 0.45, -0.1, 0, 0, 1] }]
+    },
+    {
+      "name": "crate-shadow",
+      "writes": [{ "buffer": "game", "floats": [1.5, 1.6, 3, 0.38, -0.4, 0, 0, 1] }]
+    },
+    {
+      "name": "target-shot",
+      "writes": [{ "buffer": "game", "floats": [0, 1.6, 5, 0, 0, 0, 0, 0] }]
+    }
+  ]
+}

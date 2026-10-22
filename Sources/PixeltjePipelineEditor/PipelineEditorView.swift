@@ -1281,6 +1281,7 @@ struct PipelineGraphMetrics {
     case .videoOutput: return 90
     case .assetCache: return 180
     case .trackpad: return 194
+    case .directionPad: return 104
     case .controlLoop: return 72
     case .markdownNote: return 156
     default: return 0
@@ -1292,19 +1293,20 @@ struct PipelineGraphMetrics {
     let stored = document.presentation?.nodeSizes[node.id.rawValue]
     if node.kind == .imagePreview || node.kind == .videoPreview
       || node.kind == .renderMetal || node.kind == .gpuProgram
+      || node.kind == .sceneSwitch
       || node.kind == .assetCache
       || node.kind == .markdownNote || node.kind == .trackpad
       || node.kind == .primitiveString {
       let defaultWidth: CGFloat = switch node.kind {
       case .imagePreview, .videoPreview: previewWidth
-      case .renderMetal, .gpuProgram: metalRenderWidth
+      case .renderMetal, .gpuProgram, .sceneSwitch: metalRenderWidth
       case .assetCache: metalRenderWidth
       case .markdownNote, .primitiveString: 270
       default: standardWidth
       }
       let defaultHeight: CGFloat = switch node.kind {
       case .imagePreview, .videoPreview: previewHeight
-      case .renderMetal, .gpuProgram: metalRenderHeight
+      case .renderMetal, .gpuProgram, .sceneSwitch: metalRenderHeight
       case .assetCache: metalRenderHeight
       default: requiredHeight
       }
@@ -1602,6 +1604,20 @@ private struct PipelineGraphView: View {
           resetTrackpad: { model.resetTrackpad(for: node.id) },
           canTriggerTrackpadAction: model.canTriggerTrackpadAction(for: node.id),
           triggerTrackpadAction: { model.triggerTrackpadAction(for: node.id) },
+          canTriggerTrackpadSecondaryAction:
+            model.canTriggerTrackpadSecondaryAction(for: node.id),
+          triggerTrackpadSecondaryAction: {
+            model.triggerTrackpadSecondaryAction(for: node.id)
+          },
+          spaceTriggersTrackpadSecondaryAction:
+            model.spaceTriggersTrackpadSecondaryAction(for: node.id),
+          setTrackpadSpaceAction: {
+            model.setParameter(.string($0 ? "secondary" : "primary"),
+              named: "spaceAction", for: node.id)
+          },
+          directionPadX: model.directionPadX,
+          directionPadY: model.directionPadY,
+          directionPadKeys: model.directionPadKeys,
           setLoopAutoPause: { model.setLoopAutoPause($0, for: node.id) },
           proceedLoop: { model.proceedLoop(node.id) },
           stopLoop: model.stopLoopAfterCurrentCall,
@@ -2043,6 +2059,13 @@ private struct PipelineNodeCard: View {
   let resetTrackpad: () -> Void
   let canTriggerTrackpadAction: Bool
   let triggerTrackpadAction: () -> Void
+  let canTriggerTrackpadSecondaryAction: Bool
+  let triggerTrackpadSecondaryAction: () -> Void
+  let spaceTriggersTrackpadSecondaryAction: Bool
+  let setTrackpadSpaceAction: (Bool) -> Void
+  let directionPadX: Double
+  let directionPadY: Double
+  let directionPadKeys: Int
   let setLoopAutoPause: @MainActor @Sendable (Bool) -> Void
   let proceedLoop: () -> Void
   let stopLoop: () -> Void
@@ -2061,7 +2084,7 @@ private struct PipelineNodeCard: View {
       specialContent
       portRows
       if node.kind == .imagePreview || node.kind == .renderMetal
-        || node.kind == .gpuProgram {
+        || node.kind == .gpuProgram || node.kind == .sceneSwitch {
         imagePreviewContent
       } else if node.kind == .videoPreview {
         videoPreviewContent
@@ -2100,6 +2123,7 @@ private struct PipelineNodeCard: View {
     .overlay(alignment: .bottomTrailing) {
       if node.kind == .imagePreview || node.kind == .videoPreview
         || node.kind == .renderMetal || node.kind == .gpuProgram
+        || node.kind == .sceneSwitch
         || node.kind == .assetCache
         || node.kind == .markdownNote || node.kind == .trackpad
         || node.kind == .primitiveString {
@@ -2135,6 +2159,7 @@ private struct PipelineNodeCard: View {
     case .trackpad: "Resize Trackpad"
     case .renderMetal: "Resize Metal render preview"
     case .gpuProgram: "Resize GPU program preview"
+    case .sceneSwitch: "Resize Scene Switch preview"
     default: "Resize image preview"
     }
   }
@@ -2231,7 +2256,8 @@ private struct PipelineNodeCard: View {
 
   private var assetSlotCount: Int {
     if case .integer(let count)? = node.parameters["slotCount"] {
-      return Int(min(max(count, 1), 16))
+      return Int(min(max(count, PipelineAssetCacheSlots.range.lowerBound),
+        PipelineAssetCacheSlots.range.upperBound))
     }
     return 1
   }
@@ -2245,11 +2271,13 @@ private struct PipelineNodeCard: View {
     if node.kind == .assetCache {
       VStack(alignment: .leading, spacing: 4) {
         Stepper("Slots: \(assetSlotCount)", value: Binding(
-          get: { assetSlotCount }, set: setAssetSlotCount), in: 1...16)
+          get: { assetSlotCount }, set: setAssetSlotCount),
+          in: Int(PipelineAssetCacheSlots.range.lowerBound)...Int(
+            PipelineAssetCacheSlots.range.upperBound))
           .font(.caption)
           .disabled(!isEditable)
         HStack {
-          Toggle("Keep between runs", isOn: Binding(
+          Toggle("Keep between runs and launches", isOn: Binding(
             get: { keepAssetsBetweenRuns }, set: setKeepAssetsBetweenRuns))
             .font(.caption)
             .disabled(!isEditable)
@@ -2429,7 +2457,7 @@ private struct PipelineNodeCard: View {
       let padAspect = livePixelSize.map { $0.width / max($0.height, 1) }
         ?? previewImage.map { $0.size.width / max($0.size.height, 1) }
         ?? PipelineGraphMetrics.trackpadAspectRatio
-      let padWidth = min(cardSize.width - 20, (contentHeight - 84) * padAspect)
+      let padWidth = min(cardSize.width - 20, (contentHeight - 112) * padAspect)
       VStack(spacing: 10) {
         PipelineTrackpadView(
           image: previewImage,
@@ -2439,6 +2467,7 @@ private struct PipelineNodeCard: View {
           y: trackpadCoordinate("y"),
           showsControls: true,
           isEnabled: canEditTrackpad,
+          hoverPosition: nil,
           beginEditing: beginTrackpadEdit,
           setPosition: setTrackpadPosition,
           endEditing: endTrackpadEdit)
@@ -2452,19 +2481,64 @@ private struct PipelineNodeCard: View {
             (trackpadCoordinate("x") == 0.5 && trackpadCoordinate("y") == 0.5))
           .accessibilityLabel("Reset trackpad position")
           .help("Center the trackpad")
-          Button("Action", action: triggerTrackpadAction)
-            .frame(maxWidth: .infinity)
-            .disabled(!canTriggerTrackpadAction)
-            .keyboardShortcut(.space, modifiers: [])
-            .help("Press Space or click to trigger the connected action")
+          if spaceTriggersTrackpadSecondaryAction {
+            Button("Action", action: triggerTrackpadAction)
+              .frame(maxWidth: .infinity)
+              .disabled(!canTriggerTrackpadAction)
+              .help("Click to trigger Action; Space triggers Action 2")
+          } else {
+            Button("Action", action: triggerTrackpadAction)
+              .frame(maxWidth: .infinity)
+              .disabled(!canTriggerTrackpadAction)
+              .keyboardShortcut(.space, modifiers: [])
+              .help("Press Space or click to trigger Action")
+          }
+          if canTriggerTrackpadSecondaryAction {
+            if spaceTriggersTrackpadSecondaryAction {
+              Button("Action 2", action: triggerTrackpadSecondaryAction)
+                .frame(maxWidth: .infinity)
+                .keyboardShortcut(.space, modifiers: [])
+                .help("Press Space or click to trigger Action 2")
+            } else {
+              Button("Action 2", action: triggerTrackpadSecondaryAction)
+                .frame(maxWidth: .infinity)
+                .keyboardShortcut("j", modifiers: [])
+                .help("Press J, right-click in a captured preview, or click to trigger Action 2")
+            }
+          }
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
         .frame(width: padWidth, height: 24)
+        Picker("Spacebar", selection: Binding(
+          get: { spaceTriggersTrackpadSecondaryAction },
+          set: { setTrackpadSpaceAction($0) })) {
+          Text("Action").tag(false)
+          Text("Action 2").tag(true)
+        }
+        .pickerStyle(.menu)
+        .controlSize(.small)
+        .disabled(!isEditable)
+        .frame(width: padWidth)
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
       .padding(10)
       .frame(height: contentHeight)
+    } else if node.kind == .directionPad {
+      VStack(spacing: 4) {
+        directionKey("W", active: directionPadY > 0)
+        HStack(spacing: 4) {
+          directionKey("A", active: directionPadX < 0)
+          directionKey("S", active: directionPadY < 0)
+          directionKey("D", active: directionPadX > 0)
+        }
+        Text(directionPadKeys == 0 ? "Focus preview to move"
+          : "Keys " + heldDirectionPadKeys)
+          .font(.caption2)
+          .foregroundStyle(.secondary)
+      }
+      .frame(maxWidth: .infinity)
+      .frame(height: PipelineGraphMetrics.contentHeight(for: node))
     } else if node.kind == .controlLoop {
       VStack(alignment: .leading, spacing: 6) {
         Toggle("Auto pause", isOn: Binding(
@@ -2566,7 +2640,8 @@ private struct PipelineNodeCard: View {
       }
     }
     .overlay(alignment: .bottomLeading) {
-      if node.kind == .renderMetal || node.kind == .gpuProgram,
+      if node.kind == .renderMetal || node.kind == .gpuProgram
+        || node.kind == .sceneSwitch,
         livePreview != nil || previewImage != nil,
         let previewPixelSize {
         Text("\(Int(previewPixelSize.width)) × \(Int(previewPixelSize.height))")
@@ -2631,6 +2706,22 @@ private struct PipelineNodeCard: View {
     return value.isFinite ? min(max(value, 0), 1) : 0.5
   }
 
+  private var heldDirectionPadKeys: String {
+    (PipelineDirectionPadKeys.letters + PipelineDirectionPadKeys.digits)
+      .filter { directionPadKeys & (PipelineDirectionPadKeys.bit(for: $0) ?? 0) != 0 }
+      .map { $0.uppercased() }
+      .joined(separator: " ")
+  }
+
+  private func directionKey(_ label: String, active: Bool) -> some View {
+    Text(label)
+      .font(.system(.caption, design: .monospaced).weight(.semibold))
+      .frame(width: 32, height: 26)
+      .foregroundStyle(active ? Color.white : Color.primary)
+      .background(active ? Color.accentColor : Color.secondary.opacity(0.15),
+        in: RoundedRectangle(cornerRadius: 5))
+  }
+
   private var imageSourceName: String? {
     if let imageFileURL { return imageFileURL.lastPathComponent }
     guard case .string(let sourceName) = node.parameters["sourceName"], !sourceName.isEmpty else {
@@ -2675,6 +2766,7 @@ struct PipelineTrackpadView: View {
   let y: Double
   let showsControls: Bool
   let isEnabled: Bool
+  let hoverPosition: ((Double, Double) -> Void)?
   let beginEditing: () -> Void
   let setPosition: (Double, Double) -> Void
   let endEditing: () -> Void
@@ -2729,22 +2821,30 @@ struct PipelineTrackpadView: View {
               isDragging = true
               beginEditing()
             }
-            updatePosition(value.location, in: geometry.size)
+            updatePosition(value.location, in: geometry.size, using: setPosition)
           }
           .onEnded { value in
             guard isDragging else { return }
-            updatePosition(value.location, in: geometry.size)
+            updatePosition(value.location, in: geometry.size, using: setPosition)
             isDragging = false
             endEditing()
           })
+      .onContinuousHover { phase in
+        guard isEnabled && !isDragging, let hoverPosition else { return }
+        if case .active(let location) = phase {
+          updatePosition(location, in: geometry.size, using: hoverPosition)
+        }
+      }
       .accessibilityLabel("Trackpad position")
-      .accessibilityValue("X \(x.formatted(.number.precision(.fractionLength(2)))), Y \(y.formatted(.number.precision(.fractionLength(2))))")
+      .accessibilityValue(hoverPosition != nil ? "Move pointer to look around"
+        : "X \(x.formatted(.number.precision(.fractionLength(2)))), Y \(y.formatted(.number.precision(.fractionLength(2))))")
     }
   }
 
-  private func updatePosition(_ point: CGPoint, in size: CGSize) {
+  private func updatePosition(_ point: CGPoint, in size: CGSize,
+    using update: (Double, Double) -> Void) {
     guard size.width > 0, size.height > 0 else { return }
-    setPosition(
+    update(
       min(max(Double(point.x / size.width), 0), 1),
       min(max(Double(point.y / size.height), 0), 1))
   }

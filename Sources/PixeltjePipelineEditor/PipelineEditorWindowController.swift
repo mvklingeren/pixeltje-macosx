@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import CoreGraphics
 import PixeltjeModelDesign
 import PixeltjePipelineDomain
 import PixeltjePipelineEngine
@@ -40,6 +41,9 @@ final class PipelineEditorWindowController: NSWindowController, NSMenuItemValida
       model.primaryExecutionAction()
       return true
     }
+    window.onDirectionKey = { [weak model] characters, pressed in
+      model?.setDirectionKey(characters, pressed: pressed) ?? false
+    }
     window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
     window.setContentSize(NSSize(width: 1_260, height: 780))
     window.minSize = NSSize(width: 940, height: 620)
@@ -73,6 +77,24 @@ final class PipelineEditorWindowController: NSWindowController, NSMenuItemValida
         DispatchQueue.main.async { self?.updateWindowTitle() }
       }
       .store(in: &observations)
+    NotificationCenter.default.publisher(for: NSApplication.willResignActiveNotification)
+      .sink { [weak self] _ in
+        MainActor.assumeIsolated {
+          (self?.previewWindow as? PipelineFullScreenPreviewWindow)?.releaseCursor()
+        }
+      }
+      .store(in: &observations)
+    NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+      .sink { [weak self] _ in
+        MainActor.assumeIsolated {
+          guard let preview = self?.previewWindow as? PipelineFullScreenPreviewWindow,
+            preview.styleMask.contains(.fullScreen) else { return }
+          DispatchQueue.main.async { [weak preview] in
+            _ = preview?.captureCursorIfPossible()
+          }
+        }
+      }
+      .store(in: &observations)
     updateWindowTitle()
   }
 
@@ -94,12 +116,37 @@ final class PipelineEditorWindowController: NSWindowController, NSMenuItemValida
         model.endTrackpadEdit(for: previewTrackpadNodeID)
         self.previewTrackpadNodeID = nil
       }
+      model.clearDirectionKeys()
       model.setFullScreenPreviewNode(nil)
       previewWindow = nil
       return
     }
     model.cancelExecution()
     previewWindow?.close()
+  }
+
+  func windowDidResignKey(_ notification: Notification) {
+    (notification.object as? PipelineFullScreenPreviewWindow)?.releaseCursor()
+    model.clearDirectionKeys()
+  }
+
+  func windowDidBecomeKey(_ notification: Notification) {
+    guard let preview = notification.object as? PipelineFullScreenPreviewWindow,
+      preview.styleMask.contains(.fullScreen) else { return }
+    DispatchQueue.main.async { [weak preview] in
+      _ = preview?.captureCursorIfPossible()
+    }
+  }
+
+  func windowDidEnterFullScreen(_ notification: Notification) {
+    guard let preview = notification.object as? PipelineFullScreenPreviewWindow else { return }
+    DispatchQueue.main.async { [weak preview] in
+      _ = preview?.captureCursorIfPossible()
+    }
+  }
+
+  func windowDidExitFullScreen(_ notification: Notification) {
+    (notification.object as? PipelineFullScreenPreviewWindow)?.releaseCursor()
   }
 
   private func showPreviewFullScreen(for nodeID: PipelineNodeID) {
@@ -116,15 +163,36 @@ final class PipelineEditorWindowController: NSWindowController, NSMenuItemValida
     let isGPUProgram = model.document.nodes.contains {
       $0.id == nodeID && $0.kind == .gpuProgram
     }
+    let usesRelativeLook = trackpadNodeID != nil
+      && model.hasMovementPad(forGPUProgramPreview: nodeID)
+    preview.usesRelativeLook = usesRelativeLook
+    preview.acceptsMouseMovedEvents = usesRelativeLook
+    preview.onLookDelta = { [weak model] x, y in
+      guard let trackpadNodeID else { return }
+      model?.addPreviewLookDelta(x: x, y: y, for: trackpadNodeID)
+    }
     let fpsHUD = PipelinePreviewFPSHUD()
     if isGPUProgram {
       preview.onUnmodifiedF = { fpsHUD.showsFPS.toggle() }
     }
     preview.onUnmodifiedSpace = { [weak model] in
+      guard let model, let trackpadNodeID else { return false }
+      return model.triggerTrackpadSpaceAction(for: trackpadNodeID)
+    }
+    preview.onPrimaryClick = { [weak model] in
       guard let model, let trackpadNodeID,
         model.canTriggerTrackpadAction(for: trackpadNodeID) else { return false }
       model.triggerTrackpadAction(for: trackpadNodeID)
       return true
+    }
+    preview.onUnmodifiedJ = { [weak model] in
+      guard let model, let trackpadNodeID,
+        model.canTriggerTrackpadSecondaryAction(for: trackpadNodeID) else { return false }
+      model.triggerTrackpadSecondaryAction(for: trackpadNodeID)
+      return true
+    }
+    preview.onDirectionKey = { [weak model] characters, pressed in
+      model?.setDirectionKey(characters, pressed: pressed) ?? false
     }
     preview.title = "Pipeline Image Preview"
     preview.collectionBehavior.insert(.fullScreenPrimary)
@@ -133,7 +201,10 @@ final class PipelineEditorWindowController: NSWindowController, NSMenuItemValida
     preview.contentViewController = NSHostingController(rootView:
       PipelineFullScreenPreviewView(
         model: model, nodeID: nodeID, trackpadNodeID: trackpadNodeID,
-        isGPUProgram: isGPUProgram, fpsHUD: fpsHUD))
+        isGPUProgram: isGPUProgram, usesRelativeLook: usesRelativeLook,
+        captureCursor: { [weak preview] in
+          preview?.captureCursorIfPossible() ?? false
+        }, fpsHUD: fpsHUD))
     preview.center()
     previewWindow = preview
     previewTrackpadNodeID = trackpadNodeID
@@ -585,6 +656,8 @@ private struct PipelineFullScreenPreviewView: View {
   let nodeID: PipelineNodeID
   let trackpadNodeID: PipelineNodeID?
   let isGPUProgram: Bool
+  let usesRelativeLook: Bool
+  let captureCursor: () -> Bool
   @ObservedObject var fpsHUD: PipelinePreviewFPSHUD
 
   var body: some View {
@@ -609,6 +682,11 @@ private struct PipelineFullScreenPreviewView: View {
               y: position.y,
               showsControls: false,
               isEnabled: model.canEditTrackpad,
+              hoverPosition: { x, y in
+                if !usesRelativeLook || !captureCursor() {
+                  model.setPreviewLookPosition(x: x, y: y, for: trackpadNodeID)
+                }
+              },
               beginEditing: { model.beginTrackpadEdit(for: trackpadNodeID) },
               setPosition: { x, y in
                 model.setTrackpadPosition(x: x, y: y, for: trackpadNodeID)
@@ -627,14 +705,29 @@ private struct PipelineFullScreenPreviewView: View {
         } else {
           ContentUnavailableView("No preview yet", systemImage: "photo")
         }
-        if let trackpadNodeID, model.canTriggerTrackpadAction(for: trackpadNodeID) {
+        if let trackpadNodeID, !usesRelativeLook,
+          model.canTriggerTrackpadAction(for: trackpadNodeID)
+            || model.canTriggerTrackpadSecondaryAction(for: trackpadNodeID) {
           VStack {
             Spacer()
             HStack {
               Spacer()
-              Button("Action") { model.triggerTrackpadAction(for: trackpadNodeID) }
+              if model.canTriggerTrackpadAction(for: trackpadNodeID) {
+                Button("Action") { model.triggerTrackpadAction(for: trackpadNodeID) }
+                  .buttonStyle(.borderedProminent)
+                  .help(model.spaceTriggersTrackpadSecondaryAction(for: trackpadNodeID)
+                    ? "Click to trigger Action"
+                    : "Press Space or click to trigger Action")
+              }
+              if model.canTriggerTrackpadSecondaryAction(for: trackpadNodeID) {
+                Button("Action 2") {
+                  model.triggerTrackpadSecondaryAction(for: trackpadNodeID)
+                }
                 .buttonStyle(.borderedProminent)
-                .help("Press Space or click to trigger the connected action")
+                .help(model.spaceTriggersTrackpadSecondaryAction(for: trackpadNodeID)
+                  ? "Press Space or J, or click to trigger Action 2"
+                  : "Press J or click to trigger Action 2")
+              }
             }
           }
           .padding(32)
@@ -691,8 +784,68 @@ private final class PipelineFullScreenPreviewWindow: NSWindow {
   var canCloseOnEnter: (() -> Bool)?
   var onUnmodifiedF: (() -> Void)?
   var onUnmodifiedSpace: (() -> Bool)?
+  var onPrimaryClick: (() -> Bool)?
+  var onUnmodifiedJ: (() -> Bool)?
+  var onDirectionKey: ((String?, Bool) -> Bool)?
+  var onLookDelta: ((Double, Double) -> Void)?
+  var usesRelativeLook = false
+  private(set) var isCursorCaptured = false
+
+  func captureCursorIfPossible() -> Bool {
+    if isCursorCaptured { return true }
+    guard usesRelativeLook, isKeyWindow, NSApp.isActive else { return false }
+    acceptsMouseMovedEvents = true
+    guard CGAssociateMouseAndMouseCursorPosition(0) == .success else { return false }
+    NSCursor.hide()
+    isCursorCaptured = true
+    return true
+  }
+
+  func releaseCursor() {
+    guard isCursorCaptured else { return }
+    _ = CGAssociateMouseAndMouseCursorPosition(1)
+    NSCursor.unhide()
+    isCursorCaptured = false
+  }
+
+  override func close() {
+    releaseCursor()
+    super.close()
+  }
 
   override func sendEvent(_ event: NSEvent) {
+    let isOverPreview = contentView.map { view in
+      view.bounds.contains(view.convert(event.locationInWindow, from: nil))
+    } ?? false
+    if usesRelativeLook && !isCursorCaptured && isOverPreview,
+      event.type == .mouseMoved || event.type == .leftMouseDown
+        || event.type == .rightMouseDown {
+      if captureCursorIfPossible(), event.type == .mouseMoved { return }
+    }
+    if isCursorCaptured || (usesRelativeLook && isOverPreview) {
+      switch event.type {
+      case .mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged:
+        if isCursorCaptured {
+          onLookDelta?(Double(event.deltaX), Double(event.deltaY))
+          return
+        }
+      case .leftMouseDown:
+        _ = onPrimaryClick?()
+        return
+      case .leftMouseUp:
+        return
+      case .rightMouseDown:
+        if onUnmodifiedJ?() == true { return }
+      case .rightMouseUp:
+        if onUnmodifiedJ != nil { return }
+      default: break
+      }
+    }
+    if (event.type == .keyDown || event.type == .keyUp),
+      (event.type == .keyUp || event.modifierFlags
+        .intersection([.command, .control, .option]).isEmpty),
+      onDirectionKey?(event.charactersIgnoringModifiers,
+        event.type == .keyDown) == true { return }
     if event.type == .keyDown, !event.isARepeat,
       event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty {
       if event.charactersIgnoringModifiers?.lowercased() == "f", let onUnmodifiedF {
@@ -702,6 +855,8 @@ private final class PipelineFullScreenPreviewWindow: NSWindow {
       if event.keyCode == 49, onUnmodifiedSpace?() == true {
         return
       }
+      if event.charactersIgnoringModifiers?.lowercased() == "j",
+        onUnmodifiedJ?() == true { return }
       if event.keyCode == 53 ||
         ((event.keyCode == 36 || event.keyCode == 76) && canCloseOnEnter?() == true) {
         close()
@@ -715,8 +870,15 @@ private final class PipelineFullScreenPreviewWindow: NSWindow {
 @MainActor
 private final class PipelineEditorWindow: NSWindow {
   var onUnmodifiedEnter: (() -> Bool)?
+  var onDirectionKey: ((String?, Bool) -> Bool)?
 
   override func sendEvent(_ event: NSEvent) {
+    if (event.type == .keyDown || event.type == .keyUp),
+      (event.type == .keyUp || event.modifierFlags
+        .intersection([.command, .control, .option]).isEmpty),
+      !(firstResponder is NSTextView), !(firstResponder is NSTextField),
+      onDirectionKey?(event.charactersIgnoringModifiers,
+        event.type == .keyDown) == true { return }
     if event.type == .keyDown,
       (event.keyCode == 36 || event.keyCode == 76),
       !event.isARepeat,

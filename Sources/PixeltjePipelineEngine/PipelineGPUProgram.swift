@@ -18,6 +18,59 @@ public struct PipelineGPUProgramPerformance: Encodable, Sendable {
   public var previewCopySeconds = 0.0
 }
 
+/// A sound the player synthesizes live instead of looping a file, so its
+/// pitch follows the program continuously and it never repeats.
+public struct PipelineGPUAudioSynth: Hashable, Sendable, Decodable {
+  public enum Kind: String, Hashable, Sendable, Decodable {
+    /// Electric multirotor propellers: tonal blade-pass harmonics with the
+    /// beating between slightly unequal motors, motor whine and the
+    /// turbulent air the blades chop.
+    case rotor
+  }
+  public let kind: Kind
+  /// Propellers, 1–8.
+  public let rotors: Int
+  /// Blades per propeller, 2–6.
+  public let blades: Int
+  /// Propeller revolutions per second at playback rate 1, 20–400.
+  public let hz: Float
+
+  public init(kind: Kind, rotors: Int, blades: Int, hz: Float) {
+    self.kind = kind
+    self.rotors = rotors
+    self.blades = blades
+    self.hz = hz
+  }
+
+  var isValid: Bool {
+    (1...8).contains(rotors) && (2...6).contains(blades) && (20...400).contains(hz)
+  }
+}
+
+/// A looping program sound as the last committed frame left it. The program
+/// writes loudness, playback rate and stereo position every frame, so a
+/// moving source can carry distance attenuation and Doppler shift.
+public struct PipelineGPUAudioVoice: Equatable, Sendable {
+  public enum Source: Equatable, Sendable {
+    /// A sound file played as a seamless loop.
+    case sound(URL)
+    case synth(PipelineGPUAudioSynth)
+  }
+  public let nodeID: PipelineNodeID
+  /// Index into the program's `audioVoices`.
+  public let slot: Int
+  public let source: Source
+  /// 0 is silent, 1 is the sound's own level.
+  public let gain: Float
+  /// Playback speed, which also scales pitch: 0.25–4.
+  public let rate: Float
+  /// -1 is fully left, 1 fully right.
+  public let pan: Float
+  /// How hard a synthesized source works, 0–1; it brightens the sound and
+  /// roughens its motors. A looped sound ignores it.
+  public let drive: Float
+}
+
 /// Bounded, declarative Metal passes. Workflow data names functions and fixed
 /// resource bindings; only this actor allocates resources or submits commands.
 actor PipelineGPUProgram {
@@ -27,6 +80,9 @@ actor PipelineGPUProgram {
       let kind: String
       let bytes: Int?
       let input: String?
+      let design: String?
+      let weight: String?
+      let strings: [String]?
     }
     struct Pass: Decodable {
       let kind: String
@@ -46,6 +102,20 @@ actor PipelineGPUProgram {
       let vertexTextures: [String: String]?
       let fragmentTextures: [String: String]?
     }
+    /// The UInt32 at `word` counts plays requested this frame.
+    struct AudioEvent: Decodable {
+      let buffer: String
+      let word: Int?
+      let asset: String
+    }
+    /// Four floats from `word`: gain, playback rate, pan and drive. A voice
+    /// loops its `asset` or plays its `synth`, never both.
+    struct AudioVoice: Decodable {
+      let buffer: String
+      let word: Int
+      let asset: String?
+      let synth: PipelineGPUAudioSynth?
+    }
     let version: Int
     let resources: [Resource]
     let initialize: [Pass]
@@ -53,6 +123,9 @@ actor PipelineGPUProgram {
     let present: [Pass]
     let swaps: [[String]]
     let output: String
+    let sceneRequestBuffer: String?
+    let audioEvents: [AudioEvent]?
+    let audioVoices: [AudioVoice]?
     let parameters: [String]?
   }
 
@@ -64,10 +137,12 @@ actor PipelineGPUProgram {
     var parameters2: SIMD4<Float>
     var parameters3: SIMD4<Float>
     var pointer: SIMD4<Float>
+    var movement: SIMD4<Float>
   }
 
   private enum Resource {
     case buffer(any MTLBuffer)
+    case immutableBuffer(any MTLBuffer)
     case texture(any MTLTexture)
     case inputTexture(any MTLTexture)
   }
@@ -84,6 +159,7 @@ actor PipelineGPUProgram {
     let seed: UInt64
     let framesPerSecond: Double
     let inputImageHashes: [String: String]
+    let fontFingerprints: [String: String]
   }
 
   private struct Session {
@@ -92,19 +168,59 @@ actor PipelineGPUProgram {
     var nextFrame: Int
   }
 
+  private struct Frame {
+    let image: PipelineImageInput?
+    let sceneRequest: Int64
+  }
+
+  private struct Writes {
+    var buffers: Set<Int> = []
+    var textures: Set<Int> = []
+  }
+
+  /// Declared resources per program. Memory stays bounded by the 128 MiB
+  /// total and each pass by its 1–15 binding slots.
+  static let maximumResources = 256
+  /// Audio buffers are small; events and voices share them by word.
+  private static let maximumAudioBufferBytes = 256
+  private static let maximumAudioEvents = 16
+  private static let maximumAudioVoices = 8
+
+  private struct FontKey: Hashable {
+    let design: String
+    let weight: String
+    let strings: [String]
+  }
+
   private let queue: any MTLCommandQueue
-  private var committed: Session?
-  private var pending: Session?
+  private var committed: [PipelineNodeID: Session] = [:]
+  private var pending: [PipelineNodeID: Session] = [:]
+  private var pendingAudioEvents: [PipelineNodeID: (runID: UUID?, urls: [URL])] = [:]
+  private var committedAudioEvents: [URL] = []
+  private var pendingAudioVoices: [PipelineNodeID: (runID: UUID?,
+    voices: [PipelineGPUAudioVoice])] = [:]
+  private var committedAudioVoices: [PipelineNodeID: [PipelineGPUAudioVoice]] = [:]
   private var cachedLibrary: (source: String, library: any MTLLibrary)?
   private var computePipelines: [String: any MTLComputePipelineState] = [:]
   private var renderPipelines: [String: any MTLRenderPipelineState] = [:]
+  /// The binding slots each pipeline's shader can write, from Metal's
+  /// reflection; nil where Metal reported none, which counts as all of them.
+  private var computeWrites: [String: Writes?] = [:]
+  private var renderWrites: [String: (vertex: Writes?, fragment: Writes?)] = [:]
+  /// Nodes with a frame in progress. A second frame of the same node while
+  /// one renders copies all of its state rather than sharing scratch textures.
+  private var rendering: Set<PipelineNodeID> = []
   private var liveRunID: UUID?
   private var liveNodeID: PipelineNodeID?
   private var liveFrame: PipelineMetalPreviewFrame?
-  private var livePointer: (revision: UInt64, value: SIMD4<Float>)?
+  private var livePointer: (revision: UInt64, value: SIMD4<Float>, secondaryActionCount: Float)?
   private var lastLiveTickNanoseconds: UInt64?
   private var pendingLiveTickNanoseconds: UInt64?
   private var cachedAssetHashes: (bundleID: UUID, hashes: [String: String])?
+  private var preparedFonts: [FontKey: PipelineSystemFont.Prepared] = [:]
+  private var preparedFontOrder: [FontKey] = []
+  private var fontBuffers: [String: any MTLBuffer] = [:]
+  private var fontBufferOrder: [String] = []
   private var reusableSurfaces: [IOSurface] = []
   private var surfaceSize: (width: Int, height: Int)?
   private var allocatedSurfaceCount = 0
@@ -131,8 +247,9 @@ actor PipelineGPUProgram {
 
   static func executor(runner: PipelineGPUProgram) -> PipelineNodeExecutor {
     .init(kind: .gpuProgram) { node, inputs, context in
-      guard let image = try await runner.render(node: node, inputs: inputs,
-        context: context, previewOnly: false) else {
+      let frame = try await runner.render(node: node, inputs: inputs,
+        context: context, previewOnly: false)
+      guard let image = frame.image else {
         throw PipelineEngineError.invalidInvocation("GPU Program produced no image.")
       }
       let pixels = image.width * image.height
@@ -151,23 +268,37 @@ actor PipelineGPUProgram {
           planarRGB: planar, encoding: .sRGBZeroToOne,
           semanticPipelineSHA256: context.semanticSHA256),
         previewNodeID: node.id, activeNodeIDs: [node.id]))
-      return .init(outputs: ["image": PipelineNodeValue(image, type: .image)])
+      return .init(outputs: [
+        "image": PipelineNodeValue(image, type: .image),
+        "sceneRequest": PipelineNodeValue(frame.sceneRequest, type: .integer),
+      ])
     }
   }
 
   func commit(runID: UUID?) {
-    guard let pending, pending.identity.runID == runID else { return }
-    committed = pending
-    self.pending = nil
-    if liveRunID == runID, let pendingLiveTickNanoseconds {
+    let matching = pending.filter { $0.value.identity.runID == runID }
+    for (nodeID, session) in matching {
+      committed[nodeID] = session
+      pending[nodeID] = nil
+      if let event = pendingAudioEvents.removeValue(forKey: nodeID),
+        event.runID == runID, liveRunID == runID {
+        committedAudioEvents.append(contentsOf: event.urls)
+      }
+      if let state = pendingAudioVoices.removeValue(forKey: nodeID),
+        state.runID == runID, liveRunID == runID {
+        committedAudioVoices[nodeID] = state.voices
+      }
+    }
+    if !matching.isEmpty, liveRunID == runID, let pendingLiveTickNanoseconds {
       lastLiveTickNanoseconds = pendingLiveTickNanoseconds
     }
     pendingLiveTickNanoseconds = nil
   }
 
   func discard(runID: UUID?) {
-    guard pending?.identity.runID == runID else { return }
-    pending = nil
+    pending = pending.filter { $0.value.identity.runID != runID }
+    pendingAudioEvents = pendingAudioEvents.filter { $0.value.runID != runID }
+    pendingAudioVoices = pendingAudioVoices.filter { $0.value.runID != runID }
     pendingLiveTickNanoseconds = nil
   }
 
@@ -178,15 +309,20 @@ actor PipelineGPUProgram {
     livePointer = nil
     lastLiveTickNanoseconds = nil
     pendingLiveTickNanoseconds = nil
+    committedAudioEvents = []
+    committedAudioVoices = [:]
   }
 
   func updateLivePointer(runID: UUID, nodeID: PipelineNodeID,
-    revision: UInt64, x: Double, y: Double, actionCount: Int) {
+    revision: UInt64, x: Double, y: Double, actionCount: Int,
+    secondaryActionCount: Int = 0) {
     guard liveRunID == runID, liveNodeID == nodeID,
       revision > (livePointer?.revision ?? 0),
       x.isFinite, y.isFinite, (0...1).contains(x), (0...1).contains(y),
-      (0...16_777_215).contains(actionCount) else { return }
-    livePointer = (revision, SIMD4(Float(x), Float(y), Float(actionCount), 0))
+      (0...16_777_215).contains(actionCount),
+      (0...16_777_215).contains(secondaryActionCount) else { return }
+    livePointer = (revision, SIMD4(Float(x), Float(y), Float(actionCount), 0),
+      Float(secondaryActionCount))
   }
 
   func endLivePreview(runID: UUID) {
@@ -197,6 +333,23 @@ actor PipelineGPUProgram {
     livePointer = nil
     lastLiveTickNanoseconds = nil
     pendingLiveTickNanoseconds = nil
+    committedAudioEvents = []
+    committedAudioVoices = [:]
+  }
+
+  func takeLiveAudioEvents(runID: UUID) -> [URL] {
+    guard liveRunID == runID else { return [] }
+    defer { committedAudioEvents = [] }
+    return committedAudioEvents
+  }
+
+  /// Looping voices of the frames committed since the last call. A program
+  /// that did not run in between, such as an inactive scene, reports none.
+  func takeLiveAudioVoices(runID: UUID) -> [PipelineGPUAudioVoice] {
+    guard liveRunID == runID else { return [] }
+    defer { committedAudioVoices = [:] }
+    return committedAudioVoices.keys.sorted { $0.rawValue < $1.rawValue }
+      .flatMap { committedAudioVoices[$0] ?? [] }
   }
 
   func livePreview(runID: UUID) -> PipelineMetalPreviewFrame? {
@@ -204,13 +357,14 @@ actor PipelineGPUProgram {
   }
 
   func captureLivePreview(node: PipelineNode, inputs: [String: PipelineNodeValue],
-    context: PipelineNodeExecutionContext) async throws {
+    context: PipelineNodeExecutionContext) async throws -> Int64 {
     guard let runID = context.runID, liveRunID == runID,
-      liveNodeID == node.id else {
+      liveNodeID != nil else {
       throw PipelineEngineError.invalidInvocation("GPU Program preview run is no longer active.")
     }
-    _ = try await render(node: node, inputs: inputs,
+    let frame = try await render(node: node, inputs: inputs,
       context: context, previewOnly: true)
+    return frame.sceneRequest
   }
 
   func validateLiteral(programJSON: String, source: String) async throws {
@@ -221,7 +375,8 @@ actor PipelineGPUProgram {
     let program = try JSONDecoder().decode(Definition.self, from: data)
     let size = try PipelineMetalRenderSize(width: 512, height: 512)
     try Self.validate(program, size: size, parameters: [:])
-    let library = try await queue.device.makeLibrary(source: source, options: nil)
+    let library = try await queue.device.makeLibrary(
+      source: PipelineMetalLibraries.resolving(source), options: nil)
     for pass in program.initialize + program.tick + program.present {
       let names = pass.kind == "compute" ? [pass.function!] : [pass.vertex!, pass.fragment!]
       for name in names where library.makeFunction(name: name) == nil {
@@ -232,7 +387,7 @@ actor PipelineGPUProgram {
 
   private func render(node: PipelineNode, inputs: [String: PipelineNodeValue],
     context: PipelineNodeExecutionContext,
-    previewOnly: Bool) async throws -> PipelineImageInput? {
+    previewOnly: Bool) async throws -> Frame {
     let renderStartedAt = DispatchTime.now().uptimeNanoseconds
     currentPerformance = performanceRunID != nil && context.runID == performanceRunID
       ? PipelineGPUProgramPerformance() : nil
@@ -283,6 +438,22 @@ actor PipelineGPUProgram {
         "GPU Program action count must be an integer from 0 to 16,777,215.")
     }
     let pointer = SIMD4(Float(pointerX), Float(pointerY), Float(actionCount), 0)
+    let secondaryActionCount = inputs["secondaryActionCount"]?.value(as: Double.self) ?? 0
+    guard secondaryActionCount.isFinite,
+      secondaryActionCount.rounded(.towardZero) == secondaryActionCount,
+      (0...16_777_215).contains(secondaryActionCount) else {
+      throw PipelineEngineError.invalidInvocation(
+        "GPU Program secondary action count must be an integer from 0 to 16,777,215.")
+    }
+    let moveX = try Self.movementCoordinate("moveX", inputs: inputs)
+    let moveY = try Self.movementCoordinate("moveY", inputs: inputs)
+    let keys = inputs["keys"]?.value(as: Double.self) ?? 0
+    guard PipelineDirectionPadKeys.isValidMask(keys) else {
+      throw PipelineEngineError.invalidInvocation(
+        "GPU Program keys must be an integer bitmask from 0 to \(PipelineDirectionPadKeys.allMask).")
+    }
+    let movement = SIMD4(Float(moveX), Float(moveY), Float(secondaryActionCount),
+      Float(keys))
     let source = try PipelineMeshRenderer.shaderSource(
       supplied: inputs["source"]?.value(as: String.self),
       fileName: inputs["sourceFile"]?.value(as: String.self),
@@ -292,6 +463,17 @@ actor PipelineGPUProgram {
     var inputImages: [String: PipelineImageInput] = [:]
     var inputImageHashes: [String: String] = [:]
     let assets = inputs["assets"]?.value(as: PipelineAssetBundle.self)
+    var audioAssets: [String: URL] = [:]
+    for asset in (definition.audioEvents ?? []).map(\.asset)
+      + (definition.audioVoices ?? []).compactMap(\.asset) {
+      guard let value = assets?[asset], value.type == .audio,
+        let url = value.value(as: URL.self)
+          ?? value.value(as: PipelineGeneratedAudio.self)?.fileURL else {
+        throw PipelineEngineError.invalidInvocation(
+          "GPU Program needs audio asset \(asset).")
+      }
+      audioAssets[asset] = url
+    }
     if let assets, let cachedAssetHashes, cachedAssetHashes.bundleID == assets.id {
       inputImageHashes = cachedAssetHashes.hashes
     }
@@ -322,14 +504,36 @@ actor PipelineGPUProgram {
     if let assets {
       cachedAssetHashes = (assets.id, inputImageHashes)
     }
+    var fonts: [String: PipelineSystemFont.Prepared] = [:]
+    var fontFingerprints: [String: String] = [:]
+    for resource in definition.resources where resource.kind == "systemFont" {
+      let key = FontKey(design: resource.design!, weight: resource.weight!,
+        strings: resource.strings!)
+      let prepared: PipelineSystemFont.Prepared
+      if let cached = preparedFonts[key] { prepared = cached }
+      else {
+        prepared = try PipelineSystemFont.prepare(design: key.design,
+          weight: key.weight, strings: key.strings)
+        preparedFonts[key] = prepared
+      }
+      preparedFontOrder.removeAll { $0 == key }
+      preparedFontOrder.append(key)
+      if preparedFontOrder.count > 8 {
+        preparedFonts.removeValue(forKey: preparedFontOrder.removeFirst())
+      }
+      fonts[resource.name] = prepared
+      fontFingerprints[resource.name] = prepared.fingerprint
+    }
     let declaredBytes = definition.resources.reduce(0) { total, resource in
       total + (resource.kind == "buffer" ? resource.bytes ?? 0
         : resource.kind == "texture" ? size.pixels * 8 : 0)
     }
+    // A full mip chain adds at most a third to each input texture.
     let inputBytes = inputImages.values.reduce(0) {
-      $0 + $1.width * $1.height * 8
+      $0 + $1.width * $1.height * 8 * 4 / 3
     }
-    guard declaredBytes + inputBytes <= 134_217_728 else {
+    let fontBytes = fonts.values.reduce(0) { $0 + $1.bytes.count }
+    guard declaredBytes + inputBytes + fontBytes <= 134_217_728 else {
       throw PipelineEngineError.invalidInvocation("GPU Program resources exceed 128 MiB.")
     }
     let frame = try context.invocation.integer(
@@ -342,7 +546,7 @@ actor PipelineGPUProgram {
       semanticSHA256: context.semanticSHA256, program: programJSON,
       source: source, parameterJSON: parameterJSON,
       width: width, height: height, seed: seed, framesPerSecond: fps,
-      inputImageHashes: inputImageHashes)
+      inputImageHashes: inputImageHashes, fontFingerprints: fontFingerprints)
     let library: any MTLLibrary
     if let cachedLibrary, cachedLibrary.source == source {
       library = cachedLibrary.library
@@ -351,31 +555,46 @@ actor PipelineGPUProgram {
       cachedLibrary = (source, library)
       computePipelines = [:]
       renderPipelines = [:]
+      computeWrites = [:]
+      renderWrites = [:]
     }
-    let base = committed?.identity == identity && committed!.nextFrame <= frame
-      ? committed : nil
+    let previous = committed[node.id]
+    let base = previous?.identity == identity && previous!.nextFrame <= frame
+      ? previous : nil
     guard frame - (base?.nextFrame ?? 0) < 3_600 else {
       throw PipelineEngineError.invalidInvocation(
         "GPU Program can replay at most 3,600 frames per call.")
     }
+    let exclusive = rendering.insert(node.id).inserted
+    defer { if exclusive { rendering.remove(node.id) } }
     var working: Session
     if let base {
       let cloneStartedAt = DispatchTime.now().uptimeNanoseconds
+      let unchanged = sharedResources(definition)
       working = Session(identity: identity,
         resources: try await clone(base.resources,
-          excluding: directPreview ? definition.output : nil), nextFrame: base.nextFrame)
+          excluding: directPreview ? definition.output : nil,
+          sharing: exclusive ? unchanged.readOnly.union(unchanged.scratch)
+            : unchanged.readOnly),
+        nextFrame: base.nextFrame)
       currentPerformance?.cloneSeconds = Self.seconds(since: cloneStartedAt)
     } else {
       working = Session(identity: identity,
         resources: try makeResources(definition, size: size, inputImages: inputImages,
+          fonts: fonts,
           excluding: directPreview ? definition.output : nil),
         nextFrame: 0)
-      try await clearTextures(working.resources)
+      try await prepareTextures(working.resources)
     }
     // Live controls may have moved while upstream assets were evaluated. Read
     // them immediately before advancing the GPU state for this frame.
-    var framePointer = previewOnly && liveRunID == context.runID && liveNodeID == node.id
+    var framePointer = previewOnly && liveRunID == context.runID
       ? livePointer?.value ?? pointer : pointer
+    var frameMovement = movement
+    if previewOnly && liveRunID == context.runID,
+      let livePointer {
+      frameMovement.z = livePointer.secondaryActionCount
+    }
     let liveTickNanoseconds: UInt64? = previewOnly
       ? DispatchTime.now().uptimeNanoseconds : nil
     if let liveTickNanoseconds {
@@ -389,7 +608,8 @@ actor PipelineGPUProgram {
       try await encode(definition.initialize, library: library,
         resources: working.resources, uniforms: Self.uniforms(size: size,
           frame: 0, fps: fps, seed: seed,
-          names: definition.parameters ?? [], values: dictionary, pointer: framePointer))
+          names: definition.parameters ?? [], values: dictionary, pointer: framePointer,
+          movement: frameMovement))
     }
     let directFrame: PipelineMetalPreviewFrame?
     if directPreview {
@@ -404,12 +624,23 @@ actor PipelineGPUProgram {
     }
     for index in working.nextFrame...frame {
       try Task.checkCancellation()
+      if let name = definition.sceneRequestBuffer,
+        case .buffer(let buffer)? = working.resources[name] {
+        buffer.contents().storeBytes(of: UInt32.max, as: UInt32.self)
+      }
+      for event in definition.audioEvents ?? [] {
+        if case .buffer(let buffer)? = working.resources[event.buffer] {
+          buffer.contents().storeBytes(of: UInt32.zero,
+            toByteOffset: (event.word ?? 0) * 4, as: UInt32.self)
+        }
+      }
       let includesPresent = definition.swaps.isEmpty && index == frame
       try await encode(includesPresent ? definition.tick + definition.present : definition.tick,
         library: library,
         resources: working.resources, uniforms: Self.uniforms(size: size,
           frame: index, fps: fps, seed: seed,
-          names: definition.parameters ?? [], values: dictionary, pointer: framePointer))
+          names: definition.parameters ?? [], values: dictionary, pointer: framePointer,
+          movement: frameMovement))
       for pair in definition.swaps {
         let first = working.resources[pair[0]]
         working.resources[pair[0]] = working.resources[pair[1]]
@@ -421,7 +652,50 @@ actor PipelineGPUProgram {
       try await encode(definition.present, library: library,
         resources: working.resources, uniforms: Self.uniforms(size: size,
           frame: frame, fps: fps, seed: seed,
-          names: definition.parameters ?? [], values: dictionary, pointer: framePointer))
+          names: definition.parameters ?? [], values: dictionary, pointer: framePointer,
+          movement: frameMovement))
+    }
+    let sceneRequest: Int64
+    if let name = definition.sceneRequestBuffer,
+      case .buffer(let buffer)? = working.resources[name] {
+      let raw = buffer.contents().load(as: UInt32.self)
+      sceneRequest = raw == UInt32.max ? -1 : Int64(raw)
+    } else {
+      sceneRequest = -1
+    }
+    var audioEventURLs: [URL] = []
+    for event in definition.audioEvents ?? [] {
+      guard case .buffer(let buffer)? = working.resources[event.buffer],
+        let url = audioAssets[event.asset] else { continue }
+      let count = buffer.contents().load(fromByteOffset: (event.word ?? 0) * 4,
+        as: UInt32.self)
+      guard count <= 8 else {
+        throw PipelineEngineError.invalidInvocation(
+          "GPU Program audio event count must be at most 8 per frame.")
+      }
+      audioEventURLs.append(contentsOf: repeatElement(url, count: Int(count)))
+    }
+    var audioVoices: [PipelineGPUAudioVoice] = []
+    for (slot, voice) in (definition.audioVoices ?? []).enumerated() {
+      guard case .buffer(let buffer)? = working.resources[voice.buffer] else { continue }
+      let source: PipelineGPUAudioVoice.Source
+      if let synth = voice.synth {
+        source = .synth(synth)
+      } else if let asset = voice.asset, let url = audioAssets[asset] {
+        source = .sound(url)
+      } else {
+        continue
+      }
+      func value(_ index: Int, in range: ClosedRange<Float>, otherwise: Float) -> Float {
+        let raw = buffer.contents().load(fromByteOffset: (voice.word + index) * 4,
+          as: Float.self)
+        return raw.isFinite ? min(max(raw, range.lowerBound), range.upperBound) : otherwise
+      }
+      audioVoices.append(.init(nodeID: node.id, slot: slot, source: source,
+        gain: value(0, in: 0...1, otherwise: 0),
+        rate: value(1, in: 0.25...4, otherwise: 1),
+        pan: value(2, in: -1...1, otherwise: 0),
+        drive: value(3, in: 0...1, otherwise: 0)))
     }
     guard case .texture(let output)? = working.resources[definition.output] else {
       throw PipelineEngineError.invalidInvocation("GPU Program output is not a texture.")
@@ -445,14 +719,16 @@ actor PipelineGPUProgram {
       currentPerformance?.readbackSeconds = Self.seconds(since: readbackStartedAt)
     }
     try Task.checkCancellation()
-    pending = working
+    pending[node.id] = working
+    pendingAudioEvents[node.id] = (context.runID, audioEventURLs)
+    pendingAudioVoices[node.id] = (context.runID, audioVoices)
     pendingLiveTickNanoseconds = liveTickNanoseconds
     if var sample = currentPerformance, let runID = context.runID {
       sample.renderSeconds = Self.seconds(since: renderStartedAt)
       completedPerformance.withLock { $0 = (runID, sample) }
     }
     currentPerformance = nil
-    return image
+    return Frame(image: image, sceneRequest: sceneRequest)
   }
 
   private func copyPreview(_ texture: any MTLTexture,
@@ -507,19 +783,23 @@ actor PipelineGPUProgram {
       height: size.height, runID: runID, lease: lease), target)
   }
 
-  /// The output has no history only when one pass clears and replaces it.
+  /// The output has no history when the first output pass clears it and all
+  /// following output passes only add to that same frame.
   private static func canRenderDirectlyToPreview(_ program: Definition) -> Bool {
-    guard program.present.count == 1, let pass = program.present.first,
-      pass.kind == "render", pass.target == program.output,
-      pass.load != "load" else { return false }
     func readsOutput(_ pass: Definition.Pass) -> Bool {
       [pass.textures, pass.vertexTextures, pass.fragmentTextures].contains { mapping in
         mapping?.values.contains(program.output) == true
       }
     }
-    return !readsOutput(pass) && (program.initialize + program.tick).allSatisfy {
-      $0.target != program.output && !readsOutput($0)
-    }
+    let outputPasses = program.present.filter { $0.target == program.output }
+    guard let first = outputPasses.first, first.kind == "render",
+      first.load != "load", first.blend == nil || first.blend == "replace",
+      outputPasses.dropFirst().allSatisfy({ $0.kind == "render" && $0.load == "load" }),
+      program.present.allSatisfy({ !readsOutput($0) }),
+      (program.initialize + program.tick).allSatisfy({
+        $0.target != program.output && !readsOutput($0)
+      }) else { return false }
+    return true
   }
 
   private func recycle(_ surface: IOSurface) {
@@ -552,6 +832,16 @@ actor PipelineGPUProgram {
     return value
   }
 
+  private static func movementCoordinate(_ name: String,
+    inputs: [String: PipelineNodeValue]) throws -> Double {
+    let value = inputs[name]?.value(as: Double.self) ?? 0
+    guard value.isFinite, (-1...1).contains(value) else {
+      throw PipelineEngineError.invalidInvocation(
+        "GPU Program \(name) must be a number from -1 to 1.")
+    }
+    return value
+  }
+
   private static func identifier(_ value: String) -> Bool {
     guard let first = value.utf8.first,
       (65...90).contains(first) || (97...122).contains(first) || first == 95,
@@ -567,7 +857,8 @@ actor PipelineGPUProgram {
     func fail(_ message: String) -> PipelineEngineError {
       .invalidInvocation("GPU Program: \(message)")
     }
-    guard program.version == 1, (1...12).contains(program.resources.count),
+    guard (1...2).contains(program.version),
+      (1...maximumResources).contains(program.resources.count),
       program.initialize.count <= 16, (1...16).contains(program.tick.count),
       (1...16).contains(program.present.count), program.swaps.count <= 8,
       (program.parameters?.count ?? 0) <= 16 else {
@@ -583,28 +874,81 @@ actor PipelineGPUProgram {
       kinds[resource.name] = resource.kind
       switch resource.kind {
       case "buffer":
-        guard resource.input == nil, let bytes = resource.bytes,
+        guard resource.input == nil, resource.design == nil,
+          resource.weight == nil, resource.strings == nil, let bytes = resource.bytes,
           (1...16_777_216).contains(bytes) else {
           throw fail("buffer size must be 1–16 MiB.")
         }
         memory += bytes
       case "texture":
-        guard resource.bytes == nil, resource.input == nil else {
+        guard resource.bytes == nil, resource.input == nil,
+          resource.design == nil, resource.weight == nil,
+          resource.strings == nil else {
           throw fail("textures use output dimensions.")
         }
         memory += size.pixels * 8
       case "inputTexture":
-        guard resource.bytes == nil, let input = resource.input,
+        guard resource.bytes == nil, resource.design == nil,
+          resource.weight == nil, resource.strings == nil,
+          let input = resource.input,
           identifier(input),
           !program.resources.contains(where: {
             $0.name != resource.name && $0.kind == "inputTexture" && $0.input == input
           }) else { throw fail("input textures need distinct asset names.") }
         // Input dimensions are checked against the total budget at execution.
-      default: throw fail("resource kind must be buffer, texture, or inputTexture.")
+      case "systemFont":
+        guard program.version == 2, resource.bytes == nil, resource.input == nil,
+          ["system", "monospaced", "monospacedDigits"].contains(resource.design ?? ""),
+          ["regular", "medium", "semibold", "bold"].contains(resource.weight ?? ""),
+          let strings = resource.strings, (1...64).contains(strings.count),
+          strings.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 80 }),
+          strings.reduce(0, { $0 + $1.utf8.count }) <= 4_096 else {
+          throw fail("systemFont needs a design, weight, and bounded strings in version 2.")
+        }
+      default: throw fail("unsupported resource kind.")
       }
     }
     guard memory <= 134_217_728, kinds[program.output] == "texture" else {
       throw fail("resources exceed 128 MiB or output is not a texture.")
+    }
+    if let name = program.sceneRequestBuffer {
+      guard let resource = program.resources.first(where: { $0.name == name }),
+        resource.kind == "buffer", resource.bytes == 4 else {
+        throw fail("sceneRequestBuffer must name a dedicated 4-byte buffer.")
+      }
+    }
+    // Events and voices may share a small audio buffer, but never a word.
+    var audioWords = Set<String>()
+    func claimAudioWords(buffer: String, word: Int, count: Int) -> Bool {
+      guard kinds[buffer] == "buffer", buffer != program.sceneRequestBuffer,
+        let bytes = program.resources.first(where: { $0.name == buffer })?.bytes,
+        bytes <= maximumAudioBufferBytes, bytes.isMultiple(of: 4),
+        (0..<(maximumAudioBufferBytes / 4)).contains(word),
+        (word + count) * 4 <= bytes else { return false }
+      return (word..<(word + count)).allSatisfy {
+        audioWords.insert("\(buffer)#\($0)").inserted
+      }
+    }
+    let audioEvents = program.audioEvents ?? []
+    guard audioEvents.count <= maximumAudioEvents,
+      audioEvents.allSatisfy({ event in
+        identifier(event.asset)
+          && claimAudioWords(buffer: event.buffer, word: event.word ?? 0, count: 1)
+      }) else {
+      throw fail("audio events need distinct words of small audio buffers and asset names.")
+    }
+    let audioVoices = program.audioVoices ?? []
+    guard audioVoices.count <= maximumAudioVoices,
+      audioVoices.allSatisfy({ voice in
+        let source = switch (voice.asset, voice.synth) {
+        case (let asset?, nil): identifier(asset)
+        case (nil, let synth?): synth.isValid
+        default: false
+        }
+        return source
+          && claimAudioWords(buffer: voice.buffer, word: voice.word, count: 4)
+      }) else {
+      throw fail("audio voices need four distinct words of small audio buffers and either an asset name or a valid synth.")
     }
     guard program.present.contains(where: {
       $0.kind == "render" && $0.target == program.output
@@ -631,7 +975,8 @@ actor PipelineGPUProgram {
       func bindings(_ mapping: [String: String]?, kind: String) throws {
         for (slot, name) in mapping ?? [:] {
           guard let index = Int(slot), (1...15).contains(index),
-            (kinds[name] == kind || kind == "texture" && kinds[name] == "inputTexture") else {
+            (kinds[name] == kind || kind == "buffer" && kinds[name] == "systemFont"
+              || kind == "texture" && kinds[name] == "inputTexture") else {
             throw fail("binding slots must be 1–15 and match resource types.")
           }
         }
@@ -682,6 +1027,7 @@ actor PipelineGPUProgram {
   private func makeResources(_ program: Definition,
     size: PipelineMetalRenderSize,
     inputImages: [String: PipelineImageInput],
+    fonts: [String: PipelineSystemFont.Prepared],
     excluding excluded: String? = nil) throws -> [String: Resource] {
     var result: [String: Resource] = [:]
     for item in program.resources {
@@ -691,13 +1037,36 @@ actor PipelineGPUProgram {
         else { throw PipelineEngineError.invalidInvocation("GPU Program buffer allocation failed.") }
         memset(buffer.contents(), 0, buffer.length)
         result[item.name] = .buffer(buffer)
+      } else if item.kind == "systemFont" {
+        guard let prepared = fonts[item.name] else {
+          throw PipelineEngineError.invalidInvocation("GPU Program system font is missing.")
+        }
+        let buffer: any MTLBuffer
+        if let cached = fontBuffers[prepared.fingerprint] { buffer = cached }
+        else {
+          guard let created = queue.device.makeBuffer(length: prepared.bytes.count,
+            options: .storageModeShared) else {
+            throw PipelineEngineError.invalidInvocation("GPU Program font allocation failed.")
+          }
+          _ = prepared.bytes.withUnsafeBytes { bytes in
+            memcpy(created.contents(), bytes.baseAddress!, bytes.count)
+          }
+          fontBuffers[prepared.fingerprint] = created
+          buffer = created
+        }
+        fontBufferOrder.removeAll { $0 == prepared.fingerprint }
+        fontBufferOrder.append(prepared.fingerprint)
+        if fontBufferOrder.count > 8 {
+          fontBuffers.removeValue(forKey: fontBufferOrder.removeFirst())
+        }
+        result[item.name] = .immutableBuffer(buffer)
       } else if item.kind == "inputTexture" {
         guard let port = item.input, let image = inputImages[port] else {
           throw PipelineEngineError.invalidInvocation("GPU Program input texture is missing.")
         }
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
           pixelFormat: .rgba16Float, width: image.width,
-          height: image.height, mipmapped: false)
+          height: image.height, mipmapped: true)
         descriptor.storageMode = .shared
         descriptor.usage = [.shaderRead]
         guard let texture = queue.device.makeTexture(descriptor: descriptor) else {
@@ -724,8 +1093,73 @@ actor PipelineGPUProgram {
     return result
   }
 
+  /// Resources a frame never has to copy. Read-only ones keep what
+  /// initialize wrote: no tick or present pass can write them, and the CPU
+  /// does not write them between frames. Scratch textures are cleared by the
+  /// first pass that touches them in every frame, so no frame sees another's
+  /// contents. Only what Metal reports as read-only counts as unwritten.
+  private func sharedResources(_ program: Definition)
+    -> (readOnly: Set<String>, scratch: Set<String>) {
+    var written: Set<String> = [program.output]
+    if let name = program.sceneRequestBuffer { written.insert(name) }
+    for event in program.audioEvents ?? [] { written.insert(event.buffer) }
+    let swapped = Set(program.swaps.flatMap { $0 })
+    written.formUnion(swapped)
+    func mark(_ mapping: [String: String]?, _ slots: Set<Int>?) {
+      for (slot, name) in mapping ?? [:] {
+        guard let slots, let index = Int(slot), !slots.contains(index) else {
+          written.insert(name)
+          continue
+        }
+      }
+    }
+    let passes = program.tick + program.present
+    for pass in passes {
+      if pass.kind == "compute" {
+        let writes = computeWrites[pass.function!] ?? nil
+        mark(pass.buffers, writes?.buffers)
+        mark(pass.textures, writes?.textures)
+      } else {
+        written.insert(pass.target!)
+        let writes = renderWrites[
+          "\(pass.vertex!)|\(pass.fragment!)|\(pass.blend ?? "replace")"]
+        mark(pass.vertexBuffers, writes?.vertex?.buffers)
+        mark(pass.fragmentBuffers, writes?.fragment?.buffers)
+        mark(pass.vertexTextures, writes?.vertex?.textures)
+        mark(pass.fragmentTextures, writes?.fragment?.textures)
+      }
+    }
+    let readOnly = Set(program.resources.filter {
+      ($0.kind == "buffer" || $0.kind == "texture") && !written.contains($0.name)
+    }.map(\.name))
+    func reads(_ pass: Definition.Pass, _ name: String) -> Bool {
+      [pass.textures, pass.vertexTextures, pass.fragmentTextures].contains {
+        $0?.values.contains(name) == true
+      }
+    }
+    var scratch = Set<String>()
+    for resource in program.resources where resource.kind == "texture"
+      && resource.name != program.output && !swapped.contains(resource.name) {
+      guard let first = passes.first(where: {
+        $0.target == resource.name || reads($0, resource.name)
+      }), first.kind == "render", first.target == resource.name,
+        first.load != "load", !reads(first, resource.name) else { continue }
+      scratch.insert(resource.name)
+    }
+    return (readOnly, scratch)
+  }
+
+  /// Which of a program's resources frames share instead of copying, as
+  /// far as the pipelines built so far tell.
+  func sharedResourceNames(programJSON: String) throws
+    -> (readOnly: Set<String>, scratch: Set<String>) {
+    try sharedResources(JSONDecoder().decode(Definition.self,
+      from: Data(programJSON.utf8)))
+  }
+
   private func clone(_ resources: [String: Resource],
-    excluding excluded: String? = nil) async throws -> [String: Resource] {
+    excluding excluded: String? = nil,
+    sharing shared: Set<String> = []) async throws -> [String: Resource] {
     var copies: [String: Resource] = [:]
     var command: (any MTLCommandBuffer)?
     var blit: (any MTLBlitCommandEncoder)?
@@ -741,6 +1175,10 @@ actor PipelineGPUProgram {
     }
     for (name, resource) in resources {
       if name == excluded { continue }
+      if shared.contains(name) {
+        copies[name] = resource
+        continue
+      }
       switch resource {
       case .buffer(let source):
         guard let copy = queue.device.makeBuffer(length: source.length,
@@ -754,6 +1192,8 @@ actor PipelineGPUProgram {
             destinationOffset: 0, size: source.length)
         }
         copies[name] = .buffer(copy)
+      case .immutableBuffer(let source):
+        copies[name] = .immutableBuffer(source)
       case .texture(let source):
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
           pixelFormat: .rgba16Float, width: source.width,
@@ -776,7 +1216,7 @@ actor PipelineGPUProgram {
     return copies
   }
 
-  private func clearTextures(_ resources: [String: Resource]) async throws {
+  private func prepareTextures(_ resources: [String: Resource]) async throws {
     guard let command = queue.makeCommandBuffer() else {
       throw PipelineEngineError.invalidInvocation("GPU Program texture initialization failed.")
     }
@@ -792,12 +1232,24 @@ actor PipelineGPUProgram {
       }
       encoder.endEncoding()
     }
+    // Input textures carry a full mip chain so shaders may filter them
+    // trilinearly or anisotropically; a sampler without mip_filter reads level 0.
+    let inputs = resources.values.compactMap { resource -> (any MTLTexture)? in
+      if case .inputTexture(let texture) = resource { texture } else { nil }
+    }
+    if !inputs.isEmpty {
+      guard let blit = command.makeBlitCommandEncoder() else {
+        throw PipelineEngineError.invalidInvocation("GPU Program texture initialization failed.")
+      }
+      inputs.forEach { blit.generateMipmaps(for: $0) }
+      blit.endEncoding()
+    }
     try await finish(command)
   }
 
   private static func uniforms(size: PipelineMetalRenderSize, frame: Int,
     fps: Double, seed: UInt64, names: [String], values: [String: NSNumber],
-    pointer: SIMD4<Float>) -> Uniforms {
+    pointer: SIMD4<Float>, movement: SIMD4<Float>) -> Uniforms {
     var numbers = [Float](repeating: 0, count: 16)
     for (index, name) in names.enumerated() { numbers[index] = values[name]?.floatValue ?? 0 }
     return Uniforms(
@@ -809,7 +1261,8 @@ actor PipelineGPUProgram {
       parameters1: SIMD4(numbers[4], numbers[5], numbers[6], numbers[7]),
       parameters2: SIMD4(numbers[8], numbers[9], numbers[10], numbers[11]),
       parameters3: SIMD4(numbers[12], numbers[13], numbers[14], numbers[15]),
-      pointer: pointer)
+      pointer: pointer,
+      movement: movement)
   }
 
   private func encode(_ passes: [Definition.Pass], library: any MTLLibrary,
@@ -828,8 +1281,11 @@ actor PipelineGPUProgram {
         let pipeline: any MTLComputePipelineState
         if let cached = computePipelines[pass.function!] { pipeline = cached }
         else {
-          pipeline = try await queue.device.makeComputePipelineState(function: function)
+          let (created, reflection) = try await queue.device.makeComputePipelineState(
+            function: function, options: .bindingInfo)
+          pipeline = created
           computePipelines[pass.function!] = pipeline
+          computeWrites[pass.function!] = Self.writes(reflection?.bindings)
         }
         encoder.setComputePipelineState(pipeline)
         encoder.setBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 0)
@@ -876,8 +1332,12 @@ actor PipelineGPUProgram {
         let pipeline: any MTLRenderPipelineState
         if let cached = renderPipelines[key] { pipeline = cached }
         else {
-          pipeline = try await queue.device.makeRenderPipelineState(descriptor: descriptor)
+          let (created, reflection) = try await queue.device.makeRenderPipelineState(
+            descriptor: descriptor, options: .bindingInfo)
+          pipeline = created
           renderPipelines[key] = pipeline
+          renderWrites[key] = (Self.writes(reflection?.vertexBindings),
+            Self.writes(reflection?.fragmentBindings))
         }
         let render = MTLRenderPassDescriptor()
         render.colorAttachments[0].texture = target
@@ -910,11 +1370,27 @@ actor PipelineGPUProgram {
     try await finish(command)
   }
 
+  private static func writes(_ bindings: [any MTLBinding]?) -> Writes? {
+    guard let bindings else { return nil }
+    var writes = Writes()
+    for binding in bindings where binding.access != .readOnly {
+      switch binding.type {
+      case .buffer: writes.buffers.insert(binding.index)
+      case .texture: writes.textures.insert(binding.index)
+      default: break
+      }
+    }
+    return writes
+  }
+
   private func bindBuffers(_ mapping: [String: String]?,
     resources: [String: Resource], set: (any MTLBuffer, Int) -> Void) {
     for (slot, name) in mapping ?? [:] {
-      if case .buffer(let buffer)? = resources[name], let index = Int(slot) {
-        set(buffer, index)
+      if let index = Int(slot) {
+        switch resources[name] {
+        case .buffer(let buffer)?, .immutableBuffer(let buffer)?: set(buffer, index)
+        default: break
+        }
       }
     }
   }
