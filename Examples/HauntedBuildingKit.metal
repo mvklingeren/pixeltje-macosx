@@ -47,7 +47,17 @@ constant uint houseCastIron = 17u;  // rusted cast iron: lamp caps and bases
 constant uint houseCastIronRod = 18u; // a round cast-iron rod from addHouseRod
 constant uint housePlaster = 19u;   // lime render: the mausoleums' pediments
 constant uint housePlasterColumn = 20u; // a round plastered column shaft
-constant uint houseStyleCount = 21u;
+constant uint houseFloor = 21u;     // a floor: boards on top, plaster below
+constant uint houseStair = 22u;     // treads, strings, newels and soffits
+constant uint houseBanister = 23u;  // turned balusters under a handrail (cut out)
+constant uint houseStyleCount = 24u;
+
+// The cut-out styles: rays pass through their openings, and they cast no
+// shadow.
+bool houseCutoutStyle(uint style) {
+    return (style >= houseIron && style <= houseFrieze) || style == houseCandle
+        || style == houseBanister;
+}
 
 bool houseMaterial(uint material) {
     return material >= houseMaterialBase

@@ -291,8 +291,8 @@ struct HouseGroup {
     uint4 last;             // the last group these bounds enclose, unused
 };
 
-constant uint houseCapacity = 1280u;
-constant uint houseGroupCapacity = 64u;
+constant uint houseCapacity = 1536u;
+constant uint houseGroupCapacity = 72u;
 constant uint buildingSiteCapacity = 8u;
 
 constant uint houseCandleCapacity = 4u;
@@ -943,6 +943,18 @@ bool walkable(float2 point) {
         && abs(z) <= roomLimit;
 }
 
+// The player alone climbs the haunted house's upper floors: inside its body
+// their footing and walls depend on how high their feet are, at foot.
+float playerGround(float2 point, float foot) {
+    if (!houseBodyHolds(point)) return stairHeight(point);
+    return buildingsStandFrom(point, moonHeight(point, moonTraceDetail), foot);
+}
+
+bool playerWalkable(float2 point, float foot) {
+    if (!houseBodyHolds(point)) return walkable(point);
+    return !buildingsBlockedFrom(point, foot);
+}
+
 // Where a spider body may stand: the walkable floor clear of the props. The
 // pad is the larger of the two range spiders' prop clearances.
 bool npcPathPointClear(float2 point) {
@@ -1104,11 +1116,9 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     float dt = clamp(u.pointer.w > 0.0f ? u.pointer.w : u.resolutionTime.w,
         0.0f, 0.10f);
     uint action = uint(u.pointer.z);
-    uint jumpAction = uint(u.movement.z);
     // Action keys act on the tick they go down.
     uint keys = uint(u.movement.w);
     uint pressed = keys & ~uint(game.controls.x);
-    game.controls.x = float(keys);
     if ((pressed & keyV) != 0u)
         game.controls.y = game.controls.y > 0.5f ? 0.0f : 1.0f;
     // Keys 7, 8 and 9 are consecutive bits, in the order of the effect bits.
@@ -1146,6 +1156,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
         }
     }
     if (game.progress.w != phasePlaying) {
+        game.controls.x = float(keys);
         // A requested restart happens in the restartRange tick pass.
         if (!restartRequested(game, action) && game.progress.w == phaseWon
             && game.effects.x - game.sceneTransition.x >= 2.0f) {
@@ -1197,6 +1208,25 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
             game.weapon.y = reloadDuration;
         }
     }
+}
+
+// Movement and footing run after the controls and clocks update, and before
+// enemies sense the player. Keeping the house's storey-aware collision out
+// of advanceRange lets each tick pass compile independently.
+kernel void advancePlayer(constant ProgramUniforms &u [[buffer(0)]],
+    device GameState *states [[buffer(1)]],
+    device RangeAudio *audio [[buffer(3)]],
+    uint id [[thread_position_in_grid]]) {
+    if (id != 0u) return;
+    device GameState &game = states[0];
+    if (game.progress.w != phasePlaying) return;
+    float dt = clamp(u.pointer.w > 0.0f ? u.pointer.w : u.resolutionTime.w,
+        0.0f, 0.10f);
+    uint jumpAction = uint(u.movement.z);
+    uint keys = uint(u.movement.w);
+    uint pressed = keys & ~uint(game.controls.x);
+    game.controls.x = float(keys);
+    bool cutscene = bossCutscene(game);
 
     float2 move = clamp(u.movement.xy, float2(-1.0f), float2(1.0f));
     if (cutscene) move = float2(0.0f);
@@ -1212,7 +1242,9 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     }
     float speed = game.bossScene.y > 0.0f ? 1.75f : 4.6f;
     float2 previousPosition = game.player.xz;
-    bool wasGrounded = game.player.y <= 1.55f + stairHeight(previousPosition)
+    float foot = game.player.y - 1.55f;
+    bool wasGrounded = game.player.y
+        <= 1.55f + playerGround(previousPosition, foot)
         + (onJumpPad(previousPosition) ? jumpPadHeight : 0.0f) + 0.001f;
     // Q and E dodge sideways in a quick burst on top of walking.
     uint dodgeKeys = pressed & (keyQ | keyE);
@@ -1229,14 +1261,14 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     float2 next = previousPosition + (game.motion.xy + game.dodge.xy) * dt;
     // Resolve axes independently so a diagonal approach slides along a wall.
     float2 position = previousPosition;
-    if (walkable(float2(next.x, position.y))
+    if (playerWalkable(float2(next.x, position.y), foot)
         && !buildingsDoorsBar(game, float2(next.x, position.y))) {
         position.x = next.x;
     } else {
         game.motion.x = 0.0f;
         game.dodge.x = 0.0f;
     }
-    if (walkable(float2(position.x, next.y))
+    if (playerWalkable(float2(position.x, next.y), foot)
         && !buildingsDoorsBar(game, float2(position.x, next.y))) {
         position.y = next.y;
     } else {
@@ -1283,7 +1315,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
         }
     }
     bool overJumpPad = onJumpPad(next);
-    float groundY = 1.55f + stairHeight(next)
+    float groundY = 1.55f + playerGround(next, foot)
         + (overJumpPad ? jumpPadHeight : 0.0f);
     // On the moon, feet follow the ground downhill instead of skipping off it.
     if (outside && wasGrounded && game.effects.w <= 0.0f
@@ -1312,9 +1344,10 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
         game.player.y = northernCeilingY - 0.35f;
         game.effects.w = min(game.effects.w, 0.0f);
     }
-    // A jump from the haunted house's stair landing meets its ceiling.
-    float houseHeadroom = houseOrigin.y + houseCeilingY * houseScale - 0.25f;
-    if (houseUnderRoof(next) && game.player.y > houseHeadroom) {
+    // A jump in the haunted house meets the ceiling, floor or flight over
+    // the player.
+    float houseHeadroom = buildingsCeilingOver(next, foot) - 0.25f;
+    if (game.player.y > houseHeadroom) {
         game.player.y = houseHeadroom;
         game.effects.w = min(game.effects.w, 0.0f);
     }
@@ -2841,18 +2874,19 @@ float3 houseOutdoorLighting(SceneHit hit, SurfaceMaterial material,
 }
 
 // Each room of the house is lit by its own lamps; the doorways let a little
-// of the neighbouring rooms' light through.
+// of the neighbouring rooms' light through, and the stairwell joins the
+// halls of the storeys.
 float3 houseIndoorLighting(SceneHit hit, SurfaceMaterial material,
     float3 viewDirection, ChromePose chrome, device const GameState &game) {
     float3 color = float3(0.0f);
     uint room = houseRoom(hit.position);
+    float3 local = houseLocal(hit.position);
     for (uint i = 0u; i < houseIndoorLightCount; ++i) {
         uint lightRoom;
         PointLight light = houseHauntedIndoorLight(i, game, lightRoom);
-        if (lightRoom != room) {
-            if (room != 0u && lightRoom != 0u) continue;
-            light.power *= 0.12f;
-        }
+        float share = houseLightShare(lightRoom, room, local);
+        if (share <= 0.0f) continue;
+        light.power *= share;
         color += shadePointLight(hit, material, viewDirection, light, chrome,
             game);
     }
@@ -3716,7 +3750,9 @@ float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
         PointLight light = inHouse
             ? houseHauntedIndoorLight(i, game, lightRoom)
             : roomLight(i, game.effects.x);
-        if (inHouse && lightRoom != houseRoom(eye)) light.power *= 0.12f;
+        if (inHouse)
+            light.power *= houseLightShare(lightRoom, houseRoom(eye),
+                houseLocal(eye));
         color += shadePointLight(hit, material, -direction, light, chrome,
             game);
         if (glossy) {
@@ -3921,7 +3957,7 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         color = mix(color, atmosphereSky(normalize(float3(direction.x,
                 max(direction.y, 0.02f), direction.z)), sun),
             (1.0f - exp(-hit.distance / 2200.0f)) * atmosphereDay(sun));
-    // The ground floor's windows are real glass: what lies beyond was traced
+    // The house's room windows are real glass: what lies beyond was traced
     // through them, and the pane tints, smears and reflects it.
     float3 paneNormal;
     HouseWindow pane;
