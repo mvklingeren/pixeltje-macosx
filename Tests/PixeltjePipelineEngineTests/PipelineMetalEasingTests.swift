@@ -52,3 +52,25 @@ import Testing
   let library = try device.makeLibrary(source: resolved, options: nil)
   #expect(library.makeFunction(name: "sample3D") != nil)
 }
+
+@Test func sourceFileRereadsOnlyAfterAFileChanges() throws {
+  let root = FileManager.default.temporaryDirectory
+    .appendingPathComponent(UUID().uuidString, isDirectory: true)
+  try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+  defer { try? FileManager.default.removeItem(at: root) }
+  let main = root.appendingPathComponent("Main.metal")
+  let part = root.appendingPathComponent("Part.metal")
+  try "#include \"Part.metal\"\n".write(to: main, atomically: true, encoding: .utf8)
+  try "constant float a = 1.0f;\n".write(to: part, atomically: true, encoding: .utf8)
+  func load() throws -> String {
+    try PipelineMeshRenderer.shaderSource(supplied: nil, fileName: "Main.metal",
+      sourceMediaRoot: root)
+  }
+  #expect(try load().contains("a = 1.0f"))
+  #expect(try load().contains("a = 1.0f"))
+  // An include rewritten in place, as an editor saves it.
+  try "constant float a = 2.0f;\n".write(to: part, atomically: true, encoding: .utf8)
+  #expect(try load().contains("a = 2.0f"))
+  try FileManager.default.removeItem(at: part)
+  #expect(throws: PipelineEngineError.self) { try load() }
+}
