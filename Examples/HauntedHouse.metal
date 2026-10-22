@@ -71,23 +71,31 @@ float3 houseWorld(float3 local) {
     return houseOrigin + local * houseScale;
 }
 
-// A front door, standing open against a hall wall, as a house-local box:
-// side 0 is the west door, 1 the east.
-void houseFrontDoor(uint side, thread float3 &lower, thread float3 &upper) {
-    float x = side == 0u ? -0.9f : 0.84f;
-    lower = float3(x, houseFloorY, -5.7f);
-    upper = float3(x + 0.06f, houseFloorY + houseDoorHeight, -4.8f);
+// A front door leaf as a house-local part, hung on its jamb at the back of
+// the doorway: side 0 is the west leaf, 1 the east. open runs from 0, shut
+// against its neighbour, to 1, swung in to stand against the hall.
+HousePart houseFrontDoor(uint side, float open) {
+    float s = side == 0u ? 1.0f : -1.0f;
+    return houseDoorLeaf(float3(-s * houseDoorHalfWidth, houseFloorY, -5.7f),
+        float2(s, 0.0f), float2(0.0f, -1.0f),
+        float3(houseDoorHalfWidth, houseDoorHeight, 0.06f),
+        open * 0.5f * M_PI_F, houseTrim);
 }
 
-// Scales a house-local part into the world and adds it to the open group.
-// Window sizes stay in local units; houseWindow measures in them.
-void addHousePart(device HouseModel &house, HousePart part) {
+// A house-local part scaled into the world. Window sizes stay in local
+// units; houseWindow measures in them.
+HousePart houseWorldPart(HousePart part) {
     part.lower.xyz = houseWorld(part.lower.xyz);
     part.upper.xyz = houseWorld(part.upper.xyz);
     for (uint k = 0u; k < 4u; ++k)
         part.planes[k].w = part.planes[k].w * houseScale
             + dot(part.planes[k].xyz, houseOrigin);
-    addHouseWorldPart(house, part);
+    return part;
+}
+
+// Scales a house-local part into the world and adds it to the open group.
+void addHousePart(device HouseModel &house, HousePart part) {
+    addHouseWorldPart(house, houseWorldPart(part));
 }
 
 // Adds a piece of furniture at its real size: its anchor moves with the
@@ -354,6 +362,8 @@ void houseCladdingRelief(thread SceneHit &hit, float3 direction,
     uint style = hit.material - houseMaterialBase;
     float3 face = hit.normal, p = hit.position;
     if (abs(face.y) > 0.5f || houseInteriorPoint(p)) return;
+    // A door leaf may stand at any angle; it is shaded flat.
+    if (houseIsDoorLeaf(part)) return;
     bool zFace = abs(face.z) > 0.5f;
     float lo = zFace ? part.lower.x : part.lower.z;
     float hi = zFace ? part.upper.x : part.upper.z;
@@ -726,10 +736,10 @@ void buildHouseRooms(device HouseModel &house) {
         addHousePart(house, houseBox(
             float3(x0, F + houseInnerDoorHeight, houseInnerDoorZ.x),
             float3(x1, C, houseInnerDoorZ.y), houseSiding));
-        // The front doors stand open against the hall walls.
-        float3 doorLower, doorUpper;
-        houseFrontDoor(side, doorLower, doorUpper);
-        addHousePart(house, houseBox(doorLower, doorUpper, houseTrim));
+        // The front doors are shut until someone knocks;
+        // buildingsHangDoors swings them open.
+        house.doorParts[side] = house.counts.x;
+        addHousePart(house, houseFrontDoor(side, 0.0f));
         // Closed stringers flank the hall stairs, their tops following the
         // handrail.
         HousePart stringer = houseBox(
@@ -2295,6 +2305,14 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
         s = zFace ? p.x : p.z;
         float lo = zFace ? part.lower.x : part.lower.z;
         float hi = zFace ? part.upper.x : part.upper.z;
+        if (houseIsDoorLeaf(part)) {
+            // A plank door's boards run along it from the hinge, whichever
+            // way it has swung.
+            float2 span = houseDoorLeafSpan(part, p);
+            s = span.x;
+            lo = 0.0f;
+            hi = span.y;
+        }
         HouseWindow w = houseWindow(part, index, p, face, blur, wind);
         if (inside) {
             // Wallpaper between wainscot and cornice; curtains are drawn
@@ -2403,6 +2421,10 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
 
     if (style == houseTrim || style == houseRailing || style == houseFrieze) {
         float3 size = part.upper.xyz - part.lower.xyz;
+        // A door leaf's grain runs along it, whichever way it has swung.
+        bool leaf = houseIsDoorLeaf(part);
+        float2 span = houseDoorLeafSpan(part, p);
+        if (leaf) s = span.x;
         // Weathered paint: grain shows through, worn to bare oak on edges
         // and in patches.
         float2 grainAt = abs(n.y) > 0.5f ? p.xz : float2(s, p.y);
@@ -2412,11 +2434,10 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
             + float2(index)));
         float3 albedo = mix(trim * (0.8f + 0.4f * smoothNoise(float2(s * 3.0f,
             p.y * 0.4f))), houseBareOak * 0.8f * grain, worn);
-        // The open doors carry three raised panels.
-        if (size.y > 2.0f * houseScale && size.x < 0.1f * houseScale
-            && abs(n.x) > 0.5f) {
-            float2 d = float2(p.z - part.lower.z, p.y - part.lower.y);
-            float panel = max(houseLines(d.x - 0.12f, size.z - 0.24f, 0.04f,
+        // The front doors carry three raised panels on each broad face.
+        if (leaf && abs(dot(n, part.planes[3].xyz)) > 0.5f) {
+            float2 d = float2(span.x, p.y - part.lower.y);
+            float panel = max(houseLines(d.x - 0.12f, span.y - 0.24f, 0.04f,
                 blur), houseLines(d.y - 0.12f, (size.y - 0.24f) / 3.0f, 0.04f,
                 blur));
             albedo *= 1.0f - 0.45f * panel;

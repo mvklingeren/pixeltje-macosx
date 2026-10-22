@@ -174,6 +174,44 @@ void houseWindows(thread HousePart &part, float2 counts, float2 size,
     part.rows = float4(sill, rows, pitch, glow);
 }
 
+// A door leaf hung on a vertical hinge through `hinge`, the foot of its
+// inner back edge. Shut, it runs size.x along `along` and stands size.y
+// tall and size.z thick toward `out`, the side it is knocked on; it swings
+// in, away from `out`, by `angle` radians. Its box is cut by four planes
+// along its faces and edges, so it stays a slab at any angle and a door
+// can be rehung each frame as it swings. A row pitch of -1 marks a leaf,
+// which is patterned along itself from the hinge.
+constant float houseDoorLeafPitch = -1.0f;
+
+HousePart houseDoorLeaf(float3 hinge, float2 along, float2 out, float3 size,
+    float angle, uint style) {
+    float c = cos(angle), s = sin(angle);
+    float3 a = float3(along.x * c - out.x * s, 0.0f, along.y * c - out.y * s);
+    float3 t = float3(out.x * c + along.x * s, 0.0f, out.y * c + along.y * s);
+    float3 tip = hinge + a * size.x, face = hinge + t * size.z;
+    float3 lower = min(min(hinge, tip), min(face, tip + t * size.z));
+    float3 upper = max(max(hinge, tip), max(face, tip + t * size.z));
+    upper.y = hinge.y + size.y;
+    HousePart part = houseBox(lower, upper, style);
+    houseCut(part, -a, hinge);
+    houseCut(part, a, tip);
+    houseCut(part, -t, hinge);
+    houseCut(part, t, face);
+    part.rows.z = houseDoorLeafPitch;
+    return part;
+}
+
+// A street copy scales the pitch with it, so any negative pitch marks one.
+bool houseIsDoorLeaf(device const HousePart &part) {
+    return part.rows.z < 0.0f && uint(part.upper.w) == 4u;
+}
+
+// How far p lies along a leaf from its hinge, and the leaf's width.
+float2 houseDoorLeafSpan(device const HousePart &part, float3 p) {
+    return float2(dot(part.planes[1].xyz, p) + part.planes[0].w,
+        part.planes[0].w + part.planes[1].w);
+}
+
 // Opens a group in the open site.
 void beginHouseGroup(device HouseModel &house) {
     uint g = house.counts.y;

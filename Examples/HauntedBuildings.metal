@@ -290,52 +290,100 @@ float3 buildingsSmoke(float3 color, float3 origin, float3 direction,
 
 // ------------------------------------------------------------------- doors
 
-// The doors a visitor can knock on: the house's two front doors, standing
-// open against the hall walls, the cottage's plank door and the barn's two
-// sliding leaves. Each building's file places its own.
+// The doors a visitor can knock on: the house's two front doors, the
+// cottage's plank door and the barn's two sliding leaves. Each building's
+// file places its own. The house's pair and the cottage's door are shut
+// until knocked on, then swing open and stay open until the match
+// restarts; the barn's leaves stay as they are. A swinging door is a part
+// rehung every tick, so the scene traces, shadows and shots see it where
+// it is.
 constant uint buildingsDoorCount = 5u;
 constant uint doorOfHouse = 1u;
 constant uint doorOfCottage = 2u;
 constant uint doorOfBarn = 3u;
+// Seconds a door takes to swing open, and how long after the last rap it
+// starts: an old latch gives a moment before the door moves.
+constant float buildingsHouseDoorsSwing = 2.6f;
+constant float buildingsCottageDoorSwing = 1.8f;
+constant float buildingsDoorDelay = 0.3f;
 
-// Door i as a box in its building's frame, which turn turns into the
-// world; returns the building it belongs to.
-uint buildingsDoorBox(uint i, thread float3 &lower, thread float3 &upper,
-    thread HouseTurn &turn) {
-    turn = {0.0f, 1.0f, float2(0.0f)};
-    if (i < 2u) {
-        houseFrontDoor(i, lower, upper);
-        lower = houseWorld(lower);
-        upper = houseWorld(upper);
-        return doorOfHouse;
-    }
-    if (i == 2u) {
-        cottageDoor(lower, upper);
-        lower += cottageOrigin;
-        upper += cottageOrigin;
-        turn = cottageFrame();
-        return doorOfCottage;
-    }
-    shedDoorLeaf(barnSpec(), i - 3u, lower, upper);
-    lower += shedYardOrigin;
-    upper += shedYardOrigin;
-    return doorOfBarn;
+void buildingsShutDoors(device GameState &game) {
+    game.house.doors = float4(-100.0f, -100.0f, 0.0f, 0.0f);
+}
+
+// Sets the house's (building doorOfHouse) or the cottage's door swinging
+// open, unless it already is.
+void buildingsOpenDoor(device GameState &game, uint building) {
+    float start = game.effects.x + buildingsDoorDelay;
+    if (building == doorOfHouse && game.house.doors.x < 0.0f)
+        game.house.doors.x = start;
+    if (building == doorOfCottage && game.house.doors.y < 0.0f)
+        game.house.doors.y = start;
+}
+
+// How far the house's pair (set 0) or the cottage's door (set 1) has swung
+// open, from 0 to 1: it gives a little as the latch lets go, then creaks
+// round, slowing as it comes to rest.
+float buildingsDoorOpen(device const GameState &game, uint set) {
+    float start = set == 0u ? game.house.doors.x : game.house.doors.y;
+    if (start < 0.0f) return 0.0f;
+    float t = (game.effects.x - start) / (set == 0u
+        ? buildingsHouseDoorsSwing : buildingsCottageDoorSwing);
+    return 0.1f * smoothstep(0.0f, 0.12f, t)
+        + 0.9f * smoothstep(0.18f, 1.0f, t);
+}
+
+// Rehangs the swinging doors' parts for this tick. Each swings within the
+// bounds its group was built with: the house's leaves into the hall, the
+// cottage's into its lobby.
+void buildingsHangDoors(device GameState &game) {
+    device HouseModel &house = game.house;
+    float leaves = buildingsDoorOpen(game, 0u);
+    for (uint side = 0u; side < 2u; ++side)
+        house.parts[min(house.doorParts[side], houseCapacity - 1u)]
+            = houseWorldPart(houseFrontDoor(side, leaves));
+    house.parts[min(house.doorParts.z, houseCapacity - 1u)]
+        = cottageDoor(buildingsDoorOpen(game, 1u));
+}
+
+// True where the house's front doors, while still too far shut to pass,
+// keep the walker out of the doorway.
+bool buildingsDoorsBar(device const GameState &game, float2 p) {
+    if (buildingsDoorOpen(game, 0u) > 0.7f) return false;
+    float2 local = houseLocal(p);
+    float pad = housePlayerPad / houseScale;
+    return abs(local.x) < houseDoorHalfWidth && local.y > -6.0f - pad
+        && local.y < -5.7f + pad;
 }
 
 // The nearest door the ray meets before limit: its distance, or -1 when
-// there is none. door names its building, or is 0.
-float buildingsDoorCrossing(float3 origin, float3 direction, float limit,
-    thread uint &door) {
+// there is none. door names its building, or is 0. The house's and the
+// cottage's doors are met where they hang; the barn's leaves are boxes.
+float buildingsDoorCrossing(device const HouseModel &house, float3 origin,
+    float3 direction, float limit, thread uint &door) {
     float nearest = -1.0f;
     door = 0u;
     for (uint i = 0u; i < buildingsDoorCount; ++i) {
-        float3 lower, upper, normal;
-        HouseTurn turn;
-        uint building = buildingsDoorBox(i, lower, upper, turn);
-        // A little proud of the boards, which are traced in relief.
-        float t = pixeltje_3d::rayBox(houseTurnPointIn(turn, origin),
-            houseTurnDirectionIn(turn, direction), lower - 0.03f,
-            upper + 0.03f, 0.0f, normal);
+        float3 normal;
+        float t;
+        uint building;
+        if (i < 3u) {
+            HouseTurn turn = i == 2u ? cottageFrame()
+                : HouseTurn{0.0f, 1.0f, float2(0.0f)};
+            building = i == 2u ? doorOfCottage : doorOfHouse;
+            t = housePartHit(house.parts[min(house.doorParts[i],
+                    houseCapacity - 1u)], houseTurnPointIn(turn, origin),
+                houseTurnDirectionIn(turn, direction), limit, normal);
+        } else {
+            float3 lower, upper;
+            shedDoorLeaf(barnSpec(), i - 3u, lower, upper);
+            lower += shedYardOrigin;
+            upper += shedYardOrigin;
+            building = doorOfBarn;
+            // A little proud of the boards, which are traced in relief.
+            t = pixeltje_3d::rayBox(origin, direction, lower - 0.03f,
+                upper + 0.03f, 0.0f, normal);
+        }
         if (t < 0.0f || t > limit) continue;
         nearest = t;
         limit = t;

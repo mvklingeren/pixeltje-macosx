@@ -10,7 +10,8 @@
 // shelters the front door and a lantern. Its oak clapboard walls carry the
 // house's pointed windows, a few boarded, onto dim rooms where candles
 // burn; they go dark and green when the house is haunted, but shooting
-// them leaves the house asleep. Nobody goes in.
+// them leaves the house asleep. Nobody goes in, but a knock opens the
+// door: it creaks in on a dark lobby.
 //
 // Parts are in metres around cottageOrigin, the middle of the floor, in the
 // cottage's own frame: x east, y up from the levelled ground, z north,
@@ -27,6 +28,11 @@ constant float2 cottageHalf = float2(9.0f, 7.0f);   // the walls
 constant float cottageFloor = 0.5f;                 // top of the foundation
 constant float cottageEaves = 6.4f;
 constant float cottageRidge = 14.6f;
+constant float cottageDoorHalfWidth = 0.55f;
+constant float cottageDoorHeight = 2.2f;
+// The lobby behind the door, deep enough for the door to swing into and
+// shallow enough to stay clear of the side walls' first windows.
+constant float cottageLobbyDepth = 1.3f;
 constant float3 cottageLantern = float3(0.0f, 2.25f, -7.8f);
 // The mouth of the chimney pot, where the smoke leaves it.
 constant float3 cottageChimneyTop = float3(-10.33f, 18.1f, 2.8f);
@@ -92,10 +98,14 @@ bool cottageGroundHolds(float2 p) {
     return all(local > cottagePadLower) && all(local < cottagePadUpper);
 }
 
-// The plank door in the front wall, as a box in the cottage's frame.
-void cottageDoor(thread float3 &lower, thread float3 &upper) {
-    lower = float3(-0.55f, cottageFloor, -cottageHalf.y - 0.06f);
-    upper = float3(0.55f, cottageFloor + 2.2f, -cottageHalf.y);
+// The plank door, in world metres in the cottage's frame, hung on the
+// doorway's west jamb. open runs from 0, shut over the doorway in front of
+// the wall, to 1, swung in against the lobby's west wall.
+HousePart cottageDoor(float open) {
+    return houseDoorLeaf(cottageOrigin + float3(-cottageDoorHalfWidth,
+            cottageFloor, -cottageHalf.y), float2(1.0f, 0.0f),
+        float2(0.0f, -1.0f), float3(2.0f * cottageDoorHalfWidth,
+            cottageDoorHeight, 0.06f), open * 0.5f * M_PI_F, houseBattens);
 }
 
 // The porch lantern's light. The street's table says where each cottage's
@@ -131,24 +141,36 @@ void buildCottage(device HouseModel &house) {
     const float3 o = cottageOrigin;
     const float2 h = cottageHalf;
     const float F = cottageFloor, E = cottageEaves, R = cottageRidge;
-    // Foundation, walls with two storeys of windows, a plank door and its
-    // step.
+    // Foundation, walls with two storeys of windows either side of the
+    // doorway, a dark lobby behind it, a plank door and its step. The walls
+    // are a west and an east block, each with two windows across the front
+    // and back and three along its gable end, joined behind the lobby and
+    // over the door.
+    const float W = cottageDoorHalfWidth, D = cottageLobbyDepth;
     addHouseWorldPart(house, cottageBox(float3(-h.x - 0.2f, -0.3f,
         -h.y - 0.2f), float3(h.x + 0.2f, F, h.y + 0.2f), houseStone));
-    HousePart walls = cottageBox(float3(-h.x, F, -h.y), float3(h.x, E, h.y),
-        houseSiding);
-    houseWindows(walls, float2(4.0f, 3.0f), float2(0.5f, 0.85f), 0.45f, 2.0f,
-        1.45f, 0.7f);
-    uint wallIndex = house.counts.x;
-    addHouseWorldPart(house, walls);
     float2 clad = float2(F + 0.1f, E - 0.1f) + o.y - houseOrigin.y;
-    addLooseClapboards(house, wallIndex, float3(0.0f, 0.0f, -1.0f), clad,
-        float2(o.x - 0.9f, o.x + 0.9f), 3u);
-    addLooseClapboards(house, wallIndex, float3(1.0f, 0.0f, 0.0f), clad,
-        houseNoSkip, 1u);
-    float3 doorLower, doorUpper;
-    cottageDoor(doorLower, doorUpper);
-    addHouseWorldPart(house, cottageBox(doorLower, doorUpper, houseBattens));
+    for (uint side = 0u; side < 2u; ++side) {
+        HousePart walls = cottageBox(float3(side == 0u ? -h.x : W, F, -h.y),
+            float3(side == 0u ? -W : h.x, E, h.y), houseSiding);
+        houseWindows(walls, float2(2.0f, 3.0f), float2(0.5f, 0.85f), 0.45f,
+            2.0f, 1.45f, 0.7f);
+        uint wallIndex = house.counts.x;
+        addHouseWorldPart(house, walls);
+        addLooseClapboards(house, wallIndex, float3(0.0f, 0.0f, -1.0f), clad,
+            float2(o.x - 0.9f, o.x + 0.9f), side == 0u ? 2u : 1u);
+        if (side == 1u)
+            addLooseClapboards(house, wallIndex, float3(1.0f, 0.0f, 0.0f),
+                clad, houseNoSkip, 1u);
+    }
+    // The lobby's back wall is painted panelling; the wall over the door
+    // is clad like the rest.
+    addHouseWorldPart(house, cottageBox(float3(-W, F, -h.y + D),
+        float3(W, E, h.y), houseTrim));
+    addHouseWorldPart(house, cottageBox(float3(-W, F + cottageDoorHeight,
+        -h.y), float3(W, E, -h.y + D), houseSiding));
+    house.doorParts.z = house.counts.x;
+    addHouseWorldPart(house, cottageDoor(0.0f));
     addHouseWorldPart(house, cottageBox(float3(-1.2f, -0.3f, -8.35f),
         float3(1.2f, 0.3f, -h.y - 0.2f), houseStone));
     // The door hood on two posts, and the lantern under it.

@@ -234,7 +234,9 @@ struct LaserBolt {
 // voices layer the wind loop at different rates for the night, and the
 // haunt voice plays it as the gale that blows while the house is haunted.
 // The ghost voice loops the ghost's moan from wherever the ghost flies.
-// Each knuckle rap on a door and each punch that lands is one event.
+// Each knuckle rap on a door and each punch that lands is one event, and
+// so is each door a knock swings open: the cottage's creaks, the house's
+// big pair groans.
 struct RangeAudio {
     uint shot;
     uint scare;
@@ -248,9 +250,12 @@ struct RangeAudio {
     float4 windVoice[2];
     float4 hauntWind;
     float4 ghostVoice;
+    uint cottageDoor;
+    uint houseDoors;
+    uint2 unused;
 };
 
-static_assert(sizeof(RangeAudio) == 144,
+static_assert(sizeof(RangeAudio) == 160,
     "The audio words must match the program's audioEvents and audioVoices");
 
 constant uint hudCapacity = 96u;
@@ -300,6 +305,12 @@ struct HouseModel {
     // offsets stay put when a capacity changes.
     float4 haunt;
     float4 hauntMotion;
+    // The doors a knock opens: when the house's pair and the cottage's door
+    // begin to swing open (negative while shut), and 1 in z and w once
+    // each has sounded. Then the parts that hold the house's west and east
+    // leaves and the cottage's door, which buildingsHangDoors rehangs.
+    float4 doors;
+    uint4 doorParts;
     float4 candles[houseCandleCapacity];  // flame XYZ, room
     uint4 sites[buildingSiteCapacity];    // first and end group, first and
                                           // end part; site 0 is the house
@@ -708,6 +719,7 @@ void resetGame(device GameState &game, uint seed) {
     }
     game.pickups = uint4(0u);
     houseQuiet(game);
+    buildingsShutDoors(game);
 }
 
 kernel void initializeRange(constant ProgramUniforms &u [[buffer(0)]],
@@ -1217,13 +1229,15 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     float2 next = previousPosition + (game.motion.xy + game.dodge.xy) * dt;
     // Resolve axes independently so a diagonal approach slides along a wall.
     float2 position = previousPosition;
-    if (walkable(float2(next.x, position.y))) {
+    if (walkable(float2(next.x, position.y))
+        && !buildingsDoorsBar(game, float2(next.x, position.y))) {
         position.x = next.x;
     } else {
         game.motion.x = 0.0f;
         game.dodge.x = 0.0f;
     }
-    if (walkable(float2(position.x, next.y))) {
+    if (walkable(float2(position.x, next.y))
+        && !buildingsDoorsBar(game, float2(position.x, next.y))) {
         position.y = next.y;
     } else {
         game.motion.y = 0.0f;
@@ -1594,12 +1608,34 @@ bool landPunch(device GameState &game, ShotTrace trace, float3 eye,
     return true;
 }
 
+// The doors a knock opens swing on their own time, each sounding as it
+// starts to move: the cottage's creaks, the house's pair groans. The
+// house's doors also burst open for its ghost when the green glow snaps
+// on, if nobody knocked them open first.
+void swingDoors(device GameState &game, device RangeAudio &audio) {
+    float time = game.effects.x;
+    if (houseHauntAge(game) >= houseGreenOn && game.house.doors.x < 0.0f)
+        game.house.doors.x = time;
+    float4 doors = game.house.doors;
+    if (doors.x >= 0.0f && time >= doors.x && doors.z < 0.5f) {
+        audio.houseDoors += 1u;
+        game.house.doors.z = 1.0f;
+    }
+    if (doors.y >= 0.0f && time >= doors.y && doors.w < 0.5f) {
+        audio.cottageDoor += 1u;
+        game.house.doors.w = 1.0f;
+    }
+    buildingsHangDoors(game);
+}
+
 // The hand swings in its own tick pass after fireRange, for the compile-time
 // reason fireRange gives: its reach is traced like a shot. A click while a
-// door is the nearest thing within knocking reach knocks: three raps, and
-// the first on the house's front doors wakes it. Any other click punches,
-// and the punch strikes when the fist arrives. Clicks while the hand is
-// lowered, raised or mid-swing are spent, as a gun spends them.
+// door is the nearest thing within knocking reach knocks: three raps; the
+// first on the house's front doors wakes it, and the last opens the
+// house's or the cottage's door. Any other click punches, and the punch
+// strikes when the fist arrives. Clicks while the hand is lowered, raised
+// or mid-swing are spent, as a gun spends them. The doors swing here too,
+// whatever is held.
 kernel void swingHand(constant ProgramUniforms &u [[buffer(0)]],
     device GameState *states [[buffer(1)]],
     device RangeAudio *audio [[buffer(3)]],
@@ -1607,6 +1643,7 @@ kernel void swingHand(constant ProgramUniforms &u [[buffer(0)]],
     if (id != 0u) return;
     device GameState &game = states[0];
     if (game.progress.w != phasePlaying) return;
+    swingDoors(game, audio[0]);
     if (!holdingHand(game) || game.arsenal.x != heldHand) {
         game.hand = float4(-100.0f, 0.0f, 0.0f, 0.0f);
         return;
@@ -1614,7 +1651,8 @@ kernel void swingHand(constant ProgramUniforms &u [[buffer(0)]],
     float3 eye = game.player.xyz + eyeOffset(game);
     float3 aim = pixeltje_3d::forward(game.player.w, game.view.x);
     uint door;
-    float doorDistance = buildingsDoorCrossing(eye, aim, handKnockReach, door);
+    float doorDistance = buildingsDoorCrossing(game.house, eye, aim,
+        handKnockReach, door);
     float age = handSwingAge(game);
     // While idle, w names the door in reach for the HUD's prompt.
     if (age < 0.0f) game.hand.w = armsReady(game) ? float(door) : 0.0f;
@@ -1647,6 +1685,8 @@ kernel void swingHand(constant ProgramUniforms &u [[buffer(0)]],
         if (struck == 0u && uint(game.hand.w) == doorOfHouse
             && game.house.haunt.x < 0.0f)
             houseWake(game);
+        if (struck + 1u == handRaps)
+            buildingsOpenDoor(game, uint(game.hand.w));
     }
 }
 
