@@ -64,11 +64,11 @@ void traceBuildingGroups(thread SceneHit &hit, float3 origin,
             if (t < 0.0f) continue;
             float3 p = o + d * t;
             uint style = uint(house.parts[i].lower.w);
-            if (((style >= houseIron && style <= houseFrieze)
-                    || style == houseCandle)
+            if (houseCutoutStyle(style)
                 && houseCutoutOpen(style, house.parts[i], p)) continue;
-            // Rays pass through the clear glass of the ground floor.
-            if (style == houseSiding && houseSeeThrough(house.parts[i])
+            // Rays pass through the clear glass of the house's rooms.
+            if ((style == houseSiding || style == houseBattens)
+                && houseSeeThrough(house.parts[i])
                 && houseWindow(house.parts[i], i, p, normal, 0.002f,
                     wind).glass
                     > 0.5f) continue;
@@ -114,8 +114,7 @@ bool buildingsBlockLight(float3 origin, float3 direction,
         uint end = min(uint(group.upper.w), houseCapacity);
         for (uint i = uint(group.lower.w); i < end; ++i) {
             uint style = uint(house.parts[i].lower.w);
-            if ((style >= houseIron && style <= houseFrieze)
-                || style == houseLantern || style == houseCandle) continue;
+            if (houseCutoutStyle(style) || style == houseLantern) continue;
             float3 normal;
             if (houseHitPart(house.parts[i], o, d, lightDistance, normal)
                     > 0.0f) return true;
@@ -145,7 +144,8 @@ float buildingsGlassCrossing(float3 origin, float3 direction, float limit,
         }
         uint end = min(uint(group.upper.w), houseCapacity);
         for (uint i = uint(group.lower.w); i < end; ++i) {
-            if (uint(house.parts[i].lower.w) != houseSiding
+            uint style = uint(house.parts[i].lower.w);
+            if ((style != houseSiding && style != houseBattens)
                 || !houseSeeThrough(house.parts[i])) continue;
             float3 faceNormal;
             float t = housePartHit(house.parts[i], o, d, limit, faceNormal);
@@ -227,6 +227,27 @@ PointLight buildingsStreetLamp(uint index, device const GameState &game,
 // The floor, deck, step or stair under p, or ground where there is none.
 float buildingsStand(float2 p, float ground) {
     return houseStand(p, ground);
+}
+
+// The player alone climbs to the haunted house's upper floors. With their
+// feet at foot, these stand in for buildingsStand and buildingsBlocked over
+// the house's body, and give the height of what is over their head.
+float buildingsStandFrom(float2 p, float ground, float foot) {
+    return houseStandFrom(p, ground, foot);
+}
+
+float buildingsCeilingOver(float2 p, float foot) {
+    return houseCeilingOver(p, foot);
+}
+
+bool buildingsBlocked(float2 p);
+
+bool buildingsBlockedFrom(float2 p, float foot) {
+    if (!houseBodyHolds(p)) return buildingsBlocked(p);
+    // The ground floor's walls and furniture stand in the house's table.
+    if ((foot - houseOrigin.y) / houseScale < houseCeilingY
+        && buildingsBlocked(p)) return true;
+    return houseBlockedAbove(p, foot);
 }
 
 // True where a wall, post, fence, grave or piece of furniture keeps the

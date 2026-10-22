@@ -1,0 +1,470 @@
+{
+  "width": 960,
+  "height": 540,
+  "views": [
+    {
+      "name": "hall-to-stairs",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            0.7500000000000002,
+            119.0,
+            3.14159
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.22
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "stairwell-up",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            0.7500000000000002,
+            127.6,
+            3.14159
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.8
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "landing-to-front",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            4.35,
+            138.2,
+            0.0
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.2
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "west-return",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -3.4,
+            6.15,
+            133.0,
+            0.0
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.15
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gallery-to-attic-flight",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            3.3,
+            7.949999999999999,
+            121.0,
+            3.14159
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.3
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "attic-flight",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            10.95,
+            130.0,
+            3.14159
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.25
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gallery-down-stairwell",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -3.2,
+            7.949999999999999,
+            127.6,
+            3.14159
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            -0.55
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "attic-arrival",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            14.150000000000002,
+            138.4,
+            0.0
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.05
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "attic-west-dormer",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -6,
+            14.150000000000002,
+            122,
+            -1.570795
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.1
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bedroom",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -6.0,
+            7.949999999999999,
+            124.4,
+            -1.570795
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.0
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "study",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            6.0,
+            7.949999999999999,
+            124.4,
+            1.570795
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.0
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "landing-up-to-attic-flight",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            4.35,
+            138.6,
+            0.0
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.75
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "attic-hole",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            5.2,
+            14.150000000000002,
+            129.0,
+            2.513272
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            -0.45
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "front",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            0.5,
+            78,
+            3.14159
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.12
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "back-from-yard",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            -0.75,
+            162,
+            0.0
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.2
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "west-side",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -45,
+            -0.75,
+            128,
+            1.570795
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.25
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    }
+  ]
+}
