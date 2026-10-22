@@ -252,20 +252,18 @@ bool buildingsBlocked(float2 p) {
         footprints = shedObstacles;
         count = shedObstacleCount;
     } else if (cottageGroundHolds(p)) {
-        local = cottageLocal(p);
+        local = p - cottageOrigin.xz;
         pad = housePlayerPad;
         footprints = cottageObstacles;
         count = cottageObstacleCount;
     } else {
-        // The street: its lamp posts, then the footprints of the copy whose
-        // ground holds p, in the copy's turned frame.
+        // The street: its lamp posts, then the copies' footprints.
         if (streetLampBlocked(p, housePlayerPad)) return true;
-        uint property = streetPropertyAt(p, local);
-        if (property >= streetPropertyCount) return false;
+        if (!streetNearProperties(p)) return false;
+        local = p;
         pad = housePlayerPad;
-        footprints = streetObstacles + streetObstacleFirst[property];
-        count = streetObstacleFirst[property + 1u]
-            - streetObstacleFirst[property];
+        footprints = streetObstacles;
+        count = streetObstacleCount;
     }
     for (uint i = 0u; i < count; ++i) {
         float4 r = footprints[i];

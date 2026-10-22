@@ -19,8 +19,10 @@
 constant float3 cottageOrigin = float3(-38.0f, 0.5f, 60.0f);
 // cos and sin of the 7° the cottage stands turned, taking +x toward +z.
 constant float2 cottageTurn = float2(0.992546f, 0.121869f);
-constant float2 cottagePadLower = float2(-12.5f, -11.5f);
-constant float2 cottagePadUpper = float2(11.5f, 15.5f);
+// The levelled ground around the origin: the box around the turned pad,
+// whose corners are at -12.5, -11.5 and 11.5, 15.5 in the cottage's frame.
+constant float2 cottagePadLower = float2(-14.295802f, -12.937648f);
+constant float2 cottagePadUpper = float2(12.815778f, 16.785963f);
 constant float2 cottageHalf = float2(9.0f, 7.0f);   // the walls
 constant float cottageFloor = 0.5f;                 // top of the foundation
 constant float cottageEaves = 6.4f;
@@ -29,13 +31,47 @@ constant float3 cottageLantern = float3(0.0f, 2.25f, -7.8f);
 // The mouth of the chimney pot, where the smoke leaves it.
 constant float3 cottageChimneyTop = float3(-10.33f, 18.1f, 2.8f);
 
-// Where the walker cannot go, in the cottage's frame as lower and upper
-// x and z: the house on its foundation, the lean-to, the chimney and the
-// step with its posts.
-constant uint cottageObstacleCount = 4u;
+// Where the walker cannot go, as world boxes around the origin: the
+// outlines of the house on its foundation (-9.2, -7.2 to 9.2, 7.2 in the
+// cottage's frame), the lean-to (-9.1, 7.0 to 2.7, 12.8), the chimney
+// (-10.3, 2.0 to -9.2, 3.6) and the step with its posts (-1.2, -8.35 to
+// 1.2, -7.2), turned with it and cut into pieces whose boxes reach at most
+// 0.6 m past them. The street's copies are worked out from the same
+// outlines.
+constant uint cottageObstacleCount = 32u;
 constant float4 cottageObstacles[cottageObstacleCount] = {
-    float4(-9.2f, -7.2f, 9.2f, 7.2f), float4(-9.1f, 7.0f, 2.7f, 12.8f),
-    float4(-10.3f, 2.0f, -9.2f, 3.6f), float4(-1.2f, -8.35f, 1.2f, -7.2f),
+    float4(-8.290526f, -8.267530f, -3.688253f, -7.409167f),
+    float4(-3.724814f, -7.706931f, 0.877459f, -6.848568f),
+    float4(0.840898f, -7.146332f, 5.443172f, -6.287969f),
+    float4(5.406611f, -6.585733f, 10.008884f, -5.727370f),
+    float4(-10.008884f, 5.727370f, -5.406611f, 6.585733f),
+    float4(-5.443172f, 6.287969f, -0.840898f, 7.146332f),
+    float4(-0.877459f, 6.848568f, 3.724814f, 7.706931f),
+    float4(3.688253f, 7.409167f, 8.290526f, 8.267530f),
+    float4(-8.851125f, -7.969766f, -7.992762f, -3.367493f),
+    float4(-9.411724f, -3.404054f, -8.553361f, 1.198219f),
+    float4(-9.972323f, 1.161658f, -9.113960f, 5.763931f),
+    float4(9.113960f, -5.763931f, 9.972323f, -1.161658f),
+    float4(8.553361f, -1.198219f, 9.411724f, 3.404054f),
+    float4(7.992762f, 3.367493f, 8.851125f, 7.969766f),
+    float4(-9.921816f, 5.838812f, -5.981241f, 6.615929f),
+    float4(-6.017801f, 6.318165f, -2.077226f, 7.095281f),
+    float4(-2.113786f, 6.797518f, 1.826789f, 7.574634f),
+    float4(-10.592098f, 11.297816f, -6.651522f, 12.074932f),
+    float4(-6.688083f, 11.777169f, -2.747507f, 12.554285f),
+    float4(-2.784068f, 12.256521f, 1.156508f, 13.033638f),
+    float4(-10.238676f, 6.136576f, -9.624052f, 8.753757f),
+    float4(-10.555537f, 8.717196f, -9.940913f, 11.334377f),
+    float4(1.175604f, 7.538073f, 1.790228f, 10.155254f),
+    float4(0.858744f, 10.118693f, 1.473368f, 12.735874f),
+    float4(-10.503525f, 0.729838f, -9.375163f, 1.161658f),
+    float4(-10.661955f, 2.020148f, -9.533593f, 2.451968f),
+    float4(-10.625394f, 1.027602f, -10.205761f, 2.056709f),
+    float4(-9.831357f, 1.125097f, -9.411724f, 2.154204f),
+    float4(-0.210007f, -8.434004f, 2.208664f, -7.843753f),
+    float4(-0.313596f, -7.590339f, 2.105075f, -7.000089f),
+    float4(-0.277035f, -8.136240f, 0.087757f, -7.553779f),
+    float4(1.807312f, -7.880314f, 2.172104f, -7.297853f),
 };
 
 // The cottage's turn about the vertical through its origin.
@@ -43,22 +79,16 @@ HouseTurn cottageFrame() {
     return {cottageTurn.y, cottageTurn.x, cottageOrigin.xz};
 }
 
-// p, in world x and z, in the cottage's frame around its origin.
-float2 cottageLocal(float2 p) {
-    return houseRotate(p - cottageOrigin.xz,
-        float2(cottageTurn.x, -cottageTurn.y));
-}
-
 // Weight of the natural terrain around the cottage: 0 on its levelled
 // ground and 1.5 m beyond, rising to 1 another 14 m out.
 float cottageGroundBlend(float2 p) {
-    return buildingPadBlend(cottageLocal(p), float2(0.0f), cottagePadLower,
+    return buildingPadBlend(p, cottageOrigin.xz, cottagePadLower,
         cottagePadUpper, 1.5f, 14.0f);
 }
 
 // True where p, in world x and z, lies on the cottage's ground.
 bool cottageGroundHolds(float2 p) {
-    float2 local = cottageLocal(p);
+    float2 local = p - cottageOrigin.xz;
     return all(local > cottagePadLower) && all(local < cottagePadUpper);
 }
 

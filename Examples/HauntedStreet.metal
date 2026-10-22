@@ -124,7 +124,9 @@ constant StreetProperty streetProperties[streetPropertyCount] = {
 
 // How far each property stands turned off square, beyond its quarter
 // turns, about the vertical through its centre: the cosine and sine of the
-// angle, taking +x toward +z. The cottage's is cottageTurn.
+// angle, taking +x toward +z. The cottage's is cottageTurn. buildStreet
+// turns the copies' groups by them; the tables below are worked out with
+// them.
 constant float2 streetPropertyTurns[streetPropertyCount] = {
     float2(0.992546f, 0.121869f),
     float2(0.984808f, -0.173648f),
@@ -176,29 +178,29 @@ constexpr float3 streetPlace(StreetProperty c, float3 source, float3 q) {
 // These layout tables are literal. Metal emits a forbidden global
 // constructor for computed vector arrays, even when their helpers are
 // constexpr. Keep them in sync with the properties, their turns and the
-// source footprints and pads. The spider and drone kernels read them with
-// one turn of the point into the copy that holds it, never by moving the
-// originals' tables onto the copies each frame; doing that made the spider
-// kernel take minutes to compile.
+// source footprints and pads. They are world boxes, so the spider and drone
+// kernels read them without turning or moving points each frame; doing
+// either made the spider kernel take minutes to compile.
 
-// Each property's levelled ground in its own frame: x and z from its
-// centre, after its quarter turns and before its turn off square.
+// Each property's levelled ground in world x and z: the box around its
+// pad, turned with it.
 constant float4 streetPads[streetPropertyCount] = {
-    float4(-12.500000f, -11.500000f, 11.500000f, 15.500000f),
-    float4(-11.250000f, -10.350000f, 10.350000f, 13.950000f),
-    float4(-9.375000f, -8.625000f, 8.625000f, 11.625000f),
-    float4(-9.200000f, -12.400000f, 10.000000f, 9.200000f),
-    float4(-5.850000f, -10.400000f, 5.850000f, 9.750000f),
-    float4(-7.200000f, -12.000000f, 7.200000f, 12.800000f),
-    float4(-10.500000f, -6.375000f, 10.500000f, 5.625000f),
-    float4(-22.500000f, -31.000000f, 22.500000f, 21.000000f),
-    float4(-22.500000f, -31.000000f, 22.500000f, 21.000000f),
+    float4(-52.295802f, 47.062352f, -25.184222f, 76.785963f),
+    float4(23.123654f, 45.509981f, 48.615152f, 73.191610f),
+    float4(-135.749775f, 44.487142f, -113.655855f, 68.267255f),
+    float4(-102.445754f, 7.622644f, -81.093119f, 31.111263f),
+    float4(-92.303213f, 48.312900f, -77.595105f, 70.045103f),
+    float4(83.462397f, 1.265265f, 102.703932f, 28.517253f),
+    float4(94.049705f, 47.734124f, 116.015662f, 61.518730f),
+    float4(17.500000f, -20.050000f, 62.500000f, 31.950000f),
+    float4(-62.500000f, -20.050000f, -17.500000f, 31.950000f),
 };
 
-// The copies' walls, posts and crates from their originals' tables, in
-// each copy's frame like its pad: the cottages' (properties 1 to 3), the
-// barns' (4 and 5), the open shed's (6) and the mausoleums' (7 and 8).
-// Property i's run from streetObstacleFirst[i] up to the next one's.
+// The copies' walls, posts and crates from their originals' footprints, in
+// world x and z: the cottages' (properties 1 to 3), the barns' (4 and 5),
+// the open shed's (6) and the mausoleums' (7 and 8). A turned footprint is
+// never entered, so only its outline is kept, cut into pieces whose boxes
+// reach at most 0.6 m past it.
 static_assert(streetProperties[1].kind == streetCottage
     && streetProperties[2].kind == streetCottage
     && streetProperties[3].kind == streetCottage
@@ -209,54 +211,182 @@ static_assert(streetProperties[1].kind == streetCottage
     && streetProperties[8].kind == streetTomb,
     "streetObstacles holds the copies in this order");
 
-constant uint streetObstacleCount = 38u;
-static_assert(streetObstacleCount == 3u * cottageObstacleCount
-    + shedObstacleCount + barnObstacleCount + 2u * mausoleumObstacleCount,
-    "one entry for each footprint of each copy");
-constant uint streetObstacleFirst[streetPropertyCount + 1u] = {
-    0u, 0u, 4u, 8u, 12u, 17u, 22u, 36u, 37u, 38u};
-static_assert(streetObstacleFirst[streetPropertyCount] == streetObstacleCount,
-    "the last copy's footprints end the table");
-
+constant uint streetObstacleCount = 174u;
 constant float4 streetObstacles[streetObstacleCount] = {
-    float4(-8.280000f, -6.480000f, 8.280000f, 6.480000f),
-    float4(-8.190000f, 6.300000f, 2.430000f, 11.520000f),
-    float4(-9.270000f, 1.800000f, -8.280000f, 3.240000f),
-    float4(-1.080000f, -7.515000f, 1.080000f, -6.480000f),
-    float4(-6.900000f, -5.400000f, 6.900000f, 5.400000f),
-    float4(-6.825000f, 5.250000f, 2.025000f, 9.600000f),
-    float4(-7.725000f, 1.500000f, -6.900000f, 2.700000f),
-    float4(-0.900000f, -6.262500f, 0.900000f, -5.400000f),
-    float4(-7.360000f, -5.760000f, 7.360000f, 5.760000f),
-    float4(-2.160000f, -10.240000f, 7.280000f, -5.600000f),
-    float4(7.360000f, -2.880000f, 8.240000f, -1.600000f),
-    float4(-0.960000f, 5.760000f, 0.960000f, 6.680000f),
-    float4(-4.615000f, -8.515000f, -4.420000f, 8.515000f),
-    float4(4.420000f, -8.515000f, 4.615000f, 8.515000f),
-    float4(-4.615000f, 8.320000f, 4.615000f, 8.515000f),
-    float4(-4.615000f, -8.547500f, 0.000000f, -8.320000f),
-    float4(1.625000f, -8.625500f, 4.615000f, -8.320000f),
-    float4(5.440000f, -10.480000f, 5.680000f, 10.480000f),
-    float4(-5.680000f, -10.480000f, -5.440000f, 10.480000f),
-    float4(-5.680000f, -10.480000f, 5.680000f, -10.240000f),
-    float4(-0.000000f, 10.240000f, 5.680000f, 10.520000f),
-    float4(-5.680000f, 10.240000f, -2.000000f, 10.616000f),
-    float4(-9.075000f, 3.975000f, 9.075000f, 4.200000f),
-    float4(8.850000f, -4.200000f, 9.075000f, 4.200000f),
-    float4(-9.075000f, -4.200000f, -8.850000f, 4.200000f),
-    float4(8.775000f, -4.125000f, 9.000000f, -3.900000f),
-    float4(5.812500f, -4.125000f, 6.037500f, -3.900000f),
-    float4(2.850000f, -4.125000f, 3.075000f, -3.900000f),
-    float4(-0.112500f, -4.125000f, 0.112500f, -3.900000f),
-    float4(-3.075000f, -4.125000f, -2.850000f, -3.900000f),
-    float4(-6.037500f, -4.125000f, -5.812500f, -3.900000f),
-    float4(-9.000000f, -4.125000f, -8.775000f, -3.900000f),
-    float4(4.950000f, 2.700000f, 6.000000f, 3.900000f),
-    float4(3.600000f, 2.925000f, 4.425000f, 3.900000f),
-    float4(-3.150000f, 1.500000f, -2.250000f, 2.250000f),
-    float4(-4.950000f, 2.775000f, -3.750000f, 3.900000f),
-    float4(-16.000000f, -28.500000f, 16.000000f, 17.550000f),
-    float4(-16.000000f, -28.500000f, 16.000000f, 17.550000f),
+    float4(26.720552f, 51.981130f, 30.034329f, 52.851695f),
+    float4(29.982235f, 51.406007f, 33.296013f, 52.276572f),
+    float4(33.243918f, 50.830884f, 36.557696f, 51.701449f),
+    float4(36.505601f, 50.255762f, 39.819379f, 51.126327f),
+    float4(39.767285f, 49.680639f, 43.081062f, 50.551204f),
+    float4(28.918938f, 64.448796f, 32.232715f, 65.319361f),
+    float4(32.180621f, 63.873673f, 35.494399f, 64.744238f),
+    float4(35.442304f, 63.298551f, 38.756082f, 64.169116f),
+    float4(38.703987f, 62.723428f, 42.017765f, 63.593993f),
+    float4(41.965671f, 62.148305f, 45.279448f, 63.018870f),
+    float4(26.772646f, 52.799601f, 27.604661f, 55.894751f),
+    float4(27.309219f, 55.842657f, 28.141234f, 58.937807f),
+    float4(27.845792f, 58.885712f, 28.677807f, 61.980863f),
+    float4(28.382365f, 61.928768f, 29.214380f, 65.023919f),
+    float4(42.785620f, 49.976081f, 43.617635f, 53.071232f),
+    float4(43.322193f, 53.019137f, 44.154208f, 56.114288f),
+    float4(43.858766f, 56.062193f, 44.690781f, 59.157343f),
+    float4(44.395339f, 59.105249f, 45.227354f, 62.200399f),
+    float4(29.028408f, 64.665432f, 31.695167f, 65.421910f),
+    float4(31.643073f, 64.204396f, 34.309832f, 64.960874f),
+    float4(34.257737f, 63.743360f, 36.924496f, 64.499838f),
+    float4(36.872402f, 63.282324f, 39.539161f, 64.038802f),
+    float4(29.882757f, 69.510686f, 32.549516f, 70.267164f),
+    float4(32.497422f, 69.049650f, 35.164181f, 69.806128f),
+    float4(35.112086f, 68.588614f, 37.778845f, 69.345092f),
+    float4(37.726751f, 68.127578f, 40.393510f, 68.884056f),
+    float4(29.080502f, 65.369815f, 29.777072f, 67.696816f),
+    float4(29.481630f, 67.644721f, 30.178199f, 69.971722f),
+    float4(39.243718f, 63.577766f, 39.940288f, 65.904766f),
+    float4(39.644846f, 65.852672f, 40.341415f, 68.179672f),
+    float4(27.183399f, 60.710461f, 28.210453f, 61.177815f),
+    float4(27.381358f, 61.833142f, 28.408412f, 62.300496f),
+    float4(27.235493f, 61.125720f, 27.676800f, 62.005053f),
+    float4(27.915011f, 61.005903f, 28.356317f, 61.885236f),
+    float4(33.631442f, 49.911630f, 35.810721f, 50.582152f),
+    float4(33.759073f, 50.635463f, 35.938352f, 51.305986f),
+    float4(33.683536f, 50.530058f, 34.054515f, 51.010543f),
+    float4(35.515278f, 50.207072f, 35.886258f, 50.687558f),
+    float4(-129.575903f, 48.186239f, -127.267367f, 48.995938f),
+    float4(-127.334852f, 48.703627f, -125.026315f, 49.513325f),
+    float4(-125.093801f, 49.221014f, -122.785264f, 50.030713f),
+    float4(-122.852750f, 49.738402f, -120.544213f, 50.548100f),
+    float4(-120.611698f, 50.255789f, -118.303162f, 51.065488f),
+    float4(-118.370647f, 50.773177f, -116.062111f, 51.582875f),
+    float4(-131.937889f, 58.417125f, -129.629353f, 59.226823f),
+    float4(-129.696838f, 58.934512f, -127.388302f, 59.744211f),
+    float4(-127.455787f, 59.451900f, -125.147250f, 60.261598f),
+    float4(-125.214736f, 59.969287f, -122.906199f, 60.778986f),
+    float4(-122.973685f, 60.486675f, -120.665148f, 61.296373f),
+    float4(-120.732633f, 61.004062f, -118.424097f, 61.813761f),
+    float4(-130.149528f, 48.478550f, -129.283592f, 51.030679f),
+    float4(-130.723153f, 50.963194f, -129.857217f, 53.515323f),
+    float4(-131.296779f, 53.447838f, -130.430842f, 55.999967f),
+    float4(-131.870404f, 55.932481f, -131.004468f, 58.484610f),
+    float4(-116.995532f, 51.515390f, -116.129596f, 54.067519f),
+    float4(-117.569158f, 54.000033f, -116.703221f, 56.552162f),
+    float4(-118.142783f, 56.484677f, -117.276847f, 59.036806f),
+    float4(-118.716408f, 58.969321f, -117.850472f, 61.521450f),
+    float4(-131.898554f, 58.580152f, -129.675275f, 59.370167f),
+    float4(-129.742760f, 59.077856f, -127.519481f, 59.867871f),
+    float4(-127.586967f, 59.575560f, -125.363687f, 60.365576f),
+    float4(-125.431173f, 60.073265f, -123.207894f, 60.863280f),
+    float4(-132.809606f, 62.526351f, -130.586327f, 63.316366f),
+    float4(-130.653812f, 63.024055f, -128.430533f, 63.814070f),
+    float4(-128.498018f, 63.521759f, -126.274739f, 64.311774f),
+    float4(-126.342225f, 64.019463f, -124.118945f, 64.809479f),
+    float4(-132.320337f, 58.872463f, -131.606243f, 60.766892f),
+    float4(-132.742120f, 60.699407f, -132.028026f, 62.593836f),
+    float4(-123.989473f, 60.795794f, -123.275379f, 62.690224f),
+    float4(-124.411256f, 62.622738f, -123.697162f, 64.517167f),
+    float4(-131.931921f, 54.723808f, -131.060580f, 55.201704f),
+    float4(-132.134377f, 55.600741f, -131.263036f, 56.078637f),
+    float4(-132.066891f, 55.016119f, -131.639610f, 55.668227f),
+    float4(-131.555347f, 55.134219f, -131.128065f, 55.786326f),
+    float4(-123.535662f, 48.695552f, -121.714311f, 49.392774f),
+    float4(-123.662197f, 49.243635f, -121.840846f, 49.940858f),
+    float4(-123.594712f, 48.987863f, -123.243351f, 49.311120f),
+    float4(-122.133157f, 49.325289f, -121.781796f, 49.648547f),
+    float4(-99.921765f, 15.527997f, -95.010619f, 16.339240f),
+    float4(-95.041978f, 15.015111f, -90.130832f, 15.826354f),
+    float4(-90.162190f, 14.502224f, -85.251044f, 15.313467f),
+    float4(-98.748956f, 26.686533f, -93.837810f, 27.497776f),
+    float4(-93.869168f, 26.173646f, -88.958022f, 26.984889f),
+    float4(-88.989381f, 25.660760f, -84.078235f, 26.472003f),
+    float4(-99.890407f, 16.307881f, -99.021325f, 21.769329f),
+    float4(-99.319681f, 21.737971f, -98.450599f, 27.199419f),
+    float4(-85.549401f, 14.800581f, -84.680319f, 20.262029f),
+    float4(-84.978675f, 20.230671f, -84.109593f, 25.692119f),
+    float4(-95.218539f, 10.548503f, -90.493037f, 11.340234f),
+    float4(-90.524395f, 10.055129f, -85.798894f, 10.846859f),
+    float4(-94.764885f, 14.864728f, -90.039383f, 15.656459f),
+    float4(-90.070742f, 14.371354f, -85.345240f, 15.163085f),
+    float4(-95.187180f, 11.308875f, -94.466529f, 15.358102f),
+    float4(-86.097250f, 10.353485f, -85.376599f, 14.402712f),
+    float4(-84.981361f, 17.274462f, -84.074823f, 17.664804f),
+    float4(-84.878923f, 18.249094f, -83.972385f, 18.639435f),
+    float4(-84.950002f, 17.633445f, -84.580566f, 18.341079f),
+    float4(-84.373180f, 17.572819f, -84.003744f, 18.280452f),
+    float4(-92.352657f, 26.628099f, -90.411816f, 27.127150f),
+    float4(-92.287849f, 27.244702f, -90.347009f, 27.743754f),
+    float4(-92.321299f, 27.095791f, -91.989493f, 27.445397f),
+    float4(-90.710173f, 26.926455f, -90.378367f, 27.276061f),
+    float4(-88.758958f, 50.367889f, -88.033543f, 53.762460f),
+    float4(-89.291774f, 53.731955f, -88.566359f, 57.126526f),
+    float4(-89.824590f, 57.096022f, -89.099175f, 60.490593f),
+    float4(-90.357405f, 60.460088f, -89.631990f, 63.854659f),
+    float4(-90.890221f, 63.824155f, -90.164806f, 67.218726f),
+    float4(-79.835194f, 51.781274f, -79.109779f, 55.175845f),
+    float4(-80.368010f, 55.145341f, -79.642595f, 58.539912f),
+    float4(-80.900825f, 58.509407f, -80.175410f, 61.903978f),
+    float4(-81.433641f, 61.873474f, -80.708226f, 65.268045f),
+    float4(-81.966457f, 65.237540f, -81.241042f, 68.632111f),
+    float4(-90.890221f, 66.995622f, -87.820929f, 67.669518f),
+    float4(-87.851433f, 67.476919f, -84.782141f, 68.150815f),
+    float4(-84.812646f, 67.958215f, -81.743353f, 68.632111f),
+    float4(-88.256647f, 50.335789f, -85.941967f, 50.921460f),
+    float4(-85.977556f, 50.696761f, -83.662876f, 51.282433f),
+    float4(-82.093472f, 51.234900f, -79.092493f, 52.004378f),
+    float4(96.142208f, 3.068075f, 96.921692f, 5.680720f),
+    float4(96.686937f, 5.630821f, 97.466421f, 8.243467f),
+    float4(97.231666f, 8.193568f, 98.011150f, 10.806214f),
+    float4(97.776394f, 10.756315f, 98.555878f, 13.368960f),
+    float4(98.321123f, 13.319062f, 99.100607f, 15.931707f),
+    float4(98.865852f, 15.881808f, 99.645336f, 18.494454f),
+    float4(99.410580f, 18.444555f, 100.190064f, 21.057201f),
+    float4(99.955309f, 21.007302f, 100.734793f, 23.619947f),
+    float4(85.265207f, 5.380053f, 86.044691f, 7.992698f),
+    float4(85.809936f, 7.942799f, 86.589420f, 10.555445f),
+    float4(86.354664f, 10.505546f, 87.134148f, 13.118192f),
+    float4(86.899393f, 13.068293f, 87.678877f, 15.680938f),
+    float4(87.444122f, 15.631040f, 88.223606f, 18.243685f),
+    float4(87.988850f, 18.193786f, 88.768334f, 20.806432f),
+    float4(88.533579f, 20.756533f, 89.313063f, 23.369179f),
+    float4(89.078308f, 23.319280f, 89.857792f, 25.931925f),
+    float4(85.265207f, 4.839482f, 88.093045f, 5.664707f),
+    float4(88.043146f, 4.249013f, 90.870984f, 5.074238f),
+    float4(90.821085f, 3.658544f, 93.648923f, 4.483769f),
+    float4(93.599025f, 3.068075f, 96.426863f, 3.893299f),
+    float4(95.129016f, 23.925762f, 97.965170f, 24.790113f),
+    float4(97.906955f, 23.335293f, 100.743109f, 24.199644f),
+    float4(89.573137f, 25.314612f, 91.451104f, 26.064953f),
+    float4(91.372929f, 24.932055f, 93.250895f, 25.682396f),
+    float4(95.593479f, 58.168936f, 101.640067f, 58.920372f),
+    float4(101.620457f, 58.696228f, 107.667045f, 59.447664f),
+    float4(107.647435f, 59.223520f, 113.694023f, 59.974956f),
+    float4(113.816323f, 51.587311f, 114.406521f, 55.790938f),
+    float4(113.450269f, 55.771328f, 114.040467f, 59.974956f),
+    float4(95.959533f, 50.025044f, 96.549731f, 54.228672f),
+    float4(95.593479f, 54.209062f, 96.183677f, 58.412689f),
+    float4(114.081516f, 51.655489f, 114.325270f, 51.899242f),
+    float4(111.130289f, 51.397290f, 111.374043f, 51.641043f),
+    float4(108.179062f, 51.139091f, 108.422816f, 51.382845f),
+    float4(105.227835f, 50.880892f, 105.471589f, 51.124646f),
+    float4(102.276609f, 50.622693f, 102.520363f, 50.866447f),
+    float4(99.325382f, 50.364494f, 99.569136f, 50.608248f),
+    float4(96.374155f, 50.106295f, 96.617909f, 50.350049f),
+    float4(109.669697f, 58.121147f, 110.741848f, 58.511519f),
+    float4(109.591256f, 59.017722f, 110.663408f, 59.408094f),
+    float4(109.617403f, 58.420005f, 109.968555f, 59.043869f),
+    float4(110.364549f, 58.485372f, 110.715701f, 59.109235f),
+    float4(108.305224f, 58.227630f, 109.153231f, 58.598392f),
+    float4(108.246394f, 58.900062f, 109.094401f, 59.270823f),
+    float4(108.272540f, 58.526489f, 108.604082f, 58.926208f),
+    float4(108.795542f, 58.572245f, 109.127084f, 58.971965f),
+    float4(101.705106f, 56.219751f, 102.627828f, 56.597050f),
+    float4(101.665886f, 56.668039f, 102.588608f, 57.045338f),
+    float4(101.692033f, 56.518610f, 102.003965f, 56.694186f),
+    float4(102.289750f, 56.570903f, 102.601682f, 56.746479f),
+    float4(99.800832f, 57.333019f, 101.022413f, 57.736465f),
+    float4(99.728929f, 58.154880f, 100.950509f, 58.558325f),
+    float4(99.755076f, 57.631878f, 100.099691f, 58.181027f),
+    float4(100.651651f, 57.710318f, 100.996266f, 58.259467f),
+    float4(24.000000f, -17.550000f, 56.000000f, 28.500000f),
+    float4(-56.000000f, -17.550000f, -24.000000f, 28.500000f),
 };
 
 // Each property's drive in world x and z, from its end by the building to
@@ -291,15 +421,9 @@ constant float4 streetChimneys[streetCottageCount] = {
     float4(-84.015415f, 14.130000f, 17.908448f, 0.800000f),
 };
 
-// p, in world x and z, in property i's frame.
-float2 streetLocal(uint i, float2 p) {
-    return houseRotate(p - streetProperties[i].at.xz,
-        float2(streetPropertyTurns[i].x, -streetPropertyTurns[i].y));
-}
-
 float streetPadBlend(uint i, float2 p) {
-    return buildingPadBlend(streetLocal(i, p), float2(0.0f),
-        streetPads[i].xy, streetPads[i].zw, streetPadMargin, streetPadReach);
+    return buildingPadBlend(p, float2(0.0f), streetPads[i].xy,
+        streetPads[i].zw, streetPadMargin, streetPadReach);
 }
 
 // The porch lantern of cottage i, each flickering in its own time.
@@ -346,20 +470,6 @@ bool streetNearProperties(float2 p) {
     return p.y > -36.0f && p.y < 86.0f && abs(p.x) < 146.0f;
 }
 
-// The copy whose levelled ground holds p, with p in its frame as local, or
-// streetPropertyCount where there is none.
-// Kept out of line: inlined into the spider and drone kernels' footing, its
-// loop of turns took their cold compile from seconds to minutes.
-__attribute__((noinline))
-uint streetPropertyAt(float2 p, thread float2 &local) {
-    if (!streetNearProperties(p)) return streetPropertyCount;
-    for (uint i = 1u; i < streetPropertyCount; ++i) {
-        local = streetLocal(i, p);
-        if (all(local > streetPads[i].xy) && all(local < streetPads[i].zw))
-            return i;
-    }
-    return streetPropertyCount;
-}
 
 // The terrain height h at p, graded under the road and the long drives and
 // levelled under the copies.
