@@ -568,8 +568,10 @@ struct GunHit {
     float3 normal;          // gun frame
     uint part;              // 1 chrome, 2 polymer, 3 dark steel, 4 glove,
                             // 5 sleeve, 6 blued barrel, 7 walnut,
-                            // 10 launch tube, 11 composite, 12 display
+                            // 10 launch tube, 11 composite, 12 display,
+                            // 13 hand leather, 14 hand strap, 15 hand sleeve
     float3 local;
+    float cavity;           // the hand's crease shading: 0 open, 1 shut in
 };
 
 void gunBox(thread GunHit &hit, float3 origin, float3 direction,
@@ -3445,8 +3447,9 @@ float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
             + up * viewNormal.y + front * viewNormal.z),
         eye + right * viewPoint.x + up * viewPoint.y + front * viewPoint.z,
         30u, -1, 0u};
-    SurfaceMaterial material = gun.part >= 10u ? launcherMaterial(gun)
-        : (gun.part >= 6u ? shotgunMaterial(gun) : gunMaterial(gun));
+    SurfaceMaterial material = gun.part >= 13u ? handMaterial(gun)
+        : (gun.part >= 10u ? launcherMaterial(gun)
+            : (gun.part >= 6u ? shotgunMaterial(gun) : gunMaterial(gun)));
     bool inHouse = houseInteriorPoint(eye);
     bool outside = outdoors(eye.xz, 0.0f) && !inHouse;
     float3 color = material.albedo * (1.0f - material.metallic)
@@ -3726,8 +3729,11 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
                     : traceGun(toGun * -gun.pivot, toGun * viewDirection,
                         gun.slide)));
         if (gunHit.part != 0u) {
+            float3 behind = color;
             color = shadeGun(gunHit, gun, muzzleLocal, eye, viewRight, viewUp,
                 viewFront, direction, chrome, game);
+            if (hand) color += handSheen(gunHit, gun.basis, viewDirection,
+                behind);
             depth = 0.0f;  // the bokeh pass keeps depth 0 sharp
         }
     }

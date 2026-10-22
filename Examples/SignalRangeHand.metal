@@ -105,41 +105,231 @@ HandPose handPose(device const GameState &game) {
     return {{pivot, basis, 0.0f}, transpose(basis) * elbow};
 }
 
-// Parts: 4 glove, 5 sleeve. Each finger is curled down at the knuckle and
-// back under it; the thumb wraps across the index and middle fingers. The
-// forearm runs from the wrist to `elbow`, in the fist's frame.
+// The hand is a signed distance field in the fist's frame, sphere-traced
+// like the pistol's rounded parts. Knuckles, finger joints, the heels of
+// the palm and the base of the thumb blend into one another as flesh under
+// a leather glove does; fingers only press against their neighbours, so
+// the creases between them stay. Parts: 13 leather, 14 the cuff's strap,
+// 15 sleeve.
+
+// Per finger, index to little: the head of its metacarpal, which stands up
+// as the knuckle, and the finger's size. The knuckles arc back toward the
+// little finger, and the index and middle knuckles lead the punch.
+constant float4 handKnuckles[4] = {
+    float4(-0.0262f, -0.0055f, -0.0030f, 0.97f),
+    float4(-0.0088f, -0.0040f, 0.0000f, 1.00f),
+    float4(0.0086f, -0.0060f, -0.0035f, 0.96f),
+    float4(0.0250f, -0.0110f, -0.0110f, 0.84f)};
+
+// The wrist the cuff and sleeve run back from toward the elbow, and where
+// the sleeve's hem ends, along that run.
+constant float3 handWrist = float3(0.0f, -0.020f, -0.084f);
+constant float handSleeveHem = 0.060f;
+
+float handSmoothMin(float a, float b, float k) {
+    float h = max(k - abs(a - b), 0.0f) / k;
+    return min(a, b) - h * h * k * 0.25f;
+}
+
+// A capsule whose radius runs from `ra` at `a` to `rb` at `b`.
+float handTaper(float3 p, float3 a, float3 b, float ra, float rb) {
+    float3 pa = p - a, ba = b - a;
+    float h = saturate(dot(pa, ba) / dot(ba, ba));
+    return length(pa - ba * h) - mix(ra, rb, h);
+}
+
+float handEllipsoid(float3 p, float3 centre, float3 radii) {
+    float3 q = (p - centre) / radii;
+    float k0 = length(q);
+    return k0 * (k0 - 1.0f) / length(q / radii);
+}
+
+// The bare fist: the palm and its two heels, the four fingers each curled
+// down from the knuckle and back under it, their tips buried in the palm,
+// and the thumb folded across the index and middle fingers.
+float handFist(float3 p) {
+    float3 box = abs(p - float3(-0.001f, -0.022f, -0.046f))
+        - float3(0.029f, 0.013f, 0.036f) + 0.011f;
+    float palm = length(max(box, 0.0f))
+        + min(max(box.x, max(box.y, box.z)), 0.0f) - 0.011f;
+    palm = handSmoothMin(palm, handEllipsoid(p,
+        float3(-0.024f, -0.033f, -0.060f), float3(0.016f, 0.015f, 0.026f)),
+        0.012f);
+    palm = handSmoothMin(palm, handEllipsoid(p,
+        float3(0.023f, -0.031f, -0.062f), float3(0.012f, 0.013f, 0.027f)),
+        0.012f);
+    // The fingertips press into the palm: fill the tunnel they curl around.
+    palm = handSmoothMin(palm, handEllipsoid(p,
+        float3(-0.001f, -0.037f, -0.014f), float3(0.030f, 0.011f, 0.014f)),
+        0.008f);
+    float fingers = 1.0e6f;
+    for (uint i = 0u; i < 4u; ++i) {
+        float3 knuckle = handKnuckles[i].xyz;
+        float size = handKnuckles[i].w;
+        palm = handSmoothMin(palm, handTaper(p,
+            float3(knuckle.x * 0.55f, -0.009f, -0.080f), knuckle,
+            0.0095f, 0.0108f * size), 0.010f);
+        float3 middle = knuckle + size * float3(0.0f, -0.040f, 0.006f);
+        float3 last = middle + size * float3(0.0f, -0.002f, -0.026f);
+        float finger = handTaper(p, knuckle, middle,
+            0.0106f * size, 0.0097f * size);
+        finger = handSmoothMin(finger, handTaper(p, middle, last,
+            0.0095f * size, 0.0087f * size), 0.004f);
+        fingers = min(fingers, finger);
+    }
+    float3 base = float3(-0.022f, -0.028f, -0.078f);
+    float3 joint = float3(-0.042f, -0.048f, -0.040f);
+    float3 bend = float3(-0.032f, -0.061f, -0.012f);
+    float thumb = handTaper(p, base, joint, 0.0135f, 0.0122f);
+    thumb = handSmoothMin(thumb, handTaper(p, joint, bend, 0.0122f, 0.0108f),
+        0.004f);
+    thumb = handSmoothMin(thumb, handTaper(p, bend,
+        float3(-0.011f, -0.062f, -0.003f), 0.0106f, 0.0092f), 0.004f);
+    return min(handSmoothMin(palm, fingers, 0.006f),
+        handSmoothMin(palm, thumb, 0.012f));
+}
+
+struct HandDistance {
+    float distance;
+    uint part;
+};
+
+// The whole arm: the fist, the glove's gauntlet cuff with its strap, and
+// the sleeve, which ends in a hem over the cuff and creases as it bunches
+// toward it. Cuff and sleeve are oval, wider across the back of the hand
+// than through it, and run from the wrist toward `elbow`.
+HandDistance handDistance(float3 p, float3 elbow) {
+    // The fist is only worked out near it.
+    float fist = length(p - float3(-0.008f, -0.028f, -0.038f)) - 0.075f;
+    if (fist < 0.01f) fist = handFist(p);
+    float3 along = normalize(elbow - handWrist);
+    float3 side = normalize(float3(1.0f, 0.0f, 0.0f) - along * along.x);
+    float3 q = p - handWrist;
+    float run = dot(q, along);
+    float2 section = float2(dot(q, side) * 0.82f, dot(q, cross(along, side)));
+    float radial = length(section);
+    float strap = smoothstep(0.026f, 0.028f, run)
+        * (1.0f - smoothstep(0.050f, 0.052f, run));
+    float2 cuffEdge = float2(radial - mix(0.0215f, 0.0275f,
+            saturate(run / 0.07f)) - 0.0018f * strap,
+        max(-0.01f - run, run - 0.072f));
+    float cuff = length(max(cuffEdge, 0.0f))
+        + min(max(cuffEdge.x, cuffEdge.y), 0.0f);
+    float sleeveRadius = mix(0.034f, 0.041f,
+        saturate((run - handSleeveHem) / 0.22f));
+    // The folds only matter within reach of the cloth.
+    if (abs(radial - sleeveRadius) < 0.008f) {
+        float angle = atan2(section.y, section.x);
+        sleeveRadius += 0.0024f * sin(2.0f * angle + run * 26.0f + 0.7f)
+            + 0.0024f * exp(-(run - handSleeveHem) * 14.0f)
+                * sin(run * 110.0f + 1.4f * sin(3.0f * angle));
+    }
+    float2 sleeveEdge = float2(radial - sleeveRadius,
+        max(handSleeveHem - run, run - length(elbow - handWrist) - 0.05f))
+        + 0.004f;
+    float sleeve = length(max(sleeveEdge, 0.0f))
+        + min(max(sleeveEdge.x, sleeveEdge.y), 0.0f) - 0.004f;
+    float glove = handSmoothMin(fist, cuff, 0.02f);
+    if (sleeve < glove) return {sleeve, 15u};
+    return {glove, strap > 0.5f && cuff < fist ? 14u : 13u};
+}
+
+// Sphere-traces the arm from where the ray enters a sphere around it. The
+// hit carries how far the surface is shut in by the rest of the hand, from
+// a few steps out along its normal.
 GunHit traceHand(float3 origin, float3 direction, float3 elbow) {
     GunHit hit = {1.0e6f, float3(0.0f), 0u, float3(0.0f)};
-    if (raySphere(origin, direction, 0.5f * elbow,
-            0.5f * length(elbow) + 0.12f) < 0.0f) return hit;
-    float3 normal;
-    float t = pixeltje_3d::rayEllipsoid(origin, direction,
-        float3(0.0f, -0.017f, -0.046f), float3(0.042f, 0.025f, 0.053f),
-        0.001f, normal);
-    if (t > 0.0f && t < hit.distance)
-        hit = {t, normal, 4u, origin + direction * t};
-    for (uint finger = 0u; finger < 4u; ++finger) {
-        float x = -0.026f + 0.0172f * float(finger);
-        float size = finger == 3u ? 0.86f : 1.0f;
-        float3 knuckle = float3(x, -0.002f, 0.004f * size);
-        float3 middle = float3(x, -0.038f * size, 0.011f);
-        gunCapsule(hit, origin, direction, knuckle, middle,
-            0.0105f * size, 4u);
-        gunCapsule(hit, origin, direction, middle,
-            float3(x, -0.041f * size, -0.021f), 0.0095f * size, 4u);
+    // Rays passing wide of both the fist and the forearm's axis miss.
+    float3 toFist = origin - float3(-0.008f, -0.028f, -0.038f);
+    float3 arm = elbow - handWrist, fromWrist = origin - handWrist;
+    float armDirection = dot(arm, direction);
+    float closest = saturate((dot(arm, fromWrist)
+            - armDirection * dot(direction, fromWrist))
+        / max(dot(arm, arm) - armDirection * armDirection, 1.0e-8f));
+    float passing = max(armDirection * closest - dot(direction, fromWrist),
+        0.0f);
+    closest = saturate((armDirection * passing + dot(arm, fromWrist))
+        / dot(arm, arm));
+    if (length(toFist - direction * dot(toFist, direction)) > 0.085f
+        && length(fromWrist + direction * passing - arm * closest) > 0.06f)
+        return hit;
+    float3 offset = origin - 0.5f * elbow;
+    float bound = 0.5f * length(elbow) + 0.12f;
+    float b = dot(offset, direction);
+    float discriminant = b * b - dot(offset, offset) + bound * bound;
+    if (discriminant < 0.0f) return hit;
+    float t = max(-b - sqrt(discriminant), 0.01f);
+    float far = -b + sqrt(discriminant);
+    for (uint step = 0u; step < 96u && t < far; ++step) {
+        float3 p = origin + direction * t;
+        HandDistance d = handDistance(p, elbow);
+        if (d.distance < 1.5e-4f) {
+            const float2 e = float2(2.5e-4f, -2.5e-4f);
+            float3 normal = normalize(
+                e.xyy * handDistance(p + e.xyy, elbow).distance
+                + e.yyx * handDistance(p + e.yyx, elbow).distance
+                + e.yxy * handDistance(p + e.yxy, elbow).distance
+                + e.xxx * handDistance(p + e.xxx, elbow).distance);
+            float shut = 0.0f;
+            for (uint i = 1u; i <= 3u; ++i) {
+                float h = 0.005f * float(i);
+                shut += (h - handDistance(p + normal * h, elbow).distance)
+                    / float(i);
+            }
+            hit = {t, normal, d.part, p, saturate(shut * 70.0f)};
+            return hit;
+        }
+        // Folds and blends bend the field; shorter steps keep it from
+        // stepping through an edge.
+        t += d.distance * 0.85f;
     }
-    gunCapsule(hit, origin, direction, float3(-0.036f, -0.022f, -0.072f),
-        float3(-0.042f, -0.044f, -0.031f), 0.0125f, 4u);
-    gunCapsule(hit, origin, direction, float3(-0.042f, -0.044f, -0.031f),
-        float3(-0.03f, -0.055f, -0.005f), 0.0115f, 4u);
-    gunCapsule(hit, origin, direction, float3(-0.03f, -0.055f, -0.005f),
-        float3(-0.009f, -0.055f, 0.0f), 0.0102f, 4u);
-    // The glove's cuff over the wrist, then the sleeve back to the elbow.
-    float3 wrist = float3(0.0f, -0.017f, -0.085f);
-    float3 along = normalize(elbow - wrist);
-    gunCapsule(hit, origin, direction, wrist, wrist + along * 0.07f,
-        0.029f, 4u);
-    gunCapsule(hit, origin, direction, wrist + along * 0.06f, elbow,
-        0.036f, 5u);
     return hit;
+}
+
+// Black leather with a fine pebbled grain, rubbed brown and smooth over the
+// knuckles; a woven nylon strap; the olive sleeve of the pistol's arm,
+// heathered. Shut-in creases go dark and dull.
+SurfaceMaterial handMaterial(GunHit hit) {
+    float3 p = hit.local;
+    float shade = 1.0f - 0.8f * hit.cavity;
+    if (hit.part == 15u) {
+        float weave = 0.5f * (smoothNoise(p.xz * 260.0f)
+            + smoothNoise(p.yz * 260.0f));
+        return {float3(0.085f, 0.090f, 0.060f)
+                * (0.8f + 0.4f * smoothNoise(p.xz * 45.0f + 7.0f))
+                * (0.88f + 0.24f * weave) * shade,
+            0.95f, 0.0f, float3(0.0f)};
+    }
+    if (hit.part == 14u) {
+        float weave = smoothNoise(p.xy * 900.0f) * smoothNoise(p.yz * 900.0f);
+        return {float3(0.030f, 0.030f, 0.032f) * (0.85f + 0.3f * weave)
+                * shade,
+            0.8f, 0.0f, float3(0.0f)};
+    }
+    float grain = (smoothNoise(p.xy * 520.0f) + smoothNoise(p.yz * 520.0f)
+        + smoothNoise(p.zx * 520.0f)) / 3.0f;
+    float mottle = 0.5f * (smoothNoise(p.xz * 70.0f + 3.1f)
+        + smoothNoise(p.xy * 70.0f));
+    float rubbed = 0.0f;
+    for (uint i = 0u; i < 4u; ++i)
+        rubbed = max(rubbed, 1.0f - smoothstep(0.004f, 0.015f,
+            length(p - handKnuckles[i].xyz - float3(0.0f, 0.007f, 0.006f))));
+    float wear = saturate(rubbed * (0.6f + 0.6f * mottle) + 0.2f * mottle);
+    float3 leather = mix(float3(0.040f, 0.034f, 0.030f),
+        float3(0.090f, 0.068f, 0.052f), wear) * (0.82f + 0.36f * grain);
+    return {leather * shade,
+        mix(mix(0.44f, 0.30f, rubbed) + 0.08f * grain, 1.0f, hit.cavity),
+        0.0f, float3(0.0f)};
+}
+
+// Near its outline the hand mirrors what lies just past it, so a fist held
+// against a lit door or a bright floor picks up a rim of that light, as
+// leather does at a glancing angle; the sleeve's fibres scatter a softer
+// rim. `behind` is the scene the hand covers at this pixel; the rim fades
+// in the creases.
+float3 handSheen(GunHit hit, float3x3 basis, float3 viewDirection,
+    float3 behind) {
+    float facing = saturate(dot(basis * hit.normal, -viewDirection));
+    return behind * (hit.part == 15u ? 0.3f : 0.55f)
+        * pow(1.0f - facing, 3.0f) * (1.0f - hit.cavity);
 }
