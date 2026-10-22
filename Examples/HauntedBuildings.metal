@@ -314,10 +314,11 @@ float3 buildingsSmoke(float3 color, float3 origin, float3 direction,
 // The doors a visitor can knock on: the house's two front doors, the
 // cottage's plank door and the barn's two sliding leaves. Each building's
 // file places its own. The house's pair and the cottage's door are shut
-// until knocked on, then swing open and stay open until the match
-// restarts; the barn's leaves stay as they are. A swinging door is a part
-// rehung every tick, so the scene traces, shadows and shots see it where
-// it is.
+// until knocked on, then swing open. The cottage's stays open until the
+// match restarts; the house's pair swings shut again once nobody has stood
+// on the pressure plate under them for buildingsHouseDoorsHold seconds.
+// The barn's leaves stay as they are. A swinging door is a part rehung
+// every tick, so the scene traces, shadows and shots see it where it is.
 constant uint buildingsDoorCount = 5u;
 constant uint doorOfHouse = 1u;
 constant uint doorOfCottage = 2u;
@@ -327,36 +328,70 @@ constant uint doorOfBarn = 3u;
 constant float buildingsHouseDoorsSwing = 2.6f;
 constant float buildingsCottageDoorSwing = 1.8f;
 constant float buildingsDoorDelay = 0.3f;
+// Seconds the house's pair stays open, once fully open, after the pressure
+// plate under it was last pressed.
+constant float buildingsHouseDoorsHold = 4.55f;
 
 void buildingsShutDoors(device GameState &game) {
     game.house.doors = float4(-100.0f, -100.0f, 0.0f, 0.0f);
+    game.frontDoors = float4(-100.0f, 0.0f, -100.0f, 0.0f);
 }
 
-// Sets the house's (building doorOfHouse) or the cottage's door swinging
-// open, unless it already is.
-void buildingsOpenDoor(device GameState &game, uint building) {
-    float start = game.effects.x + buildingsDoorDelay;
-    if (building == doorOfHouse && game.house.doors.x < 0.0f)
-        game.house.doors.x = start;
-    if (building == doorOfCottage && game.house.doors.y < 0.0f)
-        game.house.doors.y = start;
-}
-
-// How far the house's pair (set 0) or the cottage's door (set 1) has swung
-// open, from 0 to 1: it gives a little as the latch lets go, then creaks
-// round, slowing as it comes to rest.
-float buildingsDoorOpen(device const GameState &game, uint set) {
-    float start = set == 0u ? game.house.doors.x : game.house.doors.y;
-    if (start < 0.0f) return 0.0f;
-    float t = (game.effects.x - start) / (set == 0u
-        ? buildingsHouseDoorsSwing : buildingsCottageDoorSwing);
+// How far a door has swung open at t, the fraction of its swing time since
+// it started: it gives a little as the latch lets go, then creaks round,
+// slowing as it comes to rest.
+float buildingsDoorSwing(float t) {
     return 0.1f * smoothstep(0.0f, 0.12f, t)
         + 0.9f * smoothstep(0.18f, 1.0f, t);
 }
 
+// How far the house's pair (set 0) or the cottage's door (set 1) stands
+// open, from 0 to 1. The house's pair swings shut from where it stood,
+// gathering way, and comes to rest against itself.
+float buildingsDoorOpen(device const GameState &game, uint set) {
+    float start = set == 0u ? game.house.doors.x : game.house.doors.y;
+    if (start < 0.0f) return 0.0f;
+    float4 shut = game.frontDoors;
+    if (set == 0u && shut.x >= 0.0f) {
+        float t = (game.effects.x - shut.x)
+            / (buildingsHouseDoorsSwing * max(shut.y, 0.05f));
+        return shut.y * (1.0f - smoothstep(0.0f, 1.0f, t));
+    }
+    return buildingsDoorSwing((game.effects.x - start) / (set == 0u
+        ? buildingsHouseDoorsSwing : buildingsCottageDoorSwing));
+}
+
+// Swings the house's closing pair back open from where it stands: the
+// opening swing resumes at the moment it stood that far open.
+void buildingsReopenFrontDoors(device GameState &game) {
+    float open = buildingsDoorOpen(game, 0u);
+    float lower = 0.0f, upper = 1.0f;
+    for (uint i = 0u; i < 12u; ++i) {
+        float t = 0.5f * (lower + upper);
+        if (buildingsDoorSwing(t) < open) lower = t;
+        else upper = t;
+    }
+    game.house.doors.x = game.effects.x - upper * buildingsHouseDoorsSwing;
+    game.frontDoors.x = -100.0f;
+}
+
+// Sets the house's (building doorOfHouse) or the cottage's door swinging
+// open, unless it already is; a knock while the house's pair swings shut
+// swings it back.
+void buildingsOpenDoor(device GameState &game, uint building) {
+    float start = game.effects.x + buildingsDoorDelay;
+    if (building == doorOfHouse) {
+        if (game.house.doors.x < 0.0f) game.house.doors.x = start;
+        else if (game.frontDoors.x >= 0.0f) buildingsReopenFrontDoors(game);
+    }
+    if (building == doorOfCottage && game.house.doors.y < 0.0f)
+        game.house.doors.y = start;
+}
+
 // Rehangs the swinging doors' parts for this tick. Each swings within the
 // bounds its group was built with: the house's leaves into the hall, the
-// cottage's into its lobby.
+// cottage's into its lobby. The plate under the house's pair sinks while
+// it is pressed.
 void buildingsHangDoors(device GameState &game) {
     device HouseModel &house = game.house;
     float leaves = buildingsDoorOpen(game, 0u);
@@ -365,6 +400,8 @@ void buildingsHangDoors(device GameState &game) {
             = houseWorldPart(houseFrontDoor(side, leaves));
     house.parts[min(house.doorParts.z, houseCapacity - 1u)]
         = cottageDoor(buildingsDoorOpen(game, 1u));
+    house.parts[min(house.doorParts.w, houseCapacity - 1u)]
+        = houseWorldPart(houseDoorPlate(game.frontDoors.w > 0.5f));
 }
 
 // True where the house's front doors, while still too far shut to pass,

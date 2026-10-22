@@ -1,0 +1,33 @@
+{
+  "width": 960,
+  "height": 540,
+  "views": [
+    {
+      "name": "porch-doors",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [0, 0.75, 108, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [-0.12] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "threshold-close-up",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [0.6, 0.75, 112.5, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [-0.45] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "hall-toward-doors",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [0.4, 0.75, 122, 0] },
+        { "buffer": "game", "offset": 16, "floats": [-0.4] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    }
+  ]
+}
