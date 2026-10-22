@@ -43,14 +43,15 @@ constant uint houseTimber = 13u;    // a board or beam from addHouseBoard
 constant uint houseLog = 14u;       // a round log from addHouseLog
 constant uint houseGrave = 15u;     // headstones, the tomb, the mausoleums
 constant uint houseCorrugated = 16u; // rusted corrugated iron: shed roofs
-constant uint houseCastIron = 17u;  // rusted cast iron: lamp caps and bases
+constant uint houseCastIron = 17u;  // black enamelled cast iron: lamp caps
 constant uint houseCastIronRod = 18u; // a round cast-iron rod from addHouseRod
 constant uint housePlaster = 19u;   // lime render: the mausoleums' pediments
 constant uint housePlasterColumn = 20u; // a round plastered column shaft
 constant uint houseFloor = 21u;     // a floor: boards on top, plaster below
 constant uint houseStair = 22u;     // treads, strings, newels and soffits
 constant uint houseBanister = 23u;  // turned balusters under a handrail (cut out)
-constant uint houseStyleCount = 24u;
+constant uint houseSign = 24u;      // a street name blade
+constant uint houseStyleCount = 25u;
 
 // The cut-out styles: rays pass through their openings, and they cast no
 // shadow.
@@ -733,17 +734,92 @@ SurfaceMaterial houseCorrugatedMaterial(float3 p, float3 n, float blur) {
         float3(0.0f)};
 }
 
-// Cast iron gone to rust: a brown-black skin flaking to orange-brown rust in
-// blotches, flecked finely until the flecks are smaller than a pixel.
-SurfaceMaterial houseCastIronMaterial(float3 p, float3 n, float blur) {
-    float2 q = abs(n.y) > 0.7f ? p.xz : float2(p.x + p.z, p.y);
-    float rust = smoothstep(0.35f, 0.75f, 0.6f * smoothNoise(q * 7.0f)
-        + 0.4f * smoothNoise(q * 29.0f + 3.1f));
-    float fleck = (hashTile(floor(q * 260.0f)) - 0.5f)
-        * (1.0f - saturate(blur / 0.006f));
-    float3 albedo = mix(float3(0.032f, 0.024f, 0.019f),
-        float3(0.11f, 0.05f, 0.024f), rust) * (1.0f + 0.6f * fleck);
-    return {albedo, mix(0.5f, 0.85f, rust), 0.4f * (1.0f - rust),
+// Cast iron under fresh black enamel: an even, deep black whose gloss
+// throws back tight highlights of the lamps, the Earth and the sun. A
+// highlight narrower than a pixel would break into beads along a thin rod,
+// so the gloss softens as the rod's radius, or a box's, shrinks toward one.
+SurfaceMaterial houseCastIronMaterial(float radius, float blur) {
+    return {float3(0.011f, 0.011f, 0.012f),
+        mix(0.15f, 0.55f, saturate(4.0f * blur / max(radius, 1.0e-3f))), 0.0f,
+        float3(0.0f)};
+}
+
+// Coverage, 0 to 1, of run `run` of a system-font buffer at q, measured in
+// the font's size from the run's start on its baseline. pixel is a pixel's
+// width in the same measure. Each glyph whose box holds q is filled by its
+// outline's winding number, and its edge is smoothed over a pixel.
+__attribute__((noinline))
+float houseFontCoverage(device const float4 *font, uint run, float2 q,
+    float pixel) {
+    float4 line = font[uint(font[0].y) + run];
+    float coverage = 0.0f;
+    for (uint j = 0u; j < uint(line.y); ++j) {
+        float4 placement = font[uint(font[0].z) + uint(line.x) + j];
+        uint g = uint(font[0].x) + 2u * uint(placement.x);
+        float4 lower = font[g], upper = font[g + 1u];
+        float2 local = q - placement.yz;
+        if (any(local < lower.zw - pixel) || any(local > upper.xy + pixel))
+            continue;
+        float nearest = 1.0e3f;
+        int winding = 0;
+        for (uint i = 0u; i < uint(lower.y); ++i) {
+            float4 segment = font[uint(font[0].w) + uint(lower.x) + i];
+            float2 a = segment.xy, b = segment.zw, edge = b - a;
+            float t = saturate(dot(local - a, edge)
+                / max(dot(edge, edge), 1.0e-8f));
+            nearest = min(nearest, length(local - (a + t * edge)));
+            float side = edge.x * (local.y - a.y) - edge.y * (local.x - a.x);
+            if (a.y <= local.y && b.y > local.y && side > 0.0f) winding++;
+            else if (b.y <= local.y && a.y > local.y && side < 0.0f) winding--;
+        }
+        coverage = max(coverage, saturate(0.5f
+            + (winding != 0 ? nearest : -nearest) / pixel));
+    }
+    return coverage;
+}
+
+// A street name blade: green sheeting on aluminium, a white border inset
+// from its edge and the name in white capitals across both faces, each
+// reading left to right, condensed as highway lettering is. The blade runs
+// along its box's longer side; rows holds the name's run in the sign font
+// and the letters' size in metres, shrunk if the name would overrun the
+// blade. Its sheeting is a little dulled and grimed, as an old sign's is.
+constant float houseSignCondense = 0.8f;    // letters' width against the font's
+constant float houseSignCapital = 0.705f;   // capital height, in font sizes
+
+SurfaceMaterial houseSignMaterial(device const HousePart &part, float3 p,
+    float3 n, float blur, device const float4 *font) {
+    float3 centre = 0.5f * (part.lower.xyz + part.upper.xyz);
+    float3 reach = 0.5f * (part.upper.xyz - part.lower.xyz);
+    bool alongX = reach.x > reach.z;
+    float3 face = alongX ? float3(0.0f, 0.0f, 1.0f) : float3(1.0f, 0.0f, 0.0f);
+    if (abs(dot(n, face)) < 0.5f)
+        return {float3(0.3f, 0.3f, 0.29f), 0.4f, 1.0f, float3(0.0f)};
+    // Across the face to the right of someone looking at it, and up.
+    float3 right = cross(float3(0.0f, 1.0f, 0.0f), dot(n, face) > 0.0f
+        ? face : -face);
+    float2 at = float2(dot(p - centre, right), p.y - centre.y);
+    float2 extent = float2(alongX ? reach.x : reach.z, reach.y);
+    float2 inside = extent - abs(at);
+    float edge = min(inside.x, inside.y);
+    float border = smoothstep(0.011f - blur, 0.011f + blur, edge)
+        * (1.0f - smoothstep(0.024f - blur, 0.024f + blur, edge));
+    float4 line = font[uint(font[0].y) + uint(part.rows.x)];
+    float size = min(part.rows.y, (2.0f * extent.x - 0.12f)
+        / max(line.z * houseSignCondense, 1.0e-3f));
+    float pixel = blur / (size * houseSignCondense);
+    float2 q = float2(at.x / (size * houseSignCondense) + 0.5f * line.z,
+        at.y / size + 0.5f * houseSignCapital);
+    float letters = houseFontCoverage(font, uint(part.rows.x), q, pixel);
+    // Far off, the letters blur into a pale wash over the blade.
+    letters = mix(letters, 0.35f
+        * step(abs(q.y - 0.5f * houseSignCapital), 0.5f * houseSignCapital)
+        * step(abs(at.x), 0.5f * line.z * size * houseSignCondense),
+        smoothstep(0.08f, 0.25f, pixel));
+    float grime = smoothNoise(float2(at.x * 3.0f + centre.x, at.y * 9.0f));
+    float3 green = float3(0.0f, 0.13f, 0.045f) * (0.85f + 0.2f * grime);
+    float3 white = float3(0.72f, 0.74f, 0.7f) * (0.9f + 0.1f * grime);
+    return {mix(green, white, max(border, letters)), 0.38f, 0.0f,
         float3(0.0f)};
 }
 

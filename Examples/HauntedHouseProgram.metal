@@ -3987,6 +3987,7 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     device const float *terrainBounds [[buffer(2)]],
     device const float2 *earthShadow [[buffer(3)]],
     device const float2 *sunShadow [[buffer(4)]],
+    device const float4 *signFont [[buffer(5)]],
     texture2d<float> crateA [[texture(1)]],
     texture2d<float> crateB [[texture(2)]],
     texture2d<float> impactTexture [[texture(3)]]) {
@@ -4047,7 +4048,7 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     bool house = houseMaterial(hit.material);
     if (house)
         material = houseSurfaceMaterial(hit, game, game.effects.x,
-            pixelSpread * hit.distance, direction);
+            pixelSpread * hit.distance, direction, signFont);
     // Room lights stay in the base and the house's lamps in its rooms; the
     // Earth and the lanterns light the shell, the moon, the drones over it
     // and the outside of the house.

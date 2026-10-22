@@ -3407,7 +3407,7 @@ SurfaceMaterial houseDustSheet(float3 p, float3 n) {
 
 SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
     device const GameState &game, float time, float pixelWidth,
-    float3 direction) {
+    float3 direction, device const float4 *signFont) {
     uint index = min(hit.variant, houseCapacity - 1u);
     device const HousePart &part = game.house.parts[index];
     uint style = hit.material - houseMaterialBase;
@@ -3532,7 +3532,12 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
         return housePlasterMaterial(part, p, n, blur);
     if (style == houseCorrugated) return houseCorrugatedMaterial(p, n, blur);
     if (style == houseCastIron || style == houseCastIronRod)
-        return houseCastIronMaterial(p, n, blur);
+        return houseCastIronMaterial(style == houseCastIronRod ? part.rows.w
+            : 0.5f * min(min(part.upper.x - part.lower.x,
+                part.upper.y - part.lower.y), part.upper.z - part.lower.z),
+            blur);
+    if (style == houseSign)
+        return houseSignMaterial(part, p, n, blur, signFont);
 
     if (style == houseFloor)
         return houseFloorMaterial(p, n, local, blur, inside);

@@ -5,7 +5,7 @@
 // HauntedBuildingKit.metal into its own site; site 0 is the Victorian house
 // of HauntedHouse.metal. HauntedStreet.metal lays the road and drives
 // between them, copies the cottage, the barn and the shed along it and
-// puts up its lamps. The program includes the kit first, then each
+// puts up lamps and signs. The program includes the kit first, then each
 // building and the street, then this file, and calls only the functions
 // here for what every building shares: the scene traces, the Earth's
 // shadows, the glass, footing, obstacles, the levelled ground, the paving,
@@ -24,7 +24,7 @@
 
 // Runs once in the initialize pass: the house with its graveyards and
 // their mausoleums as site 0, the shed yard behind it and the cottage, then
-// the street's copies of them and its lamps.
+// the street's copies of them, its lamps and its signs.
 void buildBuildings(device HouseModel &house) {
     house.counts = uint4(0u);
     beginBuildingSite(house);
@@ -253,8 +253,8 @@ bool buildingsBlockedFrom(float2 p, float foot) {
 // True where a wall, post, fence, grave or piece of furniture keeps the
 // walker out, padded by the walker's reach. Each site keeps a table of
 // footprints in its own frame; the site under p picks the table, so one
-// loop serves them all. Off every site, the street's lamp posts and its
-// copies of the buildings.
+// loop serves them all. Off every site, the street's lamp posts, its
+// copies of the buildings and its sign posts.
 bool buildingsBlocked(float2 p) {
     float2 local;
     float pad;
@@ -278,7 +278,8 @@ bool buildingsBlocked(float2 p) {
         footprints = cottageObstacles;
         count = cottageObstacleCount;
     } else {
-        // The street: its lamp posts, then the copies' footprints.
+        // The street: its lamp posts, then the copies' footprints and the
+        // sign posts.
         if (streetLampBlocked(p, housePlayerPad)) return true;
         if (!streetNearProperties(p)) return false;
         local = p;

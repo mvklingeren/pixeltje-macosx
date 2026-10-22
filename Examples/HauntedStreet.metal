@@ -1,6 +1,7 @@
 // The street for HauntedHouseProgram.metal: an asphalt road across the plain
 // between the base exit and the cottage, drives to the buildings, copies of
-// those buildings along it, and lantern posts beside it.
+// those buildings along it, lantern posts beside it, and name signs at the
+// corners where drives meet it.
 //
 // The road runs east and west along streetRoadZ, graded to a level that
 // follows the plain but skips its craters and boulders, and fades under the
@@ -22,11 +23,15 @@
 // stay on the original; a copy's clapboards are whole. The walker meets a
 // copy's walls through its original's footprint table. Nobody goes in.
 //
-// Sixteen lantern posts six metres tall stand along the road, alternating
-// sides: a rusted cast-iron post with a shepherd's crook, a big lantern
-// hanging from its tip.
+// Sixteen lantern posts nine metres tall stand along the road, alternating
+// sides: a cast-iron post in glossy black enamel whose top arches out over
+// the road, a big lantern hanging from its tip.
 // Only the few near a point light it. They go out while the house is
 // haunted.
+//
+// Four street name signs stand where the long drives and two of the
+// cottages' drives meet the road: green blades with white letters crossed
+// on a black post, the road's name below and the drive's above.
 //
 // HauntedHouseProgram.metal includes this file after the buildings and
 // before HauntedBuildings.metal, which calls it. Layout is in world metres:
@@ -45,9 +50,9 @@ constant float streetPadMargin = 1.5f;
 constant float streetPadReach = 12.0f;
 
 // buildBuildings raises the house, the shed yard and the cottage as sites 0
-// to 2, then buildStreet the copies north and south of the road and the
-// lamps as sites 3 to 5. The mausoleums are the house site's last two
-// groups.
+// to 2, then buildStreet the copies north and south of the road as sites 3
+// and 4, and the lamps and then the signs as site 5. The mausoleums are the
+// house site's last two groups.
 constant uint streetHouseSite = 0u;
 constant uint streetShedYardSite = 1u;
 constant uint streetCottageSite = 2u;
@@ -200,7 +205,7 @@ constant float4 streetPads[streetPropertyCount] = {
 // world x and z: the cottages' (properties 1 to 3), the barns' (4 and 5),
 // the open shed's (6) and the mausoleums' (7 and 8). A turned footprint is
 // never entered, so only its outline is kept, cut into pieces whose boxes
-// reach at most 0.6 m past it.
+// reach at most 0.6 m past it. The street name signs' posts follow, last.
 static_assert(streetProperties[1].kind == streetCottage
     && streetProperties[2].kind == streetCottage
     && streetProperties[3].kind == streetCottage
@@ -211,7 +216,7 @@ static_assert(streetProperties[1].kind == streetCottage
     && streetProperties[8].kind == streetTomb,
     "streetObstacles holds the copies in this order");
 
-constant uint streetObstacleCount = 174u;
+constant uint streetObstacleCount = 178u;
 constant float4 streetObstacles[streetObstacleCount] = {
     float4(26.720552f, 51.981130f, 30.034329f, 52.851695f),
     float4(29.982235f, 51.406007f, 33.296013f, 52.276572f),
@@ -387,6 +392,10 @@ constant float4 streetObstacles[streetObstacleCount] = {
     float4(100.651651f, 57.710318f, 100.996266f, 58.259467f),
     float4(24.000000f, -17.550000f, 56.000000f, 28.500000f),
     float4(-56.000000f, -17.550000f, -24.000000f, 28.500000f),
+    float4(4.15f, 42.75f, 4.25f, 42.85f),
+    float4(74.55f, 42.75f, 74.65f, 42.85f),
+    float4(-35.95f, 42.75f, -35.85f, 42.85f),
+    float4(-96.75f, 33.15f, -96.65f, 33.25f),
 };
 
 // Each property's drive in world x and z, from its end by the building to
@@ -691,12 +700,17 @@ constant float streetLampSpacing = 20.0f;
 constant float streetLampSize = 2.0f;     // twice a garden lamp's
 constant float streetLampSetback = 1.3f;  // from the asphalt's edge
 constant float streetLampReach = 36.0f;   // of its light
-constant float streetLampPower = 600.0f;
+constant float streetLampPower = 1500.0f; // from its lantern 8.3 m up
 constant float streetLampGlow = 2.5f;     // its glass, against a lantern's
-constant uint streetLampParts = 12u;
-constant uint streetLampLantern = 10u;    // the lantern's part in a lamp
+constant float streetLampPost = 4.5f;     // height, times streetLampSize
+constant float2 streetLampArch = float2(0.5f, 0.4f); // out and up, the same
+constant uint streetLampArchRods = 12u;
+// A lamp's parts, in addStreetLamp's order: five for the post, the arch's
+// rods, the hook, the cap's two, the lantern and its drip plate.
+constant uint streetLampParts = 10u + streetLampArchRods;
+constant uint streetLampLantern = 8u + streetLampArchRods;
 
-// Lamp k's foot in x and z, and which way along z its crook reaches over
+// Lamp k's foot in x and z, and which way along z its arch reaches over
 // the road: even lamps stand north of it, odd ones south.
 float3 streetLampFoot(uint k) {
     float side = (k & 1u) == 0u ? 1.0f : -1.0f;
@@ -706,10 +720,11 @@ float3 streetLampFoot(uint k) {
 }
 
 // A lamp post, every measure below times streetLampSize: a flanged foot on
-// a round base plate, a slender post 3 m tall with a collar halfway up, and
-// a shepherd's crook bent from three rods. A lantern hangs from a hook at
-// the crook's tip, under a flared cap and over a drip plate; its glass
-// burns brighter than a house lantern's.
+// a round base plate, a slender post 4.5 m tall with a collar halfway up
+// and another under its top, and an arch that rises on from the post and
+// curls over in half an ellipse until its tip points down, thinning as it
+// goes. A lantern hangs from a hook at the tip, under a flared cap and over
+// a drip plate; its glass burns brighter than a house lantern's.
 void addStreetLamp(device HouseModel &house, uint k) {
     float3 lamp = streetLampFoot(k);
     float3 foot = float3(lamp.x, moonHeight(lamp.xy, moonTraceDetail),
@@ -717,17 +732,19 @@ void addStreetLamp(device HouseModel &house, uint k) {
     const float u = streetLampSize;
     const float3 up = float3(0.0f, u, 0.0f);
     float3 out = float3(0.0f, 0.0f, lamp.z * u);
-    const float bend = 0.24f;
+    float3 a = foot + up * streetLampPost;
     addHouseRod(house, foot - up * 0.015f, foot + up * 0.02f, 0.14f * u);
     addHouseRod(house, foot, foot + up * 0.22f, 0.065f * u);
-    addHouseRod(house, foot, foot + up * 3.0f, 0.045f * u);
-    addHouseRod(house, foot + up * 1.5f, foot + up * 1.56f, 0.056f * u);
-    float3 centre = foot + up * 3.0f + out * bend;
-    float3 a = foot + up * 3.0f;
-    for (uint i = 1u; i <= 3u; ++i) {
-        float angle = rangePi * (1.0f - float(i) / 3.0f);
-        float3 b = centre + (out * cos(angle) + up * sin(angle)) * bend;
-        addHouseRod(house, a, b, 0.028f * u);
+    addHouseRod(house, foot, a, 0.045f * u);
+    addHouseRod(house, foot + up * 2.22f, foot + up * 2.28f, 0.056f * u);
+    addHouseRod(house, a - up * 0.1f, a - up * 0.06f, 0.054f * u);
+    float3 centre = a + out * streetLampArch.x;
+    for (uint i = 1u; i <= streetLampArchRods; ++i) {
+        float f = float(i) / float(streetLampArchRods);
+        float angle = rangePi * (1.0f - f);
+        float3 b = centre + out * (streetLampArch.x * cos(angle))
+            + up * (streetLampArch.y * sin(angle));
+        addHouseRod(house, a, b, mix(0.036f, 0.026f, f) * u);
         a = b;
     }
     addHouseRod(house, a, a - up * 0.13f, 0.012f * u);
@@ -776,11 +793,81 @@ bool streetLampBlocked(float2 p, float pad) {
         < 0.065f * streetLampSize + pad;
 }
 
+// ------------------------------------------------------------------- signs
+// Street name signs, in metres. Each blade is green sheeting with a white
+// border, and carries its name in white from the program's signFont, whose
+// runs follow streetSignRoad and the signs' names in order. A blade is as
+// long as its name at streetSignLetters, measured in that bold monospaced
+// font and condensed by houseSignCondense, plus 0.13 m at each end.
+
+struct StreetSign {
+    float2 foot;    // x and z
+    uint name;      // the drive's run in signFont
+    float length;   // of the drive's blade
+};
+
+constant uint streetSignRoad = 0u;          // SKULL HOLLOW RD
+constant float streetSignRoadLength = 1.67f;
+constant float streetSignHeight = 2.9f;     // the lower blade's foot
+constant float streetSignBlade = 0.28f;     // a blade's height
+constant float streetSignGap = 0.04f;       // between the blades
+constant float streetSignLetters = 0.19f;   // the letters' size
+constant float streetSignPost = 0.045f;     // the post's radius
+
+// Keep the feet in sync with the last four streetObstacles.
+constant uint streetSignCount = 4u;
+constant StreetSign streetSigns[streetSignCount] = {
+    {float2(4.2f, 42.8f), 1u, 1.11f},       // COFFIN LN, the house's drive
+    {float2(74.6f, 42.8f), 2u, 1.76f},      // PUMPKIN PATCH RD, the farm track
+    {float2(-35.9f, 42.8f), 3u, 1.39f},     // TOMBSTONE CT
+    {float2(-96.7f, 33.2f), 4u, 1.67f},     // GRAVEDIGGER WAY
+};
+static_assert(streetObstacleCount == 174u + streetSignCount,
+    "streetObstacles ends with the sign posts");
+
+// A blade along `along` from its foot's centre, naming run `name`.
+void addStreetSignBlade(device HouseModel &house, float3 foot, float3 along,
+    float length, uint name) {
+    float3 reach = along * (0.5f * length)
+        + float3(along.z, 0.0f, along.x) * 0.01f;
+    HousePart blade = houseBox(foot - reach,
+        foot + reach + float3(0.0f, streetSignBlade, 0.0f), houseSign);
+    blade.rows = float4(float(name), streetSignLetters, 0.0f, 1.0f);
+    addHouseWorldPart(house, blade);
+}
+
+// Sign i: a black post on a flanged foot, the road's blade along x clamped
+// to its top, the drive's blade along z crossed over it, and a cap.
+void addStreetSign(device HouseModel &house, uint i) {
+    StreetSign sign = streetSigns[i];
+    float3 foot = float3(sign.foot.x, moonHeight(sign.foot,
+        moonTraceDetail), sign.foot.y);
+    const float3 up = float3(0.0f, 1.0f, 0.0f);
+    float low = streetSignHeight;
+    float high = low + streetSignBlade + streetSignGap;
+    float top = high + streetSignBlade;
+    addHouseRod(house, foot - up * 0.02f, foot + up * 0.03f,
+        2.2f * streetSignPost);
+    addHouseRod(house, foot, foot + up * 0.25f, 1.4f * streetSignPost);
+    addHouseRod(house, foot, foot + up * (low - 0.05f), streetSignPost);
+    addHouseWorldPart(house, houseBox(foot + float3(-0.06f, low - 0.07f,
+        -0.03f), foot + float3(0.06f, low + 0.03f, 0.03f), houseCastIron));
+    addStreetSignBlade(house, foot + up * low, float3(1.0f, 0.0f, 0.0f),
+        streetSignRoadLength, streetSignRoad);
+    addHouseWorldPart(house, houseBox(foot + float3(-0.03f,
+        high - streetSignGap - 0.03f, -0.03f),
+        foot + float3(0.03f, high + 0.03f, 0.03f), houseCastIron));
+    addStreetSignBlade(house, foot + up * high, float3(0.0f, 0.0f, 1.0f),
+        sign.length, sign.name);
+    addHouseWorldPart(house, houseBox(foot + float3(-0.03f, top - 0.03f,
+        -0.06f), foot + float3(0.03f, top + 0.04f, 0.06f), houseCastIron));
+}
+
 // ---------------------------------------------------------------- building
 
 // Runs in the initialize pass after the originals: the copies north of the
-// road as one site and those south of it as another, then the lamps, one
-// group each, as a third.
+// road as one site and those south of it as another, then the lamps and the
+// signs, one group each, as a third.
 void buildStreet(device HouseModel &house) {
     for (uint side = 0u; side < 2u; ++side) {
         beginBuildingSite(house);
@@ -807,5 +894,9 @@ void buildStreet(device HouseModel &house) {
     for (uint k = 0u; k < streetLampCount; ++k) {
         beginHouseGroup(house);
         addStreetLamp(house, k);
+    }
+    for (uint i = 0u; i < streetSignCount; ++i) {
+        beginHouseGroup(house);
+        addStreetSign(house, i);
     }
 }

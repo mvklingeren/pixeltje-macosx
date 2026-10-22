@@ -1,0 +1,296 @@
+{
+  "width": 960,
+  "height": 540,
+  "views": [
+    {
+      "name": "start",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            26,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.02
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lamp",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            6,
+            1.9,
+            36,
+            2.583
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.18
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lamp-side",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -3,
+            1.7,
+            39.5,
+            1.5708
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.36
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lamp-side-day",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -3,
+            1.7,
+            39.5,
+            1.5708
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.36
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            100
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lamp-row",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -24,
+            1.7,
+            36.5,
+            1.5708
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.16
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sign-coffin",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            3.2,
+            1.7,
+            39.0,
+            2.8843
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.3
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sign-coffin-side",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -0.5,
+            1.7,
+            43.5,
+            1.4229
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.25
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sign-pumpkin",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            77.5,
+            1.7,
+            39.5,
+            -2.4206
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.28
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sign-tombstone",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -38.5,
+            1.7,
+            39.0,
+            2.5415
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.3
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sign-gravedigger",
+      "frames": 0,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -99.5,
+            1.7,
+            36.8,
+            0.661
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.3
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            700
+          ]
+        }
+      ]
+    }
+  ]
+}
