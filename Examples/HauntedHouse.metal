@@ -2515,13 +2515,13 @@ bool houseGhostLight(device const GameState &game, bool indoors,
 
 // The house sleeps through the day. A shot through a window, a punch or a
 // knock wakes it only once the afternoon is getting dark: from
-// houseWakeAfter seconds into a match, when the sun has sunk about halfway
+// houseWakeAfter seconds after noon, when the sun has sunk about halfway
 // and the plain has lost half its light. Without the day-night transition
 // it is always night, and the house wakes at once.
 constant float houseWakeAfter = 0.5f * dayNightDuration;
 
 bool houseCanWake(device const GameState &game) {
-    return !enableDayNightTransition || game.effects.x >= houseWakeAfter;
+    return !enableDayNightTransition || dayClock(game) >= houseWakeAfter;
 }
 
 // The ghost waits in the hall, at head height.

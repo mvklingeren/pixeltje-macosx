@@ -19,10 +19,10 @@ using namespace metal;
 // The hand, pistol, double-barrel shotgun and launcher are on keys 1 to 4
 // everywhere; the hand punches, and knocks on doors. enableDrones and
 // renderBase below switch the drones and the drawn base off for now. With
-// enableDayNightTransition, each match starts at noon instead and the sun
-// sets over its first ten minutes, ending in this night; the house sleeps
-// through the bright half of the afternoon and wakes to shots only once it
-// is getting dark.
+// enableDayNightTransition, the sun crosses the sky from noon to this night
+// over ten minutes, and the timeOfDay parameter picks where on that path a
+// match starts; the house sleeps through the bright half of the afternoon
+// and wakes to shots only once it is getting dark.
 
 // Spider slots: two brown range spiders, the ambush spider, seven dark brown
 // hoppers, then the boss. Every slot before the boss runs the same AI.
@@ -81,11 +81,14 @@ constant float3 earthDirection = float3(-0.4019f, 0.309f, 0.8619f);
 constant float earthPower = 1.76e9f;      // irradiance 1.4 from 10 km away
 constant float3 earthColor = float3(0.78f, 0.86f, 1.0f);
 constant float earthRadius = 0.028f;      // drawn 1.6°, larger than life
-// Day into night. With enableDayNightTransition each match starts at lunar
-// noon: the sun stands high behind the path, lights the plain and the
-// houses and outshines the stars, then sinks toward the plain left of the
-// house and sets just before dayNightDuration seconds have passed, leaving
-// the earthlit night above. Set it false to keep the night from the start.
+// Day into night. With enableDayNightTransition the sun stands high behind
+// the path at lunar noon, lights the plain and the houses and outshines the
+// stars, then sinks toward the plain left of the house and sets just before
+// dayNightDuration seconds after noon, leaving the earthlit night above. A
+// match starts timeOfDay seconds after noon (parameters0.x): 0 starts at
+// noon, about 545 puts the sun's centre on the horizon, 553 starts just
+// after its disc has gone under, and 600 or more starts in the night. Set
+// enableDayNightTransition false to keep the night from the start.
 constant bool enableDayNightTransition = true;
 // With the transition on, an Earth-like atmosphere hangs over the moon until
 // night: a soft blue sky, skylight in the shadows, haze over the distance, a
@@ -187,7 +190,7 @@ constant uint missileMaterial = 65u;
 struct ProgramUniforms {
     float4 resolutionTime;
     uint4 frameSeed;
-    float4 parameters0;
+    float4 parameters0;   // timeOfDay, seconds after noon a match starts
     float4 parameters1;
     float4 parameters2;
     float4 parameters3;
@@ -383,11 +386,19 @@ struct GameState {
     float4 lens;            // autofocus distance (0 until the first frame),
                             // elapsed time it was last pulled; unused
     float4 hand;            // the hand's swing; see SignalRangeHand.metal
+    float4 sky;             // seconds after noon the match started at
+                            // (timeOfDay), unused
 };
 
 static_assert(sizeof(GameState) <= 262144,
     "The GPU Program game buffer must contain game state, the HUD glyphs "
     "and the buildings");
+
+// Seconds after lunar noon right now: the time of day the match started at
+// plus the time it has run.
+float dayClock(device const GameState &game) {
+    return game.sky.x + game.effects.x;
+}
 
 struct SceneHit {
     float distance;
@@ -734,6 +745,7 @@ kernel void initializeRange(constant ProgramUniforms &u [[buffer(0)]],
     // The missile flight cam starts on; V toggles it.
     states[0].controls = float4(0.0f, 1.0f, 0.0f, 0.0f);
     resetGame(states[0], u.frameSeed.y ^ u.frameSeed.z);
+    states[0].sky = float4(max(0.0f, u.parameters0.x), 0.0f, 0.0f, 0.0f);
     // Voice words persist between frames; start every hover sound silent.
     for (uint i = 0u; i < droneCount; ++i) audio[0].droneVoice[i] = float4(0.0f);
     for (uint i = 0u; i < 2u; ++i) audio[0].windVoice[i] = float4(0.0f, 1.0f, 0.0f, 0.0f);
@@ -1126,6 +1138,7 @@ kernel void restartRange(constant ProgramUniforms &u [[buffer(0)]],
     uint action = uint(u.pointer.z);
     if (!restartRequested(game, action)) return;
     resetGame(game, u.frameSeed.y ^ npcPathHash(action + u.frameSeed.x));
+    game.sky = float4(max(0.0f, u.parameters0.x), 0.0f, 0.0f, 0.0f);
     game.progress.z = action;
     game.effects.z = float(uint(u.movement.z));
 }
@@ -2809,22 +2822,23 @@ float3 regolithReflectance(float3 normal, float3 viewDirection,
         * lobe * (1.0f + surge);
 }
 
-// Where the sun stands `elapsed` seconds into the match. Strength is 1 while
-// its disc is clear of the horizon and fades to 0 as it sets; it is 0
-// throughout when the day-night transition is off.
+// Where the sun stands `afterNoon` seconds after lunar noon; dayClock gives
+// that for the current moment of a match. Strength is 1 while its disc is
+// clear of the horizon and fades to 0 as it sets; it is 0 throughout when
+// the day-night transition is off.
 struct Daylight {
     float3 direction;
     float strength;
 };
 
-Daylight daylight(float elapsed) {
+Daylight daylight(float afterNoon) {
     if (!enableDayNightTransition) return {sunsetDirection, 0.0f};
     // Noon is a quarter turn above the sunset point. The sun's height, and
     // so the light it puts on level ground, falls evenly over the duration
     // and runs a little past the horizon, so the disc is fully down at the
     // end.
     float angle = asin(mix(1.0f, -0.1f,
-        saturate(elapsed / dayNightDuration)));
+        saturate(afterNoon / dayNightDuration)));
     float3 direction = cos(angle) * sunsetDirection
         + sin(angle) * sunNoonDirection;
     return {direction, smoothstep(-sunRadius, sunRadius, direction.y)};
@@ -2923,7 +2937,7 @@ float3 shadeDistantLights(SceneHit hit, SurfaceMaterial material,
     device const float2 *sunShadow = nullptr) {
     float3 color = shadeDistantLight(hit, material, viewDirection, chrome,
         game, earthDirection, earthColor, earthPower, earthShadow);
-    Daylight sun = daylight(game.effects.x);
+    Daylight sun = daylight(dayClock(game));
     if (sun.strength > 0.0f)
         color += shadeDistantLight(hit, material, viewDirection, chrome, game,
             sun.direction, sunColor * sunTransmittance(sun),
@@ -3002,7 +3016,7 @@ kernel void bakeEarthShadows(device float2 *shadows [[buffer(1)]],
 void bakeSunShadow(uint index, device const GameState &game,
     device float2 *shadows) {
     if (index >= terrainMapTexels) return;
-    Daylight sun = daylight(game.effects.x);
+    Daylight sun = daylight(dayClock(game));
     if (sun.strength <= 0.0f) return;
     float2 corner;
     uint l = terrainTexel(index, corner);
@@ -3911,7 +3925,7 @@ float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
             : (gun.part >= 6u ? shotgunMaterial(gun) : gunMaterial(gun)));
     bool inHouse = houseInteriorPoint(eye);
     bool outside = outdoors(eye.xz, 0.0f) && !inHouse;
-    Daylight sun = daylight(game.effects.x);
+    Daylight sun = daylight(dayClock(game));
     float3 bounce = regolithBounce(sun);
     float3 color = material.albedo * (1.0f - material.metallic)
             * float3(0.030f, 0.038f, 0.046f)
@@ -4059,7 +4073,7 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     // than ground or roofs facing the sky. While there is an atmosphere, its
     // blue sky lights what faces it too, most of all ground and roofs. The
     // house's rooms keep a warm glow.
-    Daylight sun = daylight(game.effects.x);
+    Daylight sun = daylight(dayClock(game));
     float3 ambient = exterior
         ? regolithBounce(sun) * (0.004f + 0.045f * (1.0f - hit.normal.y))
             + atmosphereSkyLight(sun) * 0.5f
