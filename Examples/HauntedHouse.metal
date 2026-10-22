@@ -1633,8 +1633,20 @@ bool houseGhostLight(device const GameState &game, bool indoors,
     return true;
 }
 
+// The house sleeps through the day. A shot through a window, a punch or a
+// knock wakes it only once the afternoon is getting dark: from
+// houseWakeAfter seconds into a match, when the sun has sunk about halfway
+// and the plain has lost half its light. Without the day-night transition
+// it is always night, and the house wakes at once.
+constant float houseWakeAfter = 0.5f * dayNightDuration;
+
+bool houseCanWake(device const GameState &game) {
+    return !enableDayNightTransition || game.effects.x >= houseWakeAfter;
+}
+
 // The ghost waits in the hall, at head height.
 void houseWake(device GameState &game) {
+    if (!houseCanWake(game)) return;
     game.house.haunt = float4(game.effects.x,
         houseWorld(float3(0.0f, houseFloorY, -3.0f))
             + float3(0.0f, houseGhostHeight, 0.0f));
@@ -1853,7 +1865,7 @@ float3 houseRoomBehind(HouseWindow w, device const HousePart &part,
 
 // Old clapboards in metres, wide and 30 cm to the weather: butt joints fall
 // at random, a few boards have split, rotted away or hang loose, paint has
-// peeled back to grey wood, and the boards are nailed near their ends and
+// worn back to bare oak, and the boards are nailed near their ends and
 // to the odd stud, through their lower edge; here and there a nail has
 // rusted away and left its hole. houseCladdingRelief gives them depth; the
 // shadow under each lap and the darker butt edge are shaded here. gone
@@ -1873,12 +1885,12 @@ float3 houseClapboards(HouseBoardCell cell, float s, float y, float seed,
     float joint = houseLines(cell.along, cell.run, 0.01f, blur);
     float3 wood = paint * (0.78f + 0.44f * cell.pick) * shade
         * (1.0f - 0.6f * joint);
-    // Peeling paint bares weathered grey grain.
+    // Where the finish has worn away the bare oak's grain shows.
     float peel = smoothstep(0.6f, 0.68f, smoothNoise(float2(s * 1.9f,
         y * 2.7f + seed)) + 0.25f * smoothNoise(float2(s * 7.0f, y * 9.0f)));
     float grain = 0.85f + 0.15f * sin(s * 47.0f + 6.0f
         * smoothNoise(float2(s * 2.0f, cell.course)));
-    wood = mix(wood, float3(0.15f, 0.14f, 0.125f) * grain * shade, peel);
+    wood = mix(wood, houseBareOak * grain * shade, peel);
     if (cell.pick > 0.93f) {
         // A split runs along the board.
         float crack = abs(lap - 0.5f - 0.15f * sin(s * 2.3f + cell.pick * 9.0f));
@@ -1920,7 +1932,7 @@ float3 houseBattenBoards(float s, float y, float seed, float blur,
     float3 wood;
     if (present && offset <= houseBattenHalfWidth + 0.001f) {
         wood = mix(paint * (0.95f + 0.2f * pick),
-            float3(0.15f, 0.14f, 0.125f) * grain, 0.7f * peel);
+            houseBareOak * grain, 0.7f * peel);
         float row = round(y / 0.5f);
         float key = hashTile(float2(k * 1.7f + row, seed + 29.0f));
         float2 q = float2(s - centre, y - row * 0.5f);
@@ -1932,7 +1944,7 @@ float3 houseBattenBoards(float s, float y, float seed, float blur,
         float shadow = present ? 0.62f + 0.38f * smoothstep(0.0f, 0.06f,
             offset - houseBattenHalfWidth) : 1.0f;
         wood = mix(paint * (0.8f + 0.25f * board),
-            float3(0.15f, 0.14f, 0.125f) * grain, peel) * shadow;
+            houseBareOak * grain, peel) * shadow;
     }
     return wood * (1.0f - 0.25f * smoothstep(0.7f, 0.9f,
         smoothNoise(float2(s * 0.8f, y * 0.2f))));
@@ -1969,8 +1981,9 @@ SurfaceMaterial houseGlassPane(HouseWindow w, device const HousePart &part,
 // Headstones, the tomb and the mausoleums, in metres. A headstone is grey
 // or dark slate, streaked and blotched with lichen, dirty near the ground,
 // and engraved with a cross over three lines of lettering. The tomb and the
-// mausoleums are pale ashlar under stone roof slabs, with a worn
-// inscription over the door, and their doorways are dark; a sick glow stirs
+// mausoleums are pale ashlar under stone roof slabs (the mausoleums'
+// columns, entablature and pediment are plaster), with a worn inscription
+// over the door, and their doorways are dark; a sick glow stirs
 // in them while the house is haunted.
 SurfaceMaterial houseGraveMaterial(device const HousePart &part, float3 p,
     float3 n, float blur, HouseHaunting mood, float time) {
@@ -2249,6 +2262,11 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
     uint index = min(hit.variant, houseCapacity - 1u);
     device const HousePart &part = game.house.parts[index];
     uint style = hit.material - houseMaterialBase;
+    // A turned building is shaded in its own frame, where it was built.
+    HouseTurn turn = housePartTurn(game.house, index);
+    hit.position = houseTurnPointIn(turn, hit.position);
+    hit.normal = houseTurnDirectionIn(turn, hit.normal);
+    direction = houseTurnDirectionIn(turn, direction);
     float3 p = hit.position, n = hit.normal;
     float3 local = houseLocal(p);
     float3 metres = p - houseOrigin;
@@ -2257,7 +2275,7 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
     bool zFace = abs(n.z) > 0.5f;
     float s = zFace ? p.x : p.z;
     const float3 trim = float3(0.045f, 0.038f, 0.034f);
-    const float3 paint = float3(0.13f, 0.115f, 0.12f);
+    const float3 paint = houseOak;
     const float3 iron = float3(0.02f, 0.02f, 0.022f);
     HouseHaunting mood = houseHaunting(game);
     HouseWind wind = houseWind(game);
@@ -2340,6 +2358,8 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
     if (style == houseLog) return houseLogMaterial(part, p, n, blur, inside);
     if (style == houseGrave)
         return houseGraveMaterial(part, p, n, blur, mood, time);
+    if (style == housePlaster || style == housePlasterColumn)
+        return housePlasterMaterial(part, p, n, blur);
     if (style == houseCorrugated) return houseCorrugatedMaterial(p, n, blur);
     if (style == houseCastIron || style == houseCastIronRod)
         return houseCastIronMaterial(p, n, blur);
@@ -2383,15 +2403,15 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
 
     if (style == houseTrim || style == houseRailing || style == houseFrieze) {
         float3 size = part.upper.xyz - part.lower.xyz;
-        // Weathered paint: grain shows through, worn to grey on edges and
-        // in patches.
+        // Weathered paint: grain shows through, worn to bare oak on edges
+        // and in patches.
         float2 grainAt = abs(n.y) > 0.5f ? p.xz : float2(s, p.y);
         float grain = 0.8f + 0.2f * sin(grainAt.y * 23.0f + 7.0f
             * smoothNoise(grainAt * float2(2.0f, 0.5f)));
         float worn = smoothstep(0.58f, 0.72f, smoothNoise(grainAt * 2.1f
             + float2(index)));
         float3 albedo = mix(trim * (0.8f + 0.4f * smoothNoise(float2(s * 3.0f,
-            p.y * 0.4f))), float3(0.12f, 0.11f, 0.1f) * grain, worn);
+            p.y * 0.4f))), houseBareOak * 0.8f * grain, worn);
         // The open doors carry three raised panels.
         if (size.y > 2.0f * houseScale && size.x < 0.1f * houseScale
             && abs(n.x) > 0.5f) {
@@ -2410,7 +2430,7 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
                 && abs(local.z) < 6.15f);
             if (inside || (deck && local.y > 0.05f)) {
                 // Floor and deck boards, staggered at their ends. Outside
-                // they are warped and grey, with uneven gaps and the odd
+                // they are warped, weathered oak, with uneven gaps and the odd
                 // board rotted through.
                 float across = metres.x + (inside ? 0.0f
                     : 0.02f * sin(metres.z * 0.7f + floor(metres.x / 0.15f)));
@@ -2422,7 +2442,7 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
                     houseLines(run, 2.4f, 0.008f, blur));
                 float tone = 0.8f + 0.4f * pick;
                 float3 wood = inside ? float3(0.09f, 0.055f, 0.034f)
-                    : float3(0.07f, 0.064f, 0.058f);
+                    : houseBareOak * 0.55f;
                 float3 albedo = wood * tone * (1.0f - 0.6f * joint);
                 float roughness = inside ? 0.45f : 0.8f;
                 if (!inside) {

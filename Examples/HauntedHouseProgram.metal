@@ -13,13 +13,16 @@ using namespace metal;
 // sun has set: a full Earth lights the plain, and a flagstone path leads
 // from the exit to a procedurally built Victorian haunted house whose ground
 // floor is open. An asphalt street lit by lantern posts crosses the path,
-// with smaller copies of the cottage, barn and shed along it. The player
+// with copies of the cottage, barn and shed along it, each standing a few
+// degrees off square with the road. The player
 // starts outside on that path, facing the house.
 // The hand, pistol, double-barrel shotgun and launcher are on keys 1 to 4
 // everywhere; the hand punches, and knocks on doors. enableDrones and
 // renderBase below switch the drones and the drawn base off for now. With
 // enableDayNightTransition, each match starts at noon instead and the sun
-// sets over its first ten minutes, ending in this night.
+// sets over its first ten minutes, ending in this night; the house sleeps
+// through the bright half of the afternoon and wakes to shots only once it
+// is getting dark.
 
 // Spider slots: two brown range spiders, the ambush spider, seven dark brown
 // hoppers, then the boss. Every slot before the boss runs the same AI.
@@ -3888,6 +3891,13 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         color = houseThroughGlass(color, pane, paneNormal, direction,
             origin + direction * paneDistance, houseInteriorPoint(origin));
     color = houseGhostOverlay(color, origin, direction, hit.distance, game);
+    // Chimney smoke catches the Earth's and the sun's light, the sky's, and
+    // what the plain bounces up.
+    float3 smokeLight = (earthColor * 1.4f + sunColor * sunTransmittance(sun)
+            * sunIrradiance * sun.strength) / rangePi
+        + atmosphereSkyLight(sun) * 0.5f + regolithBounce(sun) * 0.03f;
+    color = buildingsSmoke(color, origin, direction, hit.distance, game,
+        smokeLight);
     color = shadeGlassBox(color, origin, direction, hit.distance,
         crateA, crateB, chrome, game, pixelSpread);
     color = shadeShot(color, origin, direction, hit.distance, game);

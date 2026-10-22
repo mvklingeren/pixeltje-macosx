@@ -10,12 +10,15 @@
 // too. The cottage and its neighbours have short drives from the road.
 //
 // The neighbours are the cottage, the barn and the open shed again, at
-// other sizes, standing on either side of the road and turned to face it.
+// other sizes, standing on either side of the road and turned to face it,
+// each a few degrees off square and set back by its own distance, as
+// buildings older than the road would stand.
 // Across the road from the house, two of the graveyards' mausoleums rise
 // five times their size, either side of the base exit.
 // buildStreet copies the originals' parts, already in the game buffer,
-// through a scale and a quarter turn, so a copy is traced, shadowed and
-// shaded like its original and adds no code to the traces. Loose clapboards
+// through a scale and a quarter turn, then turns the copy's groups by its
+// few degrees, so a copy is traced, shadowed and shaded like its original
+// and adds no code to the traces. Loose clapboards
 // stay on the original; a copy's clapboards are whole. The walker meets a
 // copy's walls through its original's footprint table. Nobody goes in.
 //
@@ -102,22 +105,40 @@ constant uint streetTomb = 3u;      // the west plot's mausoleum
 struct StreetProperty {
     float4 at;      // world centre of the floor, scale
     uint kind;
-    uint turns;
+    uint turns;     // quarter turns
 };
 
 constant uint streetPropertyCount = 9u;
 constant uint streetCottageCount = 4u;
 constant StreetProperty streetProperties[streetPropertyCount] = {
     {float4(cottageOrigin, 1.0f), streetCottage, 0u},
-    {float4(36.0f, 0.45f, 55.6f, 1.25f), streetCottage, 0u},
-    {float4(-124.0f, -0.85f, 52.7f, 0.8f), streetCottage, 0u},
-    {float4(-92.0f, -0.35f, 22.65f, 0.9f), streetCottage, 2u},
-    {float4(-84.0f, -0.2f, 57.9f, 0.65f), streetBarn, 0u},
-    {float4(92.0f, 0.85f, 15.7f, 0.8f), streetBarn, 2u},
-    {float4(104.0f, 1.0f, 53.9f, 0.75f), streetOpenShed, 1u},
+    {float4(36.0f, 0.45f, 57.5f, 0.9f), streetCottage, 0u},
+    {float4(-124.0f, -0.85f, 55.0f, 0.75f), streetCottage, 0u},
+    {float4(-92.0f, -0.35f, 21.0f, 0.8f), streetCottage, 2u},
+    {float4(-85.0f, -0.2f, 59.5f, 0.65f), streetBarn, 0u},
+    {float4(93.0f, 0.85f, 14.5f, 0.8f), streetBarn, 2u},
+    {float4(105.0f, 1.0f, 55.0f, 0.75f), streetOpenShed, 1u},
     {float4(40.0f, 0.45f, 10.95f, 5.0f), streetTomb, 2u},
     {float4(-40.0f, 0.45f, 10.95f, 5.0f), streetTomb, 2u},
 };
+
+// How far each property stands turned off square, beyond its quarter
+// turns, about the vertical through its centre: the cosine and sine of the
+// angle, taking +x toward +z. The cottage's is cottageTurn.
+constant float2 streetPropertyTurns[streetPropertyCount] = {
+    float2(0.992546f, 0.121869f),
+    float2(0.984808f, -0.173648f),
+    float2(0.974370f, 0.224951f),
+    float2(0.994522f, -0.104528f),
+    float2(0.987688f, 0.156434f),
+    float2(0.978148f, -0.207912f),
+    float2(0.996195f, 0.087156f),
+    float2(1.000000f, 0.000000f),
+    float2(1.000000f, 0.000000f),
+};
+static_assert(streetPropertyTurns[0].x == cottageTurn.x
+    && streetPropertyTurns[0].y == cottageTurn.y,
+    "the cottage is property 0");
 
 // The centre of each original's floor in world metres; a mausoleum's
 // doorway's foot.
@@ -152,28 +173,32 @@ constexpr float3 streetPlace(StreetProperty c, float3 source, float3 q) {
     return c.at.xyz + float3(xz.x, (q.y - source.y) * c.at.w, xz.y);
 }
 
-// These world-coordinate tables are literal. Metal emits a forbidden global
+// These layout tables are literal. Metal emits a forbidden global
 // constructor for computed vector arrays, even when their helpers are
-// constexpr. Keep them in sync with the properties and source footprints.
-// The spider and drone kernels read the tables without transforming points
-// each frame; doing that made the spider kernel take minutes to compile.
+// constexpr. Keep them in sync with the properties, their turns and the
+// source footprints and pads. The spider and drone kernels read them with
+// one turn of the point into the copy that holds it, never by moving the
+// originals' tables onto the copies each frame; doing that made the spider
+// kernel take minutes to compile.
 
-// Each property's levelled ground in world x and z.
+// Each property's levelled ground in its own frame: x and z from its
+// centre, after its quarter turns and before its turn off square.
 constant float4 streetPads[streetPropertyCount] = {
-    float4(-43.000000f, 47.500000f, -30.000000f, 62.000000f),
-    float4(27.250000f, 47.474998f, 43.500000f, 65.599998f),
-    float4(-129.600006f, 47.500000f, -119.199997f, 59.099998f),
-    float4(-97.400002f, 15.450000f, -85.699997f, 28.500000f),
-    float4(-89.849998f, 47.500000f, -78.150002f, 67.650002f),
-    float4(84.800003f, 3.700000f, 99.199997f, 28.500000f),
-    float4(93.500000f, 47.525002f, 114.500000f, 59.525002f),
-    float4(17.500000f, -20.049999f, 62.500000f, 31.950001f),
-    float4(-62.500000f, -20.049999f, -17.500000f, 31.950001f),
+    float4(-12.500000f, -11.500000f, 11.500000f, 15.500000f),
+    float4(-11.250000f, -10.350000f, 10.350000f, 13.950000f),
+    float4(-9.375000f, -8.625000f, 8.625000f, 11.625000f),
+    float4(-9.200000f, -12.400000f, 10.000000f, 9.200000f),
+    float4(-5.850000f, -10.400000f, 5.850000f, 9.750000f),
+    float4(-7.200000f, -12.000000f, 7.200000f, 12.800000f),
+    float4(-10.500000f, -6.375000f, 10.500000f, 5.625000f),
+    float4(-22.500000f, -31.000000f, 22.500000f, 21.000000f),
+    float4(-22.500000f, -31.000000f, 22.500000f, 21.000000f),
 };
 
 // The copies' walls, posts and crates from their originals' tables, in
-// world x and z: the cottages' (properties 1 to 3), the barns' (4 and 5),
-// the open shed's (6) and the mausoleums' (7 and 8).
+// each copy's frame like its pad: the cottages' (properties 1 to 3), the
+// barns' (4 and 5), the open shed's (6) and the mausoleums' (7 and 8).
+// Property i's run from streetObstacleFirst[i] up to the next one's.
 static_assert(streetProperties[1].kind == streetCottage
     && streetProperties[2].kind == streetCottage
     && streetProperties[3].kind == streetCottage
@@ -188,72 +213,93 @@ constant uint streetObstacleCount = 38u;
 static_assert(streetObstacleCount == 3u * cottageObstacleCount
     + shedObstacleCount + barnObstacleCount + 2u * mausoleumObstacleCount,
     "one entry for each footprint of each copy");
+constant uint streetObstacleFirst[streetPropertyCount + 1u] = {
+    0u, 0u, 4u, 8u, 12u, 17u, 22u, 36u, 37u, 38u};
+static_assert(streetObstacleFirst[streetPropertyCount] == streetObstacleCount,
+    "the last copy's footprints end the table");
+
 constant float4 streetObstacles[streetObstacleCount] = {
-    float4(30.187500f, 51.037498f, 41.812500f, 60.162498f),
-    float4(30.250000f, 59.974998f, 37.625000f, 63.599998f),
-    float4(29.000000f, 57.037498f, 30.187500f, 58.412498f),
-    float4(34.500000f, 49.599998f, 37.500000f, 51.037498f),
-    float4(-127.720001f, 49.779999f, -120.279999f, 55.619999f),
-    float4(-127.680000f, 55.500000f, -122.959999f, 57.820000f),
-    float4(-128.479996f, 53.619999f, -127.720001f, 54.500000f),
-    float4(-124.959999f, 48.860001f, -123.040001f, 49.779999f),
-    float4(-96.184998f, 19.365000f, -87.815002f, 25.934999f),
-    float4(-93.169998f, 16.889999f, -87.860001f, 19.500000f),
-    float4(-87.815002f, 20.625000f, -86.959999f, 21.615000f),
-    float4(-93.080002f, 25.934999f, -90.919998f, 26.969999f),
-    float4(-88.614998f, 49.384998f, -88.419998f, 66.415001f),
-    float4(-79.580002f, 49.384998f, -79.385002f, 66.415001f),
-    float4(-88.614998f, 66.220001f, -79.385002f, 66.415001f),
-    float4(-88.614998f, 49.352501f, -84.000000f, 49.579998f),
-    float4(-82.375000f, 49.274498f, -79.385002f, 49.579998f),
-    float4(97.440002f, 5.220000f, 97.680000f, 26.180000f),
-    float4(86.320000f, 5.220000f, 86.559998f, 26.180000f),
-    float4(86.320000f, 5.220000f, 97.680000f, 5.460000f),
-    float4(92.000000f, 25.940001f, 97.680000f, 26.219999f),
-    float4(86.320000f, 25.940001f, 90.000000f, 26.316000f),
-    float4(94.925003f, 57.875000f, 113.074997f, 58.099998f),
-    float4(112.849998f, 49.700001f, 113.074997f, 58.099998f),
-    float4(94.925003f, 49.700001f, 95.150002f, 58.099998f),
-    float4(112.775002f, 49.775002f, 113.000000f, 50.000000f),
-    float4(109.812500f, 49.775002f, 110.037498f, 50.000000f),
-    float4(106.849998f, 49.775002f, 107.074997f, 50.000000f),
-    float4(103.887497f, 49.775002f, 104.112503f, 50.000000f),
-    float4(100.925003f, 49.775002f, 101.150002f, 50.000000f),
-    float4(97.962502f, 49.775002f, 98.187500f, 50.000000f),
-    float4(95.000000f, 49.775002f, 95.224998f, 50.000000f),
-    float4(108.949997f, 56.599998f, 110.000000f, 57.799999f),
-    float4(107.599998f, 56.825001f, 108.425003f, 57.799999f),
-    float4(100.849998f, 55.400002f, 101.750000f, 56.150002f),
-    float4(99.050003f, 56.674999f, 100.250000f, 57.799999f),
-    float4(24.000000f, -17.549999f, 56.000000f, 28.500000f),
-    float4(-56.000000f, -17.549999f, -24.000000f, 28.500000f),
+    float4(-8.280000f, -6.480000f, 8.280000f, 6.480000f),
+    float4(-8.190000f, 6.300000f, 2.430000f, 11.520000f),
+    float4(-9.270000f, 1.800000f, -8.280000f, 3.240000f),
+    float4(-1.080000f, -7.515000f, 1.080000f, -6.480000f),
+    float4(-6.900000f, -5.400000f, 6.900000f, 5.400000f),
+    float4(-6.825000f, 5.250000f, 2.025000f, 9.600000f),
+    float4(-7.725000f, 1.500000f, -6.900000f, 2.700000f),
+    float4(-0.900000f, -6.262500f, 0.900000f, -5.400000f),
+    float4(-7.360000f, -5.760000f, 7.360000f, 5.760000f),
+    float4(-2.160000f, -10.240000f, 7.280000f, -5.600000f),
+    float4(7.360000f, -2.880000f, 8.240000f, -1.600000f),
+    float4(-0.960000f, 5.760000f, 0.960000f, 6.680000f),
+    float4(-4.615000f, -8.515000f, -4.420000f, 8.515000f),
+    float4(4.420000f, -8.515000f, 4.615000f, 8.515000f),
+    float4(-4.615000f, 8.320000f, 4.615000f, 8.515000f),
+    float4(-4.615000f, -8.547500f, 0.000000f, -8.320000f),
+    float4(1.625000f, -8.625500f, 4.615000f, -8.320000f),
+    float4(5.440000f, -10.480000f, 5.680000f, 10.480000f),
+    float4(-5.680000f, -10.480000f, -5.440000f, 10.480000f),
+    float4(-5.680000f, -10.480000f, 5.680000f, -10.240000f),
+    float4(-0.000000f, 10.240000f, 5.680000f, 10.520000f),
+    float4(-5.680000f, 10.240000f, -2.000000f, 10.616000f),
+    float4(-9.075000f, 3.975000f, 9.075000f, 4.200000f),
+    float4(8.850000f, -4.200000f, 9.075000f, 4.200000f),
+    float4(-9.075000f, -4.200000f, -8.850000f, 4.200000f),
+    float4(8.775000f, -4.125000f, 9.000000f, -3.900000f),
+    float4(5.812500f, -4.125000f, 6.037500f, -3.900000f),
+    float4(2.850000f, -4.125000f, 3.075000f, -3.900000f),
+    float4(-0.112500f, -4.125000f, 0.112500f, -3.900000f),
+    float4(-3.075000f, -4.125000f, -2.850000f, -3.900000f),
+    float4(-6.037500f, -4.125000f, -5.812500f, -3.900000f),
+    float4(-9.000000f, -4.125000f, -8.775000f, -3.900000f),
+    float4(4.950000f, 2.700000f, 6.000000f, 3.900000f),
+    float4(3.600000f, 2.925000f, 4.425000f, 3.900000f),
+    float4(-3.150000f, 1.500000f, -2.250000f, 2.250000f),
+    float4(-4.950000f, 2.775000f, -3.750000f, 3.900000f),
+    float4(-16.000000f, -28.500000f, 16.000000f, 17.550000f),
+    float4(-16.000000f, -28.500000f, 16.000000f, 17.550000f),
 };
 
 // Each property's drive in world x and z, from its end by the building to
-// the road's centre line. The mausoleums, last, have none.
+// the road's centre line, square to the road however the building stands.
+// The mausoleums, last, have none.
 constant uint streetDriveCount = 7u;
 
 constant float4 streetDrives[streetDriveCount] = {
-    float4(-34.600002f, 38.000000f, -31.800001f, 50.250000f),
-    float4(37.750000f, 38.000000f, 41.250000f, 50.912498f),
-    float4(-122.880005f, 38.000000f, -120.639999f, 49.700001f),
-    float4(-95.779999f, 26.025000f, -93.259995f, 38.000000f),
-    float4(-85.820000f, 38.000000f, -82.180000f, 49.157501f),
-    float4(89.760002f, 26.459999f, 94.239998f, 38.000000f),
-    float4(101.000000f, 38.000000f, 107.000000f, 49.400002f),
+    float4(-34.938678f, 38.000000f, -31.738678f, 53.217517f),
+    float4(36.787174f, 38.000000f, 39.667174f, 50.435936f),
+    float4(-121.191438f, 38.000000f, -118.791438f, 50.306434f),
+    float4(-95.692900f, 27.125774f, -93.132900f, 38.000000f),
+    float4(-85.452372f, 38.000000f, -81.812372f, 50.865135f),
+    float4(92.997130f, 25.024868f, 97.477130f, 38.000000f),
+    float4(102.392201f, 38.000000f, 108.392201f, 50.517124f),
 };
 
 // The cottages' porch lanterns, where their lights hang.
 constant float3 streetLanterns[streetCottageCount] = {
-    float3(-36.000000f, 2.650000f, 49.700001f),
-    float3(36.000000f, 3.137500f, 50.224998f),
-    float3(-124.000000f, 0.870000f, 49.259998f),
-    float3(-92.000000f, 1.585000f, 26.520000f),
+    float3(-37.049419f, 2.650000f, 52.258140f),
+    float3(34.780990f, 2.385000f, 50.586650f),
+    float3(-122.684036f, 0.762500f, 49.299935f),
+    float3(-91.347742f, 1.370000f, 27.205817f),
 };
 
+// The cottages' chimney pots, where their smoke leaves them, and each
+// cottage's scale.
+constant float4 streetChimneys[streetCottageCount] = {
+    float4(-48.594236f, 18.600000f, 61.520219f, 1.000000f),
+    float4(27.281836f, 16.740000f, 61.596123f, 0.900000f),
+    float4(-132.021329f, 12.725000f, 55.303369f, 0.750000f),
+    float4(-84.015415f, 14.130000f, 17.908448f, 0.800000f),
+};
+
+// p, in world x and z, in property i's frame.
+float2 streetLocal(uint i, float2 p) {
+    return houseRotate(p - streetProperties[i].at.xz,
+        float2(streetPropertyTurns[i].x, -streetPropertyTurns[i].y));
+}
+
 float streetPadBlend(uint i, float2 p) {
-    return buildingPadBlend(p, float2(0.0f), streetPads[i].xy,
-        streetPads[i].zw, streetPadMargin, streetPadReach);
+    return buildingPadBlend(streetLocal(i, p), float2(0.0f),
+        streetPads[i].xy, streetPads[i].zw, streetPadMargin, streetPadReach);
 }
 
 // The porch lantern of cottage i, each flickering in its own time.
@@ -298,6 +344,21 @@ float streetGrade(float2 p, thread float &level) {
 // True where p lies near enough a copy for its ground to matter.
 bool streetNearProperties(float2 p) {
     return p.y > -36.0f && p.y < 86.0f && abs(p.x) < 146.0f;
+}
+
+// The copy whose levelled ground holds p, with p in its frame as local, or
+// streetPropertyCount where there is none.
+// Kept out of line: inlined into the spider and drone kernels' footing, its
+// loop of turns took their cold compile from seconds to minutes.
+__attribute__((noinline))
+uint streetPropertyAt(float2 p, thread float2 &local) {
+    if (!streetNearProperties(p)) return streetPropertyCount;
+    for (uint i = 1u; i < streetPropertyCount; ++i) {
+        local = streetLocal(i, p);
+        if (all(local > streetPads[i].xy) && all(local < streetPads[i].zw))
+            return i;
+    }
+    return streetPropertyCount;
 }
 
 // The terrain height h at p, graded under the road and the long drives and
@@ -476,15 +537,15 @@ HousePart streetCopyPart(HousePart part, StreetProperty c, float3 source) {
             - dot(plane.xyz, source)) + dot(normal, c.at.xyz)) : float4(0.0f);
     }
     bool headstone = style == houseGrave && length(part.windows.xyz) > 0.5f;
-    if (style == houseTimber || style == houseLog || style == houseCastIronRod
-        || headstone) {
+    if (style == houseTimber || houseRoundStyle(style) || headstone) {
         part.windows = float4(streetTurnDirection(c, part.windows.xyz),
             headstone ? part.windows.w : s * part.windows.w);
         part.rows = float4(streetPlace(c, source, part.rows.xyz),
             style == houseTimber ? part.rows.w : s * part.rows.w);
-    } else if (style == houseGrave) {
-        // Tomb stone: an engraved line's height, half width and letter
-        // size grow with it, and a copy turned about carves its +z face.
+    } else if (style == houseGrave || style == housePlaster) {
+        // Tomb stone and plaster: an engraved line's height, half width and
+        // letter size grow with it, and a copy turned about carves its +z
+        // face.
         part.windows.xyz = streetTurnDirection(c, part.windows.xyz);
         part.rows.xyz *= s;
         if (part.rows.z > 0.0f && (c.turns & 3u) == 2u) part.rows.w = -1.0f;
@@ -616,6 +677,7 @@ void buildStreet(device HouseModel &house) {
         for (uint i = 1u; i < streetPropertyCount; ++i) {
             StreetProperty c = streetProperties[i];
             if ((c.at.z < streetRoadZ) != (side == 1u)) continue;
+            uint first = house.counts.y;
             if (c.kind == streetCottage) {
                 uint2 groups = house.sites[streetCottageSite].xy;
                 for (uint g = groups.x + 1u; g < groups.y; ++g)
@@ -627,6 +689,8 @@ void buildStreet(device HouseModel &house) {
                 copyBuildingGroup(house,
                     house.sites[streetShedYardSite].x + c.kind, c);
             }
+            turnHouseGroups(house, first, house.counts.y,
+                streetPropertyTurns[i], c.at.xz);
         }
     }
     beginBuildingSite(house);

@@ -13,7 +13,9 @@
 // lights, rooms and haunting stay in its file.
 //
 // The traces loop over groups, never over buildings, so a new building adds
-// parts rather than code to the kernels that trace the scene. Footing and
+// parts rather than code to the kernels that trace the scene. Each turns
+// the ray into a group's frame before it meets the group, so a building
+// can stand turned from the road; a hit is turned back out to the world. Footing and
 // obstacles run inside the spider and drone kernels, where every added loop
 // costs cold compile time; each building answers them in straight-line code
 // or with a single loop over its own table.
@@ -43,20 +45,24 @@ void traceBuildingGroups(thread SceneHit &hit, float3 origin,
     groups.y = min(groups.y, min(house.counts.y, houseGroupCapacity));
     HouseWind wind = houseWind(game);
     bool found = false;
+    HouseTurn foundTurn = {0.0f, 1.0f, float2(0.0f)};
     for (uint g = groups.x; g < groups.y; ++g) {
         HouseGroup group = house.groups[g];
-        if (!houseRayEntersBox(origin, direction, group.lower.xyz,
-                group.upper.xyz, hit.distance)) {
+        HouseTurn turn = houseGroupTurn(group);
+        float3 o = houseTurnPointIn(turn, origin);
+        float3 d = houseTurnDirectionIn(turn, direction);
+        if (!houseRayEntersBox(o, d, group.lower.xyz, group.upper.xyz,
+                hit.distance)) {
             g = max(g, group.last.x);
             continue;
         }
         uint end = min(uint(group.upper.w), houseCapacity);
         for (uint i = uint(group.lower.w); i < end; ++i) {
             float3 normal;
-            float t = houseHitPart(house.parts[i], origin, direction,
-                hit.distance, normal);
+            float t = houseHitPart(house.parts[i], o, d, hit.distance,
+                normal);
             if (t < 0.0f) continue;
-            float3 p = origin + direction * t;
+            float3 p = o + d * t;
             uint style = uint(house.parts[i].lower.w);
             if (((style >= houseIron && style <= houseFrieze)
                     || style == houseCandle)
@@ -68,12 +74,18 @@ void traceBuildingGroups(thread SceneHit &hit, float3 origin,
                     > 0.5f) continue;
             hit = {t, normal, p, houseMaterialBase + style, -1, i};
             found = true;
+            foundTurn = turn;
         }
     }
-    // The nearest wall face becomes the board under it.
-    if (found && (hit.material == houseMaterialBase + houseSiding
-            || hit.material == houseMaterialBase + houseBattens))
-        houseCladdingRelief(hit, direction, game);
+    if (!found) return;
+    // The nearest wall face becomes the board under it, in its group's
+    // frame, before the hit turns back out.
+    if (hit.material == houseMaterialBase + houseSiding
+            || hit.material == houseMaterialBase + houseBattens)
+        houseCladdingRelief(hit, houseTurnDirectionIn(foundTurn, direction),
+            game);
+    hit.position = houseTurnPointOut(foundTurn, hit.position);
+    hit.normal = houseTurnDirectionOut(foundTurn, hit.normal);
 }
 
 // Adds every building's nearest surface along the ray to hit.
@@ -91,8 +103,11 @@ bool buildingsBlockLight(float3 origin, float3 direction,
     uint groups = min(house.counts.y, houseGroupCapacity);
     for (uint g = 0u; g < groups; ++g) {
         HouseGroup group = house.groups[g];
-        if (!houseRayEntersBox(origin, direction, group.lower.xyz,
-                group.upper.xyz, lightDistance)) {
+        HouseTurn turn = houseGroupTurn(group);
+        float3 o = houseTurnPointIn(turn, origin);
+        float3 d = houseTurnDirectionIn(turn, direction);
+        if (!houseRayEntersBox(o, d, group.lower.xyz, group.upper.xyz,
+                lightDistance)) {
             g = max(g, group.last.x);
             continue;
         }
@@ -102,8 +117,8 @@ bool buildingsBlockLight(float3 origin, float3 direction,
             if ((style >= houseIron && style <= houseFrieze)
                 || style == houseLantern || style == houseCandle) continue;
             float3 normal;
-            if (houseHitPart(house.parts[i], origin, direction,
-                    lightDistance, normal) > 0.0f) return true;
+            if (houseHitPart(house.parts[i], o, d, lightDistance, normal)
+                    > 0.0f) return true;
         }
     }
     return false;
@@ -120,8 +135,11 @@ float buildingsGlassCrossing(float3 origin, float3 direction, float limit,
     HouseWind wind = houseWind(game);
     for (uint g = 0u; g < groups; ++g) {
         HouseGroup group = house.groups[g];
-        if (!houseRayEntersBox(origin, direction, group.lower.xyz,
-                group.upper.xyz, limit)) {
+        HouseTurn turn = houseGroupTurn(group);
+        float3 o = houseTurnPointIn(turn, origin);
+        float3 d = houseTurnDirectionIn(turn, direction);
+        if (!houseRayEntersBox(o, d, group.lower.xyz, group.upper.xyz,
+                limit)) {
             g = max(g, group.last.x);
             continue;
         }
@@ -130,15 +148,14 @@ float buildingsGlassCrossing(float3 origin, float3 direction, float limit,
             if (uint(house.parts[i].lower.w) != houseSiding
                 || !houseSeeThrough(house.parts[i])) continue;
             float3 faceNormal;
-            float t = housePartHit(house.parts[i], origin, direction, limit,
-                faceNormal);
+            float t = housePartHit(house.parts[i], o, d, limit, faceNormal);
             if (t < 0.0f) continue;
-            HouseWindow w = houseWindow(house.parts[i], i,
-                origin + direction * t, faceNormal, 0.002f, wind);
+            HouseWindow w = houseWindow(house.parts[i], i, o + d * t,
+                faceNormal, 0.002f, wind);
             if (w.glass <= 0.5f) continue;
             nearest = t;
             limit = t;
-            normal = faceNormal;
+            normal = houseTurnDirectionOut(turn, faceNormal);
             pane = w;
         }
     }
@@ -235,25 +252,42 @@ bool buildingsBlocked(float2 p) {
         footprints = shedObstacles;
         count = shedObstacleCount;
     } else if (cottageGroundHolds(p)) {
-        local = p - cottageOrigin.xz;
+        local = cottageLocal(p);
         pad = housePlayerPad;
         footprints = cottageObstacles;
         count = cottageObstacleCount;
     } else {
-        // The street: its lamp posts, then the copies' footprints, worked
-        // out from their originals' tables as the program compiles.
+        // The street: its lamp posts, then the footprints of the copy whose
+        // ground holds p, in the copy's turned frame.
         if (streetLampBlocked(p, housePlayerPad)) return true;
-        if (!streetNearProperties(p)) return false;
-        local = p;
+        uint property = streetPropertyAt(p, local);
+        if (property >= streetPropertyCount) return false;
         pad = housePlayerPad;
-        footprints = streetObstacles;
-        count = streetObstacleCount;
+        footprints = streetObstacles + streetObstacleFirst[property];
+        count = streetObstacleFirst[property + 1u]
+            - streetObstacleFirst[property];
     }
     for (uint i = 0u; i < count; ++i) {
         float4 r = footprints[i];
         if (all(local > r.xy - pad) && all(local < r.zw + pad)) return true;
     }
     return false;
+}
+
+// ------------------------------------------------------------------- smoke
+
+// Smoke from the cottages' chimneys, over color where the opaque scene lies
+// sceneDistance along the ray. light is the light the smoke catches.
+float3 buildingsSmoke(float3 color, float3 origin, float3 direction,
+    float sceneDistance, device const GameState &game, float3 light) {
+    float gale = houseWind(game).strength;
+    for (uint i = 0u; i < streetCottageCount; ++i) {
+        float4 chimney = streetChimneys[i];
+        color = cottageSmoke(color, origin, direction, sceneDistance,
+            chimney.xyz, chimney.w, 0.37f * float(i), game.effects.x, gale,
+            light);
+    }
+    return color;
 }
 
 // ------------------------------------------------------------------- doors
@@ -266,8 +300,11 @@ constant uint doorOfHouse = 1u;
 constant uint doorOfCottage = 2u;
 constant uint doorOfBarn = 3u;
 
-// Door i as a world box; returns the building it belongs to.
-uint buildingsDoorBox(uint i, thread float3 &lower, thread float3 &upper) {
+// Door i as a box in its building's frame, which turn turns into the
+// world; returns the building it belongs to.
+uint buildingsDoorBox(uint i, thread float3 &lower, thread float3 &upper,
+    thread HouseTurn &turn) {
+    turn = {0.0f, 1.0f, float2(0.0f)};
     if (i < 2u) {
         houseFrontDoor(i, lower, upper);
         lower = houseWorld(lower);
@@ -278,6 +315,7 @@ uint buildingsDoorBox(uint i, thread float3 &lower, thread float3 &upper) {
         cottageDoor(lower, upper);
         lower += cottageOrigin;
         upper += cottageOrigin;
+        turn = cottageFrame();
         return doorOfCottage;
     }
     shedDoorLeaf(barnSpec(), i - 3u, lower, upper);
@@ -294,9 +332,11 @@ float buildingsDoorCrossing(float3 origin, float3 direction, float limit,
     door = 0u;
     for (uint i = 0u; i < buildingsDoorCount; ++i) {
         float3 lower, upper, normal;
-        uint building = buildingsDoorBox(i, lower, upper);
+        HouseTurn turn;
+        uint building = buildingsDoorBox(i, lower, upper, turn);
         // A little proud of the boards, which are traced in relief.
-        float t = pixeltje_3d::rayBox(origin, direction, lower - 0.03f,
+        float t = pixeltje_3d::rayBox(houseTurnPointIn(turn, origin),
+            houseTurnDirectionIn(turn, direction), lower - 0.03f,
             upper + 0.03f, 0.0f, normal);
         if (t < 0.0f || t > limit) continue;
         nearest = t;

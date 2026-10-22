@@ -2,8 +2,9 @@
 // each graveyard plot, at the end of its aisle, facing the gate.
 //
 // A Greek revival tomb of pale limestone, at its real size: three steps up
-// to a plinth, four chamfered columns before the door carrying an inscribed
-// entablature, and a pediment under a raking cornice with a cross on its
+// to a plinth, four plastered round columns on stone bases before the door
+// carrying a plastered, inscribed entablature, and a plastered pediment
+// under a stone raking cornice with a cross on its
 // apex and finials on its corners. Iron bars close the doorway over a dark
 // recess that glows while the house is haunted. Nobody enters it: the
 // graveyard grid hands its footprint to the walker like a grave's.
@@ -44,23 +45,23 @@ HousePart mausoleumStone(float3 lower, float3 upper) {
     return part;
 }
 
-// A column on its base under its capital, standing on the plinth at x and z
-// around o. The shaft's corners are chamfered.
+// A column on its stone base under its stone capital, standing on the
+// plinth at x and z around o: a solid round shaft rendered in plaster, with
+// a plastered ring at its foot and its neck.
 void addMausoleumColumn(device HouseModel &house, float3 o, float x,
     float z) {
     const float P = mausoleumPlinthTop, top = mausoleumEntablature - 0.22f;
+    const float bottom = P + 0.2f, radius = 0.26f;
+    const float3 up = float3(0.0f, 1.0f, 0.0f);
     float3 c = o + float3(x, 0.0f, z);
     addHouseWorldPart(house, mausoleumStone(c + float3(-0.34f, P, -0.34f),
-        c + float3(0.34f, P + 0.2f, 0.34f)));
-    HousePart shaft = mausoleumStone(c + float3(-0.25f, P + 0.2f, -0.25f),
-        c + float3(0.25f, top, 0.25f));
-    for (uint k = 0u; k < 4u; ++k) {
-        float2 corner = float2((k & 1u) != 0u ? 1.0f : -1.0f,
-            (k & 2u) != 0u ? 1.0f : -1.0f);
-        houseCut(shaft, float3(corner.x, 0.0f, corner.y),
-            c + float3(corner.x * 0.25f, 0.0f, corner.y * 0.18f));
-    }
-    addHouseWorldPart(house, shaft);
+        c + float3(0.34f, bottom, 0.34f)));
+    addHouseWorldPart(house, houseRound(c + up * (0.5f * (bottom + top)), up,
+        0.5f * (top - bottom), radius, housePlasterColumn));
+    addHouseWorldPart(house, houseRound(c + up * (bottom + 0.06f), up, 0.06f,
+        radius + 0.045f, housePlasterColumn));
+    addHouseWorldPart(house, houseRound(c + up * (top - 0.05f), up, 0.05f,
+        radius + 0.03f, housePlasterColumn));
     addHouseWorldPart(house, mausoleumStone(c + float3(-0.36f, top, -0.36f),
         c + float3(0.36f, mausoleumEntablature, 0.36f)));
 }
@@ -110,20 +111,23 @@ void addMausoleum(device HouseModel &house, float3 o) {
         addMausoleumColumn(house, o,
             (i < 2u ? -1.0f : 1.0f) * mausoleumColumnX[i % 2u],
             mausoleumColumnZ);
-    // The entablature, inscribed across its front, and the cornice.
-    HousePart entablature = mausoleumStone(
+    // The plastered entablature, inscribed across its front, and the stone
+    // cornice.
+    HousePart entablature = houseBox(
         o + float3(-mausoleumHalfSpan, E, mausoleumPedimentFront),
-        o + float3(mausoleumHalfSpan, C - 0.16f, 5.45f));
+        o + float3(mausoleumHalfSpan, C - 0.16f, 5.45f), housePlaster);
     entablature.rows = float4(0.38f, 2.0f, 0.14f, 0.0f);
     addHouseWorldPart(house, entablature);
     addHouseWorldPart(house, mausoleumStone(o + float3(-3.1f, C - 0.16f, -2.38f),
         o + float3(3.1f, C, 5.62f)));
-    // The pediment, and the raking cornice as a sloping slab over each side
-    // of it, 20 cm thick and overhanging its face and eaves.
-    addHouseWorldPart(house, houseGable(
+    // The plastered pediment, and the raking cornice as a sloping stone slab
+    // over each side of it, 20 cm thick and overhanging its face and eaves.
+    HousePart pediment = houseGable(
         o + float3(-mausoleumHalfSpan, C, mausoleumPedimentFront),
         o + float3(mausoleumHalfSpan, C + mausoleumPedimentRise, 5.45f), true,
-        houseGrave));
+        housePlaster);
+    pediment.rows = float4(0.0f);
+    addHouseWorldPart(house, pediment);
     float slope = mausoleumPedimentRise / mausoleumHalfSpan;
     float apex = C + mausoleumPedimentRise;
     for (uint side = 0u; side < 2u; ++side) {
