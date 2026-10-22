@@ -20,7 +20,7 @@ included in this repository.
 ComfyUI is a trademark of Comfy Org. Pixeltje is an independent integration
 and is not affiliated with or endorsed by Comfy Org.
 
-## Requirements
+## Requirements for building, when not using the application in the .dmg 
 
 - macOS 27 and Xcode 27 with the macOS 27 SDK
 - SwiftPM (included with Xcode)
