@@ -17,7 +17,9 @@ using namespace metal;
 // starts outside on that path, facing the house.
 // The hand, pistol, double-barrel shotgun and launcher are on keys 1 to 4
 // everywhere; the hand punches, and knocks on doors. enableDrones and
-// renderBase below switch the drones and the drawn base off for now.
+// renderBase below switch the drones and the drawn base off for now. With
+// enableDayNightTransition, each match starts at noon instead and the sun
+// sets over its first ten minutes, ending in this night.
 
 // Spider slots: two brown range spiders, the ambush spider, seven dark brown
 // hoppers, then the boss. Every slot before the boss runs the same AI.
@@ -76,6 +78,27 @@ constant float3 earthDirection = float3(-0.4019f, 0.309f, 0.8619f);
 constant float earthPower = 1.76e9f;      // irradiance 1.4 from 10 km away
 constant float3 earthColor = float3(0.78f, 0.86f, 1.0f);
 constant float earthRadius = 0.028f;      // drawn 1.6°, larger than life
+// Day into night. With enableDayNightTransition each match starts at lunar
+// noon: the sun stands high behind the path, lights the plain and the
+// houses and outshines the stars, then sinks toward the plain left of the
+// house and sets just before dayNightDuration seconds have passed, leaving
+// the earthlit night above. Set it false to keep the night from the start.
+constant bool enableDayNightTransition = true;
+// With the transition on, an Earth-like atmosphere hangs over the moon until
+// night: a soft blue sky, skylight in the shadows, haze over the distance, a
+// sun that reddens as it sets and a twilight that fades to black. Set it
+// false for the airless black sky of the real moon.
+constant bool enableAtmosphere = true;
+constant float dayNightDuration = 600.0f;  // noon to night, in seconds
+// The sun's path is a great circle from its highest point, 68° up, to the
+// horizon point where it sets, 18° left of the house seen from the start.
+// The two directions are perpendicular.
+constant float3 sunNoonDirection = float3(0.3487f, 0.9303f, -0.1134f);
+constant float3 sunsetDirection = float3(0.309f, 0.0f, 0.951f);
+constant float sunIrradiance = 3.2f;
+constant float sunPower = 4.02e9f;        // sunIrradiance from 10 km away
+constant float3 sunColor = float3(1.0f, 0.97f, 0.92f);
+constant float sunRadius = 0.012f;        // drawn 1.4°, larger than life
 constant uint droneCount = 3u;
 constant uint laserCount = 6u;
 // Switched off for now: the drones neither fly, sound, shoot nor show, and
@@ -2600,10 +2623,10 @@ float3 shadePointLight(SceneHit hit, SurfaceMaterial material,
 // The lobe and surge are milder than measured lunar values, so the plain
 // with the sun behind you is not blown out to white.
 float3 regolithReflectance(float3 normal, float3 viewDirection,
-    float3 albedo) {
-    float mu0 = max(dot(normal, earthDirection), 0.0f);
+    float3 albedo, float3 lightDirection) {
+    float mu0 = max(dot(normal, lightDirection), 0.0f);
     float mu = max(dot(normal, viewDirection), 0.0f);
-    float cosPhase = clamp(dot(earthDirection, viewDirection), -1.0f, 1.0f);
+    float cosPhase = clamp(dot(lightDirection, viewDirection), -1.0f, 1.0f);
     const float asymmetry = 0.2f;
     float lobe = (1.0f - asymmetry * asymmetry) / pow(1.0f
         + asymmetry * asymmetry - 2.0f * asymmetry * cosPhase, 1.5f);
@@ -2613,32 +2636,121 @@ float3 regolithReflectance(float3 normal, float3 viewDirection,
         * lobe * (1.0f + surge);
 }
 
-// The Earth is a point light 10 km away, so room-light shading serves it.
-// The shell, the haunted buildings and the terrain cast its shadows.
-float3 shadeEarthlight(SceneHit hit, SurfaceMaterial material,
-    float3 viewDirection, ChromePose chrome, device const GameState &game) {
-    if (dot(hit.normal, earthDirection) <= 0.0f) return float3(0.0f);
+// Where the sun stands `elapsed` seconds into the match. Strength is 1 while
+// its disc is clear of the horizon and fades to 0 as it sets; it is 0
+// throughout when the day-night transition is off.
+struct Daylight {
+    float3 direction;
+    float strength;
+};
+
+Daylight daylight(float elapsed) {
+    if (!enableDayNightTransition) return {sunsetDirection, 0.0f};
+    // Noon is a quarter turn above the sunset point. The sun's height, and
+    // so the light it puts on level ground, falls evenly over the duration
+    // and runs a little past the horizon, so the disc is fully down at the
+    // end.
+    float angle = asin(mix(1.0f, -0.1f,
+        saturate(elapsed / dayNightDuration)));
+    float3 direction = cos(angle) * sunsetDirection
+        + sin(angle) * sunNoonDirection;
+    return {direction, smoothstep(-sunRadius, sunRadius, direction.y)};
+}
+
+bool atmosphereOn() {
+    return enableDayNightTransition && enableAtmosphere;
+}
+
+// How much daylight the air still scatters: 1 by day, falling through
+// twilight to 0 when the sun is about 5° below the horizon.
+float atmosphereDay(Daylight sun) {
+    return atmosphereOn() ? smoothstep(-0.09f, 0.12f, sun.direction.y) : 0.0f;
+}
+
+// The sunlight left after its path through the air: white overhead, gold
+// and then red as the sun nears the horizon and its path lengthens.
+float3 sunTransmittance(Daylight sun) {
+    if (!atmosphereOn()) return float3(1.0f);
+    float airMass = 1.0f / (max(sun.direction.y, 0.0f) + 0.06f);
+    return exp(-float3(0.02f, 0.06f, 0.16f) * max(airMass - 1.0f, 0.0f));
+}
+
+// The sky's colour in `direction`: deep blue overhead, paler toward the
+// horizon and bright around the sun. As the sun gets low the horizon on its
+// side warms to orange, and after it sets the sky deepens to black.
+float3 atmosphereSky(float3 direction, Daylight sun) {
+    float day = atmosphereDay(sun);
+    if (day <= 0.0f) return float3(0.0f);
+    float height = sun.direction.y;
+    float horizon = pow(1.0f - saturate(direction.y), 3.0f);
+    float3 sky = mix(float3(0.045f, 0.12f, 0.36f),
+        float3(0.26f, 0.38f, 0.58f), horizon);
+    float facing = dot(direction, sun.direction);
+    float side = pow(saturate(0.5f + 0.5f * facing), 3.0f);
+    float low = 1.0f - smoothstep(-0.02f, 0.3f, height);
+    sky = mix(sky, float3(0.95f, 0.42f, 0.14f),
+        low * horizon * (0.25f + 0.75f * side));
+    // Light scattered forward around the sun, coloured by its path.
+    sky += sunColor * sunTransmittance(sun) * sun.strength
+        * (0.5f * pow(saturate(facing), 48.0f)
+            + 0.12f * pow(saturate(facing), 6.0f));
+    // Twilight fades the sky away from the sun first.
+    return sky * day * day * mix(1.0f, 0.4f + 0.6f * side, low);
+}
+
+// The light the whole sky sheds on a surface facing straight up.
+float3 atmosphereSkyLight(Daylight sun) {
+    return atmosphereSky(normalize(float3(0.0f, 0.6f, 0.8f)), sun);
+}
+
+// How brightly the plain lights what faces it, in units of the earthshine
+// it bounces at night. The sun's share follows its irradiance on level
+// ground, relative to the Earth's.
+float3 regolithBounce(Daylight sun) {
+    float sunShare = sunIrradiance * saturate(sun.direction.y) * sun.strength
+        / (1.4f * earthDirection.y);
+    return earthColor + sunColor * sunTransmittance(sun) * sunShare;
+}
+
+// The Earth and the sun are point lights 10 km away, so room-light shading
+// serves them. The shell, the haunted buildings and the terrain cast their
+// shadows.
+float3 shadeDistantLight(SceneHit hit, SurfaceMaterial material,
+    float3 viewDirection, ChromePose chrome, device const GameState &game,
+    float3 lightDirection, float3 lightColor, float power) {
+    if (dot(hit.normal, lightDirection) <= 0.0f) return float3(0.0f);
     float3 origin = hit.position + hit.normal * 0.05f;
-    if ((renderBase && (crateBlocksLight(origin, earthDirection, 1.0e4f,
+    if ((renderBase && (crateBlocksLight(origin, lightDirection, 1.0e4f,
             hullFrontLower, hullFrontUpper)
-        || crateBlocksLight(origin, earthDirection, 1.0e4f,
+        || crateBlocksLight(origin, lightDirection, 1.0e4f,
             hullRearLower, hullRearUpper)))
-        || buildingsBlockLight(origin, earthDirection, 1.0e4f, game))
+        || buildingsBlockLight(origin, lightDirection, 1.0e4f, game))
         return float3(0.0f);
     float lit = pixeltje_terrain::softShadow(MoonSurface{moonTraceDetail},
-        origin, earthDirection, 0.1f, 600.0f, moonCeiling, 10.0f, 48)
-        * droneShadow(origin, earthDirection, 1.0e4f, game);
+        origin, lightDirection, 0.1f, 600.0f, moonCeiling, 10.0f, 48)
+        * droneShadow(origin, lightDirection, 1.0e4f, game);
     if (lit <= 0.0f) return float3(0.0f);
-    PointLight earth = {hit.position + earthDirection * 1.0e4f,
-        earthColor, earthPower, false};
+    PointLight light = {hit.position + lightDirection * 1.0e4f,
+        lightColor, power, false};
     if (hit.material == 40u) {
-        float3 irradiance = earthColor * earthPower
-            / (4.0f * rangePi * 1.0e8f);
-        return lit * irradiance
-            * regolithReflectance(hit.normal, viewDirection, material.albedo);
+        float3 irradiance = lightColor * power / (4.0f * rangePi * 1.0e8f);
+        return lit * irradiance * regolithReflectance(hit.normal,
+            viewDirection, material.albedo, lightDirection);
     }
-    return lit * shadePointLight(hit, material, viewDirection, earth, chrome,
+    return lit * shadePointLight(hit, material, viewDirection, light, chrome,
         game);
+}
+
+float3 shadeDistantLights(SceneHit hit, SurfaceMaterial material,
+    float3 viewDirection, ChromePose chrome, device const GameState &game) {
+    float3 color = shadeDistantLight(hit, material, viewDirection, chrome,
+        game, earthDirection, earthColor, earthPower);
+    Daylight sun = daylight(game.effects.x);
+    if (sun.strength > 0.0f)
+        color += shadeDistantLight(hit, material, viewDirection, chrome, game,
+            sun.direction, sunColor * sunTransmittance(sun),
+            sunPower * sun.strength);
+    return color;
 }
 
 // The ghost's green light reaches surfaces on its own side of the house's
@@ -2752,9 +2864,26 @@ float3 earthDisc(float3 direction, float pixelAngle, thread float &coverage) {
     return color * coverage + halo;
 }
 
+// The sun's disc and the glare it leaves on the lens. Terrain in
+// front of it hides it as it sets; coverage hides the stars behind it.
+float3 sunDisc(float3 direction, float pixelAngle, Daylight sun,
+    thread float &coverage) {
+    coverage = 0.0f;
+    if (sun.strength <= 0.0f) return float3(0.0f);
+    // Measured from the chord, which stays precise at small angles.
+    float angle = 2.0f * asin(min(0.5f * distance(direction, sun.direction),
+        1.0f));
+    float edge = max(pixelAngle, 0.002f);
+    coverage = 1.0f - smoothstep(sunRadius - edge, sunRadius + edge, angle);
+    float glare = 0.5f * exp(-angle / 0.025f) + 0.015f * exp(-angle / 0.15f);
+    return sunColor * sunTransmittance(sun)
+        * (30.0f * coverage + glare * sun.strength);
+}
+
 // An airless black sky with fixed stars. Stars are point sources, so each
-// is drawn about one pixel (pixelAngle radians) wide.
-float3 spaceSky(float3 direction, float pixelAngle) {
+// is drawn about one pixel (pixelAngle radians) wide. In daylight the lit
+// plain outshines them: visibility fades them out.
+float3 spaceSky(float3 direction, float pixelAngle, float visibility) {
     float3 color = float3(0.0f);
     // Stars sit in equal-angle cells on the six faces of a cube, which has
     // no pole or seam to stretch them. Each face-local frame is a signed axis
@@ -2781,7 +2910,8 @@ float3 spaceSky(float3 direction, float pixelAngle) {
     float2 t = tan((cell + 0.5f) * cellAngle);
     float solidAngle = (1.0f + t.x * t.x) * (1.0f + t.y * t.y)
         * pow(1.0f + dot(t, t), -1.5f);
-    if (pixeltje_terrain::hash(key, 71.0f) > 0.14f * solidAngle)
+    if (visibility <= 0.0f
+        || pixeltje_terrain::hash(key, 71.0f) > 0.14f * solidAngle)
         return color;
     // Centres stay a quarter cell from the edges, and the width is capped so
     // four sigma fits there even in the narrowest (0.71×) cells: no star is
@@ -2801,7 +2931,8 @@ float3 spaceSky(float3 direction, float pixelAngle) {
             temperature * 2.0f)
         : mix(float3(1.0f, 0.96f, 0.90f), float3(0.74f, 0.84f, 1.0f),
             temperature * 2.0f - 1.0f);
-    return color + tint * flux * exp(-0.5f * d * d / (sigma * sigma));
+    return color + visibility * tint * flux
+        * exp(-0.5f * d * d / (sigma * sigma));
 }
 
 // The latest shot lights the room twice: from the muzzle while the flash
@@ -3465,13 +3596,16 @@ SurfaceMaterial gunMaterial(GunHit hit) {
 
 // What the pistol mirrors from `origin`: indoors the tiled floor below, dark
 // walls around the horizon and a dim ceiling; on the moon earthlit regolith
-// under a black sky. Lamps and the Earth add their own highlights. `detail`
-// is 0 on curved edges, where the grout would alias.
+// under a black sky, brighter by day and under the blue sky while there is
+// one. Lamps, the Earth and the sun add their own highlights. `detail` is 0
+// on curved edges, where the grout would alias.
 // shortcut: the floor is the plane y = 0, so stairs mirror as flat tiles.
 float3 pistolSurroundings(float3 origin, float3 direction, bool outside,
-    float detail) {
-    if (outside) return earthColor * 0.08f
-        * smoothstep(0.04f, -0.04f, direction.y);
+    float detail, Daylight sun) {
+    if (outside) return regolithBounce(sun) * 0.08f
+            * smoothstep(0.04f, -0.04f, direction.y)
+        + atmosphereSky(direction, sun)
+            * smoothstep(-0.04f, 0.04f, direction.y);
     float3 wall = float3(0.035f, 0.04f, 0.048f);
     if (direction.y >= 0.0f) return mix(wall, float3(0.014f, 0.016f, 0.02f),
         smoothstep(0.0f, 0.5f, direction.y));
@@ -3485,8 +3619,8 @@ float3 pistolSurroundings(float3 origin, float3 direction, bool outside,
 }
 
 // The viewmodel is lit by the same lights as the scene it moves through: the
-// room lights in the base, the lamps in the haunted house, and the Earth and
-// the lanterns on the moon.
+// room lights in the base, the lamps in the haunted house, and the Earth,
+// the sun and the lanterns on the moon.
 float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
     float3 right, float3 up, float3 front, float3 direction,
     ChromePose chrome, device const GameState &game) {
@@ -3500,6 +3634,8 @@ float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
         : (gun.part >= 6u ? shotgunMaterial(gun) : gunMaterial(gun));
     bool inHouse = houseInteriorPoint(eye);
     bool outside = outdoors(eye.xz, 0.0f) && !inHouse;
+    Daylight sun = daylight(game.effects.x);
+    float3 bounce = regolithBounce(sun);
     float3 color = material.albedo * (1.0f - material.metallic)
             * float3(0.030f, 0.038f, 0.046f)
         + material.albedo * material.metallic
@@ -3516,16 +3652,20 @@ float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
                 * float3(0.030f, 0.038f, 0.046f)
             + sheen * pistolSurroundings(hit.position, mirrored, outside,
                 smoothstep(0.97f, 0.995f, max(abs(gun.normal.x),
-                    max(abs(gun.normal.y), abs(gun.normal.z)))));
+                    max(abs(gun.normal.y), abs(gun.normal.z)))), sun);
     if (outside) {
-        // Regolith bounces earthshine up onto the underside.
-        color += material.albedo * earthColor * 0.02f
+        // Regolith bounces earthshine and sunlight up onto the underside.
+        color += material.albedo * bounce * 0.02f
             * saturate(-hit.normal.y);
+        color += material.albedo * (1.0f - material.metallic)
+            * atmosphereSkyLight(sun) * 0.5f
+            * saturate(0.5f + 0.5f * hit.normal.y);
         // The Earth is a broad disc, not a point: its glint on the polished
-        // slide spreads instead of burning a white spot.
+        // slide spreads instead of burning a white spot. The sun's glint
+        // spreads the same way.
         SurfaceMaterial broad = material;
         broad.roughness = max(material.roughness, 0.45f);
-        color += shadeEarthlight(hit, broad, -direction, chrome, game);
+        color += shadeDistantLights(hit, broad, -direction, chrome, game);
         color += houseOutdoorLighting(hit, material, -direction, chrome, game);
     } else for (uint i = 0u; i < (inHouse ? houseIndoorLightCount : 8u);
         ++i) {
@@ -3630,18 +3770,23 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     bool houseIndoors = house && houseInteriorPoint(hit.position);
     bool exterior = hit.material == 40u || hit.material == 41u || drone
         || (house && !houseIndoors);
-    // The moon has no sky light, only earthshine bounced off the plain,
-    // which reaches slopes, boulder sides and walls more than ground or
-    // roofs facing the sky. The house's rooms keep a warm glow.
+    // The airless moon has no sky light, only earthshine and sunlight
+    // bounced off the plain, which reach slopes, boulder sides and walls more
+    // than ground or roofs facing the sky. While there is an atmosphere, its
+    // blue sky lights what faces it too, most of all ground and roofs. The
+    // house's rooms keep a warm glow.
+    Daylight sun = daylight(game.effects.x);
     float3 ambient = exterior
-        ? earthColor * (0.004f + 0.045f * (1.0f - hit.normal.y))
+        ? regolithBounce(sun) * (0.004f + 0.045f * (1.0f - hit.normal.y))
+            + atmosphereSkyLight(sun) * 0.5f
+                * saturate(0.5f + 0.5f * hit.normal.y)
         : (houseIndoors ? float3(0.014f, 0.01f, 0.007f)
             : float3(0.030f, 0.038f, 0.046f));
     float3 color = material.emission
         + material.albedo * (1.0f - material.metallic) * ambient;
     if (drone) color += droneEmission(hit, game);
     if (exterior) {
-        color += shadeEarthlight(hit, material, -direction, chrome, game);
+        color += shadeDistantLights(hit, material, -direction, chrome, game);
         color += houseOutdoorLighting(hit, material, -direction, chrome,
             game);
     } else if (houseIndoors) {
@@ -3654,7 +3799,15 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         float pixelAngle = 1.0f / (lensFocal * u.resolutionTime.y);
         float earth;
         float3 disc = earthDisc(direction, pixelAngle, earth);
-        color = spaceSky(direction, pixelAngle) * (1.0f - earth) + disc;
+        float sunCover;
+        disc += sunDisc(direction, pixelAngle, sun, sunCover);
+        // Daylight outshines the stars; a sky outshines them until night.
+        float daylit = atmosphereOn()
+            ? smoothstep(0.0f, 0.1f, atmosphereDay(sun))
+            : sun.strength * smoothstep(-0.02f, 0.15f, sun.direction.y);
+        float stars = (1.0f - earth) * (1.0f - sunCover) * (1.0f - daylit);
+        color = spaceSky(direction, pixelAngle, stars) + disc
+            + atmosphereSky(direction, sun);
     }
     color += shadeShotLights(hit, material, -direction, chrome, game);
     color += shadeOrdnanceLights(hit, material, -direction, chrome, game);
@@ -3717,9 +3870,14 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         || hit.material == sentrySensorMaterial
         || (drone && droneFlying(game, hit.variant))))
         color += float3(0.6f) * max(dot(hit.normal, -direction), 0.25f);
-    // There is no haze in vacuum.
+    // There is no haze in vacuum. With an atmosphere, the distance outside
+    // fades toward the sky behind it, less as the daylight goes.
     if (!exterior && hit.material != 0u)
         color = mix(color, float3(0.0f), 1.0f - exp(-hit.distance * 0.008f));
+    else if (exterior && atmosphereOn())
+        color = mix(color, atmosphereSky(normalize(float3(direction.x,
+                max(direction.y, 0.02f), direction.z)), sun),
+            (1.0f - exp(-hit.distance / 2200.0f)) * atmosphereDay(sun));
     // The ground floor's windows are real glass: what lies beyond was traced
     // through them, and the pane tints, smears and reflects it.
     float3 paneNormal;
