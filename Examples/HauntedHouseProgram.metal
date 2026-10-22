@@ -308,7 +308,8 @@ struct HouseModel {
     // The doors a knock opens: when the house's pair and the cottage's door
     // begin to swing open (negative while shut), and 1 in z and w once
     // each has sounded. Then the parts that hold the house's west and east
-    // leaves and the cottage's door, which buildingsHangDoors rehangs.
+    // leaves, the cottage's door and the pressure plate under the house's
+    // pair, which buildingsHangDoors rehangs.
     float4 doors;
     uint4 doorParts;
     float4 candles[houseCandleCapacity];  // flame XYZ, room
@@ -383,6 +384,11 @@ struct GameState {
     float4 lens;            // autofocus distance (0 until the first frame),
                             // elapsed time it was last pulled; unused
     float4 hand;            // the hand's swing; see SignalRangeHand.metal
+    // The house's front doors swing shut once nobody has stood on the
+    // pressure plate under them for a while: when they began to swing shut
+    // (negative while they are not), how far open they stood then, when
+    // the plate was last pressed, and 1 while it is pressed.
+    float4 frontDoors;
 };
 
 static_assert(sizeof(GameState) <= 262144,
@@ -1736,14 +1742,66 @@ bool landPunch(device GameState &game, ShotTrace trace, float3 eye,
     return true;
 }
 
+// True while the walker stands on the pressure plate under the house's
+// front doors, not while in the air over it, or a spider does.
+bool frontDoorPlatePressed(device const GameState &game) {
+    if (houseOnDoorPlate(game.player.xyz - float3(0.0f, 1.55f, 0.0f),
+            housePlayerPad))
+        return true;
+    float floorY = houseWorld(float3(0.0f, houseFloorY, 0.0f)).y;
+    for (uint i = 0u; i < enemyCount; ++i)
+        if (spiderActive(game, i) && houseOnDoorPlate(
+                float3(game.enemy[i].x, floorY, game.enemy[i].z), 0.5f))
+            return true;
+    return false;
+}
+
+// The house's front doors, once open, stay open while anyone stands on the
+// pressure plate under them, and the ghost holds them from when the green
+// glow snaps on until it is out past the plate: they burst open for it if
+// nobody knocked them open first. When the plate has been empty for
+// buildingsHouseDoorsHold seconds they swing shut with the same groan, and
+// a step onto the plate or a knock while they close swings them back.
+// Shut, they wait for a knock again.
+void swingFrontDoors(device GameState &game, device RangeAudio &audio) {
+    float time = game.effects.x;
+    float3 ghost = game.house.haunt.yzw;
+    float floorY = houseWorld(float3(0.0f, houseFloorY, 0.0f)).y;
+    bool ghostHolds = houseHauntAge(game) >= houseGreenOn
+        && game.house.hauntMotion.w < 0.0f && (houseInteriorPoint(ghost)
+            || houseOnDoorPlate(float3(ghost.x, floorY, ghost.z), 0.6f));
+    bool pressed = frontDoorPlatePressed(game);
+    game.frontDoors.w = pressed ? 1.0f : 0.0f;
+    bool held = pressed || ghostHolds;
+    if (held) game.frontDoors.z = time;
+    float opened = game.house.doors.x;
+    if (opened < 0.0f) {
+        if (ghostHolds) game.house.doors.x = time;
+        return;
+    }
+    if (game.frontDoors.x >= 0.0f) {
+        if (held) {
+            buildingsReopenFrontDoors(game);
+        } else if (buildingsDoorOpen(game, 0u) <= 0.0f) {
+            // Shut against each other: the latch catches again.
+            game.house.doors.xz = float2(-100.0f, 0.0f);
+            game.frontDoors.x = -100.0f;
+        }
+        return;
+    }
+    float open = opened + buildingsHouseDoorsSwing;
+    if (time >= open
+        && time - max(game.frontDoors.z, open) >= buildingsHouseDoorsHold) {
+        game.frontDoors.xy = float2(time, buildingsDoorOpen(game, 0u));
+        audio.houseDoors += 1u;
+    }
+}
+
 // The doors a knock opens swing on their own time, each sounding as it
-// starts to move: the cottage's creaks, the house's pair groans. The
-// house's doors also burst open for its ghost when the green glow snaps
-// on, if nobody knocked them open first.
+// starts to move: the cottage's creaks, the house's pair groans.
 void swingDoors(device GameState &game, device RangeAudio &audio) {
     float time = game.effects.x;
-    if (houseHauntAge(game) >= houseGreenOn && game.house.doors.x < 0.0f)
-        game.house.doors.x = time;
+    swingFrontDoors(game, audio);
     float4 doors = game.house.doors;
     if (doors.x >= 0.0f && time >= doors.x && doors.z < 0.5f) {
         audio.houseDoors += 1u;

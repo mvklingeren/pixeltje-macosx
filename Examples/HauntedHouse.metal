@@ -122,6 +122,30 @@ HousePart houseFrontDoor(uint side, float open) {
         open * 0.5f * M_PI_F, houseTrim);
 }
 
+// The pressure plate under the front doors: an iron plate let into the
+// floor over the threshold and the boards the leaves swing across, in
+// house-local units. It stands a little proud of the floor until someone
+// steps on it, then sinks almost flush.
+constant float housePlateHalfWidth = houseDoorHalfWidth - 0.02f;
+constant float2 housePlateZ = float2(-5.98f, -4.75f);
+
+HousePart houseDoorPlate(bool pressed) {
+    return houseBox(float3(-housePlateHalfWidth, houseFloorY - 0.01f,
+            housePlateZ.x),
+        float3(housePlateHalfWidth, houseFloorY + (pressed ? 0.003f : 0.012f),
+            housePlateZ.y), houseCastIron);
+}
+
+// True where a body of radius pad, in metres, with its feet at the world
+// point feet stands on the plate.
+bool houseOnDoorPlate(float3 feet, float pad) {
+    float3 local = houseLocal(feet);
+    pad /= houseScale;
+    return abs(local.x) < housePlateHalfWidth + pad
+        && local.z > housePlateZ.x - pad && local.z < housePlateZ.y + pad
+        && abs(local.y - houseFloorY) < 0.3f;
+}
+
 // A house-local part scaled into the world. Window sizes stay in local
 // units; houseWindow measures in them.
 HousePart houseWorldPart(HousePart part) {
@@ -969,6 +993,10 @@ void buildHouseRooms(device HouseModel &house) {
         house.doorParts[side] = house.counts.x;
         addHousePart(house, houseFrontDoor(side, 0.0f));
     }
+    // The pressure plate under them holds them open while anyone stands
+    // on it; buildingsHangDoors sinks it under their weight.
+    house.doorParts.w = house.counts.x;
+    addHousePart(house, houseDoorPlate(false));
     addHousePart(house, houseBox(float3(-houseDoorHalfWidth,
         F + houseDoorHeight, -6.0f), float3(houseDoorHalfWidth, L, -5.7f),
         houseSiding));
