@@ -173,6 +173,14 @@ actor PipelineGPUProgram {
     let sceneRequest: Int64
   }
 
+  private struct Writes {
+    var buffers: Set<Int> = []
+    var textures: Set<Int> = []
+  }
+
+  /// Declared resources per program. Memory stays bounded by the 128 MiB
+  /// total and each pass by its 1–15 binding slots.
+  static let maximumResources = 256
   /// Audio buffers are small; events and voices share them by word.
   private static let maximumAudioBufferBytes = 256
   private static let maximumAudioEvents = 16
@@ -195,6 +203,13 @@ actor PipelineGPUProgram {
   private var cachedLibrary: (source: String, library: any MTLLibrary)?
   private var computePipelines: [String: any MTLComputePipelineState] = [:]
   private var renderPipelines: [String: any MTLRenderPipelineState] = [:]
+  /// The binding slots each pipeline's shader can write, from Metal's
+  /// reflection; nil where Metal reported none, which counts as all of them.
+  private var computeWrites: [String: Writes?] = [:]
+  private var renderWrites: [String: (vertex: Writes?, fragment: Writes?)] = [:]
+  /// Nodes with a frame in progress. A second frame of the same node while
+  /// one renders copies all of its state rather than sharing scratch textures.
+  private var rendering: Set<PipelineNodeID> = []
   private var liveRunID: UUID?
   private var liveNodeID: PipelineNodeID?
   private var liveFrame: PipelineMetalPreviewFrame?
@@ -540,6 +555,8 @@ actor PipelineGPUProgram {
       cachedLibrary = (source, library)
       computePipelines = [:]
       renderPipelines = [:]
+      computeWrites = [:]
+      renderWrites = [:]
     }
     let previous = committed[node.id]
     let base = previous?.identity == identity && previous!.nextFrame <= frame
@@ -548,12 +565,18 @@ actor PipelineGPUProgram {
       throw PipelineEngineError.invalidInvocation(
         "GPU Program can replay at most 3,600 frames per call.")
     }
+    let exclusive = rendering.insert(node.id).inserted
+    defer { if exclusive { rendering.remove(node.id) } }
     var working: Session
     if let base {
       let cloneStartedAt = DispatchTime.now().uptimeNanoseconds
+      let unchanged = sharedResources(definition)
       working = Session(identity: identity,
         resources: try await clone(base.resources,
-          excluding: directPreview ? definition.output : nil), nextFrame: base.nextFrame)
+          excluding: directPreview ? definition.output : nil,
+          sharing: exclusive ? unchanged.readOnly.union(unchanged.scratch)
+            : unchanged.readOnly),
+        nextFrame: base.nextFrame)
       currentPerformance?.cloneSeconds = Self.seconds(since: cloneStartedAt)
     } else {
       working = Session(identity: identity,
@@ -834,7 +857,8 @@ actor PipelineGPUProgram {
     func fail(_ message: String) -> PipelineEngineError {
       .invalidInvocation("GPU Program: \(message)")
     }
-    guard (1...2).contains(program.version), (1...12).contains(program.resources.count),
+    guard (1...2).contains(program.version),
+      (1...maximumResources).contains(program.resources.count),
       program.initialize.count <= 16, (1...16).contains(program.tick.count),
       (1...16).contains(program.present.count), program.swaps.count <= 8,
       (program.parameters?.count ?? 0) <= 16 else {
@@ -1069,8 +1093,73 @@ actor PipelineGPUProgram {
     return result
   }
 
+  /// Resources a frame never has to copy. Read-only ones keep what
+  /// initialize wrote: no tick or present pass can write them, and the CPU
+  /// does not write them between frames. Scratch textures are cleared by the
+  /// first pass that touches them in every frame, so no frame sees another's
+  /// contents. Only what Metal reports as read-only counts as unwritten.
+  private func sharedResources(_ program: Definition)
+    -> (readOnly: Set<String>, scratch: Set<String>) {
+    var written: Set<String> = [program.output]
+    if let name = program.sceneRequestBuffer { written.insert(name) }
+    for event in program.audioEvents ?? [] { written.insert(event.buffer) }
+    let swapped = Set(program.swaps.flatMap { $0 })
+    written.formUnion(swapped)
+    func mark(_ mapping: [String: String]?, _ slots: Set<Int>?) {
+      for (slot, name) in mapping ?? [:] {
+        guard let slots, let index = Int(slot), !slots.contains(index) else {
+          written.insert(name)
+          continue
+        }
+      }
+    }
+    let passes = program.tick + program.present
+    for pass in passes {
+      if pass.kind == "compute" {
+        let writes = computeWrites[pass.function!] ?? nil
+        mark(pass.buffers, writes?.buffers)
+        mark(pass.textures, writes?.textures)
+      } else {
+        written.insert(pass.target!)
+        let writes = renderWrites[
+          "\(pass.vertex!)|\(pass.fragment!)|\(pass.blend ?? "replace")"]
+        mark(pass.vertexBuffers, writes?.vertex?.buffers)
+        mark(pass.fragmentBuffers, writes?.fragment?.buffers)
+        mark(pass.vertexTextures, writes?.vertex?.textures)
+        mark(pass.fragmentTextures, writes?.fragment?.textures)
+      }
+    }
+    let readOnly = Set(program.resources.filter {
+      ($0.kind == "buffer" || $0.kind == "texture") && !written.contains($0.name)
+    }.map(\.name))
+    func reads(_ pass: Definition.Pass, _ name: String) -> Bool {
+      [pass.textures, pass.vertexTextures, pass.fragmentTextures].contains {
+        $0?.values.contains(name) == true
+      }
+    }
+    var scratch = Set<String>()
+    for resource in program.resources where resource.kind == "texture"
+      && resource.name != program.output && !swapped.contains(resource.name) {
+      guard let first = passes.first(where: {
+        $0.target == resource.name || reads($0, resource.name)
+      }), first.kind == "render", first.target == resource.name,
+        first.load != "load", !reads(first, resource.name) else { continue }
+      scratch.insert(resource.name)
+    }
+    return (readOnly, scratch)
+  }
+
+  /// Which of a program's resources frames share instead of copying, as
+  /// far as the pipelines built so far tell.
+  func sharedResourceNames(programJSON: String) throws
+    -> (readOnly: Set<String>, scratch: Set<String>) {
+    try sharedResources(JSONDecoder().decode(Definition.self,
+      from: Data(programJSON.utf8)))
+  }
+
   private func clone(_ resources: [String: Resource],
-    excluding excluded: String? = nil) async throws -> [String: Resource] {
+    excluding excluded: String? = nil,
+    sharing shared: Set<String> = []) async throws -> [String: Resource] {
     var copies: [String: Resource] = [:]
     var command: (any MTLCommandBuffer)?
     var blit: (any MTLBlitCommandEncoder)?
@@ -1086,6 +1175,10 @@ actor PipelineGPUProgram {
     }
     for (name, resource) in resources {
       if name == excluded { continue }
+      if shared.contains(name) {
+        copies[name] = resource
+        continue
+      }
       switch resource {
       case .buffer(let source):
         guard let copy = queue.device.makeBuffer(length: source.length,
@@ -1188,8 +1281,11 @@ actor PipelineGPUProgram {
         let pipeline: any MTLComputePipelineState
         if let cached = computePipelines[pass.function!] { pipeline = cached }
         else {
-          pipeline = try await queue.device.makeComputePipelineState(function: function)
+          let (created, reflection) = try await queue.device.makeComputePipelineState(
+            function: function, options: .bindingInfo)
+          pipeline = created
           computePipelines[pass.function!] = pipeline
+          computeWrites[pass.function!] = Self.writes(reflection?.bindings)
         }
         encoder.setComputePipelineState(pipeline)
         encoder.setBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 0)
@@ -1236,8 +1332,12 @@ actor PipelineGPUProgram {
         let pipeline: any MTLRenderPipelineState
         if let cached = renderPipelines[key] { pipeline = cached }
         else {
-          pipeline = try await queue.device.makeRenderPipelineState(descriptor: descriptor)
+          let (created, reflection) = try await queue.device.makeRenderPipelineState(
+            descriptor: descriptor, options: .bindingInfo)
+          pipeline = created
           renderPipelines[key] = pipeline
+          renderWrites[key] = (Self.writes(reflection?.vertexBindings),
+            Self.writes(reflection?.fragmentBindings))
         }
         let render = MTLRenderPassDescriptor()
         render.colorAttachments[0].texture = target
@@ -1268,6 +1368,19 @@ actor PipelineGPUProgram {
       }
     }
     try await finish(command)
+  }
+
+  private static func writes(_ bindings: [any MTLBinding]?) -> Writes? {
+    guard let bindings else { return nil }
+    var writes = Writes()
+    for binding in bindings where binding.access != .readOnly {
+      switch binding.type {
+      case .buffer: writes.buffers.insert(binding.index)
+      case .texture: writes.textures.insert(binding.index)
+      default: break
+      }
+    }
+    return writes
   }
 
   private func bindBuffers(_ mapping: [String: String]?,

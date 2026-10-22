@@ -274,6 +274,26 @@ private func audioVoiceTestProgram(bytes: Int = 32, eventWord: Int = 0,
   }
 }
 
+@Test func gpuProgramAcceptsUpToTheResourceLimit() async throws {
+  let device = try #require(MTLCreateSystemDefaultDevice())
+  let runner = PipelineGPUProgram(commandQueue: try #require(device.makeCommandQueue()))
+  func program(resources count: Int) -> String {
+    let buffers = (1..<count).map { "{\"name\":\"b\($0)\",\"kind\":\"buffer\",\"bytes\":4}" }
+    return audioVoiceTestProgram().replacingOccurrences(
+      of: "{\"name\":\"display\",\"kind\":\"texture\"}",
+      with: (["{\"name\":\"display\",\"kind\":\"texture\"}"] + buffers.dropFirst())
+        .joined(separator: ","))
+  }
+  try await runner.validateLiteral(
+    programJSON: program(resources: PipelineGPUProgram.maximumResources),
+    source: audioVoiceTestSource)
+  await #expect(throws: PipelineEngineError.self) {
+    try await runner.validateLiteral(
+      programJSON: program(resources: PipelineGPUProgram.maximumResources + 1),
+      source: audioVoiceTestSource)
+  }
+}
+
 @Test func gpuProgramAudioVoicesLoopAnAssetOrPlayAValidSynth() async throws {
   let device = try #require(MTLCreateSystemDefaultDevice())
   let runner = PipelineGPUProgram(commandQueue: try #require(device.makeCommandQueue()))
@@ -672,4 +692,79 @@ private func audioVoiceTestProgram(bytes: Int = 32, eventWord: Int = 0,
   let attack = try await frame(1, x: 0.5, y: 0.5,
     actionCount: 1, runID: attackRun)
   #expect(attack.planarRGB != idle.planarRGB)
+}
+
+private let sharedStateTestSource = """
+  #include <metal_stdlib>
+  using namespace metal;
+  struct U { float4 a; uint4 frame; float4 p[4]; float4 b; float4 c; };
+  struct V { float4 position [[position]]; float2 uv; };
+  kernel void fillTable(device float4 *table [[buffer(1)]]) {
+    table[0] = float4(0.25f, 0.5f, 0.75f, 1.0f);
+  }
+  kernel void step(device uint *state [[buffer(1)]]) { state[0] += 1u; }
+  vertex V screen(uint id [[vertex_id]]) {
+    float2 uv = float2((id << 1) & 2, id & 2);
+    return {float4(uv * 2.0f - 1.0f, 0.0f, 1.0f), uv};
+  }
+  fragment float4 paint(V in [[stage_in]], device const float4 *table [[buffer(1)]],
+    device const uint *state [[buffer(2)]]) {
+    return table[0] * float(state[0] % 5u) / 4.0f;
+  }
+  fragment float4 show(V in [[stage_in]], texture2d<float> scratch [[texture(1)]]) {
+    return scratch.read(uint2(in.position.xy));
+  }
+  """
+
+private let sharedStateTestProgram = """
+  {"version":1,"resources":[{"name":"table","kind":"buffer","bytes":16},
+  {"name":"state","kind":"buffer","bytes":4},{"name":"scratch","kind":"texture"},
+  {"name":"display","kind":"texture"}],
+  "initialize":[{"kind":"compute","function":"fillTable","threads":[1],
+  "buffers":{"1":"table"}}],
+  "tick":[{"kind":"compute","function":"step","threads":[1],"buffers":{"1":"state"}}],
+  "present":[{"kind":"render","vertex":"screen","fragment":"paint","target":"scratch",
+  "load":"clear","vertexCount":3,"fragmentBuffers":{"1":"table","2":"state"}},
+  {"kind":"render","vertex":"screen","fragment":"show","target":"display",
+  "load":"clear","vertexCount":3,"fragmentTextures":{"1":"scratch"}}],
+  "swaps":[],"output":"display"}
+  """
+
+@Test func gpuProgramFramesShareOnlyStateTheyCannotChange() async throws {
+  let device = try #require(MTLCreateSystemDefaultDevice())
+  let runner = PipelineGPUProgram(commandQueue: try #require(device.makeCommandQueue()))
+  let node = PipelineNode(id: .init(rawValue: "program"), kind: .gpuProgram,
+    parameters: ["framesPerSecond": .number(30), "seed": .integer(1)])
+  let inputs: [String: PipelineNodeValue] = [
+    "program": .init(sharedStateTestProgram, type: .string),
+    "source": .init(sharedStateTestSource, type: .string),
+    "width": .init(Int64(8), type: .integer),
+    "height": .init(Int64(8), type: .integer),
+  ]
+  let executor = PipelineGPUProgram.executor(runner: runner)
+  let runID = UUID()
+  func frame(_ index: Int64) async throws -> [Float] {
+    let context = PipelineNodeExecutionContext(semanticSHA256: "shared-state",
+      invocation: .init(values: [PipelineInvocation.loopCallIndexKey: .integer(index)]),
+      sourceMediaRoot: nil, packageRootsByID: [:], nodeIndex: 0,
+      nodeCount: 1, progress: { _ in }, runID: runID)
+    let output = try await executor.execute(node, inputs: inputs, context: context)
+    return try #require(output.outputs["image"]?.value(as: PipelineImageInput.self)).rgba
+  }
+  let first = try await frame(0)
+  await runner.commit(runID: runID)
+  let shared = try await runner.sharedResourceNames(programJSON: sharedStateTestProgram)
+  #expect(shared.readOnly == ["table"])
+  #expect(shared.scratch == ["scratch"])
+
+  // A discarded frame leaves no trace in the state the next attempt starts from.
+  let second = try await frame(1)
+  #expect(second != first)
+  await runner.discard(runID: runID)
+  #expect(try await frame(1) == second)
+  await runner.commit(runID: runID)
+  let third = try await frame(2)
+  #expect(third != second)
+  // Three ticks: the table's colour at 3/4, premultiplied by its alpha.
+  #expect(abs(third[0] - 0.25 * 0.75 * 0.75) < 0.002)
 }
