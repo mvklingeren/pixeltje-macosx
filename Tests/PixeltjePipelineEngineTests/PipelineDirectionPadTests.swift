@@ -54,10 +54,11 @@ import Testing
   #expect(PipelineDirectionPadKeys.bit(for: "z") == 64)
   #expect(PipelineDirectionPadKeys.bit(for: "1") == 128)
   #expect(PipelineDirectionPadKeys.bit(for: "9") == 32_768)
+  #expect(PipelineDirectionPadKeys.bit(for: "H") == 65_536)
   #expect(PipelineDirectionPadKeys.bit(for: "w") == nil)
   #expect(PipelineDirectionPadKeys.bit(for: "f") == nil)
   #expect(PipelineDirectionPadKeys.bit(for: "j") == nil)
-  #expect(PipelineDirectionPadKeys.allMask == 65_535)
+  #expect(PipelineDirectionPadKeys.allMask == 131_071)
 
   #expect(try await keys(.init()) == 0)
   let held = PipelineDirectionPadKeys.bit(for: "e")! | PipelineDirectionPadKeys.bit(for: "2")!

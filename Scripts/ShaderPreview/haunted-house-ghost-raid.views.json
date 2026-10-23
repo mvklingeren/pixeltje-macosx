@@ -1,0 +1,901 @@
+{
+  "width": 800,
+  "height": 500,
+  "views": [
+    {
+      "name": "palm-turn",
+      "frames": 14,
+      "parameters": {
+        "timeOfDay": 900
+      },
+      "inputs": [
+        {
+          "frame": 0,
+          "movement": [
+            0,
+            0,
+            0,
+            65536
+          ]
+        },
+        {
+          "frame": 1,
+          "movement": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "frame": 2,
+          "movement": [
+            0,
+            0,
+            0,
+            65536
+          ]
+        },
+        {
+          "frame": 3,
+          "movement": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "frame": 4,
+          "movement": [
+            0,
+            0,
+            0,
+            65536
+          ]
+        },
+        {
+          "frame": 5,
+          "movement": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            90,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.04
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            100
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8768,
+          "floats": [
+            3,
+            1,
+            2,
+            0
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8800,
+          "floats": [
+            3,
+            0,
+            99,
+            1
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 9552,
+          "floats": [
+            96.1,
+            0,
+            2.5,
+            119
+          ]
+        }
+      ]
+    },
+    {
+      "name": "finger-raised",
+      "frames": 32,
+      "parameters": {
+        "timeOfDay": 900
+      },
+      "inputs": [
+        {
+          "frame": 0,
+          "movement": [
+            0,
+            0,
+            0,
+            65536
+          ]
+        },
+        {
+          "frame": 1,
+          "movement": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "frame": 2,
+          "movement": [
+            0,
+            0,
+            0,
+            65536
+          ]
+        },
+        {
+          "frame": 3,
+          "movement": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "frame": 4,
+          "movement": [
+            0,
+            0,
+            0,
+            65536
+          ]
+        },
+        {
+          "frame": 5,
+          "movement": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            90,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.04
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            100
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8768,
+          "floats": [
+            3,
+            1,
+            2,
+            0
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8800,
+          "floats": [
+            3,
+            0,
+            99,
+            1
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 9552,
+          "floats": [
+            96.1,
+            0,
+            2.5,
+            119
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ghost-taunt",
+      "frames": 19,
+      "parameters": {
+        "timeOfDay": 1110
+      },
+      "inputs": [
+        {
+          "frame": 0,
+          "movement": [
+            0,
+            0,
+            0,
+            65536
+          ]
+        },
+        {
+          "frame": 1,
+          "movement": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "frame": 2,
+          "movement": [
+            0,
+            0,
+            0,
+            65536
+          ]
+        },
+        {
+          "frame": 3,
+          "movement": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "frame": 4,
+          "movement": [
+            0,
+            0,
+            0,
+            65536
+          ]
+        },
+        {
+          "frame": 5,
+          "movement": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            113,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.04
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            100
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8768,
+          "floats": [
+            3,
+            1,
+            2,
+            0
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8800,
+          "floats": [
+            3,
+            0,
+            99,
+            1
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 9552,
+          "floats": [
+            96.1,
+            0,
+            2.5,
+            119
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bat-dive",
+      "frames": 105,
+      "parameters": {
+        "timeOfDay": 1110
+      },
+      "pointer": [
+        0.5,
+        0.26,
+        0,
+        0
+      ],
+      "inputs": [
+        {
+          "frame": 0,
+          "movement": [
+            0,
+            0,
+            0,
+            65536
+          ]
+        },
+        {
+          "frame": 1,
+          "movement": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "frame": 2,
+          "movement": [
+            0,
+            0,
+            0,
+            65536
+          ]
+        },
+        {
+          "frame": 3,
+          "movement": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "frame": 4,
+          "movement": [
+            0,
+            0,
+            0,
+            65536
+          ]
+        },
+        {
+          "frame": 5,
+          "movement": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            90,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.04
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            100
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8768,
+          "floats": [
+            3,
+            1,
+            2,
+            0
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8800,
+          "floats": [
+            3,
+            0,
+            99,
+            1
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 9552,
+          "floats": [
+            96.1,
+            0,
+            2.5,
+            119
+          ]
+        }
+      ]
+    },
+    {
+      "name": "shotgun-defense",
+      "frames": 67,
+      "parameters": {
+        "timeOfDay": 1110
+      },
+      "pointer": [
+        0.5,
+        0.1,
+        0,
+        0
+      ],
+      "inputs": [
+        {
+          "frame": 0,
+          "movement": [
+            0,
+            0,
+            0,
+            65536
+          ]
+        },
+        {
+          "frame": 1,
+          "movement": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "frame": 2,
+          "movement": [
+            0,
+            0,
+            0,
+            65536
+          ]
+        },
+        {
+          "frame": 3,
+          "movement": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "frame": 4,
+          "movement": [
+            0,
+            0,
+            0,
+            65536
+          ]
+        },
+        {
+          "frame": 5,
+          "movement": [
+            0,
+            0,
+            0,
+            512
+          ]
+        },
+        {
+          "frame": 6,
+          "movement": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "frame": 64,
+          "pointer": [
+            0.5,
+            0.1,
+            1,
+            0
+          ]
+        }
+      ],
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            90,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.04
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            100
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8768,
+          "floats": [
+            3,
+            1,
+            2,
+            0
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8800,
+          "floats": [
+            3,
+            0,
+            99,
+            1
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 9552,
+          "floats": [
+            96.1,
+            0,
+            2.5,
+            119
+          ]
+        }
+      ]
+    },
+    {
+      "name": "bat-impact",
+      "frames": 125,
+      "parameters": {
+        "timeOfDay": 1110
+      },
+      "pointer": [
+        0.5,
+        0.26,
+        0,
+        0
+      ],
+      "inputs": [
+        {
+          "frame": 0,
+          "movement": [
+            0,
+            0,
+            0,
+            65536
+          ]
+        },
+        {
+          "frame": 1,
+          "movement": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "frame": 2,
+          "movement": [
+            0,
+            0,
+            0,
+            65536
+          ]
+        },
+        {
+          "frame": 3,
+          "movement": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "frame": 4,
+          "movement": [
+            0,
+            0,
+            0,
+            65536
+          ]
+        },
+        {
+          "frame": 5,
+          "movement": [
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            90,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.04
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            100
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8768,
+          "floats": [
+            3,
+            1,
+            2,
+            0
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8800,
+          "floats": [
+            3,
+            0,
+            99,
+            1
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 9552,
+          "floats": [
+            96.1,
+            0,
+            2.5,
+            119
+          ]
+        }
+      ]
+    },
+    {
+      "name": "shotgun-survival",
+      "frames": 125,
+      "parameters": {
+        "timeOfDay": 1110
+      },
+      "pointer": [
+        0.5,
+        0.1,
+        0,
+        0
+      ],
+      "inputs": [
+        {
+          "frame": 0,
+          "movement": [
+            0,
+            0,
+            0,
+            65536
+          ]
+        },
+        {
+          "frame": 1,
+          "movement": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "frame": 2,
+          "movement": [
+            0,
+            0,
+            0,
+            65536
+          ]
+        },
+        {
+          "frame": 3,
+          "movement": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "frame": 4,
+          "movement": [
+            0,
+            0,
+            0,
+            65536
+          ]
+        },
+        {
+          "frame": 5,
+          "movement": [
+            0,
+            0,
+            0,
+            512
+          ]
+        },
+        {
+          "frame": 6,
+          "movement": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "frame": 64,
+          "pointer": [
+            0.5,
+            0.1,
+            1,
+            0
+          ]
+        },
+        {
+          "frame": 72,
+          "pointer": [
+            0.5,
+            0.26,
+            1,
+            0
+          ]
+        }
+      ],
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            90,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.04
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            100
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8768,
+          "floats": [
+            3,
+            1,
+            2,
+            0
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8800,
+          "floats": [
+            3,
+            0,
+            99,
+            1
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 9552,
+          "floats": [
+            96.1,
+            0,
+            2.5,
+            119
+          ]
+        }
+      ]
+    }
+  ]
+}

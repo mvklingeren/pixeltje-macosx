@@ -115,6 +115,7 @@ constant uint laserCount = 6u;
 constant uint batFlockCount = 2u;
 constant uint batFlockSize = 15u;
 constant uint batCount = batFlockCount * batFlockSize;
+constant uint raidBatCount = 8u;
 // Switched off for now: the drones neither fly, sound, shoot nor show, and
 // nothing can hit or lock onto them. Set true to bring them back.
 constant bool enableDrones = false;
@@ -152,6 +153,7 @@ constant uint keyE = 2u;
 constant uint keyR = 4u;
 constant uint keyV = 16u;
 constant uint keyX = 32u;
+constant uint keyH = 65536u;
 constant uint keyDigit1 = 128u;
 constant uint keyDigit2 = 256u;
 constant uint keyDigit3 = 512u;
@@ -468,6 +470,14 @@ struct GameState {
     float surfaceImpactReadyAt;
     float landingSoundReadyAt;
     uint2 debrisLandingMask;
+    // Three H taps with the hand out during a ghost charge provoke one raid.
+    // Tap count, last tap time, raised-finger start, enraged flag.
+    float4 gesture;
+    // Raid active, shotgun kills, total contact strikes, summoned this haunt.
+    uint4 batRaid;
+    Bat raidBats[raidBatCount];
+    // Orbit angle, flight mode (circle/dive/return), next dive, dive start.
+    float4 raidFlight[raidBatCount];
 };
 
 static_assert(sizeof(GameState) <= 327680,
@@ -820,6 +830,12 @@ void resetGame(device GameState &game, uint seed) {
     // restart. The pistol is in hand; X swaps to the launcher.
     game.arsenal = float4(heldPistol, heldLauncher, rocketReserveStart, 1.0f);
     game.hand = float4(-100.0f, 0.0f, 0.0f, 0.0f);
+    game.gesture = float4(0.0f, -100.0f, -100.0f, 0.0f);
+    game.batRaid = uint4(0u);
+    for (uint i = 0u; i < raidBatCount; ++i) {
+        game.raidBats[i].pose = float4(0.0f);
+        game.raidFlight[i] = float4(0.0f);
+    }
     game.launcher = float4(0.0f);
     game.controls.z = 0.0f;
     game.dodge = float4(0.0f, 0.0f, -100.0f, 0.0f);
@@ -1443,6 +1459,20 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     if ((pressed & keyDigit4) != 0u) chosen = heldLauncher;
     if ((pressed & keyX) != 0u) chosen = game.arsenal.y;
     if (chosen != game.arsenal.x) game.arsenal.xy = float2(chosen, game.arsenal.x);
+    // Three separate H presses taunt an approaching
+    // ghost. Releasing H between presses is required by the key-edge mask.
+    if ((pressed & keyH) != 0u && holdingHand(game) && armsReady(game)
+        && houseGhostFade(game) > 0.2f
+        && game.house.hauntMotion.w < 0.0f && game.gesture.w < 0.5f) {
+        game.gesture.x += 1.0f;
+        game.gesture.y = game.effects.x;
+        if (game.gesture.x >= 3.0f) {
+            game.gesture.z = game.effects.x;
+            game.gesture.w = 1.0f;
+            game.recoil.w = max(game.recoil.w, 0.35f);
+        }
+    }
+    if (game.house.haunt.x < 0.0f) game.gesture.w = 0.0f;
     // R reloads the weapon in hand early.
     if ((pressed & keyR) != 0u && armsReady(game)) {
         if (holdingLauncher(game)) {
@@ -1648,12 +1678,17 @@ struct ShotTrace {
     int sentry;
     bool surface;           // the environment stopped the ray
     uint buildingPart;      // HouseModel part, or houseCapacity
+    int bat;                // summoned attacker, or -1
 };
+
+int traceRaidBatShot(float3 eye, float3 direction,
+    device const GameState &game, thread float &limit,
+    thread float3 &normal);
 
 ShotTrace traceShot(device const GameState &game, float3 eye,
     float3 shotDirection) {
     ShotTrace shot = {sceneRayLimit, -shotDirection, 0u, -1, -1, -1,
-        false, houseCapacity};
+        false, houseCapacity, -1};
     ChromePose chrome = {game.chromeRotation, game.chromeCentre.xyz};
     SceneHit environment = {sceneRayLimit, float3(0.0f),
         float3(0.0f), 0u, -1, 0u};
@@ -1707,6 +1742,20 @@ ShotTrace traceShot(device const GameState &game, float3 eye,
         shot.sentry = int(i);
         shot.buildingPart = houseCapacity;
     }
+    float batLimit = shot.distance;
+    float3 batNormal;
+    int bat = traceRaidBatShot(eye, shotDirection, game, batLimit, batNormal);
+    if (bat >= 0) {
+        shot.distance = batLimit;
+        shot.normal = batNormal;
+        shot.material = 68u; // batFurMaterial in HauntedBats.metal
+        shot.spider = -1;
+        shot.drone = -1;
+        shot.sentry = -1;
+        shot.surface = false;
+        shot.buildingPart = houseCapacity;
+        shot.bat = bat;
+    }
     return shot;
 }
 
@@ -1723,7 +1772,8 @@ void fireRound(device GameState &game, float3 eye, float3 shotDirection,
     int target = trace.spider;
     float3 impactPoint = eye + shotDirection * trace.distance;
     uint impactMaterial = trace.material;
-    if (target < 0 && trace.drone < 0 && trace.sentry < 0 && !trace.surface) {
+    if (target < 0 && trace.drone < 0 && trace.sentry < 0
+        && trace.bat < 0 && !trace.surface) {
         impactPoint = eye + shotDirection * 28.0f;
         impactMaterial = 0u;
     }
@@ -1745,6 +1795,14 @@ void fireRound(device GameState &game, float3 eye, float3 shotDirection,
     }
     game.impacts[(game.progress.y - 1u) % impactCount] = shot;
     emitSurfaceImpact(game, audio, impactMaterial);
+    if (trace.bat >= 0 && holdingShotgun(game)) {
+        uint bat = uint(trace.bat);
+        game.batRaid.y |= 1u << bat;
+        game.raidBats[bat].pose.w = 0.0f;
+        if (game.batRaid.y == (1u << raidBatCount) - 1u)
+            game.batRaid.x = 0u;
+        game.weapon.zw = float2(0.40f, 3.0f);
+    }
     if (trace.buildingPart < houseCapacity
         && game.buildingImpactCountNow < buildingImpactCount) {
         uint index = game.buildingImpactCountNow++;
@@ -4490,7 +4548,8 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         material = droneSurfaceMaterial(hit.material,
             !droneFlying(game, hit.variant));
     bool bat = batMaterial(hit.material);
-    if (bat) material = batSurfaceMaterial(hit.material);
+    if (bat) material = batSurfaceMaterial(hit.material,
+        hit.variant >= batCount);
     bool house = houseMaterial(hit.material);
     if (house)
         material = houseSurfaceMaterial(hit, game, game.effects.x,
@@ -4680,7 +4739,8 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
             dot(direction, viewUp), dot(direction, viewFront));
         float3x3 toGun = transpose(gun.basis);
         GunHit gunHit = hand
-            ? traceHand(toGun * -gun.pivot, toGun * viewDirection, elbow)
+            ? traceHand(toGun * -gun.pivot, toGun * viewDirection, elbow,
+                handFingerExtension(game))
             : (launcher
                 ? traceLauncher(toGun * -gun.pivot, toGun * viewDirection)
                 : (shotgun

@@ -37,6 +37,20 @@ float handRapTime(uint rap) {
     return handFirstRap + handRapInterval * float(rap);
 }
 
+bool handGestureActive(device const GameState &game) {
+    return game.gesture.z >= 0.0f
+        && game.effects.x - game.gesture.z < 2.2f;
+}
+
+// Turn the closed hand first, then extend the middle finger. Retract it
+// before the wrist returns to its guard pose.
+float handFingerExtension(device const GameState &game) {
+    if (!handGestureActive(game)) return 0.0f;
+    float age = game.effects.x - game.gesture.z;
+    return smoothstep(0.35f, 0.68f, age)
+        * (1.0f - smoothstep(1.55f, 1.9f, age));
+}
+
 // The fist in view space, and the elbow its forearm runs back to, in the
 // fist's frame.
 struct HandPose {
@@ -60,7 +74,18 @@ HandPose handPose(device const GameState &game) {
     float3 elbow = float3(0.08f, -0.32f, -0.12f);
     float pitch = 0.7f, yaw = -0.18f, roll = -0.55f;
     float age = handSwingAge(game);
-    if (age >= 0.0f && !handKnocking(game)) {
+    if (handGestureActive(game)) {
+        float gestureAge = game.effects.x - game.gesture.z;
+        float turn = smoothstep(0.0f, 0.32f, gestureAge)
+            * (1.0f - smoothstep(1.85f, 2.2f, gestureAge));
+        pivot = mix(pivot, float3(0.12f, -0.025f, 0.42f), turn);
+        elbow = mix(elbow, float3(0.25f, -0.32f, -0.14f), turn);
+        // Local -Y is the palm; the wrist turn brings it toward the eye.
+        // Local +Z follows the tilted arm and carries the extended finger.
+        pitch = mix(pitch, 1.12f, turn);
+        yaw = mix(yaw, -0.76f, turn);
+        roll = mix(roll, -2.33f, turn);
+    } else if (age >= 0.0f && !handKnocking(game)) {
         float u = saturate(age / handPunchContact);
         float out = u * (2.0f - u);
         if (age > handPunchContact) {
@@ -147,7 +172,7 @@ float handEllipsoid(float3 p, float3 centre, float3 radii) {
 // The bare fist: the palm and its two heels, the four fingers each curled
 // down from the knuckle and back under it, their tips buried in the palm,
 // and the thumb folded across the index and middle fingers.
-float handFist(float3 p) {
+float handFist(float3 p, float extension) {
     float3 box = abs(p - float3(-0.001f, -0.022f, -0.046f))
         - float3(0.029f, 0.013f, 0.036f) + 0.011f;
     float palm = length(max(box, 0.0f))
@@ -171,6 +196,14 @@ float handFist(float3 p) {
             0.0095f, 0.0108f * size), 0.010f);
         float3 middle = knuckle + size * float3(0.0f, -0.040f, 0.006f);
         float3 last = middle + size * float3(0.0f, -0.002f, -0.026f);
+        if (i == 1u && extension > 0.0f) {
+            // The finger unfolds along the palm's plane and the wrist's
+            // length, rather than sticking out through the back of the hand.
+            middle = mix(middle,
+                knuckle + float3(0.0f, -0.002f, 0.046f), extension);
+            last = mix(last,
+                knuckle + float3(0.0f, -0.005f, 0.093f), extension);
+        }
         float finger = handTaper(p, knuckle, middle,
             0.0106f * size, 0.0097f * size);
         finger = handSmoothMin(finger, handTaper(p, middle, last,
@@ -198,10 +231,12 @@ struct HandDistance {
 // the sleeve, which ends in a hem over the cuff and creases as it bunches
 // toward it. Cuff and sleeve are oval, wider across the back of the hand
 // than through it, and run from the wrist toward `elbow`.
-HandDistance handDistance(float3 p, float3 elbow) {
+HandDistance handDistance(float3 p, float3 elbow, float extension) {
     // The fist is only worked out near it.
-    float fist = length(p - float3(-0.008f, -0.028f, -0.038f)) - 0.075f;
-    if (fist < 0.01f) fist = handFist(p);
+    float3 fistCentre = mix(float3(-0.008f, -0.028f, -0.038f),
+        float3(-0.008f, -0.025f, -0.010f), extension);
+    float fist = length(p - fistCentre) - (0.083f + 0.035f * extension);
+    if (fist < 0.01f) fist = handFist(p, extension);
     float3 along = normalize(elbow - handWrist);
     float3 side = normalize(float3(1.0f, 0.0f, 0.0f) - along * along.x);
     float3 q = p - handWrist;
@@ -237,7 +272,8 @@ HandDistance handDistance(float3 p, float3 elbow) {
 // Sphere-traces the arm from where the ray enters a sphere around it. The
 // hit carries how far the surface is shut in by the rest of the hand, from
 // a few steps out along its normal.
-GunHit traceHand(float3 origin, float3 direction, float3 elbow) {
+GunHit traceHand(float3 origin, float3 direction, float3 elbow,
+    float extension) {
     GunHit hit = {1.0e6f, float3(0.0f), 0u, float3(0.0f)};
     // Rays passing wide of both the fist and the forearm's axis miss.
     float3 toFist = origin - float3(-0.008f, -0.028f, -0.038f);
@@ -250,11 +286,12 @@ GunHit traceHand(float3 origin, float3 direction, float3 elbow) {
         0.0f);
     closest = saturate((armDirection * passing + dot(arm, fromWrist))
         / dot(arm, arm));
-    if (length(toFist - direction * dot(toFist, direction)) > 0.085f
+    if (length(toFist - direction * dot(toFist, direction))
+            > 0.085f + 0.045f * extension
         && length(fromWrist + direction * passing - arm * closest) > 0.06f)
         return hit;
     float3 offset = origin - 0.5f * elbow;
-    float bound = 0.5f * length(elbow) + 0.12f;
+    float bound = 0.5f * length(elbow) + 0.12f + 0.05f * extension;
     float b = dot(offset, direction);
     float discriminant = b * b - dot(offset, offset) + bound * bound;
     if (discriminant < 0.0f) return hit;
@@ -262,18 +299,19 @@ GunHit traceHand(float3 origin, float3 direction, float3 elbow) {
     float far = -b + sqrt(discriminant);
     for (uint step = 0u; step < 96u && t < far; ++step) {
         float3 p = origin + direction * t;
-        HandDistance d = handDistance(p, elbow);
+        HandDistance d = handDistance(p, elbow, extension);
         if (d.distance < 1.5e-4f) {
             const float2 e = float2(2.5e-4f, -2.5e-4f);
             float3 normal = normalize(
-                e.xyy * handDistance(p + e.xyy, elbow).distance
-                + e.yyx * handDistance(p + e.yyx, elbow).distance
-                + e.yxy * handDistance(p + e.yxy, elbow).distance
-                + e.xxx * handDistance(p + e.xxx, elbow).distance);
+                e.xyy * handDistance(p + e.xyy, elbow, extension).distance
+                + e.yyx * handDistance(p + e.yyx, elbow, extension).distance
+                + e.yxy * handDistance(p + e.yxy, elbow, extension).distance
+                + e.xxx * handDistance(p + e.xxx, elbow, extension).distance);
             float shut = 0.0f;
             for (uint i = 1u; i <= 3u; ++i) {
                 float h = 0.005f * float(i);
-                shut += (h - handDistance(p + normal * h, elbow).distance)
+                shut += (h - handDistance(p + normal * h, elbow,
+                    extension).distance)
                     / float(i);
             }
             hit = {t, normal, d.part, p, saturate(shut * 70.0f)};
@@ -317,9 +355,12 @@ SurfaceMaterial handMaterial(GunHit hit) {
     float wear = saturate(rubbed * (0.6f + 0.6f * mottle) + 0.2f * mottle);
     float3 leather = mix(float3(0.040f, 0.034f, 0.030f),
         float3(0.090f, 0.068f, 0.052f), wear) * (0.82f + 0.36f * grain);
+    float palmFacing = smoothstep(0.15f, 0.7f, -hit.normal.y);
+    leather *= 1.0f + 0.45f * palmFacing;
     return {leather * shade,
         mix(mix(0.44f, 0.30f, rubbed) + 0.08f * grain, 1.0f, hit.cavity),
-        0.0f, float3(0.0f)};
+        0.0f, float3(0.035f, 0.042f, 0.038f) * palmFacing
+            * (1.0f - hit.cavity)};
 }
 
 // Near its outline the hand mirrors what lies just past it, so a fist held

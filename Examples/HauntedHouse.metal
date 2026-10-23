@@ -2531,15 +2531,19 @@ PointLight houseHauntedOutdoorLight(uint index, device const GameState &game) {
     return light;
 }
 
-// The ghost's own green light, for surfaces on the same side of the walls:
+// The ghost's own light, for surfaces on the same side of the walls:
 // indoors while it is in the rooms, outdoors once it is out.
 bool houseGhostLight(device const GameState &game, bool indoors,
     thread PointLight &light) {
     float fade = houseGhostFade(game);
     float3 ghost = game.house.haunt.yzw;
     if (fade <= 0.0f || houseInteriorPoint(ghost) != indoors) return false;
-    light = {ghost - float3(0.0f, 0.5f, 0.0f), houseGhostGreen,
-        (indoors ? 260.0f : 420.0f) * fade, false};
+    bool angry = game.gesture.w > 0.5f;
+    float3 color = angry ? float3(0.08f, 0.35f, 1.0f)
+        : houseGhostGreen;
+    light = {ghost - float3(0.0f, 0.5f, 0.0f), color,
+        (indoors ? 260.0f : 420.0f) * fade * (angry ? 0.7f : 1.0f),
+        false};
     return true;
 }
 
@@ -2557,6 +2561,10 @@ bool houseCanWake(device const GameState &game) {
 // The ghost waits in the hall, at head height.
 void houseWake(device GameState &game) {
     if (!houseCanWake(game)) return;
+    // A fresh haunting can be taunted again. Earlier summoned bats keep
+    // circling until the shotgun has cleared the entire raid.
+    game.gesture = float4(0.0f, -100.0f, -100.0f, 0.0f);
+    if (game.batRaid.x == 0u) game.batRaid.w = 0u;
     game.house.haunt = float4(game.effects.x,
         houseWorld(float3(0.0f, houseFloorY, -3.0f))
             + float3(0.0f, houseGhostHeight, 0.0f));
@@ -2627,6 +2635,7 @@ void advanceHaunt(device GameState &game, device RangeAudio &audio,
     float3 target = out ? eye : steps;
     float speed = out ? min(3.5f + 2.6f * (age - houseGhostEmerge), 11.0f)
         : 5.0f;
+    if (game.gesture.w > 0.5f) speed *= 1.35f;
     float3 toward = target - ghost;
     velocity = mix(velocity, toward * (speed / max(length(toward), 0.001f)),
         1.0f - exp(-dt * (out ? 2.5f : 6.0f)));
@@ -4011,7 +4020,13 @@ float3 houseGhostOverlay(float3 color, float3 origin, float3 direction,
         d = houseGhostShape(q, time);
         nearest = min(nearest, d);
     }
-    float3 glow = houseGhostGreen * 0.12f * exp(-max(nearest, 0.0f) * 7.0f)
+    bool angry = game.gesture.w > 0.5f;
+    float3 ghostColor = angry ? float3(0.025f, 1.0f, 0.025f)
+        : houseGhostGreen;
+    float3 glowColor = angry ? float3(0.05f, 0.3f, 1.0f)
+        : ghostColor;
+    float3 glow = glowColor * (angry ? 0.05f : 0.12f)
+        * exp(-max(nearest, 0.0f) * 7.0f)
         * fade;
     if (!found) return color + glow;
     const float e = 0.01f;
@@ -4029,7 +4044,8 @@ float3 houseGhostOverlay(float3 color, float3 origin, float3 direction,
         ? 1.0f - smoothstep(-0.006f, 0.006f, min(eyes, mouth)) : 0.0f;
     float shimmer = 0.75f + 0.25f * smoothNoise(float2(q.x * 7.0f + time,
         q.y * 5.0f - time * 1.7f));
-    float3 sheet = mix(float3(0.55f, 0.85f, 0.65f), houseGhostGreen, 0.45f)
+    float3 sheet = mix(float3(0.55f, 0.85f, 0.65f), ghostColor,
+        angry ? 1.0f : 0.45f)
         * (0.35f + 1.6f * rim) * shimmer;
     float alpha = fade * mix(0.3f + 0.55f * rim, 0.92f, hollow);
     return mix(color, mix(sheet, float3(0.0f, 0.01f, 0.0f), hollow), alpha)
