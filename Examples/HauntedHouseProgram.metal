@@ -107,6 +107,11 @@ constant float3 sunColor = float3(1.0f, 0.97f, 0.92f);
 constant float sunRadius = 0.012f;        // drawn 1.4°, larger than life
 constant uint droneCount = 3u;
 constant uint laserCount = 6u;
+// Two flocks of bats, each six to fifteen strong, come out once the sun
+// has set; see HauntedBats.metal.
+constant uint batFlockCount = 2u;
+constant uint batFlockSize = 15u;
+constant uint batCount = batFlockCount * batFlockSize;
 // Switched off for now: the drones neither fly, sound, shoot nor show, and
 // nothing can hit or lock onto them. Set true to bring them back.
 constant bool enableDrones = false;
@@ -224,6 +229,13 @@ struct Drone {
                            // shows (drains toward pose.w), time shot down
     float4 wander;         // station XZ, hover height, loiter phase;
                            // the spark burst XYZ once shot down
+};
+
+// Where advanceBats puts each bat this frame; the view only reads it.
+struct Bat {
+    float4 pose;           // centre XYZ, size (0 while it is not out)
+    float4 heading;        // unit forward XYZ, wingbeat phase in radians
+    float4 lift;           // unit up XYZ, wingbeat amplitude 0–1
 };
 
 struct LaserBolt {
@@ -394,6 +406,7 @@ struct GameState {
     // (negative while they are not), how far open they stood then, when
     // the plate was last pressed, and 1 while it is pressed.
     float4 frontDoors;
+    Bat bats[batCount];     // the bats out tonight
 };
 
 static_assert(sizeof(GameState) <= 262144,
@@ -4053,6 +4066,8 @@ float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
     return color;
 }
 
+#include "HauntedBats.metal"
+
 fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     constant ProgramUniforms &u [[buffer(0)]],
     device const GameState *states [[buffer(1)]],
@@ -4109,6 +4124,7 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         float3(0.0f), float3(0.0f), 0u, -1, 0u};
     traceScene(hit, furPosition, origin, direction, chrome, game,
         terrainBounds);
+    traceBats(hit, origin, direction, game);
     float depth = hit.distance;
 
     SurfaceMaterial material = surfaceMaterial(hit, crateA, crateB,
@@ -4117,16 +4133,18 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     if (drone)
         material = droneSurfaceMaterial(hit.material,
             !droneFlying(game, hit.variant));
+    bool bat = batMaterial(hit.material);
+    if (bat) material = batSurfaceMaterial(hit.material);
     bool house = houseMaterial(hit.material);
     if (house)
         material = houseSurfaceMaterial(hit, game, game.effects.x,
             pixelSpread * hit.distance, direction, signFont);
     // Room lights stay in the base and the house's lamps in its rooms; the
-    // Earth and the lanterns light the shell, the moon, the drones over it
-    // and the outside of the house.
+    // Earth and the lanterns light the shell, the moon, the drones over it,
+    // the bats and the outside of the house.
     bool houseIndoors = house && houseInteriorPoint(hit.position);
     bool exterior = hit.material == 40u || hit.material == 41u || drone
-        || (house && !houseIndoors);
+        || bat || (house && !houseIndoors);
     // The airless moon has no sky light, only earthshine and sunlight
     // bounced off the plain, which reach slopes, boulder sides and walls more
     // than ground or roofs facing the sky. While there is an atmosphere, its
@@ -4142,6 +4160,7 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     float3 color = material.emission
         + material.albedo * (1.0f - material.metallic) * ambient;
     if (drone) color += droneEmission(hit, game);
+    if (bat) color += batTranslucency(hit, direction, game);
     if (exterior) {
         color += shadeDistantLights(hit, material, -direction, chrome, game,
             earthShadow, sunShadow);
