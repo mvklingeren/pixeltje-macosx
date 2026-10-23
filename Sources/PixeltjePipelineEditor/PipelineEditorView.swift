@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import PixeltjeModelDesign
 import AVKit
 import ImageIO
@@ -2299,11 +2300,7 @@ private struct PipelineNodeCard: View {
                     .frame(width: 64, height: 48)
                     .background(.black.opacity(0.08), in: RoundedRectangle(cornerRadius: 4))
                 } else if let url = cacheAssetAudioURLs[slot] {
-                  Button { openGeneratedOutput(url) } label: {
-                    Label("Play", systemImage: "waveform")
-                  }
-                  .buttonStyle(.bordered)
-                  .controlSize(.small)
+                  PipelineCachedAudioButton(url: url)
                 } else {
                   Image(systemName: "square.dashed")
                     .frame(width: 64, height: 48)
@@ -2755,6 +2752,71 @@ private struct PipelineVideoPlayerView: View {
       player = AVPlayer(url: url)
     }
     .onDisappear { player?.pause() }
+  }
+}
+
+private struct PipelineCachedAudioButton: View {
+  let url: URL
+  @StateObject private var playback = PipelineCachedAudioPlayback()
+  @State private var playbackError: String?
+
+  var body: some View {
+    Button {
+      do { try playback.toggle(url: url) }
+      catch { playbackError = error.localizedDescription }
+    } label: {
+      Label(playback.isPlaying ? "Stop" : "Play",
+        systemImage: playback.isPlaying ? "stop.fill" : "play.fill")
+    }
+    .buttonStyle(.bordered)
+    .controlSize(.small)
+    .help(playback.isPlaying ? "Stop cached audio" : "Play cached audio")
+    .onChange(of: url) { _, _ in playback.stop() }
+    .onDisappear { playback.stop() }
+    .alert("Could not play audio", isPresented: Binding(
+      get: { playbackError != nil },
+      set: { if !$0 { playbackError = nil } }
+    )) {
+      Button("OK", role: .cancel) { playbackError = nil }
+    } message: {
+      Text(playbackError ?? "")
+    }
+  }
+}
+
+@MainActor
+private final class PipelineCachedAudioPlayback: NSObject, ObservableObject,
+  AVAudioPlayerDelegate {
+  @Published private(set) var isPlaying = false
+  private var player: AVAudioPlayer?
+
+  func toggle(url: URL) throws {
+    if isPlaying {
+      stop()
+      return
+    }
+    let player = try AVAudioPlayer(data: Data(contentsOf: url))
+    player.delegate = self
+    player.prepareToPlay()
+    self.player = player
+    isPlaying = true
+    guard player.play() else {
+      stop()
+      throw CocoaError(.fileReadUnknown)
+    }
+  }
+
+  func stop() {
+    player?.stop()
+    player?.delegate = nil
+    player = nil
+    isPlaying = false
+  }
+
+  func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+    guard self.player === player else { return }
+    self.player = nil
+    isPlaying = false
   }
 }
 

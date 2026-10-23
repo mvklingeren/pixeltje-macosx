@@ -3444,8 +3444,12 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
     uint fragmentSlot = buildingDebris ? hit.variant - houseCapacity : 0u;
     uint masonrySlot = masonryDebris ? min(hit.variant - houseCapacity
         - buildingFragmentCount, masonryDebrisCount - 1u) : 0u;
+    uint masonryPieceIndex = masonryDebris
+        ? game.house.debrisParts[masonrySlot] : 0u;
+    uint masonryPanel = masonryDebris ? min(uint(game.house.parts[
+        masonryPieceIndex].windows.z), masonryPanelCount - 1u) : 0u;
     uint index = buildingDebris ? game.buildingFragmentSource[fragmentSlot]
-        : masonryDebris ? game.house.debrisParts[masonrySlot]
+        : masonryDebris ? game.house.masonryParts[masonryPanel]
         : min(hit.variant, houseCapacity - 1u);
     device const HousePart &part = game.house.parts[index];
     uint style = hit.material - houseMaterialBase;
@@ -3456,7 +3460,8 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
         pixeltje_physics::RigidBody body
             = game.physicsWorld.bodies[bodyIndex];
         device const HousePart &piece = buildingDebris
-            ? game.buildingFragments[fragmentSlot] : part;
+            ? game.buildingFragments[fragmentSlot]
+            : game.house.parts[masonryPieceIndex];
         float3 originalCentre = 0.5f * (piece.lower.xyz + piece.upper.xyz);
         hit.position = originalCentre + pixeltje_physics::unrotate(
             body.orientation, hit.position - body.centreMass.xyz);
@@ -3577,11 +3582,15 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
     }
 
     if (style == houseMasonry)
-        return masonrySurfaceMaterial(part, p, n, blur);
+        return masonrySurfaceMaterial(part, p, n, blur, game);
     if (style == houseTimber) return houseTimberMaterial(part, p, n, blur, paint);
     if (style == houseLog) return houseLogMaterial(part, p, n, blur, inside);
-    if (style == houseGrave)
-        return houseGraveMaterial(part, p, n, blur, mood, time);
+    if (style == houseGrave) {
+        SurfaceMaterial stone = houseGraveMaterial(part, p, n, blur,
+            mood, time);
+        return buildingDebris ? stone : shadeMausoleumSpalls(stone, game,
+            index, p, n, blur);
+    }
     if (style == housePlaster || style == housePlasterColumn)
         return housePlasterMaterial(part, p, n, blur);
     if (style == houseCorrugated) return houseCorrugatedMaterial(p, n, blur);
@@ -3664,7 +3673,7 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
     }
 
     if (style == houseStone) {
-        if (n.y > 0.5f) {
+        if (n.y > 0.5f && !buildingDebris) {
             bool deck = local.z < -6.15f || (abs(local.x) < 8.15f
                 && abs(local.z) < 6.15f);
             if (inside || (deck && local.y > 0.05f)) {

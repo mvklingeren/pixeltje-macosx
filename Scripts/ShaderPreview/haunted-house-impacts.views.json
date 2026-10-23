@@ -1,0 +1,186 @@
+{
+  "width": 640,
+  "height": 360,
+  "views": [
+    {
+      "name": "barn-impact",
+      "frames": 31,
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            -27,
+            -0.75,
+            148,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.14
+          ]
+        }
+      ],
+      "movement": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "pointer": [
+        0.5,
+        0.42,
+        0,
+        0.03333333333333333
+      ],
+      "inputs": [
+        {
+          "frame": 24,
+          "pointer": [
+            0.5,
+            0.42,
+            1,
+            0.03333333333333333
+          ]
+        }
+      ]
+    },
+    {
+      "name": "barn-fall",
+      "frames": 65,
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            -27,
+            -0.75,
+            148,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.14
+          ]
+        }
+      ],
+      "movement": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "pointer": [
+        0.5,
+        0.42,
+        0,
+        0.03333333333333333
+      ],
+      "inputs": [
+        {
+          "frame": 24,
+          "pointer": [
+            0.5,
+            0.42,
+            1,
+            0.03333333333333333
+          ]
+        }
+      ]
+    },
+    {
+      "name": "stone-impact",
+      "frames": 31,
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            50,
+            -0.75,
+            130,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.2
+          ]
+        }
+      ],
+      "movement": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "pointer": [
+        0.5,
+        0.42,
+        0,
+        0.03333333333333333
+      ],
+      "inputs": [
+        {
+          "frame": 24,
+          "pointer": [
+            0.5,
+            0.42,
+            1,
+            0.03333333333333333
+          ]
+        }
+      ]
+    },
+    {
+      "name": "stone-cloud",
+      "frames": 39,
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            50,
+            -0.75,
+            130,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.2
+          ]
+        }
+      ],
+      "movement": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "pointer": [
+        0.5,
+        0.42,
+        0,
+        0.03333333333333333
+      ],
+      "inputs": [
+        {
+          "frame": 24,
+          "pointer": [
+            0.5,
+            0.42,
+            1,
+            0.03333333333333333
+          ]
+        }
+      ]
+    }
+  ]
+}

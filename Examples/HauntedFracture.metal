@@ -32,11 +32,54 @@ uint debrisMaterialKind(uint style) {
     return 0u;
 }
 
-void emitDebrisSound(device RangeAudio &audio, uint style, uint size) {
-    if (audio.debrisPlaysThisFrame >= 6u) return;
-    uint channel = debrisMaterialKind(style) * 3u + min(size, 2u);
-    audio.debrisImpact[channel] = min(audio.debrisImpact[channel] + 1u, 8u);
-    ++audio.debrisPlaysThisFrame;
+bool concreteImpactStyle(uint style) {
+    return style == houseStone || style == houseBrick
+        || style == houseGrave || style == houseMasonry
+        || style == housePlaster || style == housePlasterColumn
+        || style == houseRoof;
+}
+
+bool woodImpactStyle(uint style) {
+    return style == houseSiding || style == houseBattens
+        || style == houseTrim || style == houseTimber
+        || style == houseLog || style == houseFloor
+        || style == houseStair;
+}
+
+void emitSurfaceImpact(device GameState &game, device RangeAudio &audio,
+    uint material) {
+    if (!houseMaterial(material)
+        || game.effects.x < game.surfaceImpactReadyAt
+        || audio.surfaceImpact[0] != 0u || audio.surfaceImpact[1] != 0u)
+        return;
+    uint style = material - houseMaterialBase;
+    if (!woodImpactStyle(style) && !concreteImpactStyle(style)) return;
+    audio.surfaceImpact[concreteImpactStyle(style) ? 1u : 0u] = 1u;
+    // A shotgun may strike several cells in one tick. Its first solid hit
+    // supplies the single close impact instead of a stack of pellet sounds.
+    game.surfaceImpactReadyAt = game.effects.x + 0.12f;
+}
+
+void resetLandingPlayed(device GameState &game, uint slot) {
+    if (slot < 32u) game.debrisLandingMask.x &= ~(1u << slot);
+    else game.debrisLandingMask.y &= ~(1u << (slot - 32u));
+}
+
+void emitDebrisSound(device GameState &game, device RangeAudio &audio,
+    uint style, uint size) {
+    uint previous = audio.debrisSelectedChannel;
+    if (previous == 0u && game.effects.x < game.debrisSoundReadyAt) return;
+    size = min(size, 2u);
+    if (previous != 0u) {
+        if (size <= (previous - 1u) % 3u) return;
+        audio.debrisImpact[previous - 1u] = 0u;
+    }
+    uint channel = debrisMaterialKind(style) * 3u + size;
+    audio.debrisImpact[channel] = 1u;
+    audio.debrisSelectedChannel = channel + 1u;
+    // The clip already contains its break and landing. Let it finish before
+    // another piece of the same blast can start a new debris clip.
+    game.debrisSoundReadyAt = game.effects.x + (size == 2u ? 2.0f : 1.0f);
 }
 
 // The two broadest directions define a damage map without storing separate
@@ -54,7 +97,10 @@ uint2 buildingCellAxes(device const HousePart &part) {
 uint2 buildingCellGrid(device const HousePart &part) {
     uint2 axes = buildingCellAxes(part);
     float3 span = part.upper.xyz - part.lower.xyz;
-    return uint2(clamp(ceil(float2(span[axes.x], span[axes.y]) / 1.25f),
+    // Large mausoleum faces use finer cells for compact fracture pieces.
+    float pitch = uint(part.lower.w) == houseGrave
+        && max(max(span.x, span.y), span.z) > 3.0f ? 0.52f : 1.25f;
+    return uint2(clamp(ceil(float2(span[axes.x], span[axes.y]) / pitch),
         float2(1.0f), float2(8.0f)));
 }
 
@@ -84,25 +130,32 @@ float buildingCollapseThreshold(uint owner) {
     return 30.0f; // original and street-copy barns and open sheds
 }
 
-// Keep the source material and cut planes, but split each removed damage cell
-// into four independently tumbling fragments. A round log/column splits along
-// its axis so its cylinder shape and cap positions stay correct.
+// Split a removed cell into four small pieces. Stone and plaster make cubes;
+// wood makes narrow splinters. Keep the source part for material sampling so
+// each piece carries the texture of the surface it broke from.
 void launchBuildingFragment(device GameState &game, uint index, uint2 cell,
     uint shard, HouseTurn turn, float3 velocity) {
     device const HousePart &source = game.house.parts[index];
     HousePart piece = source;
-    if (houseRoundStyle(uint(source.lower.w))) {
+    uint style = uint(source.lower.w);
+    bool wood = woodImpactStyle(style);
+    bool concrete = concreteImpactStyle(style) && style != houseRoof;
+    float seed = houseHash(float(index * 31u + cell.x * 11u
+        + cell.y * 7u + shard * 43u));
+    if (style == houseLog) {
         float3 axis = source.windows.xyz;
-        float segment = 0.5f * source.windows.w;
+        float segment = min(0.18f + 0.06f * seed,
+            0.5f * source.windows.w);
         piece.windows.w = segment;
-        piece.rows.xyz = source.rows.xyz
-            + axis * ((float(shard) - 1.5f) * 2.0f * segment);
+        piece.rows.xyz = source.rows.xyz + axis
+            * ((float(shard) - 1.5f) * 0.5f * source.windows.w);
+        piece.rows.w = min(source.rows.w, 0.045f + 0.025f * seed);
         float3 a = piece.rows.xyz - axis * segment;
         float3 b = piece.rows.xyz + axis * segment;
         piece.lower.xyz = max(source.lower.xyz,
-            min(a, b) - float3(source.rows.w));
+            min(a, b) - float3(piece.rows.w));
         piece.upper.xyz = min(source.upper.xyz,
-            max(a, b) + float3(source.rows.w));
+            max(a, b) + float3(piece.rows.w));
     } else {
         uint2 axes = buildingCellAxes(source);
         uint2 grid = buildingCellGrid(source);
@@ -118,6 +171,27 @@ void launchBuildingFragment(device GameState &game, uint index, uint2 cell,
             + begin.y * span[axes.y] / float(grid.y);
         piece.upper[axes.y] = source.lower[axes.y]
             + end.y * span[axes.y] / float(grid.y);
+        float3 available = piece.upper.xyz - piece.lower.xyz;
+        float3 centre = 0.5f * (piece.lower.xyz + piece.upper.xyz);
+        if (concrete) {
+            float side = min(0.42f + 0.24f * seed,
+                min(available[axes.x], available[axes.y]));
+            piece.lower.xyz = centre - 0.5f * side;
+            piece.upper.xyz = centre + 0.5f * side;
+            piece.upper.w = 0.0f; // fracture faces are square, not roof cuts
+            if (style == housePlasterColumn) piece.lower.w = housePlaster;
+        } else if (wood) {
+            uint axis = available.x >= available.z ? 0u : 2u;
+            if (available.y > max(available.x, available.z) * 1.6f)
+                axis = 1u;
+            float3 halfSize = min(0.5f * available,
+                float3(0.025f + 0.015f * seed));
+            halfSize[axis] = min(0.5f * available[axis],
+                0.16f + 0.07f * seed);
+            piece.lower.xyz = centre - halfSize;
+            piece.upper.xyz = centre + halfSize;
+            piece.upper.w = 0.0f;
+        }
     }
     uint slot = game.buildingFragmentNext++ % buildingFragmentCount;
     game.buildingFragments[slot] = piece;
@@ -129,18 +203,25 @@ void launchBuildingFragment(device GameState &game, uint index, uint2 cell,
     float angle = atan2(turn.sine, turn.cosine);
     float4 orientation = float4(0.0f, -sin(0.5f * angle), 0.0f,
         cos(0.5f * angle));
+    if (wood) {
+        float3 tiltAxis = normalize(float3(
+            houseHash(seed * 31.0f + 1.0f) - 0.5f,
+            houseHash(seed * 37.0f + 2.0f) - 0.5f,
+            houseHash(seed * 43.0f + 3.0f) - 0.5f));
+        float tilt = 0.5f * (houseHash(seed * 47.0f + 4.0f) - 0.5f);
+        orientation = pixeltje_physics::multiplyRotation(orientation,
+            float4(tiltAxis * sin(0.5f * tilt), cos(0.5f * tilt)));
+    }
     float3 halfExtent = 0.5f * (piece.upper.xyz - piece.lower.xyz);
     float inverseMass = 1.0f / max(0.2f,
         2.0f * halfExtent.x * 2.0f * halfExtent.y
             * 2.0f * halfExtent.z);
     game.physicsWorld.bodies[slot] = pixeltje_physics::makeRigidBody(
-        centre, halfExtent, orientation, velocity, inverseMass, 0.18f, 0.75f);
-    float spin = houseHash(float(index * 31u + cell.x * 11u
-        + cell.y * 7u + shard * 43u));
+        centre, halfExtent, orientation, velocity, inverseMass, 0.06f, 0.75f);
     game.physicsWorld.bodies[slot].angularFriction.xyz = float3(
-        1.8f + 2.2f * spin, 1.0f - 2.0f * spin, -2.5f + 2.0f * spin);
+        1.8f + 2.2f * seed, 1.0f - 2.0f * seed, -2.5f + 2.0f * seed);
     game.physicsWorld.sleepSeconds[slot] = 0.0f;
-    game.debrisSoundAt[slot] = game.effects.x;
+    resetLandingPlayed(game, slot);
 }
 
 void launchBuildingCellFragments(device GameState &game, uint index,
@@ -153,6 +234,50 @@ void launchBuildingCellFragments(device GameState &game, uint index,
         launchBuildingFragment(game, index, cell, shard, turn,
             velocity + 1.5f * scatter);
     }
+}
+
+// A shotgun pellets the mausoleum's broad stone facade without punching a
+// wall-sized opening. Detached cubes and a persistent scar record the hit.
+void spallMausoleumFacade(device GameState &game, BuildingImpact impact) {
+    uint index = impact.part;
+    if (index >= min(game.house.counts.x, houseCapacity)) return;
+    device const HousePart &part = game.house.parts[index];
+    if (uint(part.lower.w) != houseGrave) return;
+    HouseTurn turn = housePartTurn(game.house, index);
+    float3 local = houseTurnPointIn(turn, impact.pointDamage.xyz);
+    uint2 cell = buildingCell(part, local);
+    game.mausoleumSpalls[game.mausoleumSpallNext++ % mausoleumSpallCount]
+        = float4(local, float(index + 1u));
+    launchBuildingCellFragments(game, index, cell, turn,
+        impact.normal.xyz * 3.0f + float3(0.0f, 0.15f, 0.0f));
+    uint owner = buildingPartOwner(game.house, index);
+    if (owner < buildingCount) game.buildingDamage[owner] += 0.10f;
+}
+
+__attribute__((noinline))
+SurfaceMaterial shadeMausoleumSpalls(SurfaceMaterial material,
+    device const GameState &game, uint index, float3 p, float3 normal,
+    float blur) {
+    for (uint i = 0u; i < mausoleumSpallCount; ++i) {
+        float4 chip = game.mausoleumSpalls[i];
+        if (uint(chip.w) != index + 1u) continue;
+        float3 offset = p - chip.xyz;
+        if (abs(dot(offset, normal)) > 0.08f) continue;
+        float3 tangent = abs(normal.y) < 0.85f
+            ? normalize(cross(float3(0.0f, 1.0f, 0.0f), normal))
+            : float3(1.0f, 0.0f, 0.0f);
+        float3 across = cross(normal, tangent);
+        float2 q = float2(dot(offset, tangent), dot(offset, across));
+        float r = length(q);
+        if (r >= 0.27f) continue;
+        float angle = atan2(q.y, q.x);
+        float jagged = 0.018f * sin(7.0f * angle + float(i) * 2.1f);
+        float ring = 1.0f - smoothstep(0.006f, 0.015f + blur,
+            abs(r - 0.13f - jagged));
+        float centre = 1.0f - smoothstep(0.025f, 0.085f, r);
+        material.albedo *= 1.0f - 0.46f * ring - 0.38f * centre;
+    }
+    return material;
 }
 
 bool buildingCollapseSurface(uint style) {
@@ -236,7 +361,7 @@ void buildingMaybeCollapse(device GameState &game, device RangeAudio &audio,
         }
         uint material = debrisMaterialKind(uint(part.lower.w));
         if (!sounded[material]) {
-            emitDebrisSound(audio, uint(part.lower.w), 2u);
+            emitDebrisSound(game, audio, uint(part.lower.w), 2u);
             sounded[material] = true;
         }
         game.buildingGone[index] = ~0ul;
@@ -275,7 +400,6 @@ void damageBuildingHit(device GameState &game, device RangeAudio &audio,
     float3 velocity = impact.normal.xyz * 2.8f
         + float3(0.0f, 0.15f, 0.0f);
     launchBuildingCellFragments(game, index, cell, turn, velocity);
-    emitDebrisSound(audio, style, 0u);
     buildingMaybeCollapse(game, audio, owner);
 }
 
@@ -366,7 +490,7 @@ void damageBuildingsBlast(device GameState &game, device RangeAudio &audio,
         uint style = uint(part.lower.w);
         uint material = debrisMaterialKind(style);
         if (!sounded[material]) {
-            emitDebrisSound(audio, style, 2u);
+            emitDebrisSound(game, audio, style, 2u);
             sounded[material] = true;
         }
     }
@@ -385,13 +509,18 @@ void resetBuildingDamage(device GameState &game) {
         game.buildingFragmentGone[i] = 0ul;
         game.physicsWorld.bodies[i].extentState.w = 0.0f;
         game.physicsWorld.sleepSeconds[i] = 0.0f;
-        game.debrisSoundAt[i] = -100.0f;
     }
     game.buildingFragmentNext = 0u;
     game.buildingFragmentActive = 0u;
-    game.debrisLastPhysicsSound = -100.0f;
+    game.debrisSoundReadyAt = -100.0f;
+    game.surfaceImpactReadyAt = -100.0f;
+    game.landingSoundReadyAt = -100.0f;
+    game.debrisLandingMask = uint2(0u);
     game.buildingImpactCountNow = 0u;
     game.buildingLastBlast = -100.0f;
+    game.mausoleumSpallNext = 0u;
+    for (uint i = 0u; i < mausoleumSpallCount; ++i)
+        game.mausoleumSpalls[i] = float4(0.0f);
 }
 
 // Dynamic fragments keep their authoring geometry and follow world bodies.

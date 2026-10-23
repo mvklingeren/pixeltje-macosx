@@ -1,0 +1,186 @@
+{
+  "width": 1280,
+  "height": 720,
+  "views": [
+    {
+      "name": "barn-splinters-early",
+      "frames": 27,
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            -27,
+            -0.75,
+            148,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.14
+          ]
+        }
+      ],
+      "movement": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "pointer": [
+        0.5,
+        0.42,
+        0,
+        0.03333333333333333
+      ],
+      "inputs": [
+        {
+          "frame": 24,
+          "pointer": [
+            0.5,
+            0.42,
+            1,
+            0.03333333333333333
+          ]
+        }
+      ]
+    },
+    {
+      "name": "barn-splinters-fading",
+      "frames": 31,
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            -27,
+            -0.75,
+            148,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.14
+          ]
+        }
+      ],
+      "movement": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "pointer": [
+        0.5,
+        0.42,
+        0,
+        0.03333333333333333
+      ],
+      "inputs": [
+        {
+          "frame": 24,
+          "pointer": [
+            0.5,
+            0.42,
+            1,
+            0.03333333333333333
+          ]
+        }
+      ]
+    },
+    {
+      "name": "barn-splinters-gone",
+      "frames": 36,
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            -27,
+            -0.75,
+            148,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.14
+          ]
+        }
+      ],
+      "movement": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "pointer": [
+        0.5,
+        0.42,
+        0,
+        0.03333333333333333
+      ],
+      "inputs": [
+        {
+          "frame": 24,
+          "pointer": [
+            0.5,
+            0.42,
+            1,
+            0.03333333333333333
+          ]
+        }
+      ]
+    },
+    {
+      "name": "barn-splinters-landed",
+      "frames": 65,
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            -27,
+            -0.75,
+            148,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.14
+          ]
+        }
+      ],
+      "movement": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "pointer": [
+        0.5,
+        0.42,
+        0,
+        0.03333333333333333
+      ],
+      "inputs": [
+        {
+          "frame": 24,
+          "pointer": [
+            0.5,
+            0.42,
+            1,
+            0.03333333333333333
+          ]
+        }
+      ]
+    }
+  ]
+}

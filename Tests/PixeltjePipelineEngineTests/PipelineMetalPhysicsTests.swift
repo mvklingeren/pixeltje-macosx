@@ -125,6 +125,17 @@ import Testing
         pixeltje_physics::boxBox(pairA, pairB));
       results[7] = pairA.linearBounce.x;
       results[8] = pairB.linearBounce.x;
+      auto shard = pixeltje_physics::makeRigidBody(
+        float3(0.95f, 0.0f, 0.0f), float3(0.1f),
+        float4(0.0f, 0.0f, 0.0f, 1.0f),
+        float3(2.0f, 0.0f, 0.0f), 1.0f, 0.1f, 0.7f);
+      auto wall = pixeltje_physics::makeRigidBody(
+        float3(3.0f, 0.0f, 0.0f), float3(2.0f),
+        float4(0.0f, 0.0f, 0.0f, 1.0f),
+        float3(0.0f), 0.0f, 0.1f, 0.7f);
+      auto shardContact = pixeltje_physics::boxBox(shard, wall);
+      results[9] = shardContact.depth;
+      results[10] = shardContact.point.x - shard.centreMass.x;
     }
     """
   let resolved = PipelineMetalLibraries.resolving(source)
@@ -133,7 +144,7 @@ import Testing
   let function = try #require(library.makeFunction(name: "sampleWorld"))
   let pipeline = try device.makeComputePipelineState(function: function)
   let queue = try #require(device.makeCommandQueue())
-  let buffer = try #require(device.makeBuffer(length: 9 * MemoryLayout<Float>.stride,
+  let buffer = try #require(device.makeBuffer(length: 11 * MemoryLayout<Float>.stride,
     options: .storageModeShared))
   let commands = try #require(queue.makeCommandBuffer())
   let encoder = try #require(commands.makeComputeCommandEncoder())
@@ -145,7 +156,7 @@ import Testing
   commands.commit()
   commands.waitUntilCompleted()
   let result = Array(UnsafeBufferPointer(
-    start: buffer.contents().assumingMemoryBound(to: Float.self), count: 9))
+    start: buffer.contents().assumingMemoryBound(to: Float.self), count: 11))
   #expect(result[0] > 0.2 && result[0] < 0.3)
   #expect(result[1] == -1.0)
   #expect(result[2] < 2.0)
@@ -155,4 +166,6 @@ import Testing
   #expect(result[6] == 0.0)
   #expect(result[7] < 2.0)
   #expect(result[8] > -1.0)
+  #expect(result[9] > 0.0)
+  #expect(abs(result[10]) <= 0.1001)
 }

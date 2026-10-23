@@ -274,13 +274,15 @@ struct RangeAudio {
     float4 ghostVoice;
     uint cottageDoor;
     uint houseDoors;
-    uint debrisPlaysThisFrame;
+    uint debrisSelectedChannel; // channel + 1, or 0 this frame
     uint unused;
     // Wood, stone, metal, plaster; three impact sizes per material.
     uint debrisImpact[12];
+    uint surfaceImpact[2]; // wood, concrete
+    uint landingImpact;
 };
 
-static_assert(sizeof(RangeAudio) == 208,
+static_assert(sizeof(RangeAudio) == 224,
     "The audio words must match the program's audioEvents and audioVoices");
 
 constant uint hudCapacity = 96u;
@@ -326,6 +328,7 @@ constant uint masonryDebrisCount = 24u;
 constant uint buildingCount = 15u; // 0 is scenery; 1–14 are buildings
 constant uint buildingImpactCount = 16u;
 constant uint buildingFragmentCount = 32u;
+constant uint mausoleumSpallCount = 16u;
 constant uint buildingShardsPerCell = 4u;
 constant uint buildingBlastCellCount = buildingFragmentCount
     / buildingShardsPerCell;
@@ -440,6 +443,7 @@ struct GameState {
     Bat bats[batCount];     // the bats out tonight
     // One bit per missing stone, indexed by panel, course and column.
     uint masonryGone[masonryPanelCount][masonryMaxRows];
+    uint masonrySpalled[masonryPanelCount][masonryMaxRows];
     uint masonryDebrisNext[2];
     float masonryLastBlast;
     // Intact parts stay compact. Only struck parts acquire missing cells,
@@ -450,6 +454,8 @@ struct GameState {
     BuildingImpact buildingImpacts[buildingImpactCount];
     uint buildingImpactCountNow;
     float buildingLastBlast;
+    float4 mausoleumSpalls[mausoleumSpallCount]; // local XYZ, part index + 1
+    uint mausoleumSpallNext;
     HousePart buildingFragments[buildingFragmentCount];
     uint buildingFragmentSource[buildingFragmentCount];
     ulong buildingFragmentGone[buildingFragmentCount];
@@ -458,8 +464,10 @@ struct GameState {
     // The physics world owns both debris pools. HousePart remains immutable
     // collision/render geometry; the body's pose moves it through the scene.
     pixeltje_physics::World<physicsBodyCount> physicsWorld;
-    float debrisSoundAt[physicsBodyCount];
-    float debrisLastPhysicsSound;
+    float debrisSoundReadyAt;
+    float surfaceImpactReadyAt;
+    float landingSoundReadyAt;
+    uint2 debrisLandingMask;
 };
 
 static_assert(sizeof(GameState) <= 327680,
@@ -574,6 +582,9 @@ PointLight roomLight(uint index, float time) {
 
 #include "HauntedBuildingKit.metal"
 #include "HauntedMasonry.metal"
+SurfaceMaterial shadeMausoleumSpalls(SurfaceMaterial material,
+    device const GameState &game, uint index, float3 p, float3 normal,
+    float blur);
 #include "HauntedHouse.metal"
 #include "HauntedMausoleum.metal"
 #include "HauntedShed.metal"
@@ -1350,7 +1361,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     uint id [[thread_position_in_grid]]) {
     if (id != 0u) return;
     device GameState &game = states[0];
-    audio[0].debrisPlaysThisFrame = 0u;
+    audio[0].debrisSelectedChannel = 0u;
     float dt = clamp(u.pointer.w > 0.0f ? u.pointer.w : u.resolutionTime.w,
         0.0f, 0.10f);
     uint action = uint(u.pointer.z);
@@ -1733,6 +1744,7 @@ void fireRound(device GameState &game, float3 eye, float3 shotDirection,
             yaw);
     }
     game.impacts[(game.progress.y - 1u) % impactCount] = shot;
+    emitSurfaceImpact(game, audio, impactMaterial);
     if (trace.buildingPart < houseCapacity
         && game.buildingImpactCountNow < buildingImpactCount) {
         uint index = game.buildingImpactCountNow++;
@@ -2066,8 +2078,31 @@ kernel void damageBuildings(constant ProgramUniforms &u [[buffer(0)]],
     uint id [[thread_position_in_grid]]) {
     if (id != 0u || states[0].progress.w != phasePlaying) return;
     device GameState &game = states[0];
-    for (uint i = 0u; i < game.buildingImpactCountNow; ++i)
-        damageBuildingHit(game, audio[0], game.buildingImpacts[i]);
+    bool mausoleumShotHandled = false;
+    for (uint i = 0u; i < game.buildingImpactCountNow; ++i) {
+        BuildingImpact impact = game.buildingImpacts[i];
+        if (impact.part >= houseCapacity) continue;
+        uint style = uint(game.house.parts[impact.part].lower.w);
+        uint owner = buildingPartOwner(game.house, impact.part);
+        bool stoneMausoleum = (owner == 2u || owner == 3u
+                || owner == 13u || owner == 14u)
+            && (style == houseGrave || style == houseMasonry
+                || style == houseStone || style == houseBrick
+                || style == housePlaster);
+        if (impact.pointDamage.w < 0.5f && stoneMausoleum) {
+            if (mausoleumShotHandled) continue;
+            if (style == houseMasonry)
+                mausoleumShotHandled = damageStreetTombShot(game, impact);
+            else if (style == houseGrave) {
+                spallMausoleumFacade(game, impact);
+                mausoleumShotHandled = true;
+            }
+            else {
+                damageBuildingHit(game, audio[0], impact);
+                mausoleumShotHandled = true;
+            }
+        } else damageBuildingHit(game, audio[0], impact);
+    }
     game.buildingImpactCountNow = 0u;
     if (game.blast.w > game.buildingLastBlast) {
         damageBuildingsBlast(game, audio[0], game.blast.xyz);
@@ -3919,6 +3954,150 @@ float3 shadeSpiderParticles(float3 color, float3 origin,
     return color;
 }
 
+// ShotImpact is a reusable twelve-slot ring. Its point, normal and time seed
+// the same short-lived cloud and chips on every frame, without a particle
+// allocation or a second simulation pass.
+float3 impactPieceBase(uint style) {
+    if (style == houseBrick) return float3(0.13f, 0.065f, 0.055f);
+    if (style == houseStone) return float3(0.115f, 0.11f, 0.104f);
+    if (style == houseRoof) return float3(0.05f, 0.057f, 0.068f);
+    if (style == houseGrave || style == houseMasonry)
+        return float3(0.17f, 0.162f, 0.145f);
+    if (style == housePlaster || style == housePlasterColumn)
+        return float3(0.12f, 0.115f, 0.10f);
+    return float3(0.08f, 0.05f, 0.035f);
+}
+
+// The shot ring doubles as a fixed-size particle pool. Solid chips are ray
+// traced as little cubes of the hit material; wooden hits shed thin slivers.
+float3 shadeImpactPieces(float3 color, float3 origin,
+    float3 direction, SceneHit surfaceHit, SurfaceMaterial surface,
+    device const GameState &game) {
+    float nearestConcrete = surfaceHit.distance;
+    for (uint i = 0u; i < impactCount; ++i) {
+        ShotImpact shot = game.impacts[i];
+        uint material = uint(shot.normalMaterial.w);
+        if (shot.pointEnemy.w > 0.0f || !houseMaterial(material)) continue;
+        uint style = material - houseMaterialBase;
+        bool concrete = concreteImpactStyle(style);
+        bool wood = woodImpactStyle(style);
+        if (!concrete && !wood) continue;
+        float age = game.effects.x - shot.muzzleTime.w;
+        if (age < 0.0f || age >= (wood ? 0.85f / 3.0f : 0.85f))
+            continue;
+        float3 impact = shot.pointEnemy.xyz;
+        float along = dot(impact - origin, direction);
+        if (along <= 0.0f || along >= surfaceHit.distance + 1.5f
+            || length(origin + direction * along - impact) > 1.8f) continue;
+        float3 normal = normalize(shot.normalMaterial.xyz);
+        float3 reference = abs(normal.y) < 0.85f
+            ? float3(0.0f, 1.0f, 0.0f) : float3(0.0f, 0.0f, 1.0f);
+        float3 tangent = normalize(cross(reference, normal));
+        float3 bitangent = cross(normal, tangent);
+        float fade = 1.0f - smoothstep(0.34f, 0.85f, age);
+        if (concrete) for (uint puff = 0u; puff < 7u; ++puff) {
+            float key = float(i * 79u + puff * 37u + 1u);
+            float angle = 2.0f * rangePi * houseHash(key);
+            float spread = houseHash(key + 11.0f);
+            float3 centre = impact - direction * (0.12f + 0.08f * age)
+                + normal * (0.08f + age * 0.38f)
+                + (tangent * cos(angle) + bitangent * sin(angle))
+                    * (0.04f + age * (0.24f + 0.18f * spread))
+                + float3(0.0f, 0.12f * age, 0.0f);
+            float depth = dot(centre - origin, direction);
+            if (depth <= 0.0f || depth >= surfaceHit.distance - 0.01f)
+                continue;
+            float radius = 1.5f * (0.19f + 0.75f * age)
+                * (0.8f + 0.45f * spread);
+            float separation = length(origin + direction * depth - centre);
+            float radial = separation / radius;
+            float density = (0.20f + 0.80f
+                * smoothstep(0.08f, 0.50f, radial))
+                * (1.0f - smoothstep(0.65f, 1.0f, radial));
+            color = mix(color, float3(0.12f, 0.11f, 0.095f),
+                0.22f * density * fade);
+        }
+        if (concrete) {
+            float3 cloudCentre = impact - direction * (0.18f + 0.08f * age);
+            float cloudDepth = dot(cloudCentre - origin, direction);
+            if (cloudDepth > 0.0f && cloudDepth < surfaceHit.distance) {
+                float radius = 1.5f * (0.19f + 0.58f * age);
+                float separation = length(origin + direction * cloudDepth
+                    - cloudCentre);
+                float radial = separation / radius;
+                float opacity = 0.26f * fade
+                    * (0.18f + 0.82f * smoothstep(0.08f, 0.50f, radial))
+                    * (1.0f - smoothstep(0.62f, 1.0f, radial));
+                color = mix(color, float3(0.11f, 0.10f, 0.09f), opacity);
+            }
+        }
+        float3 base = surfaceHit.material == material
+            && distance(surfaceHit.position, impact) < 3.0f
+            ? surface.albedo : impactPieceBase(style);
+        for (uint chip = 0u; chip < (concrete ? 36u : 24u); ++chip) {
+            float key = float(i * 131u + chip * 17u + 3u);
+            float angle = 2.0f * rangePi * houseHash(key);
+            float lift = houseHash(key + 17.0f);
+            float speed = 1.2f + 2.6f * houseHash(key + 39.0f);
+            float3 spray = normalize(normal * (0.8f + lift)
+                + tangent * cos(angle) + bitangent * sin(angle));
+            float3 centre = impact - direction * 0.06f
+                + normal * 0.05f + spray * speed * age
+                - float3(0.0f, 3.2f * age * age, 0.0f);
+            float depth = dot(centre - origin, direction);
+            if (depth <= 0.0f || depth >= surfaceHit.distance) continue;
+            float3 face;
+            float t;
+            if (concrete) {
+                float halfSide = 0.075f + 0.084f
+                    * houseHash(key + 53.0f);
+                t = rayBox(origin, direction, centre - halfSide,
+                    centre + halfSide, face);
+            } else {
+                // Give each shorter splinter an independent in-plane angle
+                // and a small out-of-plane tilt, separate from its flight.
+                float twist = 2.0f * rangePi * houseHash(key + 67.0f);
+                float tilt = 0.55f * (houseHash(key + 83.0f) - 0.5f);
+                float3 alongWood = normalize((tangent * cos(twist)
+                    + bitangent * sin(twist)) * cos(tilt)
+                    + normal * sin(tilt));
+                float3 acrossWood = normalize(cross(normal, alongWood));
+                float3 depthWood = cross(alongWood, acrossWood);
+                float3 localOrigin = float3(dot(origin - centre, alongWood),
+                    dot(origin - centre, acrossWood),
+                    dot(origin - centre, depthWood));
+                float3 localDirection = float3(dot(direction, alongWood),
+                    dot(direction, acrossWood), dot(direction, depthWood));
+                float3 halfSize = float3(0.072f + 0.048f * lift,
+                    0.008f + 0.006f * lift, 0.007f + 0.006f * lift);
+                t = rayBox(localOrigin, localDirection, -halfSize,
+                    halfSize, face);
+                face = alongWood * face.x + acrossWood * face.y
+                    + depthWood * face.z;
+            }
+            if (t <= 0.0f || t >= surfaceHit.distance) continue;
+            if (concrete && t >= nearestConcrete) continue;
+            float3 point = origin + direction * t;
+            float grain = 0.82f + 0.32f * smoothNoise(
+                float2(point.x + point.z, point.y) * 14.0f
+                    + float2(key * 0.13f));
+            float light = 0.58f + 0.22f * abs(face.y)
+                + 0.30f * max(dot(face,
+                    normalize(float3(-0.4f, 0.8f, -0.3f))), 0.0f);
+            if (concrete) {
+                nearestConcrete = t;
+                color = base * grain * light;
+            }
+            else {
+                float fadePiece = 1.0f - smoothstep(0.50f / 3.0f,
+                    0.85f / 3.0f, age);
+                color = mix(color, base * grain * light, fadePiece);
+            }
+        }
+    }
+    return color;
+}
+
 void gunBox(thread GunHit &hit, float3 origin, float3 direction,
     float3 lower, float3 upper, uint part) {
     float3 normal;
@@ -4465,6 +4644,8 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     color = shadeShot(color, origin, direction, hit.distance, game);
     color = shadeSpiderParticles(color, origin, direction,
         hit.distance, game);
+    color = shadeImpactPieces(color, origin, direction, hit,
+        material, game);
     color = shadeSentryEffects(color, origin, direction, hit.distance, game);
     color = shadeOrdnance(color, origin, direction, hit.distance, game);
     float pixelAngle = 1.0f / (lensFocal * u.resolutionTime.y);

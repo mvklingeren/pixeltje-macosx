@@ -209,14 +209,17 @@ enum PipelineMetalPhysics {
         if (depth < best.depth) {
           best.depth = depth;
           best.normal = dot(between, axis) >= 0.0f ? axis : -axis;
-          best.point = 0.5f * (a.centreMass.xyz + b.centreMass.xyz);
+          float3 reach = boxHalfBounds(a);
+          best.point = clamp(0.5f * (a.centreMass.xyz + b.centreMass.xyz),
+            a.centreMass.xyz - reach, a.centreMass.xyz + reach);
         }
         return true;
       }
 
       // Fifteen separating axes cover two oriented boxes, including
-      // edge-on-edge contacts. The contact point is a stable centre estimate;
-      // plane contacts below provide exact bottom-face/edge support points.
+      // edge-on-edge contacts. Clamp the centre estimate to the first body's
+      // bounds: a tiny piece against a large wall must not take an impulse at
+      // the wall's distant centre. Plane contacts below use exact support points.
       inline RigidContact boxBox(RigidBody a, RigidBody b) {
         RigidContact best = {float3(0.0f, 1.0f, 0.0f),
           1.0e9f, 0.5f * (a.centreMass.xyz + b.centreMass.xyz)};

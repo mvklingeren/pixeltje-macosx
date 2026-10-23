@@ -1134,7 +1134,8 @@ void addStreetTombMasonry(device HouseModel &house, StreetProperty c,
 void resetStreetTombMasonry(device GameState &game) {
     for (uint panel = 0u; panel < masonryPanelCount; ++panel)
         for (uint row = 0u; row < masonryMaxRows; ++row)
-            game.masonryGone[panel][row] = 0u;
+            game.masonryGone[panel][row]
+                = game.masonrySpalled[panel][row] = 0u;
     StreetProperty ruin = streetProperties[streetRuinedTomb];
     for (uint wall = 3u; wall < 6u; wall += 2u) {
         uint panel = wall;
@@ -1170,7 +1171,6 @@ void resetStreetTombMasonry(device GameState &game) {
         game.physicsWorld.bodies[buildingFragmentCount + i].extentState.w
             = 0.0f;
         game.physicsWorld.sleepSeconds[buildingFragmentCount + i] = 0.0f;
-        game.debrisSoundAt[buildingFragmentCount + i] = -100.0f;
     }
     for (uint i = 0u; i < masonryDebrisCount; ++i) {
         StreetProperty c = streetProperties[streetTombFirst
@@ -1199,23 +1199,80 @@ void launchMasonryFragment(device GameState &game, uint instance,
             float4(0.0f, 0.0f, 0.0f, 1.0f),
             launchVelocity,
             1.0f / max(0.2f, 8.0f * halfExtent.x * halfExtent.y
-                * halfExtent.z), 0.16f, 0.8f);
+                * halfExtent.z), 0.06f, 0.8f);
     game.physicsWorld.sleepSeconds[buildingFragmentCount + slot] = 0.0f;
-    game.debrisSoundAt[buildingFragmentCount + slot] = game.effects.x;
+    resetLandingPlayed(game, buildingFragmentCount + slot);
 }
 
-void launchMasonryStone(device GameState &game, uint instance,
+void launchMasonryStone(device GameState &game, uint panel, uint instance,
     float3 centre, float3 halfSize, float3 blast, float seed) {
     uint axis = halfSize.x > halfSize.z ? 0u : 2u;
-    float3 radius = max(halfSize * 0.82f, float3(0.04f));
-    radius[axis] *= 0.5f;
+    float side = min(0.60f + 0.21f * seed,
+        2.0f * min(halfSize[axis], halfSize.y));
+    float3 radius = float3(max(0.025f, 0.5f * side));
     float3 offset = float3(0.0f);
-    offset[axis] = halfSize[axis] * 0.5f;
+    offset[axis] = halfSize[axis] * 0.45f;
     for (uint pieceIndex = 0u; pieceIndex < 2u; ++pieceIndex) {
         float3 at = centre + (pieceIndex == 0u ? -offset : offset);
-        launchMasonryFragment(game, instance, houseBox(at - radius,
-            at + radius, houseGrave), at, blast, seed);
+        HousePart shard = houseBox(at - radius, at + radius, houseMasonry);
+        // Keep the source panel ID in the pooled piece. Shading can sample
+        // the original masonry course and weathering at the piece's point.
+        shard.windows.z = float(panel);
+        launchMasonryFragment(game, instance, shard, at, blast, seed);
     }
+}
+
+// One shotgun barrel spalls at most one masonry stone. The first hit leaves
+// a persistent fracture and ejects a couple of cubes; a later hit can
+// dislodge that stone. This is much smaller than the launcher blast radius.
+bool damageStreetTombShot(device GameState &game, BuildingImpact impact) {
+    if (impact.part >= houseCapacity) return false;
+    device const HousePart &part = game.house.parts[impact.part];
+    if (uint(part.lower.w) != houseMasonry) return false;
+    uint panel = uint(part.windows.z);
+    if (panel >= masonryPanelCount
+        || game.house.masonryParts[panel] != impact.part) return false;
+    HouseTurn turn = housePartTurn(game.house, impact.part);
+    float3 local = houseTurnPointIn(turn, impact.pointDamage.xyz);
+    uint row = min(uint(max(floor((local.y - part.lower.y)
+        / part.windows.y), 0.0f)), masonryMaxRows - 1u);
+    float axis = part.windows.w < 0.5f ? local.x : local.z;
+    float start = part.windows.w < 0.5f ? part.lower.x : part.lower.z;
+    uint col = min(uint(max(floor((axis - start) / part.windows.x
+        + 0.5f * float(row & 1u)), 0.0f)), 31u);
+    if (masonryStoneGone(game, panel, row, col)) return false;
+    float3 lower, upper;
+    masonryStoneBox(part, row, col, lower, upper);
+    if (any(lower >= upper)) return false;
+    uint bit = 1u << col;
+    uint instance = panel / masonryPanelsPerTomb;
+    float seed = houseHash(float(panel * 101u + row * 29u + col * 13u));
+    if ((game.masonrySpalled[panel][row] & bit) != 0u) {
+        game.masonryGone[panel][row] |= bit;
+        float3 centre = houseTurnPointOut(turn, 0.5f * (lower + upper));
+        launchMasonryStone(game, panel, instance, centre,
+            0.5f * (upper - lower), impact.pointDamage.xyz, seed);
+        game.buildingDamage[13u + instance] += 0.35f;
+    } else {
+        game.masonrySpalled[panel][row] |= bit;
+        float3 normal = normalize(impact.normal.xyz);
+        float3 tangent = abs(normal.x) > abs(normal.z)
+            ? float3(0.0f, 0.0f, 1.0f) : float3(1.0f, 0.0f, 0.0f);
+        for (uint chip = 0u; chip < 2u; ++chip) {
+            float radius = 0.12f + 0.05f * houseHash(seed * 41.0f
+                + float(chip) * 17.0f);
+            float3 at = impact.pointDamage.xyz
+                + normal * (radius + 0.03f)
+                + tangent * ((chip == 0u ? -1.0f : 1.0f) * radius);
+            HousePart shard = houseBox(at - radius, at + radius,
+                houseMasonry);
+            shard.windows.z = float(panel);
+            launchMasonryFragment(game, instance, shard, at,
+                impact.pointDamage.xyz - normal * 0.5f, seed);
+        }
+        game.buildingDamage[13u + instance] += 0.10f;
+    }
+    return true;
 }
 
 // The same occupancy bit that opens a sightline launches the detached block.
@@ -1252,13 +1309,14 @@ void damageStreetTombMasonry(device GameState &game,
                     += 0.35f;
                 float3 centre = houseTurnPointOut(turn,
                     0.5f * (lower + upper));
-                launchMasonryStone(game, panel / masonryPanelsPerTomb, centre,
+                launchMasonryStone(game, panel,
+                    panel / masonryPanelsPerTomb, centre,
                     0.5f * (upper - lower), blast, seed);
             }
         }
     }
     if (broken > 0u)
-        emitDebrisSound(audio, houseGrave, broken >= 4u ? 2u : 1u);
+        emitDebrisSound(game, audio, houseGrave, broken >= 4u ? 2u : 1u);
 }
 
 // ---------------------------------------------------------------- building

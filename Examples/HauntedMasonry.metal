@@ -40,6 +40,12 @@ bool masonryStoneGone(device const GameState &game, uint panel, uint row,
         [min(row, masonryMaxRows - 1u)] & (1u << min(column, 31u))) != 0u;
 }
 
+bool masonryStoneSpalled(device const GameState &game, uint panel, uint row,
+    uint column) {
+    return (game.masonrySpalled[min(panel, masonryPanelCount - 1u)]
+        [min(row, masonryMaxRows - 1u)] & (1u << min(column, 31u))) != 0u;
+}
+
 // The panel is at most one wall thick. Test only courses and stones crossed
 // by that segment of the ray, rather than every block in the building.
 __attribute__((noinline))
@@ -97,7 +103,7 @@ float masonryHitPart(device const HousePart &part,
 }
 
 SurfaceMaterial masonrySurfaceMaterial(device const HousePart &part,
-    float3 p, float3 n, float blur) {
+    float3 p, float3 n, float blur, device const GameState &game) {
     float u = part.windows.w < 0.5f ? p.x - part.lower.x
         : p.z - part.lower.z;
     float v = p.y - part.lower.y;
@@ -115,6 +121,22 @@ SurfaceMaterial masonrySurfaceMaterial(device const HousePart &part,
     float weather = 0.86f + 0.18f * smoothNoise(float2(
         (p.x + p.z) * 3.0f, p.y * 0.55f));
     float3 stone = float3(0.17f, 0.162f, 0.145f) * tone * weather;
+    uint panel = min(uint(part.windows.z), masonryPanelCount - 1u);
+    uint course = min(uint(max(row, 0.0f)), masonryMaxRows - 1u);
+    uint column = min(uint(max(cell, 0.0f)), 31u);
+    if (masonryStoneSpalled(game, panel, course, column)) {
+        // A shotgun knocks a shallow chip out before repeated hits remove
+        // the stone. Keep the local fracture on the original masonry face.
+        float2 q = fract(float2(shifted, v / part.windows.y)) - 0.5f;
+        float r = length(q);
+        float branch = abs(q.x + 0.14f * sin(q.y * 18.0f
+            + float(cell) * 2.7f));
+        float crack = (1.0f - smoothstep(0.005f,
+            0.018f + blur / part.windows.x, branch))
+            * (1.0f - smoothstep(0.12f, 0.43f, r));
+        float pit = 1.0f - smoothstep(0.04f, 0.16f, r);
+        stone *= 1.0f - 0.45f * crack - 0.22f * pit;
+    }
     // Faces revealed by a missing neighbour show the less weathered core.
     if (abs(n.y) > 0.5f || (part.windows.w < 0.5f
             ? abs(n.x) > 0.5f : abs(n.z) > 0.5f))

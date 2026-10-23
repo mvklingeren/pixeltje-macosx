@@ -93,6 +93,51 @@
       ]
     },
     {
+      "name": "cottage-rubble-at-rest",
+      "frames": 160,
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            -36,
+            2.0,
+            42.0,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.15
+          ]
+        }
+      ],
+      "movement": [
+        0,
+        0,
+        0,
+        1040
+      ],
+      "pointer": [
+        0.5,
+        0.42,
+        0,
+        0.03333333333333333
+      ],
+      "inputs": [
+        {
+          "frame": 24,
+          "pointer": [
+            0.5,
+            0.42,
+            1,
+            0.03333333333333333
+          ]
+        }
+      ]
+    },
+    {
       "name": "cottage-rubble-side",
       "frames": 100,
       "initialWrites": [
