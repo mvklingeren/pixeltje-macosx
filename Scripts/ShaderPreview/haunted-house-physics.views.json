@@ -1,0 +1,232 @@
+{
+  "width": 640,
+  "height": 360,
+  "views": [
+    {
+      "name": "cottage-impact-early",
+      "frames": 57,
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            -36,
+            2.0,
+            42.0,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.15
+          ]
+        }
+      ],
+      "movement": [
+        0,
+        0,
+        0,
+        1040
+      ],
+      "pointer": [
+        0.5,
+        0.42,
+        0,
+        0.03333333333333333
+      ],
+      "inputs": [
+        {
+          "frame": 24,
+          "pointer": [
+            0.5,
+            0.42,
+            1,
+            0.03333333333333333
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cottage-impact-settled",
+      "frames": 100,
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            -36,
+            2.0,
+            42.0,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.15
+          ]
+        }
+      ],
+      "movement": [
+        0,
+        0,
+        0,
+        1040
+      ],
+      "pointer": [
+        0.5,
+        0.42,
+        0,
+        0.03333333333333333
+      ],
+      "inputs": [
+        {
+          "frame": 24,
+          "pointer": [
+            0.5,
+            0.42,
+            1,
+            0.03333333333333333
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cottage-rubble-side",
+      "frames": 100,
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            -36,
+            2.0,
+            42.0,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.15
+          ]
+        }
+      ],
+      "movement": [
+        0,
+        0,
+        0,
+        1040
+      ],
+      "pointer": [
+        0.5,
+        0.42,
+        0,
+        0.03333333333333333
+      ],
+      "inputs": [
+        {
+          "frame": 24,
+          "pointer": [
+            0.5,
+            0.42,
+            1,
+            0.03333333333333333
+          ]
+        }
+      ],
+      "writes": [
+        {
+          "buffer": "game",
+          "offset": 0,
+          "floats": [
+            -24,
+            4,
+            45,
+            4.28
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.08
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cottage-multiple-impacts",
+      "frames": 310,
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            -36,
+            2.0,
+            42.0,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.15
+          ]
+        }
+      ],
+      "movement": [
+        0,
+        0,
+        0,
+        1040
+      ],
+      "pointer": [
+        0.5,
+        0.42,
+        0,
+        0.03333333333333333
+      ],
+      "inputs": [
+        {
+          "frame": 24,
+          "pointer": [
+            0.5,
+            0.42,
+            1,
+            0.03333333333333333
+          ]
+        },
+        {
+          "frame": 104,
+          "pointer": [
+            0.5,
+            0.42,
+            2,
+            0.03333333333333333
+          ]
+        },
+        {
+          "frame": 184,
+          "pointer": [
+            0.5,
+            0.42,
+            3,
+            0.03333333333333333
+          ]
+        },
+        {
+          "frame": 264,
+          "pointer": [
+            0.5,
+            0.42,
+            4,
+            0.03333333333333333
+          ]
+        }
+      ]
+    }
+  ]
+}

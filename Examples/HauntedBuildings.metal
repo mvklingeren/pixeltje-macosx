@@ -38,6 +38,12 @@ void buildBuildings(device HouseModel &house) {
 
 // ----------------------------------------------------------------- tracing
 
+bool physicsReservedPart(device const HouseModel &house, uint index);
+bool physicsMasonryAt(device const GameState &game,
+    device const HousePart &part, float3 local);
+void traceStreetTombDebris(thread SceneHit &hit, float3 origin,
+    float3 direction, device const GameState &game);
+
 // Adds the nearest building surface along the ray, among groups
 // [groups.x, groups.y), to hit.
 void traceBuildingGroups(thread SceneHit &hit, float3 origin,
@@ -47,15 +53,10 @@ void traceBuildingGroups(thread SceneHit &hit, float3 origin,
     HouseWind wind = houseWind(game);
     bool found = false;
     HouseTurn foundTurn = {0.0f, 1.0f, float2(0.0f)};
-    float foundDrop = 0.0f;
     for (uint g = groups.x; g < groups.y; ++g) {
         HouseGroup group = house.groups[g];
-        uint owner = house.groupBuilding[g];
-        if (buildingCollapseAge(game, owner) >= 1.5f) continue;
-        float drop = buildingCollapseDrop(game, owner);
         HouseTurn turn = houseGroupTurn(group);
-        float3 o = houseTurnPointIn(turn,
-            origin + float3(0.0f, drop, 0.0f));
+        float3 o = houseTurnPointIn(turn, origin);
         float3 d = houseTurnDirectionIn(turn, direction);
         if (!houseRayEntersBox(o, d, group.lower.xyz, group.upper.xyz,
                 hit.distance)) {
@@ -64,6 +65,7 @@ void traceBuildingGroups(thread SceneHit &hit, float3 origin,
         }
         uint end = min(uint(group.upper.w), houseCapacity);
         for (uint i = uint(group.lower.w); i < end; ++i) {
+            if (physicsReservedPart(house, i)) continue;
             uint style = uint(house.parts[i].lower.w);
             float3 normal;
             float t = style == houseMasonry
@@ -84,7 +86,6 @@ void traceBuildingGroups(thread SceneHit &hit, float3 origin,
             hit = {t, normal, p, houseMaterialBase + style, -1, i};
             found = true;
             foundTurn = turn;
-            foundDrop = drop;
         }
     }
     if (!found) return;
@@ -94,8 +95,7 @@ void traceBuildingGroups(thread SceneHit &hit, float3 origin,
             || hit.material == houseMaterialBase + houseBattens)
         houseCladdingRelief(hit, houseTurnDirectionIn(foundTurn, direction),
             game);
-    hit.position = houseTurnPointOut(foundTurn, hit.position)
-        - float3(0.0f, foundDrop, 0.0f);
+    hit.position = houseTurnPointOut(foundTurn, hit.position);
     hit.normal = houseTurnDirectionOut(foundTurn, hit.normal);
 }
 
@@ -105,6 +105,7 @@ void traceBuildings(thread SceneHit &hit, float3 origin, float3 direction,
     traceBuildingGroups(hit, origin, direction, game,
         uint2(0u, game.house.counts.y));
     traceBuildingFragments(hit, origin, direction, game);
+    traceStreetTombDebris(hit, origin, direction, game);
 }
 
 // True when a solid part lies between origin and the light. Cut-out panels
@@ -115,12 +116,8 @@ bool buildingsBlockLight(float3 origin, float3 direction,
     uint groups = min(house.counts.y, houseGroupCapacity);
     for (uint g = 0u; g < groups; ++g) {
         HouseGroup group = house.groups[g];
-        uint owner = house.groupBuilding[g];
-        if (buildingCollapseAge(game, owner) >= 1.5f) continue;
-        float drop = buildingCollapseDrop(game, owner);
         HouseTurn turn = houseGroupTurn(group);
-        float3 o = houseTurnPointIn(turn,
-            origin + float3(0.0f, drop, 0.0f));
+        float3 o = houseTurnPointIn(turn, origin);
         float3 d = houseTurnDirectionIn(turn, direction);
         if (!houseRayEntersBox(o, d, group.lower.xyz, group.upper.xyz,
                 lightDistance)) {
@@ -129,6 +126,7 @@ bool buildingsBlockLight(float3 origin, float3 direction,
         }
         uint end = min(uint(group.upper.w), houseCapacity);
         for (uint i = uint(group.lower.w); i < end; ++i) {
+            if (physicsReservedPart(house, i)) continue;
             uint style = uint(house.parts[i].lower.w);
             if (houseCutoutStyle(style) || style == houseLantern) continue;
             float3 normal;
@@ -140,7 +138,11 @@ bool buildingsBlockLight(float3 origin, float3 direction,
                     o + d * t)) return true;
         }
     }
-    return false;
+    SceneHit rubble = {lightDistance, float3(0.0f), float3(0.0f),
+        0u, -1, 0u};
+    traceBuildingFragments(rubble, origin, direction, game);
+    traceStreetTombDebris(rubble, origin, direction, game);
+    return rubble.distance < lightDistance;
 }
 
 // The nearest see-through pane the ray crosses before limit: its distance,
@@ -154,12 +156,8 @@ float buildingsGlassCrossing(float3 origin, float3 direction, float limit,
     HouseWind wind = houseWind(game);
     for (uint g = 0u; g < groups; ++g) {
         HouseGroup group = house.groups[g];
-        uint owner = house.groupBuilding[g];
-        if (buildingCollapseAge(game, owner) >= 1.5f) continue;
-        float drop = buildingCollapseDrop(game, owner);
         HouseTurn turn = houseGroupTurn(group);
-        float3 o = houseTurnPointIn(turn,
-            origin + float3(0.0f, drop, 0.0f));
+        float3 o = houseTurnPointIn(turn, origin);
         float3 d = houseTurnDirectionIn(turn, direction);
         if (!houseRayEntersBox(o, d, group.lower.xyz, group.upper.xyz,
                 limit)) {
@@ -268,14 +266,13 @@ float buildingsCeilingOver(float2 p, float foot) {
 
 bool buildingsBlocked(float2 p);
 
-bool buildingsBlockedLive(device const GameState &game, float2 p);
+bool buildingsBlockedLive(device const GameState &game, float2 p, float foot);
 
 bool buildingsBlockedFrom(device const GameState &game, float2 p, float foot) {
-    if (buildingCollapseAge(game, 1u) >= 1.5f) return false;
-    if (!houseBodyHolds(p)) return buildingsBlockedLive(game, p);
+    if (!houseBodyHolds(p)) return buildingsBlockedLive(game, p, foot);
     // The ground floor's walls and furniture stand in the house's table.
     if ((foot - houseOrigin.y) / houseScale < houseCeilingY
-        && buildingsBlockedLive(game, p)) return true;
+        && buildingsBlockedLive(game, p, foot)) return true;
     return houseBlockedAbove(p, foot);
 }
 
@@ -323,60 +320,52 @@ bool buildingsBlocked(float2 p) {
     return false;
 }
 
-// Path generation keeps the static footprint table. Movement checks this
-// smaller live correction only when a table footprint actually blocks it.
+// Path generation keeps the static footprint table. For movement, only a
+// collapsed building's old footprint needs a live check: sample the walker
+// against its surviving pieces at body height, including removed grid cells.
 __attribute__((noinline))
-bool buildingsBlockedLive(device const GameState &game, float2 p) {
+bool buildingsBlockedLive(device const GameState &game, float2 p, float foot) {
     if (!buildingsBlocked(p)) return false;
-    if (houseBodyHolds(p) && buildingCollapseAge(game, 1u) >= 1.5f)
-        return false;
-    if (houseGroundHolds(p)) {
-        float2 local = houseLocal(p);
-        float4 footprint = mausoleumFootprint();
-        for (uint plot = 0u; plot < 2u; ++plot) {
-            float2 tomb = local - float2(houseYardAisle(plot),
-                houseYardMausoleumZ);
-            if (all(tomb > footprint.xy - housePlayerPad / houseScale)
-                && all(tomb < footprint.zw + housePlayerPad / houseScale)
-                && buildingCollapseAge(game, 2u + plot) >= 1.5f)
-                return false;
-        }
-    }
-    if (cottageGroundHolds(p) && buildingCollapseAge(game, 6u) >= 1.5f)
-        return false;
-    if (shedYardHolds(p)) {
-        float2 local = p - shedYardOrigin.xz;
-        if (abs(local.x - barnX) < barnHalfSpan + housePlayerPad
-            && abs(local.y - barnZ) < barnHalfLength + housePlayerPad
-            && buildingCollapseAge(game, 4u) >= 1.5f) return false;
-        if (abs(local.x - openShedX) < openShedHalfSpan + housePlayerPad
-            && abs(local.y - openShedZ) < openShedHalfLength
-                + housePlayerPad
-            && buildingCollapseAge(game, 5u) >= 1.5f) {
-            for (uint i = shedObstacleCount - openShedCrateCount;
-                    i < shedObstacleCount; ++i) {
-                float4 r = shedObstacles[i];
-                if (all(local > r.xy - housePlayerPad)
-                    && all(local < r.zw + housePlayerPad)) return true;
+    bool damagedFootprint = false;
+    for (uint g = 0u; g < min(game.house.counts.y, houseGroupCapacity);
+            ++g) {
+        uint owner = game.house.groupBuilding[g];
+        if (owner == 0u || owner >= buildingCount
+            || game.buildingCollapseTime[owner] < 0.0f) continue;
+        HouseGroup group = game.house.groups[g];
+        HouseTurn turn = houseGroupTurn(group);
+        float3 local = houseTurnPointIn(turn,
+            float3(p.x, foot + 0.9f, p.y));
+        if (any(local.xz < group.lower.xz - housePlayerPad)
+            || any(local.xz > group.upper.xz + housePlayerPad)) continue;
+        damagedFootprint = true;
+        for (uint index = uint(group.lower.w);
+                index < min(uint(group.upper.w), houseCapacity); ++index) {
+            if (physicsReservedPart(game.house, index)
+                || game.buildingGone[index] == ~0ul) continue;
+            device const HousePart &part = game.house.parts[index];
+            if (!buildingBreakable(uint(part.lower.w))
+                && uint(part.lower.w) != houseMasonry) continue;
+            if (any(local.xz < part.lower.xz - housePlayerPad)
+                || any(local.xz > part.upper.xz + housePlayerPad)) continue;
+            for (uint sample = 0u; sample < 2u; ++sample) {
+                float3 point = local;
+                point.y = foot + (sample == 0u ? 0.4f : 1.3f);
+                if (point.y < part.lower.y || point.y > part.upper.y)
+                    continue;
+                bool outside = false;
+                for (uint plane = 0u; plane < uint(part.upper.w); ++plane)
+                    outside |= dot(part.planes[plane].xyz, point)
+                        > part.planes[plane].w;
+                if (outside || buildingCellGone(game, index, part, point))
+                    continue;
+                if (uint(part.lower.w) == houseMasonry
+                    && !physicsMasonryAt(game, part, point)) continue;
+                return true;
             }
-            return false;
         }
-        return true;
     }
-    if (streetLampBlocked(p, housePlayerPad)) return true;
-    for (uint i = streetObstacleCount - streetSignCount;
-            i < streetObstacleCount; ++i) {
-        float4 r = streetObstacles[i];
-        if (all(p > r.xy - housePlayerPad)
-            && all(p < r.zw + housePlayerPad)) return true;
-    }
-    for (uint i = 1u; i <= 6u; ++i) {
-        float4 pad = streetPads[i];
-        if (all(p > pad.xy - 1.0f) && all(p < pad.zw + 1.0f)
-            && buildingCollapseAge(game, 6u + i) >= 1.5f)
-            return false;
-    }
-    return true;
+    return !damagedFootprint;
 }
 
 // -------------------------------------------------------------------- lair

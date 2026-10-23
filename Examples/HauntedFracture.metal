@@ -60,17 +60,6 @@ bool buildingCellGone(device const GameState &game, uint index,
     return (mask & (1ul << (cell.y * 8u + cell.x))) != 0ul;
 }
 
-float buildingCollapseAge(device const GameState &game, uint owner) {
-    return owner > 0u && owner < buildingCount
-        && game.buildingCollapseTime[owner] >= 0.0f
-        ? game.effects.x - game.buildingCollapseTime[owner] : -1.0f;
-}
-
-float buildingCollapseDrop(device const GameState &game, uint owner) {
-    float age = buildingCollapseAge(game, owner);
-    return age > 0.0f ? min(7.0f * age * age, 16.0f) : 0.0f;
-}
-
 float buildingCollapseThreshold(uint owner) {
     if (owner == 1u) return 60.0f;
     if (owner == 2u || owner == 3u || owner >= 13u) return 28.0f;
@@ -99,12 +88,21 @@ void launchBuildingFragment(device GameState &game, uint index, uint2 cell,
     }
     uint slot = game.buildingFragmentNext++ % buildingFragmentCount;
     game.buildingFragments[slot] = piece;
-    game.buildingFragmentMotion[slot] = float4(velocity, 1.0f);
-    game.buildingFragmentTurn[slot] = float4(turn.sine, turn.cosine,
-        turn.pivot);
-    game.buildingFragmentShift[slot] = float4(0.0f);
     game.buildingFragmentSource[slot] = index;
+    game.buildingFragmentGone[slot] = whole ? game.buildingGone[index] : 0ul;
     game.buildingFragmentActive = 1u;
+    float3 centre = houseTurnPointOut(turn,
+        0.5f * (piece.lower.xyz + piece.upper.xyz));
+    float angle = atan2(turn.sine, turn.cosine);
+    float4 orientation = float4(0.0f, -sin(0.5f * angle), 0.0f,
+        cos(0.5f * angle));
+    float3 halfExtent = 0.5f * (piece.upper.xyz - piece.lower.xyz);
+    float inverseMass = 1.0f / max(0.2f,
+        2.0f * halfExtent.x * 2.0f * halfExtent.y
+            * 2.0f * halfExtent.z);
+    game.physicsWorld.bodies[slot] = pixeltje_physics::makeRigidBody(
+        centre, halfExtent, orientation, velocity, inverseMass, 0.18f, 0.75f);
+    game.physicsWorld.sleepSeconds[slot] = 0.0f;
 }
 
 bool buildingCollapseSurface(uint style) {
@@ -158,6 +156,8 @@ void buildingMaybeCollapse(device GameState &game, uint owner) {
             1.8f * (houseHash(float(index * 19u)) - 0.5f));
         launchBuildingFragment(game, index, uint2(0u), turn,
             velocity, true);
+        // The detached surface now belongs only to the moving world body.
+        game.buildingGone[index] = ~0ul;
     }
 }
 
@@ -180,7 +180,7 @@ void damageBuildingHit(device GameState &game, BuildingImpact impact) {
     uint index = impact.part;
     if (index >= min(game.house.counts.x, houseCapacity)) return;
     uint owner = buildingPartOwner(game.house, index);
-    if (owner == 0u || buildingCollapseAge(game, owner) >= 0.0f) return;
+    if (owner == 0u) return;
     device const HousePart &part = game.house.parts[index];
     uint style = uint(part.lower.w);
     if (!buildingBreakable(style)) return;
@@ -209,8 +209,7 @@ void damageBuildingsBlast(device GameState &game, float3 blast) {
         nearestDistance[k] = 1.0e9f;
     for (uint g = 0u; g < min(game.house.counts.y, houseGroupCapacity); ++g) {
         uint owner = game.house.groupBuilding[g];
-        if (owner == 0u || owner >= buildingCount
-            || buildingCollapseAge(game, owner) >= 0.0f) continue;
+        if (owner == 0u || owner >= buildingCount) continue;
         HouseGroup group = game.house.groups[g];
         HouseTurn turn = houseGroupTurn(group);
         float3 localBlast = houseTurnPointIn(turn, blast);
@@ -290,10 +289,10 @@ void resetBuildingDamage(device GameState &game) {
         game.buildingCollapseTime[i] = -100.0f;
     }
     for (uint i = 0u; i < buildingFragmentCount; ++i) {
-        game.buildingFragmentMotion[i] = float4(0.0f);
-        game.buildingFragmentTurn[i] = float4(0.0f);
-        game.buildingFragmentShift[i] = float4(0.0f);
         game.buildingFragmentSource[i] = 0u;
+        game.buildingFragmentGone[i] = 0ul;
+        game.physicsWorld.bodies[i].extentState.w = 0.0f;
+        game.physicsWorld.sleepSeconds[i] = 0.0f;
     }
     game.buildingFragmentNext = 0u;
     game.buildingFragmentActive = 0u;
@@ -301,66 +300,31 @@ void resetBuildingDamage(device GameState &game) {
     game.buildingLastBlast = -100.0f;
 }
 
-// Detached sections retain their original geometry, hit the terrain, and
-// remain as rubble. Only the bounded fragment pool is traced each frame.
-__attribute__((noinline))
-void advanceBuildingFragments(device GameState &game, float dt) {
-    if (game.buildingFragmentActive == 0u) return;
-    for (uint i = 0u; i < buildingFragmentCount; ++i) {
-        float4 motion = game.buildingFragmentMotion[i];
-        if (motion.w < 0.5f || motion.w > 1.5f) continue;
-        device HousePart &part = game.buildingFragments[i];
-        float4 fragmentTurn = game.buildingFragmentTurn[i];
-        HouseTurn turn = {fragmentTurn.x, fragmentTurn.y, fragmentTurn.zw};
-        float3 radius = 0.5f * (part.upper.xyz - part.lower.xyz);
-        pixeltje_physics::Body body = {
-            houseTurnPointOut(turn, 0.5f * (part.upper.xyz + part.lower.xyz)),
-            motion.xyz};
-        float3 previous = body.position;
-        body = pixeltje_physics::integrate(body,
-            float3(0.0f, -9.8f, 0.0f), 0.6f, dt);
-        float floorY = buildingsGround(body.position.xz,
-            moonHeight(body.position.xz, moonTraceDetail));
-        pixeltje_physics::Contact floor = pixeltje_physics::spherePlane(
-            body.position, radius.y, float3(0.0f, floorY, 0.0f),
-            float3(0.0f, 1.0f, 0.0f));
-        body = pixeltje_physics::resolve(body, floor, 0.25f, 0.55f);
-        if (floor.depth > 0.0f && abs(body.velocity.y) < 0.3f
-            && length(body.velocity.xz) < 0.35f) {
-            body.velocity = float3(0.0f);
-            motion.w = 2.0f;
-        }
-        float3 delta = houseTurnDirectionIn(turn, body.position - previous);
-        part.lower.xyz += delta;
-        part.upper.xyz += delta;
-        for (uint plane = 0u; plane < uint(part.upper.w); ++plane)
-            part.planes[plane].w += dot(part.planes[plane].xyz, delta);
-        if (uint(part.lower.w) == houseTimber
-            || houseRoundStyle(uint(part.lower.w)))
-            part.rows.xyz += delta;
-        game.buildingFragmentShift[i].xyz += delta;
-        game.buildingFragmentMotion[i] = float4(body.velocity, motion.w);
-    }
-}
-
+// Dynamic fragments keep their authoring geometry and follow world bodies.
 void traceBuildingFragments(thread SceneHit &hit, float3 origin,
     float3 direction, device const GameState &game) {
     if (game.buildingFragmentActive == 0u) return;
     for (uint i = 0u; i < buildingFragmentCount; ++i) {
-        if (game.buildingFragmentMotion[i].w <= 0.0f) continue;
+        pixeltje_physics::RigidBody body = game.physicsWorld.bodies[i];
+        if (body.extentState.w <= 0.0f) continue;
         device const HousePart &part = game.buildingFragments[i];
-        float4 fragmentTurn = game.buildingFragmentTurn[i];
-        HouseTurn turn = {fragmentTurn.x, fragmentTurn.y, fragmentTurn.zw};
-        float3 localOrigin = houseTurnPointIn(turn, origin);
-        float3 localDirection = houseTurnDirectionIn(turn, direction);
+        float3 originalCentre = 0.5f * (part.lower.xyz + part.upper.xyz);
+        float3 localOrigin = originalCentre
+            + pixeltje_physics::unrotate(body.orientation,
+                origin - body.centreMass.xyz);
+        float3 localDirection
+            = pixeltje_physics::unrotate(body.orientation, direction);
         float3 normal;
         float t = houseHitPart(part, localOrigin, localDirection,
             hit.distance, normal);
         if (t > 0.0f) {
+            float3 point = localOrigin + localDirection * t;
+            uint2 cell = buildingCell(part, point);
+            if ((game.buildingFragmentGone[i]
+                    & (1ul << (cell.y * 8u + cell.x))) != 0ul) continue;
             uint source = game.buildingFragmentSource[i];
             device const HousePart &original = game.house.parts[source];
-            float3 originalPoint = localOrigin + localDirection * t
-                - game.buildingFragmentShift[i].xyz;
+            float3 originalPoint = point;
             uint style = uint(part.lower.w);
             if (houseCutoutStyle(style)
                 && houseCutoutOpen(style, original, originalPoint)) continue;
@@ -369,7 +333,8 @@ void traceBuildingFragments(thread SceneHit &hit, float3 origin,
                 && houseWindow(original, source, originalPoint, normal,
                     0.002f, houseWind(game)).glass > 0.5f) continue;
         }
-        if (t > 0.0f) hit = {t, houseTurnDirectionOut(turn, normal),
+        if (t > 0.0f) hit = {t,
+            pixeltje_physics::rotate(body.orientation, normal),
             origin + direction * t,
             houseMaterialBase + uint(part.lower.w), -1, houseCapacity + i};
     }
@@ -384,15 +349,14 @@ float buildingFragmentStand(device const GameState &game, float2 p,
     if (game.buildingFragmentActive == 0u) return ground;
     float top = ground;
     for (uint i = 0u; i < buildingFragmentCount; ++i) {
-        if (game.buildingFragmentMotion[i].w < 1.5f) continue;
-        float4 fragmentTurn = game.buildingFragmentTurn[i];
-        HouseTurn turn = {fragmentTurn.x, fragmentTurn.y, fragmentTurn.zw};
-        float3 local = houseTurnPointIn(turn, float3(p.x, foot, p.y));
-        device const HousePart &part = game.buildingFragments[i];
-        if (all(local.xz >= part.lower.xz)
-            && all(local.xz <= part.upper.xz)
-            && part.upper.y <= foot + buildingFragmentClimb)
-            top = max(top, part.upper.y);
+        pixeltje_physics::RigidBody body = game.physicsWorld.bodies[i];
+        if (body.extentState.w < 1.5f) continue;
+        float3 boundsHalf = pixeltje_physics::boxHalfBounds(body);
+        float3 lower = body.centreMass.xyz - boundsHalf;
+        float3 upper = body.centreMass.xyz + boundsHalf;
+        if (all(p >= lower.xz) && all(p <= upper.xz)
+            && upper.y <= foot + buildingFragmentClimb)
+            top = max(top, upper.y);
     }
     return top;
 }
@@ -402,16 +366,16 @@ bool buildingFragmentBlocked(device const GameState &game, float2 p,
     float foot) {
     if (game.buildingFragmentActive == 0u) return false;
     for (uint i = 0u; i < buildingFragmentCount; ++i) {
-        if (game.buildingFragmentMotion[i].w < 1.5f) continue;
-        float4 fragmentTurn = game.buildingFragmentTurn[i];
-        HouseTurn turn = {fragmentTurn.x, fragmentTurn.y, fragmentTurn.zw};
-        float3 local = houseTurnPointIn(turn, float3(p.x, foot, p.y));
-        device const HousePart &part = game.buildingFragments[i];
-        float2 gap = max(max(part.lower.xz - local.xz,
-            local.xz - part.upper.xz), float2(0.0f));
+        pixeltje_physics::RigidBody body = game.physicsWorld.bodies[i];
+        if (body.extentState.w < 1.5f) continue;
+        float3 boundsHalf = pixeltje_physics::boxHalfBounds(body);
+        float3 lower = body.centreMass.xyz - boundsHalf;
+        float3 upper = body.centreMass.xyz + boundsHalf;
+        float2 gap = max(max(lower.xz - p,
+            p - upper.xz), float2(0.0f));
         if (length(gap) < housePlayerPad
-            && part.upper.y > foot + buildingFragmentClimb
-            && part.lower.y < foot + 1.75f) return true;
+            && upper.y > foot + buildingFragmentClimb
+            && lower.y < foot + 1.75f) return true;
     }
     return false;
 }

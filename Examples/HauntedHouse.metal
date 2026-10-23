@@ -3438,24 +3438,36 @@ SurfaceMaterial houseDustSheet(float3 p, float3 n) {
 SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
     device const GameState &game, float time, float pixelWidth,
     float3 direction, device const float4 *signFont) {
-    bool isDebris = hit.variant >= houseCapacity;
-    uint fragmentSlot = isDebris ? min(hit.variant - houseCapacity,
-        buildingFragmentCount - 1u) : 0u;
-    uint index = isDebris ? game.buildingFragmentSource[fragmentSlot]
+    bool buildingDebris = hit.variant >= houseCapacity
+        && hit.variant < houseCapacity + buildingFragmentCount;
+    bool masonryDebris = hit.variant >= houseCapacity + buildingFragmentCount;
+    uint fragmentSlot = buildingDebris ? hit.variant - houseCapacity : 0u;
+    uint masonrySlot = masonryDebris ? min(hit.variant - houseCapacity
+        - buildingFragmentCount, masonryDebrisCount - 1u) : 0u;
+    uint index = buildingDebris ? game.buildingFragmentSource[fragmentSlot]
+        : masonryDebris ? game.house.debrisParts[masonrySlot]
         : min(hit.variant, houseCapacity - 1u);
     device const HousePart &part = game.house.parts[index];
     uint style = hit.material - houseMaterialBase;
     // A turned building is shaded in its own frame, where it was built.
-    float4 fragmentTurn = isDebris ? game.buildingFragmentTurn[fragmentSlot]
-        : float4(0.0f, 1.0f, 0.0f, 0.0f);
-    HouseTurn turn = isDebris ? HouseTurn{fragmentTurn.x,
-        fragmentTurn.y, fragmentTurn.zw}
-        : housePartTurn(game.house, index);
-    hit.position = houseTurnPointIn(turn, hit.position);
-    if (isDebris)
-        hit.position -= game.buildingFragmentShift[fragmentSlot].xyz;
-    hit.normal = houseTurnDirectionIn(turn, hit.normal);
-    direction = houseTurnDirectionIn(turn, direction);
+    if (buildingDebris || masonryDebris) {
+        uint bodyIndex = buildingDebris ? fragmentSlot
+            : buildingFragmentCount + masonrySlot;
+        pixeltje_physics::RigidBody body
+            = game.physicsWorld.bodies[bodyIndex];
+        device const HousePart &piece = buildingDebris
+            ? game.buildingFragments[fragmentSlot] : part;
+        float3 originalCentre = 0.5f * (piece.lower.xyz + piece.upper.xyz);
+        hit.position = originalCentre + pixeltje_physics::unrotate(
+            body.orientation, hit.position - body.centreMass.xyz);
+        hit.normal = pixeltje_physics::unrotate(body.orientation, hit.normal);
+        direction = pixeltje_physics::unrotate(body.orientation, direction);
+    } else {
+        HouseTurn turn = housePartTurn(game.house, index);
+        hit.position = houseTurnPointIn(turn, hit.position);
+        hit.normal = houseTurnDirectionIn(turn, hit.normal);
+        direction = houseTurnDirectionIn(turn, direction);
+    }
     float3 p = hit.position, n = hit.normal;
     float3 local = houseLocal(p);
     float3 metres = p - houseOrigin;

@@ -929,7 +929,6 @@ bool streetTombBlockedFrom(device const GameState &game, float2 p,
     float foot) {
     uint i = streetTombUnder(p);
     if (i >= streetPropertyCount) return false;
-    if (buildingCollapseAge(game, 6u + i) >= 1.5f) return false;
     StreetProperty c = streetProperties[i];
     if (mausoleumBlocked(streetTombLocal(c, p), streetTombKind(i),
         (foot - c.at.y) / c.at.w, streetTombClimb / c.at.w,
@@ -969,12 +968,15 @@ float streetTombDebrisStand(device const GameState &game, float2 p,
     float foot, float ground) {
     float top = ground;
     for (uint i = 0u; i < masonryDebrisCount; ++i) {
-        if (game.masonryDebrisVelocity[i].w < 1.5f) continue;
-        device const HousePart &part = game.house.parts[
-            game.house.debrisParts[i]];
-        if (all(p >= part.lower.xz) && all(p <= part.upper.xz)
-            && part.upper.y <= foot + streetTombClimb)
-            top = max(top, part.upper.y);
+        pixeltje_physics::RigidBody body = game.physicsWorld.bodies[
+            buildingFragmentCount + i];
+        if (body.extentState.w < 1.5f) continue;
+        float3 boundsHalf = pixeltje_physics::boxHalfBounds(body);
+        float3 lower = body.centreMass.xyz - boundsHalf;
+        float3 upper = body.centreMass.xyz + boundsHalf;
+        if (all(p >= lower.xz) && all(p <= upper.xz)
+            && upper.y <= foot + streetTombClimb)
+            top = max(top, upper.y);
     }
     return top;
 }
@@ -983,14 +985,17 @@ __attribute__((noinline))
 bool streetTombDebrisBlocked(device const GameState &game, float2 p,
     float foot) {
     for (uint i = 0u; i < masonryDebrisCount; ++i) {
-        if (game.masonryDebrisVelocity[i].w < 1.5f) continue;
-        device const HousePart &part = game.house.parts[
-            game.house.debrisParts[i]];
-        float2 gap = max(max(part.lower.xz - p,
-            p - part.upper.xz), float2(0.0f));
+        pixeltje_physics::RigidBody body = game.physicsWorld.bodies[
+            buildingFragmentCount + i];
+        if (body.extentState.w < 1.5f) continue;
+        float3 boundsHalf = pixeltje_physics::boxHalfBounds(body);
+        float3 lower = body.centreMass.xyz - boundsHalf;
+        float3 upper = body.centreMass.xyz + boundsHalf;
+        float2 gap = max(max(lower.xz - p,
+            p - upper.xz), float2(0.0f));
         if (length(gap) < housePlayerPad
-            && part.upper.y > foot + streetTombClimb
-            && part.lower.y < foot + 1.75f) return true;
+            && upper.y > foot + streetTombClimb
+            && lower.y < foot + 1.75f) return true;
     }
     return false;
 }
@@ -1161,8 +1166,11 @@ void resetStreetTombMasonry(device GameState &game) {
         if (corner.lower.y + (float(row) + 0.5f) * corner.windows.y
                 < ruin.at.y + 3.45f * ruin.at.w)
             game.masonryGone[11u][row] = (1u << masonryColumns(corner)) - 1u;
-    for (uint i = 0u; i < masonryDebrisCount; ++i)
-        game.masonryDebrisVelocity[i] = float4(0.0f);
+    for (uint i = 0u; i < masonryDebrisCount; ++i) {
+        game.physicsWorld.bodies[buildingFragmentCount + i].extentState.w
+            = 0.0f;
+        game.physicsWorld.sleepSeconds[buildingFragmentCount + i] = 0.0f;
+    }
     for (uint i = 0u; i < masonryDebrisCount; ++i) {
         StreetProperty c = streetProperties[streetTombFirst
             + i / (masonryDebrisCount / 2u)];
@@ -1182,8 +1190,16 @@ void launchMasonryFragment(device GameState &game, uint instance,
     float3 away = centre - blast;
     away = length(away) > 0.01f ? normalize(away)
         : float3(0.0f, 0.5f, 1.0f);
-    game.masonryDebrisVelocity[slot] = float4(
-        away * (3.0f + 2.5f * seed) + float3(0.0f, 2.5f, 0.0f), 1.0f);
+    float3 launchVelocity = away * (3.0f + 2.5f * seed)
+        + float3(0.0f, 2.5f, 0.0f);
+    float3 halfExtent = 0.5f * (shard.upper.xyz - shard.lower.xyz);
+    game.physicsWorld.bodies[buildingFragmentCount + slot]
+        = pixeltje_physics::makeRigidBody(centre, halfExtent,
+            float4(0.0f, 0.0f, 0.0f, 1.0f),
+            launchVelocity,
+            1.0f / max(0.2f, 8.0f * halfExtent.x * halfExtent.y
+                * halfExtent.z), 0.16f, 0.8f);
+    game.physicsWorld.sleepSeconds[buildingFragmentCount + slot] = 0.0f;
 }
 
 void launchMasonryStone(device GameState &game, uint instance,
@@ -1228,39 +1244,6 @@ void damageStreetTombMasonry(device GameState &game, float3 blast) {
                     0.5f * (upper - lower), blast, seed);
             }
         }
-    }
-}
-
-__attribute__((noinline))
-void advanceStreetTombDebris(device GameState &game, float dt) {
-    for (uint i = 0u; i < masonryDebrisCount; ++i) {
-        float4 motion = game.masonryDebrisVelocity[i];
-        if (motion.w < 0.5f || motion.w > 1.5f) continue;
-        uint partIndex = game.house.debrisParts[i];
-        device HousePart &part = game.house.parts[partIndex];
-        float3 radius = 0.5f * (part.upper.xyz - part.lower.xyz);
-        pixeltje_physics::Body body = {
-            0.5f * (part.upper.xyz + part.lower.xyz), motion.xyz};
-        body = pixeltje_physics::integrate(body,
-            float3(0.0f, -9.8f, 0.0f), 0.0f, dt);
-        uint instance = i / (masonryDebrisCount / 2u);
-        float floorY = streetTombStand(body.position.xz,
-            streetProperties[streetTombFirst + instance].at.y);
-        pixeltje_physics::Contact floor = pixeltje_physics::spherePlane(
-            body.position, radius.y, float3(0.0f, floorY, 0.0f),
-            float3(0.0f, 1.0f, 0.0f));
-        body = pixeltje_physics::resolve(body, floor, 0.23f, 0.45f);
-        if (floor.depth > 0.0f && abs(body.velocity.y) < 0.3f) {
-            body.velocity.y = 0.0f;
-            motion.w = 2.0f;
-        }
-        float3 move = body.position
-            - 0.5f * (part.upper.xyz + part.lower.xyz);
-        part.lower.xyz += move;
-        part.upper.xyz += move;
-        for (uint plane = 0u; plane < uint(part.upper.w); ++plane)
-            part.planes[plane].w += dot(part.planes[plane].xyz, move);
-        game.masonryDebrisVelocity[i] = float4(body.velocity, motion.w);
     }
 }
 

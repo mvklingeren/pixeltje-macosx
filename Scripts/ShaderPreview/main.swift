@@ -12,7 +12,10 @@
 //     "views": [ { "name": "start",
 //       "frames": 1,               ticks before present; 0 = initialize only
 //       "pointer": [x, y, actionCount, dt], "movement": [x, y, secondary, keys],
+//       "inputs": [{ "frame": 20, "pointer": [x, y, 1, dt] }],
 //       "parameters": { "name": 1.0 },       overrides the workflow's values
+//       "initialWrites": [ { "buffer": "game", "offset": 0,
+//                            "floats": [ ... ] } ],
 //       "writes": [ { "buffer": "game", "offset": 0, "floats": [ ... ] },
 //                   { "buffer": "game", "offset": 32, "uints": [ ... ] } ]
 //     } ] }
@@ -78,11 +81,18 @@ struct Views: Decodable {
     let uints: [UInt32]?
   }
   struct View: Decodable {
+    struct Input: Decodable {
+      let frame: Int
+      let pointer: [Float]?
+      let movement: [Float]?
+    }
     let name: String
     let frames: Int?
     let pointer: [Float]?
     let movement: [Float]?
+    let inputs: [Input]?
     let parameters: [String: Float]?
+    let initialWrites: [Write]?
     let writes: [Write]?
   }
   let width: Int?
@@ -283,13 +293,15 @@ func uniforms(frame: Int, view: Views.View) -> Uniforms {
     numbers[index] = values[name] ?? 0
   }
   func group(_ start: Int) -> SIMD4<Float> { vector(Array(numbers[start..<(start + 4)])) }
+  let input = view.inputs?.filter { $0.frame <= frame }
+    .max { $0.frame < $1.frame }
   return Uniforms(
     resolutionTime: SIMD4(Float(width), Float(height), Float(Double(frame) / fps), Float(1 / fps)),
     frameSeed: SIMD4(UInt32(frame), UInt32(truncatingIfNeeded: seed),
       UInt32(truncatingIfNeeded: seed >> 32), 0),
     parameters: (group(0), group(4), group(8), group(12)),
-    pointer: vector(view.pointer ?? [0.5, 0.5, 0, 0]),
-    movement: vector(view.movement))
+    pointer: vector(input?.pointer ?? view.pointer ?? [0.5, 0.5, 0, 0]),
+    movement: vector(input?.movement ?? view.movement))
 }
 
 final class Renderer {
@@ -321,9 +333,17 @@ final class Renderer {
         guard let function = library.makeFunction(name: name) else {
           throw Failure(description: "Missing compute function \(name).")
         }
-        let pipeline = try computePipelines[name]
-          ?? device.makeComputePipelineState(function: function)
-        computePipelines[name] = pipeline
+        let pipeline: any MTLComputePipelineState
+        if let cached = computePipelines[name] { pipeline = cached } else {
+          let start = ProcessInfo.processInfo.systemUptime
+          pipeline = try device.makeComputePipelineState(function: function)
+          if ProcessInfo.processInfo.environment["PIXELTJE_SHADER_TIMINGS"] == "1" {
+            let seconds = String(format: "%.3f",
+              ProcessInfo.processInfo.systemUptime - start)
+            print("cold pipeline \(name): \(seconds) s")
+          }
+          computePipelines[name] = pipeline
+        }
         let encoder = command.makeComputeCommandEncoder()!
         encoder.setComputePipelineState(pipeline)
         encoder.setBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 0)
@@ -359,7 +379,13 @@ final class Renderer {
             attachment.sourceAlphaBlendFactor = .one
             attachment.destinationAlphaBlendFactor = blend == "alpha" ? .oneMinusSourceAlpha : .one
           }
+          let start = ProcessInfo.processInfo.systemUptime
           pipeline = try device.makeRenderPipelineState(descriptor: descriptor)
+          if ProcessInfo.processInfo.environment["PIXELTJE_SHADER_TIMINGS"] == "1" {
+            let seconds = String(format: "%.3f",
+              ProcessInfo.processInfo.systemUptime - start)
+            print("cold pipeline \(key): \(seconds) s")
+          }
           renderPipelines[key] = pipeline
         }
         let render = MTLRenderPassDescriptor()
@@ -387,6 +413,27 @@ final class Renderer {
 
   // Returns 8-bit RGBA rows of the output texture, whose values the engine
   // reads as sRGB-encoded 0–1.
+  func applyWrites(_ writes: [Views.Write]?, resources: [String: Resource]) throws {
+    for write in writes ?? [] {
+      guard case .buffer(let buffer)? = resources[write.buffer] else {
+        throw Failure(description: "Write target \(write.buffer) is not a buffer.")
+      }
+      let offset = write.offset ?? 0
+      let bytes = (write.floats ?? []).count * 4 + (write.uints ?? []).count * 4
+      guard offset >= 0, offset + bytes <= buffer.length,
+        (write.floats == nil) != (write.uints == nil) else {
+        throw Failure(description: "Write to \(write.buffer) needs floats or uints within its \(buffer.length) bytes.")
+      }
+      let destination = buffer.contents() + offset
+      if let floats = write.floats {
+        floats.withUnsafeBytes { destination.copyMemory(from: $0.baseAddress!, byteCount: $0.count) }
+      }
+      if let uints = write.uints {
+        uints.withUnsafeBytes { destination.copyMemory(from: $0.baseAddress!, byteCount: $0.count) }
+      }
+    }
+  }
+
   func render(_ view: Views.View) throws -> [UInt8] {
     var resources = try makeResources()
     let clear = queue.makeCommandBuffer()!
@@ -400,6 +447,7 @@ final class Renderer {
     clear.commit()
     clear.waitUntilCompleted()
     try encode(program.initialize, resources: resources, uniforms: uniforms(frame: 0, view: view))
+    try applyWrites(view.initialWrites, resources: resources)
     let frames = max(view.frames ?? 1, 0)
     for index in 0..<frames {
       if let name = program.sceneRequestBuffer, case .buffer(let buffer)? = resources[name] {
@@ -418,20 +466,7 @@ final class Renderer {
         resources[pair[1]] = first
       }
     }
-    for write in view.writes ?? [] {
-      guard case .buffer(let buffer)? = resources[write.buffer] else {
-        throw Failure(description: "Write target \(write.buffer) is not a buffer.")
-      }
-      let offset = write.offset ?? 0
-      let bytes = (write.floats ?? []).count * 4 + (write.uints ?? []).count * 4
-      guard offset >= 0, offset + bytes <= buffer.length,
-        (write.floats == nil) != (write.uints == nil) else {
-        throw Failure(description: "Write to \(write.buffer) needs floats or uints within its \(buffer.length) bytes.")
-      }
-      let destination = buffer.contents() + offset
-      if let floats = write.floats { floats.withUnsafeBytes { destination.copyMemory(from: $0.baseAddress!, byteCount: $0.count) } }
-      if let uints = write.uints { uints.withUnsafeBytes { destination.copyMemory(from: $0.baseAddress!, byteCount: $0.count) } }
-    }
+    try applyWrites(view.writes, resources: resources)
     try encode(program.present, resources: resources,
       uniforms: uniforms(frame: max(frames - 1, 0), view: view))
     guard case .texture(let output)? = resources[program.output] else {

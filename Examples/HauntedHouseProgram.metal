@@ -323,6 +323,7 @@ constant uint masonryDebrisCount = 24u;
 constant uint buildingCount = 15u; // 0 is scenery; 1–14 are buildings
 constant uint buildingImpactCount = 16u;
 constant uint buildingFragmentCount = 12u;
+constant uint physicsBodyCount = buildingFragmentCount + masonryDebrisCount;
 
 constant uint houseCandleCapacity = 4u;
 
@@ -433,7 +434,6 @@ struct GameState {
     Bat bats[batCount];     // the bats out tonight
     // One bit per missing stone, indexed by panel, course and column.
     uint masonryGone[masonryPanelCount][masonryMaxRows];
-    float4 masonryDebrisVelocity[masonryDebrisCount];
     uint masonryDebrisNext[2];
     float masonryLastBlast;
     // Intact parts stay compact. Only struck parts acquire missing cells,
@@ -445,12 +445,13 @@ struct GameState {
     uint buildingImpactCountNow;
     float buildingLastBlast;
     HousePart buildingFragments[buildingFragmentCount];
-    float4 buildingFragmentMotion[buildingFragmentCount];
-    float4 buildingFragmentTurn[buildingFragmentCount];
-    float4 buildingFragmentShift[buildingFragmentCount];
     uint buildingFragmentSource[buildingFragmentCount];
+    ulong buildingFragmentGone[buildingFragmentCount];
     uint buildingFragmentNext;
     uint buildingFragmentActive;
+    // The physics world owns both debris pools. HousePart remains immutable
+    // collision/render geometry; the body's pose moves it through the scene.
+    pixeltje_physics::World<physicsBodyCount> physicsWorld;
 };
 
 static_assert(sizeof(GameState) <= 327680,
@@ -572,6 +573,7 @@ PointLight roomLight(uint index, float time) {
 #include "HauntedFracture.metal"
 #include "HauntedStreet.metal"
 #include "HauntedBuildings.metal"
+#include "HauntedPhysicsWorld.metal"
 
 // The broodmother waits by the candles in the ruined mausoleum's hall and,
 // once the player climbs in, walks out toward the gap; see
@@ -1152,8 +1154,7 @@ float playerTombGround(device const GameState &game, float2 point,
     float foot) {
     float base = moonHeight(point, moonTraceDetail);
     uint tomb = streetTombUnder(point);
-    if (tomb < streetPropertyCount
-        && buildingCollapseAge(game, 6u + tomb) < 1.5f)
+    if (tomb < streetPropertyCount)
         base = buildingsTombStand(point, base);
     return streetTombDebrisStand(game, point, foot, base);
 }
@@ -1164,9 +1165,6 @@ float playerGround(device const GameState &game, float2 point, float foot) {
             playerTombGround(game, point, foot));
     if (!houseBodyHolds(point))
         return buildingFragmentStand(game, point, foot, stairHeight(point));
-    if (buildingCollapseAge(game, 1u) >= 1.5f)
-        return buildingFragmentStand(game, point, foot,
-            moonHeight(point, moonTraceDetail));
     return buildingFragmentStand(game, point, foot,
         buildingsStandFrom(point, moonHeight(point, moonTraceDetail), foot));
 }
@@ -1179,7 +1177,7 @@ bool playerWalkable(device const GameState &game, float2 point, float foot) {
     if (!houseBodyHolds(point)) {
         if (outdoors(point, 0.45f))
             return dot(point, point) < moonWalkRadius * moonWalkRadius
-                && !buildingsBlockedLive(game, point);
+                && !buildingsBlockedLive(game, point, foot);
         return walkable(point);
     }
     return !buildingsBlockedFrom(game, point, foot);
@@ -2048,7 +2046,6 @@ kernel void advanceMasonry(constant ProgramUniforms &u [[buffer(0)]],
         damageStreetTombMasonry(states[0], states[0].blast.xyz);
         states[0].masonryLastBlast = states[0].blast.w;
     }
-    advanceStreetTombDebris(states[0], tickStep(u));
 }
 
 // Fracturing is event-driven. These passes follow shooting and ordnance so
@@ -2071,7 +2068,7 @@ kernel void advanceBuildingDebris(constant ProgramUniforms &u [[buffer(0)]],
     device GameState *states [[buffer(1)]],
     uint id [[thread_position_in_grid]]) {
     if (id != 0u || states[0].progress.w != phasePlaying) return;
-    advanceBuildingFragments(states[0], tickStep(u));
+    advancePhysicsWorld(states[0], tickStep(u));
 }
 
 // Sentries aim and fire, then their bolts fly. A sentry shot uses the

@@ -80,3 +80,79 @@ import Testing
   #expect(abs(results[12] - 2.0) < 0.0001)
   #expect(results[13] == -1.0)
 }
+
+@Test func physicsWorldResolvesOffCentreRigidBodyImpact() throws {
+  let source = """
+    // pixeltje:physics-v1
+    #include <metal_stdlib>
+    kernel void sampleWorld(device float *results [[buffer(0)]],
+                            uint index [[thread_position_in_grid]]) {
+      if (index != 0u) return;
+      pixeltje_physics::World<2> world;
+      world.bodies[0] = pixeltje_physics::makeRigidBody(
+        float3(-0.35f, 0.5f, 0.0f), float3(0.5f),
+        float4(0.0f, 0.0f, 0.0f, 1.0f),
+        float3(2.0f, 0.0f, 0.0f), 1.0f, 0.2f, 0.7f);
+      world.bodies[1] = pixeltje_physics::makeRigidBody(
+        float3(0.4f, 0.0f, 0.0f), float3(0.5f),
+        float4(0.0f, 0.0f, 0.0f, 1.0f),
+        float3(0.0f), 0.0f, 0.1f, 0.7f);
+      auto contact = pixeltje_physics::boxBox(
+        world.bodies[0], world.bodies[1]);
+      results[0] = contact.depth;
+      results[1] = contact.normal.x;
+      pixeltje_physics::solve(world.bodies[0], world.bodies[1], contact);
+      results[2] = world.bodies[0].linearBounce.x;
+      results[3] = world.bodies[0].angularFriction.z;
+      results[4] = world.bodies[1].centreMass.x;
+      pixeltje_physics::integrateRigid(world.bodies[0], float3(0.0f),
+        0.0f, 0.0f, 0.1f);
+      results[5] = world.bodies[0].orientation.z;
+      auto separated = pixeltje_physics::boxBox(world.bodies[0],
+        pixeltje_physics::makeRigidBody(float3(5.0f), float3(0.5f),
+          float4(0.0f, 0.0f, 0.0f, 1.0f), float3(0.0f),
+          0.0f, 0.1f, 0.7f));
+      results[6] = separated.depth;
+      auto pairA = pixeltje_physics::makeRigidBody(
+        float3(-0.35f, 0.2f, 0.0f), float3(0.5f),
+        float4(0.0f, 0.0f, 0.0f, 1.0f),
+        float3(2.0f, 0.0f, 0.0f), 1.0f, 0.2f, 0.7f);
+      auto pairB = pixeltje_physics::makeRigidBody(
+        float3(0.4f, 0.0f, 0.0f), float3(0.5f),
+        float4(0.0f, 0.0f, 0.0f, 1.0f),
+        float3(-1.0f, 0.0f, 0.0f), 1.0f, 0.2f, 0.7f);
+      pixeltje_physics::solve(pairA, pairB,
+        pixeltje_physics::boxBox(pairA, pairB));
+      results[7] = pairA.linearBounce.x;
+      results[8] = pairB.linearBounce.x;
+    }
+    """
+  let resolved = PipelineMetalLibraries.resolving(source)
+  let device = try #require(MTLCreateSystemDefaultDevice())
+  let library = try device.makeLibrary(source: resolved, options: nil)
+  let function = try #require(library.makeFunction(name: "sampleWorld"))
+  let pipeline = try device.makeComputePipelineState(function: function)
+  let queue = try #require(device.makeCommandQueue())
+  let buffer = try #require(device.makeBuffer(length: 9 * MemoryLayout<Float>.stride,
+    options: .storageModeShared))
+  let commands = try #require(queue.makeCommandBuffer())
+  let encoder = try #require(commands.makeComputeCommandEncoder())
+  encoder.setComputePipelineState(pipeline)
+  encoder.setBuffer(buffer, offset: 0, index: 0)
+  encoder.dispatchThreads(MTLSize(width: 1, height: 1, depth: 1),
+    threadsPerThreadgroup: MTLSize(width: 1, height: 1, depth: 1))
+  encoder.endEncoding()
+  commands.commit()
+  commands.waitUntilCompleted()
+  let result = Array(UnsafeBufferPointer(
+    start: buffer.contents().assumingMemoryBound(to: Float.self), count: 9))
+  #expect(result[0] > 0.2 && result[0] < 0.3)
+  #expect(result[1] == -1.0)
+  #expect(result[2] < 2.0)
+  #expect(abs(result[3]) > 0.01)
+  #expect(result[4] == 0.4)
+  #expect(abs(result[5]) > 0.001)
+  #expect(result[6] == 0.0)
+  #expect(result[7] < 2.0)
+  #expect(result[8] > -1.0)
+}
