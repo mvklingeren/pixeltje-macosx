@@ -229,16 +229,10 @@ float buildingsStand(float2 p, float ground) {
     return houseStand(p, ground);
 }
 
-// The player alone climbs to the haunted house's upper floors and onto the
-// street's mausoleums. With their feet at foot, these stand in for
-// buildingsStand and buildingsBlocked over the house's body and the
-// mausoleums' pads, and give the height of what is over their head.
-bool buildingsClimbHolds(float2 p) {
-    return houseBodyHolds(p) || streetTombPadHolds(p);
-}
-
+// The player alone climbs to the haunted house's upper floors. With their
+// feet at foot, these stand in for buildingsStand and buildingsBlocked over
+// the house's body, and give the height of what is over their head.
 float buildingsStandFrom(float2 p, float ground, float foot) {
-    if (streetTombPadHolds(p)) return streetTombStand(p, ground);
     return houseStandFrom(p, ground, foot);
 }
 
@@ -249,7 +243,6 @@ float buildingsCeilingOver(float2 p, float foot) {
 bool buildingsBlocked(float2 p);
 
 bool buildingsBlockedFrom(float2 p, float foot) {
-    if (streetTombPadHolds(p)) return streetTombBlockedFrom(p, foot);
     if (!houseBodyHolds(p)) return buildingsBlocked(p);
     // The ground floor's walls and furniture stand in the house's table.
     if ((foot - houseOrigin.y) / houseScale < houseCeilingY
@@ -302,6 +295,24 @@ bool buildingsBlocked(float2 p) {
 }
 
 // -------------------------------------------------------------------- lair
+
+// The player alone climbs the street's mausoleums. On their pads these
+// stand in for buildingsStandFrom and buildingsBlockedFrom, out of line:
+// inlined into each of the player tick's footing and wall tests, their
+// table loops made it take minutes to compile.
+bool buildingsTombPadHolds(float2 p) {
+    return streetTombPadHolds(p);
+}
+
+__attribute__((noinline))
+float buildingsTombStand(float2 p, float ground) {
+    return streetTombStand(p, ground);
+}
+
+__attribute__((noinline))
+bool buildingsTombBlockedFrom(float2 p, float foot) {
+    return streetTombBlockedFrom(p, foot);
+}
 
 // The ruined mausoleum's hall, the broodmother's lair: whether p lies in
 // it, and the candlelight that lights it.

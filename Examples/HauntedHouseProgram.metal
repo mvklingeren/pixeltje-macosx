@@ -694,7 +694,7 @@ void gunCapsule(thread GunHit &hit, float3 origin, float3 direction,
 // True where the street's mausoleums stand over the undrawn base: a spider
 // or sentry of the base there is not there at all.
 bool baseBuried(float2 point) {
-    return !renderBase && streetTombPadHolds(point);
+    return !renderBase && buildingsTombPadHolds(point);
 }
 
 void resetGame(device GameState &game, uint seed) {
@@ -1101,13 +1101,23 @@ bool walkable(float2 point) {
 // The player alone climbs the haunted house's upper floors and the street's
 // mausoleums: there their footing and walls depend on how high their feet
 // are, at foot. On the mausoleums' pads the base's rooms are not there.
+// The ground under a mausoleum's pad, out of line for the same reason as
+// the tombs' own tests.
+__attribute__((noinline))
+float playerTombGround(float2 point) {
+    return buildingsTombStand(point, moonHeight(point, moonTraceDetail));
+}
+
 float playerGround(float2 point, float foot) {
-    if (!buildingsClimbHolds(point)) return stairHeight(point);
+    if (buildingsTombPadHolds(point)) return playerTombGround(point);
+    if (!houseBodyHolds(point)) return stairHeight(point);
     return buildingsStandFrom(point, moonHeight(point, moonTraceDetail), foot);
 }
 
 bool playerWalkable(float2 point, float foot) {
-    if (!buildingsClimbHolds(point)) return walkable(point);
+    if (buildingsTombPadHolds(point))
+        return !buildingsTombBlockedFrom(point, foot);
+    if (!houseBodyHolds(point)) return walkable(point);
     return !buildingsBlockedFrom(point, foot);
 }
 
@@ -1435,7 +1445,7 @@ kernel void advancePlayer(constant ProgramUniforms &u [[buffer(0)]],
     next = position;
     // Walking around the outside of the base, or over the mausoleums' pads,
     // must not trip the room rules.
-    bool outside = outdoors(next, 0.0f) || streetTombPadHolds(next);
+    bool outside = outdoors(next, 0.0f) || buildingsTombPadHolds(next);
     if (!rangeCleared(game) && !outside
         && previousPosition.y >= -outerRoomFar + 0.3f)
         next.y = max(next.y, -outerRoomFar + 0.3f);
@@ -4037,7 +4047,7 @@ float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
             : (gun.part >= 6u ? shotgunMaterial(gun) : gunMaterial(gun)));
     bool inHouse = houseInteriorPoint(eye);
     bool inLair = buildingsLairHolds(eye);
-    bool outside = (outdoors(eye.xz, 0.0f) || streetTombPadHolds(eye.xz))
+    bool outside = (outdoors(eye.xz, 0.0f) || buildingsTombPadHolds(eye.xz))
         && !inHouse && !inLair;
     Daylight sun = daylight(dayClock(game));
     float3 bounce = regolithBounce(sun);

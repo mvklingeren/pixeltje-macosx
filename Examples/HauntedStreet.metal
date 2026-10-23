@@ -890,9 +890,11 @@ constant float streetTombClimb = 0.8f;
 
 // The tomb on whose pad p lies, or streetPropertyCount.
 uint streetTombUnder(float2 p) {
-    for (uint i = streetTombFirst; i < streetPropertyCount; ++i)
-        if (all(p >= streetPads[i].xy) && all(p <= streetPads[i].zw))
-            return i;
+    const uint east = streetTombFirst, west = streetTombFirst + 1u;
+    if (all(p >= streetPads[east].xy) && all(p <= streetPads[east].zw))
+        return east;
+    if (all(p >= streetPads[west].xy) && all(p <= streetPads[west].zw))
+        return west;
     return streetPropertyCount;
 }
 
@@ -911,9 +913,7 @@ uint streetTombKind(uint i) {
 }
 
 // The height a walker stands at over p on a tomb's pad: its steps, plinth
-// or heap, or ground. The player's tick reaches these from several places;
-// inlined there, their table loops made it take minutes to compile.
-__attribute__((noinline))
+// or heap, or ground.
 float streetTombStand(float2 p, float ground) {
     uint i = streetTombUnder(p);
     if (i >= streetPropertyCount) return ground;
@@ -924,7 +924,6 @@ float streetTombStand(float2 p, float ground) {
 
 // True where a tomb's wall, or footing more than a step above their feet
 // at foot, keeps the walker out.
-__attribute__((noinline))
 bool streetTombBlockedFrom(float2 p, float foot) {
     uint i = streetTombUnder(p);
     if (i >= streetPropertyCount) return false;
