@@ -261,6 +261,7 @@ void buildShed(device HouseModel &house, ShedSpec shed) {
 // the barn, each traced as a group of its own, in a site of their own.
 void buildShedYard(device HouseModel &house) {
     beginBuildingSite(house);
+    house.activeBuilding = 4u;
     buildShed(house, barnSpec());
     addHouseBoard(house, shedYardOrigin + float3(barnX - 3.0f, 0.04f,
             barnZ + 2.0f), float3(0.3f, 0.0f, 1.0f), float3(0.0f, 1.0f, 0.0f),
@@ -269,6 +270,7 @@ void buildShedYard(device HouseModel &house) {
             1.5f, barnZ + 6.0f), float3(0.0f, 1.0f, 0.25f),
         float3(1.0f, 0.0f, 0.0f), float3(3.2f, 0.25f, 0.05f),
         houseNailsAtEnds);
+    house.activeBuilding = 5u;
     buildShed(house, {float2(openShedX, openShedZ), float2(openShedHalfSpan,
         openShedHalfLength), 4.6f, 2.6f, true, 0.0f, 1u << (8u + 1u)});
     for (uint i = 0u; i < openShedCrateCount; ++i) {
@@ -278,4 +280,5 @@ void buildShedYard(device HouseModel &house) {
     }
     addShedBox(house, float3(25.8f, 1.1f, -7.8f), float3(27.0f, 2.0f, -6.8f),
         houseFurniture);
+    house.activeBuilding = 0u;
 }

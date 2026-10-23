@@ -135,6 +135,7 @@ void addCottageDormer(device HouseModel &house, float x) {
 }
 
 void buildCottage(device HouseModel &house) {
+    house.activeBuilding = 6u;
     beginBuildingSite(house);
     uint firstGroup = house.counts.y;
     beginHouseGroup(house);
@@ -225,6 +226,7 @@ void buildCottage(device HouseModel &house) {
         - float3(0.15f, 0.5f, 0.15f), cottageChimneyTop
         + float3(0.15f, 0.0f, 0.15f), houseBrick));
     turnHouseGroups(house, firstGroup, house.counts.y, cottageTurn, o.xz);
+    house.activeBuilding = 0u;
 }
 
 // ------------------------------------------------------------------- smoke

@@ -929,6 +929,7 @@ bool streetTombBlockedFrom(device const GameState &game, float2 p,
     float foot) {
     uint i = streetTombUnder(p);
     if (i >= streetPropertyCount) return false;
+    if (buildingCollapseAge(game, 6u + i) >= 1.5f) return false;
     StreetProperty c = streetProperties[i];
     if (mausoleumBlocked(streetTombLocal(c, p), streetTombKind(i),
         (foot - c.at.y) / c.at.w, streetTombClimb / c.at.w,
@@ -1125,106 +1126,6 @@ void addStreetTombMasonry(device HouseModel &house, StreetProperty c,
     house.groups[group].upper.xyz += float3(12.0f, 4.0f, 12.0f);
 }
 
-// A roof fragment is a convex, sloping triangle, not a masonry course.
-// Thirty-two triangular sheets tile the two slopes; four thin gable wedges
-// close their ends. Fourteen plaster fascia sections support the eaves
-// along the sides and rear. The original solid pediment and roof slabs are
-// removed from the giant copies so a broken piece leaves an actual opening.
-// The final six pieces reconstruct the copied cross and corner finials.
-HousePart streetTombRoofPiece(StreetProperty c, uint piece) {
-    const float3 source = streetTombSource;
-    const float C = mausoleumCornice;
-    const float slope = mausoleumPedimentRise / mausoleumHalfSpan;
-    HousePart part;
-    if (piece < 32u) {
-        uint side = piece / 16u;
-        uint tile = (piece % 16u) / 2u;
-        uint across = tile / 4u, along = tile % 4u;
-        uint triangle = piece & 1u;
-        float sign = side == 0u ? -1.0f : 1.0f;
-        float xA = source.x + sign * (3.1f * float(across) / 2.0f);
-        float xB = source.x + sign * (3.1f * float(across + 1u) / 2.0f);
-        float x0 = min(xA, xB), x1 = max(xA, xB);
-        float z0 = source.z - 2.38f + 8.0f * float(along) / 4.0f;
-        float z1 = source.z - 2.38f + 8.0f * float(along + 1u) / 4.0f;
-        part = houseRoofSheet(float2(source.x,
-            source.y + C + mausoleumPedimentRise + 0.2f), sign, 3.1f,
-            slope, 0.2f, float2(z0, z1), houseGrave);
-        part.lower.x = x0;
-        part.upper.x = x1;
-        float3 diagonal = float3(1.0f / (x1 - x0), 0.0f,
-            -1.0f / (z1 - z0));
-        houseCut(part, triangle == 0u ? diagonal : -diagonal,
-            float3(x0, source.y, z0));
-    } else if (piece < 36u) {
-        uint end = (piece - 32u) / 2u;
-        uint column = (piece - 32u) % 2u;
-        float z0 = end == 0u ? -2.2f : 5.20f;
-        part = houseGable(source + float3(-mausoleumHalfSpan, C, z0),
-            source + float3(mausoleumHalfSpan,
-                C + mausoleumPedimentRise, z0 + 0.25f), true,
-            housePlaster);
-        part.lower.x = source.x - mausoleumHalfSpan
-            + 2.0f * mausoleumHalfSpan * float(column) / 2.0f;
-        part.upper.x = source.x - mausoleumHalfSpan
-            + 2.0f * mausoleumHalfSpan * float(column + 1u) / 2.0f;
-    } else if (piece < 44u) {
-        uint side = (piece - 36u) / 4u;
-        uint along = (piece - 36u) % 4u;
-        float x0 = side == 0u ? -mausoleumHalfSpan : 2.48f;
-        float x1 = side == 0u ? -2.48f : mausoleumHalfSpan;
-        float z0 = -1.75f + 7.20f * float(along) / 4.0f;
-        float z1 = -1.75f + 7.20f * float(along + 1u) / 4.0f;
-        part = houseBox(source + float3(x0, mausoleumEntablature, z0),
-            source + float3(x1, C + 0.08f, z1), housePlaster);
-    } else if (piece < 47u) {
-        uint across = piece - 44u;
-        float x0 = -2.48f + 4.96f * float(across) / 3.0f;
-        float x1 = -2.48f + 4.96f * float(across + 1u) / 3.0f;
-        part = houseBox(source + float3(x0, mausoleumEntablature, 5.0f),
-            source + float3(x1, C + 0.08f, 5.45f), housePlaster);
-    } else if (piece < 50u) {
-        uint across = piece - 47u;
-        float x0 = -mausoleumHalfSpan
-            + 2.0f * mausoleumHalfSpan * float(across) / 3.0f;
-        float x1 = -mausoleumHalfSpan
-            + 2.0f * mausoleumHalfSpan * float(across + 1u) / 3.0f;
-        part = houseBox(source + float3(x0, mausoleumEntablature,
-            mausoleumPedimentFront), source + float3(x1, C + 0.08f,
-            -1.75f), housePlaster);
-    } else if (piece == 50u) {
-        float apex = C + mausoleumPedimentRise;
-        part = mausoleumStone(source + float3(-0.07f, apex, -2.36f),
-            source + float3(0.07f, apex + 1.25f, -2.2f));
-    } else if (piece == 51u) {
-        float apex = C + mausoleumPedimentRise;
-        part = mausoleumStone(source + float3(-0.3f, apex + 0.85f,
-            -2.36f), source + float3(0.3f, apex + 0.97f, -2.2f));
-    } else {
-        uint corner = piece - 52u;
-        float x = ((corner & 1u) != 0u ? 1.0f : -1.0f) * 2.95f;
-        float z = (corner & 2u) != 0u ? 5.47f : -2.23f;
-        part = houseSpire(source + float3(x - 0.16f, C, z - 0.16f),
-            source + float3(x + 0.16f, C + 0.85f, z + 0.16f),
-            float2(0.0f), houseGrave);
-    }
-    part.rows = piece == 48u ? float4(0.38f, 2.0f, 0.14f, 0.0f)
-        : float4(0.0f);
-    return streetCopyPart(part, c, source);
-}
-
-void addStreetTombRoof(device HouseModel &house, StreetProperty c,
-    uint instance, uint copiedFirstPart) {
-    for (uint piece = 0u; piece < 50u; ++piece) {
-        house.roofParts[instance * masonryRoofPiecesPerTomb + piece]
-            = house.counts.x;
-        addHouseWorldPart(house, streetTombRoofPiece(c, piece));
-    }
-    for (uint piece = 50u; piece < masonryRoofPiecesPerTomb; ++piece)
-        house.roofParts[instance * masonryRoofPiecesPerTomb + piece]
-            = copiedFirstPart + mausoleumRoofOrnamentFirstPart + piece - 50u;
-}
-
 void resetStreetTombMasonry(device GameState &game) {
     for (uint panel = 0u; panel < masonryPanelCount; ++panel)
         for (uint row = 0u; row < masonryMaxRows; ++row)
@@ -1260,13 +1161,6 @@ void resetStreetTombMasonry(device GameState &game) {
         if (corner.lower.y + (float(row) + 0.5f) * corner.windows.y
                 < ruin.at.y + 3.45f * ruin.at.w)
             game.masonryGone[11u][row] = (1u << masonryColumns(corner)) - 1u;
-    for (uint index = 0u; index < masonryRoofPieceCount; ++index) {
-        uint instance = index / masonryRoofPiecesPerTomb;
-        uint piece = index % masonryRoofPiecesPerTomb;
-        StreetProperty c = streetProperties[streetTombFirst + instance];
-        game.house.parts[game.house.roofParts[index]]
-            = streetTombRoofPiece(c, piece);
-    }
     for (uint i = 0u; i < masonryDebrisCount; ++i)
         game.masonryDebrisVelocity[i] = float4(0.0f);
     for (uint i = 0u; i < masonryDebrisCount; ++i) {
@@ -1326,35 +1220,14 @@ void damageStreetTombMasonry(device GameState &game, float3 blast) {
                 if (distance(point, clamp(point, lower, upper))
                     > reach * (0.82f + 0.22f * seed)) continue;
                 game.masonryGone[panel][row] |= 1u << col;
+                game.buildingDamage[13u + panel / masonryPanelsPerTomb]
+                    += 0.35f;
                 float3 centre = houseTurnPointOut(turn,
                     0.5f * (lower + upper));
                 launchMasonryStone(game, panel / masonryPanelsPerTomb, centre,
                     0.5f * (upper - lower), blast, seed);
             }
         }
-    }
-}
-
-// Detach angular roof facets around the impact. Their own convex planes
-// remain on the flying pieces, so this reads as shattering rather than
-// another set of rectangular stone courses.
-__attribute__((noinline))
-void damageStreetTombRoof(device GameState &game, float3 blast) {
-    for (uint index = 0u; index < masonryRoofPieceCount; ++index) {
-        uint partIndex = game.house.roofParts[index];
-        device HousePart &part = game.house.parts[partIndex];
-        if (any(part.lower.xyz >= part.upper.xyz)) continue;
-        HouseTurn turn = housePartTurn(game.house, partIndex);
-        float3 point = houseTurnPointIn(turn, blast);
-        float seed = houseHash(float(index * 59u + 7u));
-        if (distance(point, clamp(point, part.lower.xyz, part.upper.xyz))
-                > 3.2f * (0.78f + 0.3f * seed)) continue;
-        HousePart shard = part;
-        float3 centre = houseTurnPointOut(turn,
-            0.5f * (part.lower.xyz + part.upper.xyz));
-        uint instance = index / masonryRoofPiecesPerTomb;
-        launchMasonryFragment(game, instance, shard, centre, blast, seed);
-        part.upper.xyz = part.lower.xyz;
     }
 }
 
@@ -1402,6 +1275,7 @@ void buildStreet(device HouseModel &house) {
         for (uint i = 1u; i < streetPropertyCount; ++i) {
             StreetProperty c = streetProperties[i];
             if ((c.at.z < streetRoadZ) != (side == 1u)) continue;
+            house.activeBuilding = 6u + i;
             uint first = house.counts.y;
             if (c.kind == streetCottage) {
                 uint2 groups = house.sites[streetCottageSite].xy;
@@ -1423,14 +1297,7 @@ void buildStreet(device HouseModel &house) {
                         k < mausoleumDoorFrameFirstPart + 3u; ++k)
                     house.parts[firstPart + k].upper.xyz
                         = house.parts[firstPart + k].lower.xyz;
-                // The old full-width ceiling and solid gable would fill
-                // holes made in the triangular roof pieces.
-                for (uint k = mausoleumRoofFirstPart;
-                        k <= mausoleumRoofLastPart; ++k)
-                    house.parts[firstPart + k].upper.xyz
-                        = house.parts[firstPart + k].lower.xyz;
                 addStreetTombMasonry(house, c, i - streetTombFirst);
-                addStreetTombRoof(house, c, i - streetTombFirst, firstPart);
             } else {
                 copyBuildingGroup(house,
                     house.sites[streetShedYardSite].x + c.kind, c);
@@ -1439,6 +1306,7 @@ void buildStreet(device HouseModel &house) {
                 streetPropertyTurns[i], c.at.xz);
         }
     }
+    house.activeBuilding = 0u;
     beginBuildingSite(house);
     for (uint k = 0u; k < streetLampCount; ++k) {
         beginHouseGroup(house);

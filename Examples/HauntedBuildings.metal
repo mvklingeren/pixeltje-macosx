@@ -27,6 +27,7 @@
 // the street's copies of them, its lamps and its signs.
 void buildBuildings(device HouseModel &house) {
     house.counts = uint4(0u);
+    house.activeBuilding = 0u;
     beginBuildingSite(house);
     buildHouse(house);
     buildMausoleums(house);
@@ -46,10 +47,15 @@ void traceBuildingGroups(thread SceneHit &hit, float3 origin,
     HouseWind wind = houseWind(game);
     bool found = false;
     HouseTurn foundTurn = {0.0f, 1.0f, float2(0.0f)};
+    float foundDrop = 0.0f;
     for (uint g = groups.x; g < groups.y; ++g) {
         HouseGroup group = house.groups[g];
+        uint owner = house.groupBuilding[g];
+        if (buildingCollapseAge(game, owner) >= 1.5f) continue;
+        float drop = buildingCollapseDrop(game, owner);
         HouseTurn turn = houseGroupTurn(group);
-        float3 o = houseTurnPointIn(turn, origin);
+        float3 o = houseTurnPointIn(turn,
+            origin + float3(0.0f, drop, 0.0f));
         float3 d = houseTurnDirectionIn(turn, direction);
         if (!houseRayEntersBox(o, d, group.lower.xyz, group.upper.xyz,
                 hit.distance)) {
@@ -66,6 +72,7 @@ void traceBuildingGroups(thread SceneHit &hit, float3 origin,
                 : houseHitPart(house.parts[i], o, d, hit.distance, normal);
             if (t < 0.0f) continue;
             float3 p = o + d * t;
+            if (buildingCellGone(game, i, house.parts[i], p)) continue;
             if (houseCutoutStyle(style)
                 && houseCutoutOpen(style, house.parts[i], p)) continue;
             // Rays pass through the clear glass of the house's rooms.
@@ -77,6 +84,7 @@ void traceBuildingGroups(thread SceneHit &hit, float3 origin,
             hit = {t, normal, p, houseMaterialBase + style, -1, i};
             found = true;
             foundTurn = turn;
+            foundDrop = drop;
         }
     }
     if (!found) return;
@@ -86,7 +94,8 @@ void traceBuildingGroups(thread SceneHit &hit, float3 origin,
             || hit.material == houseMaterialBase + houseBattens)
         houseCladdingRelief(hit, houseTurnDirectionIn(foundTurn, direction),
             game);
-    hit.position = houseTurnPointOut(foundTurn, hit.position);
+    hit.position = houseTurnPointOut(foundTurn, hit.position)
+        - float3(0.0f, foundDrop, 0.0f);
     hit.normal = houseTurnDirectionOut(foundTurn, hit.normal);
 }
 
@@ -95,6 +104,7 @@ void traceBuildings(thread SceneHit &hit, float3 origin, float3 direction,
     device const GameState &game) {
     traceBuildingGroups(hit, origin, direction, game,
         uint2(0u, game.house.counts.y));
+    traceBuildingFragments(hit, origin, direction, game);
 }
 
 // True when a solid part lies between origin and the light. Cut-out panels
@@ -105,8 +115,12 @@ bool buildingsBlockLight(float3 origin, float3 direction,
     uint groups = min(house.counts.y, houseGroupCapacity);
     for (uint g = 0u; g < groups; ++g) {
         HouseGroup group = house.groups[g];
+        uint owner = house.groupBuilding[g];
+        if (buildingCollapseAge(game, owner) >= 1.5f) continue;
+        float drop = buildingCollapseDrop(game, owner);
         HouseTurn turn = houseGroupTurn(group);
-        float3 o = houseTurnPointIn(turn, origin);
+        float3 o = houseTurnPointIn(turn,
+            origin + float3(0.0f, drop, 0.0f));
         float3 d = houseTurnDirectionIn(turn, direction);
         if (!houseRayEntersBox(o, d, group.lower.xyz, group.upper.xyz,
                 lightDistance)) {
@@ -122,7 +136,8 @@ bool buildingsBlockLight(float3 origin, float3 direction,
                 ? masonryHitPart(house.parts[i], game, o, d,
                     lightDistance, normal)
                 : houseHitPart(house.parts[i], o, d, lightDistance, normal);
-            if (t > 0.0f) return true;
+            if (t > 0.0f && !buildingCellGone(game, i, house.parts[i],
+                    o + d * t)) return true;
         }
     }
     return false;
@@ -139,8 +154,12 @@ float buildingsGlassCrossing(float3 origin, float3 direction, float limit,
     HouseWind wind = houseWind(game);
     for (uint g = 0u; g < groups; ++g) {
         HouseGroup group = house.groups[g];
+        uint owner = house.groupBuilding[g];
+        if (buildingCollapseAge(game, owner) >= 1.5f) continue;
+        float drop = buildingCollapseDrop(game, owner);
         HouseTurn turn = houseGroupTurn(group);
-        float3 o = houseTurnPointIn(turn, origin);
+        float3 o = houseTurnPointIn(turn,
+            origin + float3(0.0f, drop, 0.0f));
         float3 d = houseTurnDirectionIn(turn, direction);
         if (!houseRayEntersBox(o, d, group.lower.xyz, group.upper.xyz,
                 limit)) {
@@ -155,6 +174,8 @@ float buildingsGlassCrossing(float3 origin, float3 direction, float limit,
             float3 faceNormal;
             float t = housePartHit(house.parts[i], o, d, limit, faceNormal);
             if (t < 0.0f) continue;
+            if (buildingCellGone(game, i, house.parts[i], o + d * t))
+                continue;
             HouseWindow w = houseWindow(house.parts[i], i, o + d * t,
                 faceNormal, 0.002f, wind);
             if (w.glass <= 0.5f) continue;
@@ -247,11 +268,14 @@ float buildingsCeilingOver(float2 p, float foot) {
 
 bool buildingsBlocked(float2 p);
 
-bool buildingsBlockedFrom(float2 p, float foot) {
-    if (!houseBodyHolds(p)) return buildingsBlocked(p);
+bool buildingsBlockedLive(device const GameState &game, float2 p);
+
+bool buildingsBlockedFrom(device const GameState &game, float2 p, float foot) {
+    if (buildingCollapseAge(game, 1u) >= 1.5f) return false;
+    if (!houseBodyHolds(p)) return buildingsBlockedLive(game, p);
     // The ground floor's walls and furniture stand in the house's table.
     if ((foot - houseOrigin.y) / houseScale < houseCeilingY
-        && buildingsBlocked(p)) return true;
+        && buildingsBlockedLive(game, p)) return true;
     return houseBlockedAbove(p, foot);
 }
 
@@ -297,6 +321,62 @@ bool buildingsBlocked(float2 p) {
         if (all(local > r.xy - pad) && all(local < r.zw + pad)) return true;
     }
     return false;
+}
+
+// Path generation keeps the static footprint table. Movement checks this
+// smaller live correction only when a table footprint actually blocks it.
+__attribute__((noinline))
+bool buildingsBlockedLive(device const GameState &game, float2 p) {
+    if (!buildingsBlocked(p)) return false;
+    if (houseBodyHolds(p) && buildingCollapseAge(game, 1u) >= 1.5f)
+        return false;
+    if (houseGroundHolds(p)) {
+        float2 local = houseLocal(p);
+        float4 footprint = mausoleumFootprint();
+        for (uint plot = 0u; plot < 2u; ++plot) {
+            float2 tomb = local - float2(houseYardAisle(plot),
+                houseYardMausoleumZ);
+            if (all(tomb > footprint.xy - housePlayerPad / houseScale)
+                && all(tomb < footprint.zw + housePlayerPad / houseScale)
+                && buildingCollapseAge(game, 2u + plot) >= 1.5f)
+                return false;
+        }
+    }
+    if (cottageGroundHolds(p) && buildingCollapseAge(game, 6u) >= 1.5f)
+        return false;
+    if (shedYardHolds(p)) {
+        float2 local = p - shedYardOrigin.xz;
+        if (abs(local.x - barnX) < barnHalfSpan + housePlayerPad
+            && abs(local.y - barnZ) < barnHalfLength + housePlayerPad
+            && buildingCollapseAge(game, 4u) >= 1.5f) return false;
+        if (abs(local.x - openShedX) < openShedHalfSpan + housePlayerPad
+            && abs(local.y - openShedZ) < openShedHalfLength
+                + housePlayerPad
+            && buildingCollapseAge(game, 5u) >= 1.5f) {
+            for (uint i = shedObstacleCount - openShedCrateCount;
+                    i < shedObstacleCount; ++i) {
+                float4 r = shedObstacles[i];
+                if (all(local > r.xy - housePlayerPad)
+                    && all(local < r.zw + housePlayerPad)) return true;
+            }
+            return false;
+        }
+        return true;
+    }
+    if (streetLampBlocked(p, housePlayerPad)) return true;
+    for (uint i = streetObstacleCount - streetSignCount;
+            i < streetObstacleCount; ++i) {
+        float4 r = streetObstacles[i];
+        if (all(p > r.xy - housePlayerPad)
+            && all(p < r.zw + housePlayerPad)) return true;
+    }
+    for (uint i = 1u; i <= 6u; ++i) {
+        float4 pad = streetPads[i];
+        if (all(p > pad.xy - 1.0f) && all(p < pad.zw + 1.0f)
+            && buildingCollapseAge(game, 6u + i) >= 1.5f)
+            return false;
+    }
+    return true;
 }
 
 // -------------------------------------------------------------------- lair

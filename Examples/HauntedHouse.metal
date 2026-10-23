@@ -1703,6 +1703,7 @@ void buildHouseYards(device HouseModel &house) {
 
 // The house, its lot and both graveyard plots, into the open site.
 void buildHouse(device HouseModel &house) {
+    house.activeBuilding = 1u;
     buildHouseBody(house);
     buildHouseUpperWalls(house);
     buildHouseRooms(house);
@@ -1711,6 +1712,7 @@ void buildHouse(device HouseModel &house) {
     buildHouseAtticStairs(house);
     buildHouseAttic(house);
     buildHousePorch(house);
+    house.activeBuilding = 0u;
     buildHouseFence(house);
     buildHouseGraveyard(house);
     buildHouseYards(house);
@@ -3436,11 +3438,15 @@ SurfaceMaterial houseDustSheet(float3 p, float3 n) {
 SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
     device const GameState &game, float time, float pixelWidth,
     float3 direction, device const float4 *signFont) {
-    uint index = min(hit.variant, houseCapacity - 1u);
-    device const HousePart &part = game.house.parts[index];
+    bool isDebris = hit.variant >= houseCapacity;
+    uint index = isDebris ? min(hit.variant - houseCapacity,
+        buildingFragmentCount - 1u) : min(hit.variant, houseCapacity - 1u);
+    device const HousePart &part = isDebris
+        ? game.buildingFragments[index] : game.house.parts[index];
     uint style = hit.material - houseMaterialBase;
     // A turned building is shaded in its own frame, where it was built.
-    HouseTurn turn = housePartTurn(game.house, index);
+    HouseTurn turn = isDebris ? HouseTurn{0.0f, 1.0f, float2(0.0f)}
+        : housePartTurn(game.house, index);
     hit.position = houseTurnPointIn(turn, hit.position);
     hit.normal = houseTurnDirectionIn(turn, hit.normal);
     direction = houseTurnDirectionIn(turn, direction);

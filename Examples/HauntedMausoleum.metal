@@ -363,8 +363,10 @@ bool mausoleumBlocked(float2 p, uint tomb, float foot, float climb,
 // the last two groups of the house's site, the west plot's first.
 void buildMausoleums(device HouseModel &house) {
     for (uint plot = 0u; plot < 2u; ++plot) {
+        house.activeBuilding = 2u + plot;
         beginHouseGroup(house);
         addMausoleum(house, houseWorld(float3(houseYardAisle(plot), 0.0f,
             houseYardMausoleumZ)));
     }
+    house.activeBuilding = 0u;
 }

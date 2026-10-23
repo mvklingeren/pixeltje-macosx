@@ -228,6 +228,7 @@ float2 houseDoorLeafSpan(device const HousePart &part, float3 p) {
 void beginHouseGroup(device HouseModel &house) {
     uint g = house.counts.y;
     if (g >= houseGroupCapacity) return;
+    house.groupBuilding[g] = house.activeBuilding;
     float first = float(house.counts.x);
     house.groups[g].lower = float4(float3(1.0e9f), first);
     house.groups[g].upper = float4(float3(-1.0e9f), first);

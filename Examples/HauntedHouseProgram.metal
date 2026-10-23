@@ -137,8 +137,9 @@ constant float spawnYaw = 3.14159265f;
 // 1 to 4 pick the hand, pistol, shotgun and launcher; X swaps back to the
 // one held before.
 constant float launcherReloadDuration = 2.4f;
-constant float rocketReserveStart = 4.0f;
-constant uint rocketLimit = 7u;            // loaded plus reserve
+constant float rocketReserveStart = 99.0f; // plus one loaded for 100 at spawn
+constant uint rocketLimit = 100u;          // loaded plus reserve
+constant uint rocketHUDPips = 7u;          // compact indicator; the count is numeric
 constant float lockDuration = 1.0f;
 constant float blastRadius = 4.5f;
 constant uint trailCount = 12u;
@@ -319,8 +320,9 @@ constant uint masonryPanelsPerTomb = 15u;
 constant uint masonryPanelCount = 2u * masonryPanelsPerTomb;
 constant uint masonryMaxRows = 32u;
 constant uint masonryDebrisCount = 24u;
-constant uint masonryRoofPiecesPerTomb = 56u;
-constant uint masonryRoofPieceCount = 2u * masonryRoofPiecesPerTomb;
+constant uint buildingCount = 15u; // 0 is scenery; 1–14 are buildings
+constant uint buildingImpactCount = 16u;
+constant uint buildingFragmentCount = 12u;
 
 constant uint houseCandleCapacity = 4u;
 
@@ -346,7 +348,13 @@ struct HouseModel {
     HousePart parts[houseCapacity];
     uint masonryParts[masonryPanelCount];
     uint debrisParts[masonryDebrisCount];
-    uint roofParts[masonryRoofPieceCount];
+    uint activeBuilding;    // builder-only owner for the next group
+    uint groupBuilding[houseGroupCapacity];
+};
+
+struct BuildingImpact {
+    float4 pointDamage;    // world XYZ, damage contribution
+    uint part;             // HouseModel part index
 };
 
 struct GameState {
@@ -427,9 +435,21 @@ struct GameState {
     float4 masonryDebrisVelocity[masonryDebrisCount];
     uint masonryDebrisNext[2];
     float masonryLastBlast;
+    // Intact parts stay compact. Only struck parts acquire missing cells,
+    // and only active fragments enter the scene trace.
+    ulong buildingGone[houseCapacity];
+    float buildingDamage[buildingCount];
+    float buildingCollapseTime[buildingCount];
+    BuildingImpact buildingImpacts[buildingImpactCount];
+    uint buildingImpactCountNow;
+    float buildingLastBlast;
+    HousePart buildingFragments[buildingFragmentCount];
+    float4 buildingFragmentMotion[buildingFragmentCount];
+    uint buildingFragmentNext;
+    uint buildingFragmentActive;
 };
 
-static_assert(sizeof(GameState) <= 262144,
+static_assert(sizeof(GameState) <= 327680,
     "The GPU Program game buffer must contain game state, the HUD glyphs "
     "and the buildings");
 
@@ -545,6 +565,7 @@ PointLight roomLight(uint index, float time) {
 #include "HauntedMausoleum.metal"
 #include "HauntedShed.metal"
 #include "HauntedCottage.metal"
+#include "HauntedFracture.metal"
 #include "HauntedStreet.metal"
 #include "HauntedBuildings.metal"
 
@@ -796,6 +817,7 @@ void resetGame(device GameState &game, uint seed) {
     }
     game.pickups = uint4(0u);
     resetStreetTombMasonry(game);
+    resetBuildingDamage(game);
     game.masonryLastBlast = -100.0f;
     houseQuiet(game);
     buildingsShutDoors(game);
@@ -1124,8 +1146,11 @@ bool walkable(float2 point) {
 __attribute__((noinline))
 float playerTombGround(device const GameState &game, float2 point,
     float foot) {
-    float base = buildingsTombStand(point,
-        moonHeight(point, moonTraceDetail));
+    float base = moonHeight(point, moonTraceDetail);
+    uint tomb = streetTombUnder(point);
+    if (tomb < streetPropertyCount
+        && buildingCollapseAge(game, 6u + tomb) < 1.5f)
+        base = buildingsTombStand(point, base);
     return streetTombDebrisStand(game, point, foot, base);
 }
 
@@ -1133,6 +1158,8 @@ float playerGround(device const GameState &game, float2 point, float foot) {
     if (buildingsTombPadHolds(point))
         return playerTombGround(game, point, foot);
     if (!houseBodyHolds(point)) return stairHeight(point);
+    if (buildingCollapseAge(game, 1u) >= 1.5f)
+        return moonHeight(point, moonTraceDetail);
     return buildingsStandFrom(point, moonHeight(point, moonTraceDetail), foot);
 }
 
@@ -1140,8 +1167,13 @@ bool playerWalkable(device const GameState &game, float2 point, float foot) {
     if (buildingsTombPadHolds(point))
         return !buildingsTombBlockedFrom(game, point, foot)
             && !streetTombDebrisBlocked(game, point, foot);
-    if (!houseBodyHolds(point)) return walkable(point);
-    return !buildingsBlockedFrom(point, foot);
+    if (!houseBodyHolds(point)) {
+        if (outdoors(point, 0.45f))
+            return dot(point, point) < moonWalkRadius * moonWalkRadius
+                && !buildingsBlockedLive(game, point);
+        return walkable(point);
+    }
+    return !buildingsBlockedFrom(game, point, foot);
 }
 
 // Where a spider body may stand: the walkable floor clear of the props. The
@@ -1588,11 +1620,13 @@ struct ShotTrace {
     int drone;
     int sentry;
     bool surface;           // the environment stopped the ray
+    uint buildingPart;      // HouseModel part, or houseCapacity
 };
 
 ShotTrace traceShot(device const GameState &game, float3 eye,
     float3 shotDirection) {
-    ShotTrace shot = {sceneRayLimit, -shotDirection, 0u, -1, -1, -1, false};
+    ShotTrace shot = {sceneRayLimit, -shotDirection, 0u, -1, -1, -1,
+        false, houseCapacity};
     ChromePose chrome = {game.chromeRotation, game.chromeCentre.xyz};
     SceneHit environment = {sceneRayLimit, float3(0.0f),
         float3(0.0f), 0u, -1, 0u};
@@ -1602,6 +1636,8 @@ ShotTrace traceShot(device const GameState &game, float3 eye,
         shot.normal = environment.normal;
         shot.material = environment.material;
         shot.surface = true;
+        if (houseMaterial(environment.material))
+            shot.buildingPart = environment.variant;
     }
     for (uint i = 0u; i < enemyCount; ++i) {
         if (!spiderActive(game, i)) continue;
@@ -1616,6 +1652,7 @@ ShotTrace traceShot(device const GameState &game, float3 eye,
             shot.spider = int(i);
             shot.normal = spider.normal;
             shot.material = spider.material;
+            shot.buildingPart = houseCapacity;
         }
     }
     float limit = shot.distance;
@@ -1629,6 +1666,7 @@ ShotTrace traceShot(device const GameState &game, float3 eye,
         shot.material = material;
         shot.spider = -1;
         shot.drone = drone;
+        shot.buildingPart = houseCapacity;
     }
     for (uint i = 0u; i < sentryCount; ++i) {
         SpiderHit sentry = traceSentry(eye, shotDirection, game, i,
@@ -1640,6 +1678,7 @@ ShotTrace traceShot(device const GameState &game, float3 eye,
         shot.spider = -1;
         shot.drone = -1;
         shot.sentry = int(i);
+        shot.buildingPart = houseCapacity;
     }
     return shot;
 }
@@ -1678,6 +1717,13 @@ void fireRound(device GameState &game, float3 eye, float3 shotDirection,
             yaw);
     }
     game.impacts[(game.progress.y - 1u) % impactCount] = shot;
+    if (trace.buildingPart < houseCapacity
+        && game.buildingImpactCountNow < buildingImpactCount) {
+        uint index = game.buildingImpactCountNow++;
+        game.buildingImpacts[index] = {
+            float4(impactPoint, holdingShotgun(game) ? 0.35f : 0.60f),
+            trace.buildingPart};
+    }
     if (trace.drone >= 0)
         damageDrone(game, uint(trace.drone), shotDirection,
             holdingShotgun(game) ? dronePelletDamage : 1.0f, audio);
@@ -1990,10 +2036,32 @@ kernel void advanceMasonry(constant ProgramUniforms &u [[buffer(0)]],
     if (id != 0u || states[0].progress.w != phasePlaying) return;
     if (states[0].blast.w > states[0].masonryLastBlast) {
         damageStreetTombMasonry(states[0], states[0].blast.xyz);
-        damageStreetTombRoof(states[0], states[0].blast.xyz);
         states[0].masonryLastBlast = states[0].blast.w;
     }
     advanceStreetTombDebris(states[0], tickStep(u));
+}
+
+// Fracturing is event-driven. These passes follow shooting and ordnance so
+// none of the building search enters their hot kernels.
+kernel void damageBuildings(constant ProgramUniforms &u [[buffer(0)]],
+    device GameState *states [[buffer(1)]],
+    uint id [[thread_position_in_grid]]) {
+    if (id != 0u || states[0].progress.w != phasePlaying) return;
+    device GameState &game = states[0];
+    for (uint i = 0u; i < game.buildingImpactCountNow; ++i)
+        damageBuildingHit(game, game.buildingImpacts[i]);
+    game.buildingImpactCountNow = 0u;
+    if (game.blast.w > game.buildingLastBlast) {
+        damageBuildingsBlast(game, game.blast.xyz);
+        game.buildingLastBlast = game.blast.w;
+    }
+}
+
+kernel void advanceBuildingDebris(constant ProgramUniforms &u [[buffer(0)]],
+    device GameState *states [[buffer(1)]],
+    uint id [[thread_position_in_grid]]) {
+    if (id != 0u || states[0].progress.w != phasePlaying) return;
+    advanceBuildingFragments(states[0], tickStep(u));
 }
 
 // Sentries aim and fire, then their bolts fly. A sentry shot uses the
@@ -4781,7 +4849,7 @@ fragment float4 compositeFragment(ScreenVertex in [[stage_in]],
     if (game.progress.w == phasePlaying && holdingLauncher(game)) {
         float2 corner = u.resolutionTime.xy - float2(28.0f, 28.0f);
         uint rockets = uint(game.arsenal.w + game.arsenal.z + 0.5f);
-        for (uint i = 0u; i < rocketLimit; ++i) {
+        for (uint i = 0u; i < rocketHUDPips; ++i) {
             float right = corner.x - float(i) * 13.0f;
             if (pixel.x > right - 8.0f && pixel.x < right
                 && pixel.y > corner.y - 22.0f && pixel.y < corner.y) {
@@ -4791,7 +4859,7 @@ fragment float4 compositeFragment(ScreenVertex in [[stage_in]],
                         : float3(0.62f, 0.52f, 0.32f));
             }
         }
-        float barWidth = float(rocketLimit) * 13.0f - 5.0f;
+        float barWidth = float(rocketHUDPips) * 13.0f - 5.0f;
         if (game.launcher.z > 0.0f && pixel.y > corner.y + 5.0f
             && pixel.y < corner.y + 8.0f && pixel.x < corner.x
             && pixel.x > corner.x - barWidth) {
