@@ -1170,6 +1170,7 @@ void resetStreetTombMasonry(device GameState &game) {
         game.physicsWorld.bodies[buildingFragmentCount + i].extentState.w
             = 0.0f;
         game.physicsWorld.sleepSeconds[buildingFragmentCount + i] = 0.0f;
+        game.debrisSoundAt[buildingFragmentCount + i] = -100.0f;
     }
     for (uint i = 0u; i < masonryDebrisCount; ++i) {
         StreetProperty c = streetProperties[streetTombFirst
@@ -1190,8 +1191,8 @@ void launchMasonryFragment(device GameState &game, uint instance,
     float3 away = centre - blast;
     away = length(away) > 0.01f ? normalize(away)
         : float3(0.0f, 0.5f, 1.0f);
-    float3 launchVelocity = away * (3.0f + 2.5f * seed)
-        + float3(0.0f, 2.5f, 0.0f);
+    float3 launchVelocity = away * (3.8f + 2.2f * seed)
+        + float3(0.0f, 0.25f, 0.0f);
     float3 halfExtent = 0.5f * (shard.upper.xyz - shard.lower.xyz);
     game.physicsWorld.bodies[buildingFragmentCount + slot]
         = pixeltje_physics::makeRigidBody(centre, halfExtent,
@@ -1200,21 +1201,31 @@ void launchMasonryFragment(device GameState &game, uint instance,
             1.0f / max(0.2f, 8.0f * halfExtent.x * halfExtent.y
                 * halfExtent.z), 0.16f, 0.8f);
     game.physicsWorld.sleepSeconds[buildingFragmentCount + slot] = 0.0f;
+    game.debrisSoundAt[buildingFragmentCount + slot] = game.effects.x;
 }
 
 void launchMasonryStone(device GameState &game, uint instance,
     float3 centre, float3 halfSize, float3 blast, float seed) {
+    uint axis = halfSize.x > halfSize.z ? 0u : 2u;
     float3 radius = max(halfSize * 0.82f, float3(0.04f));
-    launchMasonryFragment(game, instance, houseBox(centre - radius,
-        centre + radius, houseGrave), centre, blast, seed);
+    radius[axis] *= 0.5f;
+    float3 offset = float3(0.0f);
+    offset[axis] = halfSize[axis] * 0.5f;
+    for (uint pieceIndex = 0u; pieceIndex < 2u; ++pieceIndex) {
+        float3 at = centre + (pieceIndex == 0u ? -offset : offset);
+        launchMasonryFragment(game, instance, houseBox(at - radius,
+            at + radius, houseGrave), at, blast, seed);
+    }
 }
 
 // The same occupancy bit that opens a sightline launches the detached block.
 // A local radius leaves whole stones at the edge; it can straddle two panels
 // at a corner and repeated strikes enlarge the opening.
 __attribute__((noinline))
-void damageStreetTombMasonry(device GameState &game, float3 blast) {
+void damageStreetTombMasonry(device GameState &game,
+    device RangeAudio &audio, float3 blast) {
     const float reach = 2.9f;
+    uint broken = 0u;
     for (uint panel = 0u; panel < masonryPanelCount; ++panel) {
         uint partIndex = game.house.masonryParts[panel];
         device const HousePart &part = game.house.parts[partIndex];
@@ -1236,6 +1247,7 @@ void damageStreetTombMasonry(device GameState &game, float3 blast) {
                 if (distance(point, clamp(point, lower, upper))
                     > reach * (0.82f + 0.22f * seed)) continue;
                 game.masonryGone[panel][row] |= 1u << col;
+                ++broken;
                 game.buildingDamage[13u + panel / masonryPanelsPerTomb]
                     += 0.35f;
                 float3 centre = houseTurnPointOut(turn,
@@ -1245,6 +1257,8 @@ void damageStreetTombMasonry(device GameState &game, float3 blast) {
             }
         }
     }
+    if (broken > 0u)
+        emitDebrisSound(audio, houseGrave, broken >= 4u ? 2u : 1u);
 }
 
 // ---------------------------------------------------------------- building

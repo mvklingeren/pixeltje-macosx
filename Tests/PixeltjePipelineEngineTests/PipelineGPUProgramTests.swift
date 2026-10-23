@@ -274,6 +274,26 @@ private func audioVoiceTestProgram(bytes: Int = 32, eventWord: Int = 0,
   }
 }
 
+@Test func gpuProgramAcceptsMaterialAndSizeImpactChannels() async throws {
+  let device = try #require(MTLCreateSystemDefaultDevice())
+  let runner = PipelineGPUProgram(commandQueue: try #require(device.makeCommandQueue()))
+  func program(eventCount: Int) -> String {
+    let events = (0..<eventCount).map { word in
+      "{\"buffer\":\"audio\",\"word\":\(word),\"asset\":\"sfx\"}"
+    }.joined(separator: ",")
+    return audioVoiceTestProgram(bytes: 208, voiceWord: 48)
+      .replacingOccurrences(
+        of: "\"audioEvents\":[{\"buffer\":\"audio\",\"word\":0,\"asset\":\"sfx\"}]",
+        with: "\"audioEvents\":[\(events)]")
+  }
+  try await runner.validateLiteral(programJSON: program(eventCount: 22),
+    source: audioVoiceTestSource)
+  await #expect(throws: PipelineEngineError.self) {
+    try await runner.validateLiteral(programJSON: program(eventCount: 33),
+      source: audioVoiceTestSource)
+  }
+}
+
 @Test func gpuProgramAcceptsUpToTheResourceLimit() async throws {
   let device = try #require(MTLCreateSystemDefaultDevice())
   let runner = PipelineGPUProgram(commandQueue: try #require(device.makeCommandQueue()))

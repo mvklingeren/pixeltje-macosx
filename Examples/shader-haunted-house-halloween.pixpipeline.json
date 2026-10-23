@@ -747,6 +747,402 @@
         "nodeID": "generate-house-doors",
         "port": "audio"
       }
+    },
+    {
+      "id": "prompt-debris-wood-small.prompt->generate-debris-wood-small.prompt",
+      "input": {
+        "nodeID": "generate-debris-wood-small",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-debris-wood-small",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-debris-wood-small.seed->generate-debris-wood-small.seed",
+      "input": {
+        "nodeID": "generate-debris-wood-small",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-debris-wood-small",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-debris-wood-small.audio->texture-cache.asset15",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset15"
+      },
+      "output": {
+        "nodeID": "generate-debris-wood-small",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-debris-wood-medium.prompt->generate-debris-wood-medium.prompt",
+      "input": {
+        "nodeID": "generate-debris-wood-medium",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-debris-wood-medium",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-debris-wood-medium.seed->generate-debris-wood-medium.seed",
+      "input": {
+        "nodeID": "generate-debris-wood-medium",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-debris-wood-medium",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-debris-wood-medium.audio->texture-cache.asset16",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset16"
+      },
+      "output": {
+        "nodeID": "generate-debris-wood-medium",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-debris-wood-large.prompt->generate-debris-wood-large.prompt",
+      "input": {
+        "nodeID": "generate-debris-wood-large",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-debris-wood-large",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-debris-wood-large.seed->generate-debris-wood-large.seed",
+      "input": {
+        "nodeID": "generate-debris-wood-large",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-debris-wood-large",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-debris-wood-large.audio->texture-cache.asset17",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset17"
+      },
+      "output": {
+        "nodeID": "generate-debris-wood-large",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-debris-stone-small.prompt->generate-debris-stone-small.prompt",
+      "input": {
+        "nodeID": "generate-debris-stone-small",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-debris-stone-small",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-debris-stone-small.seed->generate-debris-stone-small.seed",
+      "input": {
+        "nodeID": "generate-debris-stone-small",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-debris-stone-small",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-debris-stone-small.audio->texture-cache.asset18",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset18"
+      },
+      "output": {
+        "nodeID": "generate-debris-stone-small",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-debris-stone-medium.prompt->generate-debris-stone-medium.prompt",
+      "input": {
+        "nodeID": "generate-debris-stone-medium",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-debris-stone-medium",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-debris-stone-medium.seed->generate-debris-stone-medium.seed",
+      "input": {
+        "nodeID": "generate-debris-stone-medium",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-debris-stone-medium",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-debris-stone-medium.audio->texture-cache.asset19",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset19"
+      },
+      "output": {
+        "nodeID": "generate-debris-stone-medium",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-debris-stone-large.prompt->generate-debris-stone-large.prompt",
+      "input": {
+        "nodeID": "generate-debris-stone-large",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-debris-stone-large",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-debris-stone-large.seed->generate-debris-stone-large.seed",
+      "input": {
+        "nodeID": "generate-debris-stone-large",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-debris-stone-large",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-debris-stone-large.audio->texture-cache.asset20",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset20"
+      },
+      "output": {
+        "nodeID": "generate-debris-stone-large",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-debris-metal-small.prompt->generate-debris-metal-small.prompt",
+      "input": {
+        "nodeID": "generate-debris-metal-small",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-debris-metal-small",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-debris-metal-small.seed->generate-debris-metal-small.seed",
+      "input": {
+        "nodeID": "generate-debris-metal-small",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-debris-metal-small",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-debris-metal-small.audio->texture-cache.asset21",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset21"
+      },
+      "output": {
+        "nodeID": "generate-debris-metal-small",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-debris-metal-medium.prompt->generate-debris-metal-medium.prompt",
+      "input": {
+        "nodeID": "generate-debris-metal-medium",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-debris-metal-medium",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-debris-metal-medium.seed->generate-debris-metal-medium.seed",
+      "input": {
+        "nodeID": "generate-debris-metal-medium",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-debris-metal-medium",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-debris-metal-medium.audio->texture-cache.asset22",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset22"
+      },
+      "output": {
+        "nodeID": "generate-debris-metal-medium",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-debris-metal-large.prompt->generate-debris-metal-large.prompt",
+      "input": {
+        "nodeID": "generate-debris-metal-large",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-debris-metal-large",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-debris-metal-large.seed->generate-debris-metal-large.seed",
+      "input": {
+        "nodeID": "generate-debris-metal-large",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-debris-metal-large",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-debris-metal-large.audio->texture-cache.asset23",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset23"
+      },
+      "output": {
+        "nodeID": "generate-debris-metal-large",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-debris-plaster-small.prompt->generate-debris-plaster-small.prompt",
+      "input": {
+        "nodeID": "generate-debris-plaster-small",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-debris-plaster-small",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-debris-plaster-small.seed->generate-debris-plaster-small.seed",
+      "input": {
+        "nodeID": "generate-debris-plaster-small",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-debris-plaster-small",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-debris-plaster-small.audio->texture-cache.asset24",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset24"
+      },
+      "output": {
+        "nodeID": "generate-debris-plaster-small",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-debris-plaster-medium.prompt->generate-debris-plaster-medium.prompt",
+      "input": {
+        "nodeID": "generate-debris-plaster-medium",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-debris-plaster-medium",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-debris-plaster-medium.seed->generate-debris-plaster-medium.seed",
+      "input": {
+        "nodeID": "generate-debris-plaster-medium",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-debris-plaster-medium",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-debris-plaster-medium.audio->texture-cache.asset25",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset25"
+      },
+      "output": {
+        "nodeID": "generate-debris-plaster-medium",
+        "port": "audio"
+      }
+    },
+    {
+      "id": "prompt-debris-plaster-large.prompt->generate-debris-plaster-large.prompt",
+      "input": {
+        "nodeID": "generate-debris-plaster-large",
+        "port": "prompt"
+      },
+      "output": {
+        "nodeID": "prompt-debris-plaster-large",
+        "port": "prompt"
+      }
+    },
+    {
+      "id": "seed-debris-plaster-large.seed->generate-debris-plaster-large.seed",
+      "input": {
+        "nodeID": "generate-debris-plaster-large",
+        "port": "seed"
+      },
+      "output": {
+        "nodeID": "seed-debris-plaster-large",
+        "port": "seed"
+      }
+    },
+    {
+      "id": "generate-debris-plaster-large.audio->texture-cache.asset26",
+      "input": {
+        "nodeID": "texture-cache",
+        "port": "asset26"
+      },
+      "output": {
+        "nodeID": "generate-debris-plaster-large",
+        "port": "audio"
+      }
     }
   ],
   "controlConnections": [
@@ -890,7 +1286,7 @@
       "id": "program-text",
       "kind": "primitive.string",
       "parameters": {
-        "value": "{\"version\":2,\"parameters\":[\"timeOfDay\"],\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":327680},{\"name\":\"terrainBounds\",\"kind\":\"buffer\",\"bytes\":3407872},{\"name\":\"earthShadow\",\"kind\":\"buffer\",\"bytes\":6815744},{\"name\":\"sunShadow\",\"kind\":\"buffer\",\"bytes\":6815744},{\"name\":\"display\",\"kind\":\"texture\"},{\"name\":\"sceneColor\",\"kind\":\"texture\"},{\"name\":\"antialiased\",\"kind\":\"texture\"},{\"name\":\"focused\",\"kind\":\"texture\"},{\"name\":\"crateATexture\",\"kind\":\"inputTexture\",\"input\":\"asset0\"},{\"name\":\"crateBTexture\",\"kind\":\"inputTexture\",\"input\":\"asset1\"},{\"name\":\"impactTexture\",\"kind\":\"inputTexture\",\"input\":\"asset2\"},{\"name\":\"route\",\"kind\":\"buffer\",\"bytes\":4},{\"name\":\"audio\",\"kind\":\"buffer\",\"bytes\":160},{\"name\":\"hudFont\",\"kind\":\"systemFont\",\"design\":\"monospaced\",\"weight\":\"semibold\",\"strings\":[\"HEALTH\",\"SPIDERS\",\"BROODMOTHER\",\"ENRAGED\",\"RELOADING\",\"NORTH GATE OPEN\",\"VICTORY\",\"THE RANGE IS CLEAR\",\"YOU DIED\",\"CLICK TO RESTART\",\"0\",\"1\",\"2\",\"3\",\"4\",\"5\",\"6\",\"7\",\"8\",\"9\",\"PISTOL\",\"SHOTGUN\",\"JAVELIN\",\"LOCKING\",\"LOCKED\",\"FLIGHT CAM\",\"TOP ATTACK\",\"DIRECT\",\"SENTRIES\",\"MEDKIT\",\"ROCKETS\",\"HAND\",\"KNOCK\"]},{\"name\":\"signFont\",\"kind\":\"systemFont\",\"design\":\"monospaced\",\"weight\":\"bold\",\"strings\":[\"SKULL HOLLOW RD\",\"COFFIN LN\",\"PUMPKIN PATCH RD\",\"TOMBSTONE CT\",\"GRAVEDIGGER WAY\"]}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"bakeTerrainBounds\",\"threads\":[1024,832],\"buffers\":{\"1\":\"terrainBounds\"}},{\"kind\":\"compute\",\"function\":\"bakeEarthShadows\",\"threads\":[1024,832],\"buffers\":{\"1\":\"earthShadow\"}},{\"kind\":\"compute\",\"function\":\"bakeSunShadows\",\"threads\":[1024,832],\"buffers\":{\"1\":\"game\",\"2\":\"sunShadow\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"2\":\"route\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"advancePlayer\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"senseSpiders\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"advanceEnemies\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"restartRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"fireRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"swingHand\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"advanceDrones\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"advanceOrdnance\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"advanceMasonry\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"damageBuildings\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"advanceBuildingDebris\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"advanceSentries\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"advanceBats\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"refreshSunShadows\",\"threads\":[1024,52],\"buffers\":{\"1\":\"game\",\"2\":\"sunShadow\"}}],\"present\":[{\"kind\":\"compute\",\"function\":\"buildRangeHUD\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"2\":\"hudFont\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"rangeFragment\",\"target\":\"sceneColor\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\",\"2\":\"terrainBounds\",\"3\":\"earthShadow\",\"4\":\"sunShadow\",\"5\":\"signFont\"},\"fragmentTextures\":{\"1\":\"crateATexture\",\"2\":\"crateBTexture\",\"3\":\"impactTexture\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"antialiasFragment\",\"target\":\"antialiased\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentTextures\":{\"1\":\"sceneColor\"}},{\"kind\":\"compute\",\"function\":\"focusLens\",\"threads\":[1],\"buffers\":{\"1\":\"game\"},\"textures\":{\"1\":\"antialiased\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"bokehFragment\",\"target\":\"focused\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"antialiased\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"bloomFragment\",\"target\":\"sceneColor\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentTextures\":{\"1\":\"focused\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"compositeFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"focused\",\"2\":\"sceneColor\"}},{\"kind\":\"render\",\"vertex\":\"rangeHUDVertex\",\"fragment\":\"rangeHUDFragment\",\"target\":\"display\",\"load\":\"load\",\"blend\":\"alpha\",\"vertexCount\":6,\"instanceCount\":96,\"vertexBuffers\":{\"1\":\"hudFont\",\"2\":\"game\"},\"fragmentBuffers\":{\"1\":\"hudFont\"}}],\"swaps\":[],\"output\":\"display\",\"sceneRequestBuffer\":\"route\",\"audioEvents\":[{\"buffer\":\"audio\",\"word\":0,\"asset\":\"asset3\"},{\"buffer\":\"audio\",\"word\":1,\"asset\":\"asset4\"},{\"buffer\":\"audio\",\"word\":2,\"asset\":\"asset5\"},{\"buffer\":\"audio\",\"word\":3,\"asset\":\"asset6\"},{\"buffer\":\"audio\",\"word\":4,\"asset\":\"asset7\"},{\"buffer\":\"audio\",\"word\":5,\"asset\":\"asset8\"},{\"buffer\":\"audio\",\"word\":6,\"asset\":\"asset11\"},{\"buffer\":\"audio\",\"word\":7,\"asset\":\"asset12\"},{\"buffer\":\"audio\",\"word\":36,\"asset\":\"asset13\"},{\"buffer\":\"audio\",\"word\":37,\"asset\":\"asset14\"}],\"audioVoices\":[{\"buffer\":\"audio\",\"word\":8,\"synth\":{\"kind\":\"rotor\",\"rotors\":4,\"blades\":2,\"hz\":105}},{\"buffer\":\"audio\",\"word\":12,\"synth\":{\"kind\":\"rotor\",\"rotors\":4,\"blades\":2,\"hz\":105}},{\"buffer\":\"audio\",\"word\":16,\"synth\":{\"kind\":\"rotor\",\"rotors\":4,\"blades\":2,\"hz\":105}},{\"buffer\":\"audio\",\"word\":20,\"asset\":\"asset9\"},{\"buffer\":\"audio\",\"word\":24,\"asset\":\"asset9\"},{\"buffer\":\"audio\",\"word\":28,\"asset\":\"asset9\"},{\"buffer\":\"audio\",\"word\":32,\"asset\":\"asset10\"}]}"
+        "value": "{\"version\":2,\"parameters\":[\"timeOfDay\"],\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":327680},{\"name\":\"terrainBounds\",\"kind\":\"buffer\",\"bytes\":3407872},{\"name\":\"earthShadow\",\"kind\":\"buffer\",\"bytes\":6815744},{\"name\":\"sunShadow\",\"kind\":\"buffer\",\"bytes\":6815744},{\"name\":\"display\",\"kind\":\"texture\"},{\"name\":\"sceneColor\",\"kind\":\"texture\"},{\"name\":\"antialiased\",\"kind\":\"texture\"},{\"name\":\"focused\",\"kind\":\"texture\"},{\"name\":\"crateATexture\",\"kind\":\"inputTexture\",\"input\":\"asset0\"},{\"name\":\"crateBTexture\",\"kind\":\"inputTexture\",\"input\":\"asset1\"},{\"name\":\"impactTexture\",\"kind\":\"inputTexture\",\"input\":\"asset2\"},{\"name\":\"route\",\"kind\":\"buffer\",\"bytes\":4},{\"name\":\"audio\",\"kind\":\"buffer\",\"bytes\":208},{\"name\":\"hudFont\",\"kind\":\"systemFont\",\"design\":\"monospaced\",\"weight\":\"semibold\",\"strings\":[\"HEALTH\",\"SPIDERS\",\"BROODMOTHER\",\"ENRAGED\",\"RELOADING\",\"NORTH GATE OPEN\",\"VICTORY\",\"THE RANGE IS CLEAR\",\"YOU DIED\",\"CLICK TO RESTART\",\"0\",\"1\",\"2\",\"3\",\"4\",\"5\",\"6\",\"7\",\"8\",\"9\",\"PISTOL\",\"SHOTGUN\",\"JAVELIN\",\"LOCKING\",\"LOCKED\",\"FLIGHT CAM\",\"TOP ATTACK\",\"DIRECT\",\"SENTRIES\",\"MEDKIT\",\"ROCKETS\",\"HAND\",\"KNOCK\"]},{\"name\":\"signFont\",\"kind\":\"systemFont\",\"design\":\"monospaced\",\"weight\":\"bold\",\"strings\":[\"SKULL HOLLOW RD\",\"COFFIN LN\",\"PUMPKIN PATCH RD\",\"TOMBSTONE CT\",\"GRAVEDIGGER WAY\"]}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializeRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"bakeTerrainBounds\",\"threads\":[1024,832],\"buffers\":{\"1\":\"terrainBounds\"}},{\"kind\":\"compute\",\"function\":\"bakeEarthShadows\",\"threads\":[1024,832],\"buffers\":{\"1\":\"earthShadow\"}},{\"kind\":\"compute\",\"function\":\"bakeSunShadows\",\"threads\":[1024,832],\"buffers\":{\"1\":\"game\",\"2\":\"sunShadow\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advanceRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"2\":\"route\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"advancePlayer\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"senseSpiders\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"advanceEnemies\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"restartRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"fireRange\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"swingHand\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"advanceDrones\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"advanceOrdnance\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"advanceMasonry\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"damageBuildings\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"advanceBuildingDebris\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"advanceSentries\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"3\":\"audio\"}},{\"kind\":\"compute\",\"function\":\"advanceBats\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"refreshSunShadows\",\"threads\":[1024,52],\"buffers\":{\"1\":\"game\",\"2\":\"sunShadow\"}}],\"present\":[{\"kind\":\"compute\",\"function\":\"buildRangeHUD\",\"threads\":[1],\"buffers\":{\"1\":\"game\",\"2\":\"hudFont\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"rangeFragment\",\"target\":\"sceneColor\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\",\"2\":\"terrainBounds\",\"3\":\"earthShadow\",\"4\":\"sunShadow\",\"5\":\"signFont\"},\"fragmentTextures\":{\"1\":\"crateATexture\",\"2\":\"crateBTexture\",\"3\":\"impactTexture\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"antialiasFragment\",\"target\":\"antialiased\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentTextures\":{\"1\":\"sceneColor\"}},{\"kind\":\"compute\",\"function\":\"focusLens\",\"threads\":[1],\"buffers\":{\"1\":\"game\"},\"textures\":{\"1\":\"antialiased\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"bokehFragment\",\"target\":\"focused\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"antialiased\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"bloomFragment\",\"target\":\"sceneColor\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentTextures\":{\"1\":\"focused\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"compositeFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"focused\",\"2\":\"sceneColor\"}},{\"kind\":\"render\",\"vertex\":\"rangeHUDVertex\",\"fragment\":\"rangeHUDFragment\",\"target\":\"display\",\"load\":\"load\",\"blend\":\"alpha\",\"vertexCount\":6,\"instanceCount\":96,\"vertexBuffers\":{\"1\":\"hudFont\",\"2\":\"game\"},\"fragmentBuffers\":{\"1\":\"hudFont\"}}],\"swaps\":[],\"output\":\"display\",\"sceneRequestBuffer\":\"route\",\"audioEvents\":[{\"buffer\":\"audio\",\"word\":0,\"asset\":\"asset3\"},{\"buffer\":\"audio\",\"word\":1,\"asset\":\"asset4\"},{\"buffer\":\"audio\",\"word\":2,\"asset\":\"asset5\"},{\"buffer\":\"audio\",\"word\":3,\"asset\":\"asset6\"},{\"buffer\":\"audio\",\"word\":4,\"asset\":\"asset7\"},{\"buffer\":\"audio\",\"word\":5,\"asset\":\"asset8\"},{\"buffer\":\"audio\",\"word\":6,\"asset\":\"asset11\"},{\"buffer\":\"audio\",\"word\":7,\"asset\":\"asset12\"},{\"buffer\":\"audio\",\"word\":36,\"asset\":\"asset13\"},{\"buffer\":\"audio\",\"word\":37,\"asset\":\"asset14\"},{\"buffer\":\"audio\",\"word\":40,\"asset\":\"asset15\"},{\"buffer\":\"audio\",\"word\":41,\"asset\":\"asset16\"},{\"buffer\":\"audio\",\"word\":42,\"asset\":\"asset17\"},{\"buffer\":\"audio\",\"word\":43,\"asset\":\"asset18\"},{\"buffer\":\"audio\",\"word\":44,\"asset\":\"asset19\"},{\"buffer\":\"audio\",\"word\":45,\"asset\":\"asset20\"},{\"buffer\":\"audio\",\"word\":46,\"asset\":\"asset21\"},{\"buffer\":\"audio\",\"word\":47,\"asset\":\"asset22\"},{\"buffer\":\"audio\",\"word\":48,\"asset\":\"asset23\"},{\"buffer\":\"audio\",\"word\":49,\"asset\":\"asset24\"},{\"buffer\":\"audio\",\"word\":50,\"asset\":\"asset25\"},{\"buffer\":\"audio\",\"word\":51,\"asset\":\"asset26\"}],\"audioVoices\":[{\"buffer\":\"audio\",\"word\":8,\"synth\":{\"kind\":\"rotor\",\"rotors\":4,\"blades\":2,\"hz\":105}},{\"buffer\":\"audio\",\"word\":12,\"synth\":{\"kind\":\"rotor\",\"rotors\":4,\"blades\":2,\"hz\":105}},{\"buffer\":\"audio\",\"word\":16,\"synth\":{\"kind\":\"rotor\",\"rotors\":4,\"blades\":2,\"hz\":105}},{\"buffer\":\"audio\",\"word\":20,\"asset\":\"asset9\"},{\"buffer\":\"audio\",\"word\":24,\"asset\":\"asset9\"},{\"buffer\":\"audio\",\"word\":28,\"asset\":\"asset9\"},{\"buffer\":\"audio\",\"word\":32,\"asset\":\"asset10\"}]}"
       },
       "resources": {},
       "title": "Game state and render passes"
@@ -1199,11 +1595,11 @@
         "keepBetweenRuns": true,
         "slotCount": {
           "$type": "integer",
-          "value": 15
+          "value": 27
         }
       },
       "resources": {},
-      "title": "Klein materials and twelve sounds · asset cache"
+      "title": "Klein materials and 24 sounds · asset cache"
     },
     {
       "id": "triangle-source",
@@ -2511,6 +2907,1266 @@
           }
         }
       }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-debris-wood-small",
+      "kind": "input.prompt",
+      "title": "Wood small impact prompt",
+      "parameters": {
+        "value": "A single small wood break and impact sound effect: one crisp dry wood splinter snap and tiny pieces pattering down. Close, natural, short decay, no voices or music."
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-debris-wood-small",
+      "kind": "input.seed",
+      "title": "Wood small fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 20000
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-debris-wood-small",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Wood small impact · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 0.6
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-debris-wood-medium",
+      "kind": "input.prompt",
+      "title": "Wood medium impact prompt",
+      "parameters": {
+        "value": "A single medium wood break and impact sound effect: several wooden planks breaking and clattering onto hard ground. Close, natural, short decay, no voices or music."
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-debris-wood-medium",
+      "kind": "input.seed",
+      "title": "Wood medium fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 20013
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-debris-wood-medium",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Wood medium impact · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 1.0
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-debris-wood-large",
+      "kind": "input.prompt",
+      "title": "Wood large impact prompt",
+      "parameters": {
+        "value": "A single large wood break and impact sound effect: a heavy timber wall breaking apart, beams cracking and crashing down. Close, natural, short decay, no voices or music."
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-debris-wood-large",
+      "kind": "input.seed",
+      "title": "Wood large fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 20026
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-debris-wood-large",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Wood large impact · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 1.6
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-debris-stone-small",
+      "kind": "input.prompt",
+      "title": "Stone small impact prompt",
+      "parameters": {
+        "value": "A single small stone break and impact sound effect: one small sharp stone chip snapping off with a light clink. Close, natural, short decay, no voices or music."
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-debris-stone-small",
+      "kind": "input.seed",
+      "title": "Stone small fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 20100
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-debris-stone-small",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Stone small impact · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 0.6
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-debris-stone-medium",
+      "kind": "input.prompt",
+      "title": "Stone medium impact prompt",
+      "parameters": {
+        "value": "A single medium stone break and impact sound effect: several bricks and stones breaking and tumbling onto stone. Close, natural, short decay, no voices or music."
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-debris-stone-medium",
+      "kind": "input.seed",
+      "title": "Stone medium fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 20113
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-debris-stone-medium",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Stone medium impact · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 1.0
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-debris-stone-large",
+      "kind": "input.prompt",
+      "title": "Stone large impact prompt",
+      "parameters": {
+        "value": "A single large stone break and impact sound effect: a heavy masonry section fracturing and collapsing in a deep rumble. Close, natural, short decay, no voices or music."
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-debris-stone-large",
+      "kind": "input.seed",
+      "title": "Stone large fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 20126
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-debris-stone-large",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Stone large impact · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 1.6
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-debris-metal-small",
+      "kind": "input.prompt",
+      "title": "Metal small impact prompt",
+      "parameters": {
+        "value": "A single small metal break and impact sound effect: one small sheet metal piece snapping loose with a bright clang. Close, natural, short decay, no voices or music."
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-debris-metal-small",
+      "kind": "input.seed",
+      "title": "Metal small fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 20200
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-debris-metal-small",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Metal small impact · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 0.6
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-debris-metal-medium",
+      "kind": "input.prompt",
+      "title": "Metal medium impact prompt",
+      "parameters": {
+        "value": "A single medium metal break and impact sound effect: loose metal panels bending and clattering together. Close, natural, short decay, no voices or music."
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-debris-metal-medium",
+      "kind": "input.seed",
+      "title": "Metal medium fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 20213
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-debris-metal-medium",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Metal medium impact · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 1.0
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-debris-metal-large",
+      "kind": "input.prompt",
+      "title": "Metal large impact prompt",
+      "parameters": {
+        "value": "A single large metal break and impact sound effect: a large corrugated metal roof section tearing free and crashing down. Close, natural, short decay, no voices or music."
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-debris-metal-large",
+      "kind": "input.seed",
+      "title": "Metal large fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 20226
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-debris-metal-large",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Metal large impact · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 1.6
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-debris-plaster-small",
+      "kind": "input.prompt",
+      "title": "Plaster small impact prompt",
+      "parameters": {
+        "value": "A single small plaster break and impact sound effect: a small dry plaster crack and a few crumbs falling. Close, natural, short decay, no voices or music."
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-debris-plaster-small",
+      "kind": "input.seed",
+      "title": "Plaster small fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 20300
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-debris-plaster-small",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Plaster small impact · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 0.6
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-debris-plaster-medium",
+      "kind": "input.prompt",
+      "title": "Plaster medium impact prompt",
+      "parameters": {
+        "value": "A single medium plaster break and impact sound effect: plaster wall chunks breaking and scattering on the floor. Close, natural, short decay, no voices or music."
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-debris-plaster-medium",
+      "kind": "input.seed",
+      "title": "Plaster medium fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 20313
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-debris-plaster-medium",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Plaster medium impact · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 1.0
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
+    },
+    {
+      "executionState": "enabled",
+      "id": "prompt-debris-plaster-large",
+      "kind": "input.prompt",
+      "title": "Plaster large impact prompt",
+      "parameters": {
+        "value": "A single large plaster break and impact sound effect: a large plaster wall section cracking, crumbling and collapsing. Close, natural, short decay, no voices or music."
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "seed-debris-plaster-large",
+      "kind": "input.seed",
+      "title": "Plaster large fixed seed",
+      "parameters": {
+        "mode": "fixed",
+        "value": {
+          "$type": "integer",
+          "value": 20326
+        }
+      },
+      "resources": {}
+    },
+    {
+      "executionState": "enabled",
+      "id": "generate-debris-plaster-large",
+      "kind": "coreai.audioDiffusionGenerate",
+      "title": "Plaster large impact · Stable Audio 3 Small SFX",
+      "parameters": {
+        "duration": {
+          "$type": "number",
+          "value": 1.6
+        },
+        "steps": {
+          "$type": "integer",
+          "value": 8
+        },
+        "guidance": {
+          "$type": "number",
+          "value": 1
+        }
+      },
+      "resources": {
+        "textEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "5a2113a406bcdbe8269bc82edfc321e1523383607fe6ebf43bedbb11aeff5929",
+            "componentRole": "textEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "durationEncoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "a37635c4487b25fc00474d82a234d4d263ca3f50ad428fc14d3cb697ef8b23f7",
+            "componentRole": "durationEncoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "denoiser": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "1b17f7b7f315ad547c4ebff9d28a35cd250ae852019068b78984ec943f1772c8",
+            "componentRole": "denoiser",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "audioDecoder": {
+          "state": "linked",
+          "reference": {
+            "kind": "coreAIModel",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "889da0c4f3539c4da996dd2526016a6d73e51a3784bc8738aecf9a8cbdf0f23d",
+            "componentRole": "audioDecoder",
+            "functionName": "main",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        },
+        "tokenizer": {
+          "state": "linked",
+          "reference": {
+            "kind": "tokenizer",
+            "packageID": "coreai.stabilityai.stable-audio-3-small-sfx",
+            "packageVersion": "sha256.98f91e7eceaf4b41411a21b87ef76fd37ad8fe3bf1b43684749731dc34fa08c9",
+            "contentHash": "7794135caa3ea73918949c902a781cc61dab674a4b59c17d85931c77c1114cbd",
+            "componentRole": "tokenizer",
+            "familyABI": "stable-audio-3-small-sfx-coreai@1"
+          }
+        }
+      }
     }
   ],
   "presentation": {
@@ -2763,6 +4419,150 @@
       "parameters-text": {
         "x": 82,
         "y": 495
+      },
+      "prompt-debris-wood-small": {
+        "x": 100,
+        "y": 7580
+      },
+      "seed-debris-wood-small": {
+        "x": 100,
+        "y": 7790
+      },
+      "generate-debris-wood-small": {
+        "x": 400,
+        "y": 7580
+      },
+      "prompt-debris-wood-medium": {
+        "x": 100,
+        "y": 8040
+      },
+      "seed-debris-wood-medium": {
+        "x": 100,
+        "y": 8250
+      },
+      "generate-debris-wood-medium": {
+        "x": 400,
+        "y": 8040
+      },
+      "prompt-debris-wood-large": {
+        "x": 100,
+        "y": 8500
+      },
+      "seed-debris-wood-large": {
+        "x": 100,
+        "y": 8710
+      },
+      "generate-debris-wood-large": {
+        "x": 400,
+        "y": 8500
+      },
+      "prompt-debris-stone-small": {
+        "x": 860,
+        "y": 7580
+      },
+      "seed-debris-stone-small": {
+        "x": 860,
+        "y": 7790
+      },
+      "generate-debris-stone-small": {
+        "x": 1160,
+        "y": 7580
+      },
+      "prompt-debris-stone-medium": {
+        "x": 860,
+        "y": 8040
+      },
+      "seed-debris-stone-medium": {
+        "x": 860,
+        "y": 8250
+      },
+      "generate-debris-stone-medium": {
+        "x": 1160,
+        "y": 8040
+      },
+      "prompt-debris-stone-large": {
+        "x": 860,
+        "y": 8500
+      },
+      "seed-debris-stone-large": {
+        "x": 860,
+        "y": 8710
+      },
+      "generate-debris-stone-large": {
+        "x": 1160,
+        "y": 8500
+      },
+      "prompt-debris-metal-small": {
+        "x": 100,
+        "y": 8960
+      },
+      "seed-debris-metal-small": {
+        "x": 100,
+        "y": 9170
+      },
+      "generate-debris-metal-small": {
+        "x": 400,
+        "y": 8960
+      },
+      "prompt-debris-metal-medium": {
+        "x": 100,
+        "y": 9420
+      },
+      "seed-debris-metal-medium": {
+        "x": 100,
+        "y": 9630
+      },
+      "generate-debris-metal-medium": {
+        "x": 400,
+        "y": 9420
+      },
+      "prompt-debris-metal-large": {
+        "x": 100,
+        "y": 9880
+      },
+      "seed-debris-metal-large": {
+        "x": 100,
+        "y": 10090
+      },
+      "generate-debris-metal-large": {
+        "x": 400,
+        "y": 9880
+      },
+      "prompt-debris-plaster-small": {
+        "x": 860,
+        "y": 8960
+      },
+      "seed-debris-plaster-small": {
+        "x": 860,
+        "y": 9170
+      },
+      "generate-debris-plaster-small": {
+        "x": 1160,
+        "y": 8960
+      },
+      "prompt-debris-plaster-medium": {
+        "x": 860,
+        "y": 9420
+      },
+      "seed-debris-plaster-medium": {
+        "x": 860,
+        "y": 9630
+      },
+      "generate-debris-plaster-medium": {
+        "x": 1160,
+        "y": 9420
+      },
+      "prompt-debris-plaster-large": {
+        "x": 860,
+        "y": 9880
+      },
+      "seed-debris-plaster-large": {
+        "x": 860,
+        "y": 10090
+      },
+      "generate-debris-plaster-large": {
+        "x": 1160,
+        "y": 9880
       }
     },
     "nodeSizes": {

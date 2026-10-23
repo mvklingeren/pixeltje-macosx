@@ -274,10 +274,13 @@ struct RangeAudio {
     float4 ghostVoice;
     uint cottageDoor;
     uint houseDoors;
-    uint2 unused;
+    uint debrisPlaysThisFrame;
+    uint unused;
+    // Wood, stone, metal, plaster; three impact sizes per material.
+    uint debrisImpact[12];
 };
 
-static_assert(sizeof(RangeAudio) == 160,
+static_assert(sizeof(RangeAudio) == 208,
     "The audio words must match the program's audioEvents and audioVoices");
 
 constant uint hudCapacity = 96u;
@@ -322,7 +325,10 @@ constant uint masonryMaxRows = 32u;
 constant uint masonryDebrisCount = 24u;
 constant uint buildingCount = 15u; // 0 is scenery; 1–14 are buildings
 constant uint buildingImpactCount = 16u;
-constant uint buildingFragmentCount = 12u;
+constant uint buildingFragmentCount = 32u;
+constant uint buildingShardsPerCell = 4u;
+constant uint buildingBlastCellCount = buildingFragmentCount
+    / buildingShardsPerCell;
 constant uint physicsBodyCount = buildingFragmentCount + masonryDebrisCount;
 
 constant uint houseCandleCapacity = 4u;
@@ -452,6 +458,8 @@ struct GameState {
     // The physics world owns both debris pools. HousePart remains immutable
     // collision/render geometry; the body's pose moves it through the scene.
     pixeltje_physics::World<physicsBodyCount> physicsWorld;
+    float debrisSoundAt[physicsBodyCount];
+    float debrisLastPhysicsSound;
 };
 
 static_assert(sizeof(GameState) <= 327680,
@@ -1342,6 +1350,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     uint id [[thread_position_in_grid]]) {
     if (id != 0u) return;
     device GameState &game = states[0];
+    audio[0].debrisPlaysThisFrame = 0u;
     float dt = clamp(u.pointer.w > 0.0f ? u.pointer.w : u.resolutionTime.w,
         0.0f, 0.10f);
     uint action = uint(u.pointer.z);
@@ -2040,10 +2049,11 @@ kernel void advanceOrdnance(constant ProgramUniforms &u [[buffer(0)]],
 // The heavy masonry update stays out of the ordnance pass's missile loop.
 kernel void advanceMasonry(constant ProgramUniforms &u [[buffer(0)]],
     device GameState *states [[buffer(1)]],
+    device RangeAudio *audio [[buffer(3)]],
     uint id [[thread_position_in_grid]]) {
     if (id != 0u || states[0].progress.w != phasePlaying) return;
     if (states[0].blast.w > states[0].masonryLastBlast) {
-        damageStreetTombMasonry(states[0], states[0].blast.xyz);
+        damageStreetTombMasonry(states[0], audio[0], states[0].blast.xyz);
         states[0].masonryLastBlast = states[0].blast.w;
     }
 }
@@ -2052,23 +2062,25 @@ kernel void advanceMasonry(constant ProgramUniforms &u [[buffer(0)]],
 // none of the building search enters their hot kernels.
 kernel void damageBuildings(constant ProgramUniforms &u [[buffer(0)]],
     device GameState *states [[buffer(1)]],
+    device RangeAudio *audio [[buffer(3)]],
     uint id [[thread_position_in_grid]]) {
     if (id != 0u || states[0].progress.w != phasePlaying) return;
     device GameState &game = states[0];
     for (uint i = 0u; i < game.buildingImpactCountNow; ++i)
-        damageBuildingHit(game, game.buildingImpacts[i]);
+        damageBuildingHit(game, audio[0], game.buildingImpacts[i]);
     game.buildingImpactCountNow = 0u;
     if (game.blast.w > game.buildingLastBlast) {
-        damageBuildingsBlast(game, game.blast.xyz);
+        damageBuildingsBlast(game, audio[0], game.blast.xyz);
         game.buildingLastBlast = game.blast.w;
     }
 }
 
 kernel void advanceBuildingDebris(constant ProgramUniforms &u [[buffer(0)]],
     device GameState *states [[buffer(1)]],
+    device RangeAudio *audio [[buffer(3)]],
     uint id [[thread_position_in_grid]]) {
     if (id != 0u || states[0].progress.w != phasePlaying) return;
-    advancePhysicsWorld(states[0], tickStep(u));
+    advancePhysicsWorld(states[0], audio[0], tickStep(u));
 }
 
 // Sentries aim and fire, then their bolts fly. A sentry shot uses the

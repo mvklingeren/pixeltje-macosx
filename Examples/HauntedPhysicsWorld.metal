@@ -58,8 +58,25 @@ bool physicsSolidPart(uint style) {
     return buildingBreakable(style) || style == houseMasonry;
 }
 
+void physicsImpactSound(device GameState &game, device RangeAudio &audio,
+    uint worldIndex, float speed) {
+    if (speed < 1.8f
+        || game.effects.x - game.debrisLastPhysicsSound < 0.12f
+        || game.effects.x - game.debrisSoundAt[worldIndex] < 0.18f) return;
+    pixeltje_physics::RigidBody body = game.physicsWorld.bodies[worldIndex];
+    float width = 2.0f * max(max(body.extentState.x,
+        body.extentState.y), body.extentState.z);
+    float strength = speed * width;
+    uint size = strength >= 5.0f ? 2u : strength >= 2.0f ? 1u : 0u;
+    uint style = worldIndex < buildingFragmentCount
+        ? uint(game.buildingFragments[worldIndex].lower.w) : houseGrave;
+    emitDebrisSound(audio, style, size);
+    game.debrisSoundAt[worldIndex] = game.effects.x;
+    game.debrisLastPhysicsSound = game.effects.x;
+}
+
 __attribute__((noinline))
-bool physicsResolveBuildings(device const GameState &game,
+bool physicsResolveBuildings(device GameState &game, device RangeAudio &audio,
     thread pixeltje_physics::RigidBody &body, uint worldIndex) {
     bool touched = false;
     float reach = length(body.extentState.xyz) + 0.1f;
@@ -106,6 +123,8 @@ bool physicsResolveBuildings(device const GameState &game,
             } else if (buildingCellGone(game, index, part, localPoint)) {
                 continue;
             }
+            physicsImpactSound(game, audio, worldIndex,
+                max(-dot(body.linearBounce.xyz, contact.normal), 0.0f));
             pixeltje_physics::solve(body, staticBody, contact);
             touched = true;
         }
@@ -125,26 +144,29 @@ float physicsGroundY(device const GameState &game, uint worldIndex,
 }
 
 __attribute__((noinline))
-bool physicsResolveStatic(device const GameState &game,
+bool physicsResolveStatic(device GameState &game, device RangeAudio &audio,
     thread pixeltje_physics::RigidBody &body, uint worldIndex) {
     float floorY = physicsGroundY(game, worldIndex, body.centreMass.xz);
     pixeltje_physics::RigidContact floor = pixeltje_physics::boxPlane(
         body, float3(0.0f, floorY, 0.0f), float3(0.0f, 1.0f, 0.0f));
     bool touched = floor.depth > 0.0f;
     if (touched) {
+        physicsImpactSound(game, audio, worldIndex,
+            max(-body.linearBounce.y, 0.0f));
         pixeltje_physics::RigidBody ground
             = pixeltje_physics::makeRigidBody(float3(0.0f), float3(1.0f),
                 float4(0.0f, 0.0f, 0.0f, 1.0f), float3(0.0f),
                 0.0f, 0.1f, 0.9f);
         pixeltje_physics::solve(body, ground, floor);
     }
-    return physicsResolveBuildings(game, body, worldIndex) || touched;
+    return physicsResolveBuildings(game, audio, body, worldIndex) || touched;
 }
 
 // One deterministic solver updates all active debris together. The two pools
 // share one array so a roof section can strike masonry rubble and vice versa.
 __attribute__((noinline))
-void advancePhysicsWorld(device GameState &game, float dt) {
+void advancePhysicsWorld(device GameState &game, device RangeAudio &audio,
+    float dt) {
     dt = clamp(dt, 0.0f, 0.05f);
     if (dt <= 0.0f) return;
     uint steps = min(uint(ceil(dt * 60.0f)), 3u);
@@ -155,7 +177,7 @@ void advancePhysicsWorld(device GameState &game, float dt) {
             touched[i] = false;
             pixeltje_physics::RigidBody body = game.physicsWorld.bodies[i];
             pixeltje_physics::integrateRigid(body,
-                float3(0.0f, -9.8f, 0.0f), 0.12f, 0.25f, step);
+                float3(0.0f, -22.0f, 0.0f), 0.06f, 0.18f, step);
             game.physicsWorld.bodies[i] = body;
         }
         // Two iterations make stacked contacts less order-dependent without
@@ -164,7 +186,7 @@ void advancePhysicsWorld(device GameState &game, float dt) {
             for (uint i = 0u; i < physicsBodyCount; ++i) {
                 pixeltje_physics::RigidBody body = game.physicsWorld.bodies[i];
                 if (body.extentState.w != 1.0f) continue;
-                touched[i] |= physicsResolveStatic(game, body, i);
+                touched[i] |= physicsResolveStatic(game, audio, body, i);
                 game.physicsWorld.bodies[i] = body;
             }
             for (uint i = 0u; i < physicsBodyCount; ++i) {
@@ -183,6 +205,16 @@ void advancePhysicsWorld(device GameState &game, float dt) {
                     pixeltje_physics::RigidContact contact
                         = pixeltje_physics::boxBox(a, b);
                     if (contact.depth <= 0.0f) continue;
+                    float impact = max(-dot(a.linearBounce.xyz
+                        - b.linearBounce.xyz, contact.normal), 0.0f);
+                    physicsImpactSound(game, audio, i, impact);
+                    if (debrisMaterialKind(i < buildingFragmentCount
+                            ? uint(game.buildingFragments[i].lower.w)
+                            : houseGrave)
+                        != debrisMaterialKind(j < buildingFragmentCount
+                            ? uint(game.buildingFragments[j].lower.w)
+                            : houseGrave))
+                        physicsImpactSound(game, audio, j, impact);
                     pixeltje_physics::solve(a, b, contact);
                     game.physicsWorld.bodies[j] = b;
                     touched[i] = true;

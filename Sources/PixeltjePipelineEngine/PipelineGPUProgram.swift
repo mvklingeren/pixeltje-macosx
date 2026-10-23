@@ -183,7 +183,7 @@ actor PipelineGPUProgram {
   static let maximumResources = 256
   /// Audio buffers are small; events and voices share them by word.
   private static let maximumAudioBufferBytes = 256
-  private static let maximumAudioEvents = 16
+  private static let maximumAudioEvents = 32
   private static let maximumAudioVoices = 8
 
   private struct FontKey: Hashable {
