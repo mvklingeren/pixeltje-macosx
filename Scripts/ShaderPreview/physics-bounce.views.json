@@ -1,0 +1,10 @@
+{
+  "width": 800,
+  "height": 500,
+  "views": [
+    { "name": "start", "frames": 0 },
+    { "name": "falling", "frames": 28 },
+    { "name": "floor-bounce", "frames": 55 },
+    { "name": "box-contact", "frames": 100 }
+  ]
+}

@@ -8,6 +8,7 @@ enum PipelineMetalLibraries {
     (PipelineMetal3D.marker, PipelineMetal3D.library),
     (PipelineMetalTerrain.marker, PipelineMetalTerrain.library),
     (PipelineMetalPostFX.marker, PipelineMetalPostFX.library),
+    (PipelineMetalPhysics.marker, PipelineMetalPhysics.library),
   ]
 
   static func resolving(_ source: String) -> String {
