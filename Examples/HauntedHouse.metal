@@ -3439,15 +3439,21 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
     device const GameState &game, float time, float pixelWidth,
     float3 direction, device const float4 *signFont) {
     bool isDebris = hit.variant >= houseCapacity;
-    uint index = isDebris ? min(hit.variant - houseCapacity,
-        buildingFragmentCount - 1u) : min(hit.variant, houseCapacity - 1u);
-    device const HousePart &part = isDebris
-        ? game.buildingFragments[index] : game.house.parts[index];
+    uint fragmentSlot = isDebris ? min(hit.variant - houseCapacity,
+        buildingFragmentCount - 1u) : 0u;
+    uint index = isDebris ? game.buildingFragmentSource[fragmentSlot]
+        : min(hit.variant, houseCapacity - 1u);
+    device const HousePart &part = game.house.parts[index];
     uint style = hit.material - houseMaterialBase;
     // A turned building is shaded in its own frame, where it was built.
-    HouseTurn turn = isDebris ? HouseTurn{0.0f, 1.0f, float2(0.0f)}
+    float4 fragmentTurn = isDebris ? game.buildingFragmentTurn[fragmentSlot]
+        : float4(0.0f, 1.0f, 0.0f, 0.0f);
+    HouseTurn turn = isDebris ? HouseTurn{fragmentTurn.x,
+        fragmentTurn.y, fragmentTurn.zw}
         : housePartTurn(game.house, index);
     hit.position = houseTurnPointIn(turn, hit.position);
+    if (isDebris)
+        hit.position -= game.buildingFragmentShift[fragmentSlot].xyz;
     hit.normal = houseTurnDirectionIn(turn, hit.normal);
     direction = houseTurnDirectionIn(turn, direction);
     float3 p = hit.position, n = hit.normal;

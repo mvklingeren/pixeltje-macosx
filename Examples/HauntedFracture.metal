@@ -22,8 +22,8 @@ bool buildingBreakable(uint style) {
         || style == houseFloor || style == houseStair;
 }
 
-// The two broadest directions give an 8x8 damage map without storing 64
-// separate parts. Roofs and floors use their plan, including pitched roofs.
+// The two broadest directions define a damage map without storing separate
+// pieces before an impact. Roofs and floors use their plan.
 uint2 buildingCellAxes(device const HousePart &part) {
     uint style = uint(part.lower.w);
     if (style == houseRoof || style == houseCorrugated
@@ -34,13 +34,22 @@ uint2 buildingCellAxes(device const HousePart &part) {
     return uint2(0u, 1u);
 }
 
+uint2 buildingCellGrid(device const HousePart &part) {
+    uint2 axes = buildingCellAxes(part);
+    float3 span = part.upper.xyz - part.lower.xyz;
+    return uint2(clamp(ceil(float2(span[axes.x], span[axes.y]) / 1.25f),
+        float2(1.0f), float2(8.0f)));
+}
+
 uint2 buildingCell(device const HousePart &part, float3 p) {
     uint2 axes = buildingCellAxes(part);
+    uint2 grid = buildingCellGrid(part);
     float3 span = max(part.upper.xyz - part.lower.xyz, float3(0.001f));
     float2 uv = (float2(p[axes.x], p[axes.y])
         - float2(part.lower[axes.x], part.lower[axes.y]))
         / float2(span[axes.x], span[axes.y]);
-    return uint2(clamp(floor(uv * 8.0f), float2(0.0f), float2(7.0f)));
+    return uint2(clamp(floor(uv * float2(grid)), float2(0.0f),
+        float2(grid - 1u)));
 }
 
 bool buildingCellGone(device const GameState &game, uint index,
@@ -69,19 +78,40 @@ float buildingCollapseThreshold(uint owner) {
     return 30.0f; // original and street-copy barns and open sheds
 }
 
-void launchBuildingFragment(device GameState &game, float3 point,
-    float3 blast, uint style, float size, float seed) {
+// Keep the exact cut-box geometry and material of a detached section. Its
+// group turn stays with it, so street copies retain their angle as they fall.
+void launchBuildingFragment(device GameState &game, uint index, uint2 cell,
+    HouseTurn turn, float3 velocity, bool whole) {
+    device const HousePart &source = game.house.parts[index];
+    HousePart piece = source;
+    if (!whole && !houseRoundStyle(uint(source.lower.w))) {
+        uint2 axes = buildingCellAxes(source);
+        uint2 grid = buildingCellGrid(source);
+        float3 span = source.upper.xyz - source.lower.xyz;
+        piece.lower[axes.x] = source.lower[axes.x]
+            + float(cell.x) * span[axes.x] / float(grid.x);
+        piece.upper[axes.x] = source.lower[axes.x]
+            + float(cell.x + 1u) * span[axes.x] / float(grid.x);
+        piece.lower[axes.y] = source.lower[axes.y]
+            + float(cell.y) * span[axes.y] / float(grid.y);
+        piece.upper[axes.y] = source.lower[axes.y]
+            + float(cell.y + 1u) * span[axes.y] / float(grid.y);
+    }
     uint slot = game.buildingFragmentNext++ % buildingFragmentCount;
-    float r = clamp(size, 0.09f, 0.8f);
-    float3 radius = float3(r, 0.55f * r, 0.75f * r);
-    game.buildingFragments[slot] = houseBox(point - radius,
-        point + radius, style);
-    float3 away = point - blast;
-    away = length(away) > 0.01f ? normalize(away)
-        : float3(0.0f, 0.6f, 0.8f);
-    game.buildingFragmentMotion[slot] = float4(
-        away * (2.0f + 3.0f * seed) + float3(0.0f, 2.0f, 0.0f), 3.2f);
+    game.buildingFragments[slot] = piece;
+    game.buildingFragmentMotion[slot] = float4(velocity, 1.0f);
+    game.buildingFragmentTurn[slot] = float4(turn.sine, turn.cosine,
+        turn.pivot);
+    game.buildingFragmentShift[slot] = float4(0.0f);
+    game.buildingFragmentSource[slot] = index;
     game.buildingFragmentActive = 1u;
+}
+
+bool buildingCollapseSurface(uint style) {
+    return style == houseSiding || style == houseBattens
+        || style == houseRoof || style == houseCorrugated
+        || style == houseStone || style == houseBrick
+        || style == housePlaster;
 }
 
 void buildingMaybeCollapse(device GameState &game, uint owner) {
@@ -90,37 +120,53 @@ void buildingMaybeCollapse(device GameState &game, uint owner) {
         || game.buildingDamage[owner] < buildingCollapseThreshold(owner))
         return;
     game.buildingCollapseTime[owner] = game.effects.x;
-    // Make a few large pieces only at the transition. The intact building
-    // remains one set of broad surfaces until this point.
-    uint launched = 0u;
-    for (uint g = 0u; g < min(game.house.counts.y, houseGroupCapacity)
-            && launched < 8u; ++g) {
+    // Detach a few of the building's largest structural surfaces as the
+    // remaining framework gives way. The shared pool bounds render cost.
+    thread float area[8];
+    thread uint selected[8];
+    for (uint k = 0u; k < 8u; ++k) {
+        area[k] = 0.0f;
+        selected[k] = 0u;
+    }
+    for (uint g = 0u; g < min(game.house.counts.y, houseGroupCapacity);
+            ++g) {
         if (game.house.groupBuilding[g] != owner) continue;
         HouseGroup group = game.house.groups[g];
-        uint first = uint(group.lower.w);
-        uint end = min(uint(group.upper.w), houseCapacity);
-        if (end <= first) continue;
-        uint stride = max((end - first) / (8u - launched), 1u);
-        HouseTurn turn = houseGroupTurn(group);
-        for (uint index = first; index < end && launched < 8u;
-                index += stride) {
+        for (uint index = uint(group.lower.w);
+                index < min(uint(group.upper.w), houseCapacity); ++index) {
             device const HousePart &part = game.house.parts[index];
-            uint style = uint(part.lower.w);
-            if (!buildingBreakable(style)
-                || any(part.upper.xyz <= part.lower.xyz)) continue;
-            float3 local = 0.5f * (part.lower.xyz + part.upper.xyz);
-            float3 point = houseTurnPointOut(turn, local);
-            float seed = houseHash(float(index * 37u + owner * 13u));
-            launchBuildingFragment(game, point,
-                houseTurnPointOut(turn, 0.5f *
-                    (group.lower.xyz + group.upper.xyz)), style,
-                0.45f + 0.35f * seed, seed);
-            ++launched;
+            if (!buildingCollapseSurface(uint(part.lower.w))) continue;
+            float3 size = part.upper.xyz - part.lower.xyz;
+            if (any(size <= 0.0f)) continue;
+            float score = max(max(size.x * size.y, size.y * size.z),
+                size.x * size.z);
+            uint smallest = 0u;
+            for (uint k = 1u; k < 8u; ++k)
+                if (area[k] < area[smallest]) smallest = k;
+            if (score > area[smallest]) {
+                area[smallest] = score;
+                selected[smallest] = index;
+            }
         }
+    }
+    for (uint k = 0u; k < 8u; ++k) {
+        if (area[k] <= 0.0f) continue;
+        uint index = selected[k];
+        HouseTurn turn = housePartTurn(game.house, index);
+        float seed = houseHash(float(index * 37u + owner * 13u));
+        float3 velocity = float3(1.8f * (seed - 0.5f), 0.8f,
+            1.8f * (houseHash(float(index * 19u)) - 0.5f));
+        launchBuildingFragment(game, index, uint2(0u), turn,
+            velocity, true);
     }
 }
 
 bool markBuildingCell(device GameState &game, uint index, uint2 cell) {
+    if (houseRoundStyle(uint(game.house.parts[index].lower.w))) {
+        if (game.buildingGone[index] != 0ul) return false;
+        game.buildingGone[index] = ~0ul;
+        return true;
+    }
     ulong bit = 1ul << (cell.y * 8u + cell.x);
     if ((game.buildingGone[index] & bit) != 0ul) return false;
     game.buildingGone[index] |= bit;
@@ -140,12 +186,12 @@ void damageBuildingHit(device GameState &game, BuildingImpact impact) {
     if (!buildingBreakable(style)) return;
     HouseTurn turn = housePartTurn(game.house, index);
     float3 local = houseTurnPointIn(turn, impact.pointDamage.xyz);
-    if (!markBuildingCell(game, index, buildingCell(part, local))) return;
+    uint2 cell = buildingCell(part, local);
+    if (!markBuildingCell(game, index, cell)) return;
     game.buildingDamage[owner] += impact.pointDamage.w;
-    float seed = houseHash(float(index) * 11.0f + game.effects.x * 3.0f);
-    launchBuildingFragment(game, impact.pointDamage.xyz,
-        impact.pointDamage.xyz - float3(0.0f, 0.3f, 0.0f), style,
-        0.13f + 0.13f * seed, seed);
+    float3 velocity = impact.normal.xyz * 1.2f
+        + float3(0.0f, 0.35f, 0.0f);
+    launchBuildingFragment(game, index, cell, turn, velocity, false);
     buildingMaybeCollapse(game, owner);
 }
 
@@ -156,7 +202,11 @@ __attribute__((noinline))
 void damageBuildingsBlast(device GameState &game, float3 blast) {
     thread float added[buildingCount];
     for (uint owner = 0u; owner < buildingCount; ++owner) added[owner] = 0.0f;
-    uint launched = 0u;
+    thread float nearestDistance[buildingFragmentCount];
+    thread uint nearestPart[buildingFragmentCount];
+    thread uint2 nearestCell[buildingFragmentCount];
+    for (uint k = 0u; k < buildingFragmentCount; ++k)
+        nearestDistance[k] = 1.0e9f;
     for (uint g = 0u; g < min(game.house.counts.y, houseGroupCapacity); ++g) {
         uint owner = game.house.groupBuilding[g];
         if (owner == 0u || owner >= buildingCount
@@ -175,33 +225,59 @@ void damageBuildingsBlast(device GameState &game, float3 blast) {
             float3 nearest = clamp(localBlast, part.lower.xyz, part.upper.xyz);
             if (distance(localBlast, nearest) > blastRadius) continue;
             uint2 cell = buildingCell(part, nearest);
+            uint2 grid = buildingCellGrid(part);
             uint2 axes = buildingCellAxes(part);
             float3 span = part.upper.xyz - part.lower.xyz;
-            for (int y = -1; y <= 1; ++y)
-                for (int x = -1; x <= 1; ++x) {
+            int extent = houseRoundStyle(style) ? 0 : 1;
+            for (int y = -extent; y <= extent; ++y)
+                for (int x = -extent; x <= extent; ++x) {
                     int2 next = int2(cell) + int2(x, y);
-                    if (any(next < int2(0)) || any(next > int2(7))) continue;
+                    if (any(next < int2(0)) || any(next >= int2(grid))) continue;
                     float3 sample = nearest;
                     sample[axes.x] = part.lower[axes.x]
-                        + (float(next.x) + 0.5f) * span[axes.x] / 8.0f;
+                        + (float(next.x) + 0.5f) * span[axes.x] / float(grid.x);
                     sample[axes.y] = part.lower[axes.y]
-                        + (float(next.y) + 0.5f) * span[axes.y] / 8.0f;
-                    if (distance(sample, localBlast) > blastRadius) continue;
-                    if (!markBuildingCell(game, index, uint2(next))) continue;
-                    if (added[owner] < 10.0f) {
-                        game.buildingDamage[owner] += 1.0f;
-                        added[owner] += 1.0f;
-                    }
-                    if (launched < buildingFragmentCount / 2u) {
-                        float seed = houseHash(float(index * 29u
-                            + uint(next.x) * 7u + uint(next.y)));
-                        launchBuildingFragment(game,
-                            houseTurnPointOut(turn, sample), blast, style,
-                            0.16f + 0.18f * seed, seed);
-                        ++launched;
+                        + (float(next.y) + 0.5f) * span[axes.y] / float(grid.y);
+                    float distanceToBlast = distance(sample, localBlast);
+                    if (distanceToBlast > blastRadius) continue;
+                    ulong bit = 1ul << (uint(next.y) * 8u + uint(next.x));
+                    if ((game.buildingGone[index] & bit) != 0ul) continue;
+                    uint farthest = 0u;
+                    for (uint k = 1u; k < buildingFragmentCount; ++k)
+                        if (nearestDistance[k] > nearestDistance[farthest])
+                            farthest = k;
+                    if (distanceToBlast < nearestDistance[farthest]) {
+                        nearestDistance[farthest] = distanceToBlast;
+                        nearestPart[farthest] = index;
+                        nearestCell[farthest] = uint2(next);
                     }
                 }
         }
+    }
+    for (uint k = 0u; k < buildingFragmentCount; ++k) {
+        if (nearestDistance[k] > blastRadius) continue;
+        uint index = nearestPart[k];
+        uint owner = buildingPartOwner(game.house, index);
+        uint2 cell = nearestCell[k];
+        if (!markBuildingCell(game, index, cell)) continue;
+        if (added[owner] < 10.0f) {
+            game.buildingDamage[owner] += 1.0f;
+            added[owner] += 1.0f;
+        }
+        HouseTurn turn = housePartTurn(game.house, index);
+        device const HousePart &part = game.house.parts[index];
+        uint2 axes = buildingCellAxes(part);
+        uint2 grid = buildingCellGrid(part);
+        float3 local = 0.5f * (part.lower.xyz + part.upper.xyz);
+        local[axes.x] = part.lower[axes.x] + (float(cell.x) + 0.5f)
+            * (part.upper[axes.x] - part.lower[axes.x]) / float(grid.x);
+        local[axes.y] = part.lower[axes.y] + (float(cell.y) + 0.5f)
+            * (part.upper[axes.y] - part.lower[axes.y]) / float(grid.y);
+        float3 away = houseTurnPointOut(turn, local) - blast;
+        float seed = houseHash(float(index * 29u + cell.x * 7u + cell.y));
+        float3 velocity = normalize(away + float3(0.0f, 0.5f, 0.0f))
+            * (1.0f + 1.5f * seed);
+        launchBuildingFragment(game, index, cell, turn, velocity, false);
     }
     for (uint owner = 1u; owner < buildingCount; ++owner)
         buildingMaybeCollapse(game, owner);
@@ -213,26 +289,34 @@ void resetBuildingDamage(device GameState &game) {
         game.buildingDamage[i] = 0.0f;
         game.buildingCollapseTime[i] = -100.0f;
     }
-    for (uint i = 0u; i < buildingFragmentCount; ++i)
+    for (uint i = 0u; i < buildingFragmentCount; ++i) {
         game.buildingFragmentMotion[i] = float4(0.0f);
+        game.buildingFragmentTurn[i] = float4(0.0f);
+        game.buildingFragmentShift[i] = float4(0.0f);
+        game.buildingFragmentSource[i] = 0u;
+    }
     game.buildingFragmentNext = 0u;
     game.buildingFragmentActive = 0u;
     game.buildingImpactCountNow = 0u;
     game.buildingLastBlast = -100.0f;
 }
 
-// Fragments are temporary: inactive slots are never traced. The settled
-// masonry blocks keep their separate, persistent collision behaviour.
+// Detached sections retain their original geometry, hit the terrain, and
+// remain as rubble. Only the bounded fragment pool is traced each frame.
 __attribute__((noinline))
 void advanceBuildingFragments(device GameState &game, float dt) {
-    game.buildingFragmentActive = 0u;
+    if (game.buildingFragmentActive == 0u) return;
     for (uint i = 0u; i < buildingFragmentCount; ++i) {
         float4 motion = game.buildingFragmentMotion[i];
-        if (motion.w <= 0.0f) continue;
+        if (motion.w < 0.5f || motion.w > 1.5f) continue;
         device HousePart &part = game.buildingFragments[i];
+        float4 fragmentTurn = game.buildingFragmentTurn[i];
+        HouseTurn turn = {fragmentTurn.x, fragmentTurn.y, fragmentTurn.zw};
         float3 radius = 0.5f * (part.upper.xyz - part.lower.xyz);
         pixeltje_physics::Body body = {
-            0.5f * (part.upper.xyz + part.lower.xyz), motion.xyz};
+            houseTurnPointOut(turn, 0.5f * (part.upper.xyz + part.lower.xyz)),
+            motion.xyz};
+        float3 previous = body.position;
         body = pixeltje_physics::integrate(body,
             float3(0.0f, -9.8f, 0.0f), 0.6f, dt);
         float floorY = buildingsGround(body.position.xz,
@@ -241,13 +325,21 @@ void advanceBuildingFragments(device GameState &game, float dt) {
             body.position, radius.y, float3(0.0f, floorY, 0.0f),
             float3(0.0f, 1.0f, 0.0f));
         body = pixeltje_physics::resolve(body, floor, 0.25f, 0.55f);
-        float3 delta = body.position
-            - 0.5f * (part.upper.xyz + part.lower.xyz);
+        if (floor.depth > 0.0f && abs(body.velocity.y) < 0.3f
+            && length(body.velocity.xz) < 0.35f) {
+            body.velocity = float3(0.0f);
+            motion.w = 2.0f;
+        }
+        float3 delta = houseTurnDirectionIn(turn, body.position - previous);
         part.lower.xyz += delta;
         part.upper.xyz += delta;
-        motion = float4(body.velocity, motion.w - dt);
-        game.buildingFragmentMotion[i] = motion;
-        if (motion.w > 0.0f) game.buildingFragmentActive = 1u;
+        for (uint plane = 0u; plane < uint(part.upper.w); ++plane)
+            part.planes[plane].w += dot(part.planes[plane].xyz, delta);
+        if (uint(part.lower.w) == houseTimber
+            || houseRoundStyle(uint(part.lower.w)))
+            part.rows.xyz += delta;
+        game.buildingFragmentShift[i].xyz += delta;
+        game.buildingFragmentMotion[i] = float4(body.velocity, motion.w);
     }
 }
 
@@ -257,9 +349,69 @@ void traceBuildingFragments(thread SceneHit &hit, float3 origin,
     for (uint i = 0u; i < buildingFragmentCount; ++i) {
         if (game.buildingFragmentMotion[i].w <= 0.0f) continue;
         device const HousePart &part = game.buildingFragments[i];
+        float4 fragmentTurn = game.buildingFragmentTurn[i];
+        HouseTurn turn = {fragmentTurn.x, fragmentTurn.y, fragmentTurn.zw};
+        float3 localOrigin = houseTurnPointIn(turn, origin);
+        float3 localDirection = houseTurnDirectionIn(turn, direction);
         float3 normal;
-        float t = houseHitPart(part, origin, direction, hit.distance, normal);
-        if (t > 0.0f) hit = {t, normal, origin + direction * t,
+        float t = houseHitPart(part, localOrigin, localDirection,
+            hit.distance, normal);
+        if (t > 0.0f) {
+            uint source = game.buildingFragmentSource[i];
+            device const HousePart &original = game.house.parts[source];
+            float3 originalPoint = localOrigin + localDirection * t
+                - game.buildingFragmentShift[i].xyz;
+            uint style = uint(part.lower.w);
+            if (houseCutoutStyle(style)
+                && houseCutoutOpen(style, original, originalPoint)) continue;
+            if ((style == houseSiding || style == houseBattens)
+                && houseSeeThrough(original)
+                && houseWindow(original, source, originalPoint, normal,
+                    0.002f, houseWind(game)).glass > 0.5f) continue;
+        }
+        if (t > 0.0f) hit = {t, houseTurnDirectionOut(turn, normal),
+            origin + direction * t,
             houseMaterialBase + uint(part.lower.w), -1, houseCapacity + i};
     }
+}
+
+// Resting chunks have the same basic footing and clearance as the tomb's
+// masonry rubble. Moving chunks are still visual until they settle.
+constant float buildingFragmentClimb = 0.8f;
+__attribute__((noinline))
+float buildingFragmentStand(device const GameState &game, float2 p,
+    float foot, float ground) {
+    if (game.buildingFragmentActive == 0u) return ground;
+    float top = ground;
+    for (uint i = 0u; i < buildingFragmentCount; ++i) {
+        if (game.buildingFragmentMotion[i].w < 1.5f) continue;
+        float4 fragmentTurn = game.buildingFragmentTurn[i];
+        HouseTurn turn = {fragmentTurn.x, fragmentTurn.y, fragmentTurn.zw};
+        float3 local = houseTurnPointIn(turn, float3(p.x, foot, p.y));
+        device const HousePart &part = game.buildingFragments[i];
+        if (all(local.xz >= part.lower.xz)
+            && all(local.xz <= part.upper.xz)
+            && part.upper.y <= foot + buildingFragmentClimb)
+            top = max(top, part.upper.y);
+    }
+    return top;
+}
+
+__attribute__((noinline))
+bool buildingFragmentBlocked(device const GameState &game, float2 p,
+    float foot) {
+    if (game.buildingFragmentActive == 0u) return false;
+    for (uint i = 0u; i < buildingFragmentCount; ++i) {
+        if (game.buildingFragmentMotion[i].w < 1.5f) continue;
+        float4 fragmentTurn = game.buildingFragmentTurn[i];
+        HouseTurn turn = {fragmentTurn.x, fragmentTurn.y, fragmentTurn.zw};
+        float3 local = houseTurnPointIn(turn, float3(p.x, foot, p.y));
+        device const HousePart &part = game.buildingFragments[i];
+        float2 gap = max(max(part.lower.xz - local.xz,
+            local.xz - part.upper.xz), float2(0.0f));
+        if (length(gap) < housePlayerPad
+            && part.upper.y > foot + buildingFragmentClimb
+            && part.lower.y < foot + 1.75f) return true;
+    }
+    return false;
 }

@@ -354,6 +354,7 @@ struct HouseModel {
 
 struct BuildingImpact {
     float4 pointDamage;    // world XYZ, damage contribution
+    float4 normal;         // outward surface normal for the loose piece
     uint part;             // HouseModel part index
 };
 
@@ -445,6 +446,9 @@ struct GameState {
     float buildingLastBlast;
     HousePart buildingFragments[buildingFragmentCount];
     float4 buildingFragmentMotion[buildingFragmentCount];
+    float4 buildingFragmentTurn[buildingFragmentCount];
+    float4 buildingFragmentShift[buildingFragmentCount];
+    uint buildingFragmentSource[buildingFragmentCount];
     uint buildingFragmentNext;
     uint buildingFragmentActive;
 };
@@ -1156,14 +1160,19 @@ float playerTombGround(device const GameState &game, float2 point,
 
 float playerGround(device const GameState &game, float2 point, float foot) {
     if (buildingsTombPadHolds(point))
-        return playerTombGround(game, point, foot);
-    if (!houseBodyHolds(point)) return stairHeight(point);
+        return buildingFragmentStand(game, point, foot,
+            playerTombGround(game, point, foot));
+    if (!houseBodyHolds(point))
+        return buildingFragmentStand(game, point, foot, stairHeight(point));
     if (buildingCollapseAge(game, 1u) >= 1.5f)
-        return moonHeight(point, moonTraceDetail);
-    return buildingsStandFrom(point, moonHeight(point, moonTraceDetail), foot);
+        return buildingFragmentStand(game, point, foot,
+            moonHeight(point, moonTraceDetail));
+    return buildingFragmentStand(game, point, foot,
+        buildingsStandFrom(point, moonHeight(point, moonTraceDetail), foot));
 }
 
 bool playerWalkable(device const GameState &game, float2 point, float foot) {
+    if (buildingFragmentBlocked(game, point, foot)) return false;
     if (buildingsTombPadHolds(point))
         return !buildingsTombBlockedFrom(game, point, foot)
             && !streetTombDebrisBlocked(game, point, foot);
@@ -1722,6 +1731,7 @@ void fireRound(device GameState &game, float3 eye, float3 shotDirection,
         uint index = game.buildingImpactCountNow++;
         game.buildingImpacts[index] = {
             float4(impactPoint, holdingShotgun(game) ? 0.35f : 0.60f),
+            float4(trace.normal, 0.0f),
             trace.buildingPart};
     }
     if (trace.drone >= 0)
