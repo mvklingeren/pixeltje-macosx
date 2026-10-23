@@ -74,11 +74,16 @@ void addMausoleumColumn(device HouseModel &house, float3 o, float x,
 }
 
 // The parts addMausoleum adds, by their place in its order, that the ruin
-// replaces: the plinth, its cap, the cella and the +x side's back pilaster.
+// replaces: the plinth and its cap. The giant copies replace their cella,
+// pilasters, doorway frame and roof separately with breakable pieces.
 constant uint mausoleumPlinthPart = 3u;
 constant uint mausoleumCapPart = 4u;
 constant uint mausoleumCellaPart = 5u;
-constant uint mausoleumCornerPilasterPart = 11u;
+constant uint mausoleumPilasterFirstPart = 6u;
+constant uint mausoleumDoorFrameFirstPart = 14u;
+constant uint mausoleumRoofFirstPart = 37u;
+constant uint mausoleumRoofLastPart = 41u;
+constant uint mausoleumRoofOrnamentFirstPart = 42u;
 
 // The whole tomb around the doorway's foot o.
 void addMausoleum(device HouseModel &house, float3 o) {
@@ -194,24 +199,19 @@ struct MausoleumBlock {
     float2 tilt;
 };
 
-// The first blocks replace the copied plinth, cap and broken pilaster.
-// The cella itself is rebuilt from removable masonry panels, not from these
-// static slabs; the remaining blocks are the fallen plinth and rubble.
-constant uint mausoleumRuinReplaced = 3u;
+// The first blocks replace the copied plinth and cap. The cella, corner
+// pilasters and roof use breakable pieces; the rest is fallen rubble.
+constant uint mausoleumRuinReplaced = 2u;
 constant uint mausoleumRuinReplaces[mausoleumRuinReplaced] = {
-    mausoleumPlinthPart, mausoleumCapPart,
-    mausoleumCornerPilasterPart};
+    mausoleumPlinthPart, mausoleumCapPart};
 
-constant uint mausoleumRuinBlockCount = 24u;
+constant uint mausoleumRuinBlockCount = 23u;
 constant MausoleumBlock mausoleumRuinBlocks[mausoleumRuinBlockCount] = {
-    // The plinth and its cap short of the gap, and the corner pilaster's
-    // remnant hanging from the cornice.
+    // The plinth and its cap short of the gap.
     {float4(-3.15f, -0.2f, -2.55f, 0.0f), float4(1.0f, 0.5f, 5.65f, 0.0f),
         float2(0.0f)},
     {float4(-3.2f, 0.5f, -2.6f, 0.0f), float4(1.0f, 0.6f, 5.7f, 0.0f),
         float2(0.0f)},
-    {float4(2.55f, 3.45f, 4.88f, 1.0f), float4(2.67f, 4.3f, 5.3f, 0.0f),
-        float2(0.0f, 0.5f)},
     // The plinth and its cap in front of the gap.
     {float4(1.0f, -0.2f, -2.55f, 0.0f), float4(3.15f, 0.5f, 3.6f, 0.0f),
         float2(0.0f)},

@@ -103,6 +103,24 @@
       ]
     },
     {
+      "name": "giant-ruin-roof-above",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [40, 45, -40, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [-0.42] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "giant-intact-roof-above",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-40, 45, -40, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [-0.42] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
       "name": "yard-from-back-gate",
       "frames": 0,
       "writes": [

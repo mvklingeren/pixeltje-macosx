@@ -2,6 +2,7 @@
 // pixeltje:3d-v1
 // pixeltje:terrain-v1
 // pixeltje:postfx-v1
+// pixeltje:physics-v1
 #include <metal_stdlib>
 using namespace metal;
 
@@ -314,9 +315,12 @@ struct HouseGroup {
 constant uint houseCapacity = 1664u;
 constant uint houseGroupCapacity = 72u;
 constant uint buildingSiteCapacity = 8u;
-constant uint masonryPanelCount = 12u;
+constant uint masonryPanelsPerTomb = 15u;
+constant uint masonryPanelCount = 2u * masonryPanelsPerTomb;
 constant uint masonryMaxRows = 32u;
 constant uint masonryDebrisCount = 24u;
+constant uint masonryRoofPiecesPerTomb = 56u;
+constant uint masonryRoofPieceCount = 2u * masonryRoofPiecesPerTomb;
 
 constant uint houseCandleCapacity = 4u;
 
@@ -342,6 +346,7 @@ struct HouseModel {
     HousePart parts[houseCapacity];
     uint masonryParts[masonryPanelCount];
     uint debrisParts[masonryDebrisCount];
+    uint roofParts[masonryRoofPieceCount];
 };
 
 struct GameState {
@@ -1985,6 +1990,7 @@ kernel void advanceMasonry(constant ProgramUniforms &u [[buffer(0)]],
     if (id != 0u || states[0].progress.w != phasePlaying) return;
     if (states[0].blast.w > states[0].masonryLastBlast) {
         damageStreetTombMasonry(states[0], states[0].blast.xyz);
+        damageStreetTombRoof(states[0], states[0].blast.xyz);
         states[0].masonryLastBlast = states[0].blast.w;
     }
     advanceStreetTombDebris(states[0], tickStep(u));
