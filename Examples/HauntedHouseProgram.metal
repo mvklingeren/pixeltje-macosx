@@ -314,6 +314,9 @@ struct HouseGroup {
 constant uint houseCapacity = 1664u;
 constant uint houseGroupCapacity = 72u;
 constant uint buildingSiteCapacity = 8u;
+constant uint masonryPanelCount = 12u;
+constant uint masonryMaxRows = 32u;
+constant uint masonryDebrisCount = 24u;
 
 constant uint houseCandleCapacity = 4u;
 
@@ -337,6 +340,8 @@ struct HouseModel {
                                           // end part; site 0 is the house
     HouseGroup groups[houseGroupCapacity];
     HousePart parts[houseCapacity];
+    uint masonryParts[masonryPanelCount];
+    uint debrisParts[masonryDebrisCount];
 };
 
 struct GameState {
@@ -412,6 +417,11 @@ struct GameState {
     // the plate was last pressed, and 1 while it is pressed.
     float4 frontDoors;
     Bat bats[batCount];     // the bats out tonight
+    // One bit per missing stone, indexed by panel, course and column.
+    uint masonryGone[masonryPanelCount][masonryMaxRows];
+    float4 masonryDebrisVelocity[masonryDebrisCount];
+    uint masonryDebrisNext[2];
+    float masonryLastBlast;
 };
 
 static_assert(sizeof(GameState) <= 262144,
@@ -525,6 +535,7 @@ PointLight roomLight(uint index, float time) {
 }
 
 #include "HauntedBuildingKit.metal"
+#include "HauntedMasonry.metal"
 #include "HauntedHouse.metal"
 #include "HauntedMausoleum.metal"
 #include "HauntedShed.metal"
@@ -779,6 +790,8 @@ void resetGame(device GameState &game, uint seed) {
         game.boltVelocity[i] = float4(0.0f, 0.0f, 0.0f, -100.0f);
     }
     game.pickups = uint4(0u);
+    resetStreetTombMasonry(game);
+    game.masonryLastBlast = -100.0f;
     houseQuiet(game);
     buildingsShutDoors(game);
 }
@@ -1104,19 +1117,24 @@ bool walkable(float2 point) {
 // The ground under a mausoleum's pad, out of line for the same reason as
 // the tombs' own tests.
 __attribute__((noinline))
-float playerTombGround(float2 point) {
-    return buildingsTombStand(point, moonHeight(point, moonTraceDetail));
+float playerTombGround(device const GameState &game, float2 point,
+    float foot) {
+    float base = buildingsTombStand(point,
+        moonHeight(point, moonTraceDetail));
+    return streetTombDebrisStand(game, point, foot, base);
 }
 
-float playerGround(float2 point, float foot) {
-    if (buildingsTombPadHolds(point)) return playerTombGround(point);
+float playerGround(device const GameState &game, float2 point, float foot) {
+    if (buildingsTombPadHolds(point))
+        return playerTombGround(game, point, foot);
     if (!houseBodyHolds(point)) return stairHeight(point);
     return buildingsStandFrom(point, moonHeight(point, moonTraceDetail), foot);
 }
 
-bool playerWalkable(float2 point, float foot) {
+bool playerWalkable(device const GameState &game, float2 point, float foot) {
     if (buildingsTombPadHolds(point))
-        return !buildingsTombBlockedFrom(point, foot);
+        return !buildingsTombBlockedFrom(game, point, foot)
+            && !streetTombDebrisBlocked(game, point, foot);
     if (!houseBodyHolds(point)) return walkable(point);
     return !buildingsBlockedFrom(point, foot);
 }
@@ -1411,7 +1429,7 @@ kernel void advancePlayer(constant ProgramUniforms &u [[buffer(0)]],
     float2 previousPosition = game.player.xz;
     float foot = game.player.y - 1.55f;
     bool wasGrounded = game.player.y
-        <= 1.55f + playerGround(previousPosition, foot)
+        <= 1.55f + playerGround(game, previousPosition, foot)
         + (onJumpPad(previousPosition) ? jumpPadHeight : 0.0f) + 0.001f;
     // Q and E dodge sideways in a quick burst on top of walking.
     uint dodgeKeys = pressed & (keyQ | keyE);
@@ -1428,14 +1446,14 @@ kernel void advancePlayer(constant ProgramUniforms &u [[buffer(0)]],
     float2 next = previousPosition + (game.motion.xy + game.dodge.xy) * dt;
     // Resolve axes independently so a diagonal approach slides along a wall.
     float2 position = previousPosition;
-    if (playerWalkable(float2(next.x, position.y), foot)
+    if (playerWalkable(game, float2(next.x, position.y), foot)
         && !buildingsDoorsBar(game, float2(next.x, position.y))) {
         position.x = next.x;
     } else {
         game.motion.x = 0.0f;
         game.dodge.x = 0.0f;
     }
-    if (playerWalkable(float2(position.x, next.y), foot)
+    if (playerWalkable(game, float2(position.x, next.y), foot)
         && !buildingsDoorsBar(game, float2(position.x, next.y))) {
         position.y = next.y;
     } else {
@@ -1483,7 +1501,7 @@ kernel void advancePlayer(constant ProgramUniforms &u [[buffer(0)]],
         }
     }
     bool overJumpPad = onJumpPad(next);
-    float groundY = 1.55f + playerGround(next, foot)
+    float groundY = 1.55f + playerGround(game, next, foot)
         + (overJumpPad ? jumpPadHeight : 0.0f);
     // On the moon, feet follow the ground downhill instead of skipping off it.
     if (outside && wasGrounded && game.effects.w <= 0.0f
@@ -1958,6 +1976,18 @@ kernel void advanceOrdnance(constant ProgramUniforms &u [[buffer(0)]],
         ChromePose chrome = {game.chromeRotation, game.chromeCentre.xyz};
         if (flyMissile(game, dt, chrome, audio[0])) audio[0].shotgun += 1u;
     }
+}
+
+// The heavy masonry update stays out of the ordnance pass's missile loop.
+kernel void advanceMasonry(constant ProgramUniforms &u [[buffer(0)]],
+    device GameState *states [[buffer(1)]],
+    uint id [[thread_position_in_grid]]) {
+    if (id != 0u || states[0].progress.w != phasePlaying) return;
+    if (states[0].blast.w > states[0].masonryLastBlast) {
+        damageStreetTombMasonry(states[0], states[0].blast.xyz);
+        states[0].masonryLastBlast = states[0].blast.w;
+    }
+    advanceStreetTombDebris(states[0], tickStep(u));
 }
 
 // Sentries aim and fire, then their bolts fly. A sentry shot uses the

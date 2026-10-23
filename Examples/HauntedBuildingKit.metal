@@ -51,7 +51,8 @@ constant uint houseFloor = 21u;     // a floor: boards on top, plaster below
 constant uint houseStair = 22u;     // treads, strings, newels and soffits
 constant uint houseBanister = 23u;  // turned balusters under a handrail (cut out)
 constant uint houseSign = 24u;      // a street name blade
-constant uint houseStyleCount = 25u;
+constant uint houseMasonry = 25u;   // a compact grid of removable stone blocks
+constant uint houseStyleCount = 26u;
 
 // The cut-out styles: rays pass through their openings, and they cast no
 // shadow.

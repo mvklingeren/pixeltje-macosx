@@ -924,13 +924,74 @@ float streetTombStand(float2 p, float ground) {
 
 // True where a tomb's wall, or footing more than a step above their feet
 // at foot, keeps the walker out.
-bool streetTombBlockedFrom(float2 p, float foot) {
+__attribute__((noinline))
+bool streetTombBlockedFrom(device const GameState &game, float2 p,
+    float foot) {
     uint i = streetTombUnder(p);
     if (i >= streetPropertyCount) return false;
     StreetProperty c = streetProperties[i];
-    return mausoleumBlocked(streetTombLocal(c, p), streetTombKind(i),
+    if (mausoleumBlocked(streetTombLocal(c, p), streetTombKind(i),
         (foot - c.at.y) / c.at.w, streetTombClimb / c.at.w,
-        housePlayerPad / c.at.w);
+        housePlayerPad / c.at.w)) return true;
+    uint first = (i - streetTombFirst) * 6u;
+    for (uint wall = 0u; wall < 6u; ++wall) {
+        uint panel = first + wall;
+        uint partIndex = game.house.masonryParts[panel];
+        device const HousePart &part = game.house.parts[partIndex];
+        HouseTurn turn = housePartTurn(game.house, partIndex);
+        float3 point = houseTurnPointIn(turn, float3(p.x, foot, p.y));
+        if (point.x < part.lower.x - housePlayerPad
+            || point.x > part.upper.x + housePlayerPad
+            || point.z < part.lower.z - housePlayerPad
+            || point.z > part.upper.z + housePlayerPad) continue;
+        for (uint row = 0u; row < masonryRows(part); ++row) {
+            float y0 = part.lower.y + float(row) * part.windows.y;
+            if (y0 > foot + 1.75f || y0 + part.windows.y < foot + 0.1f)
+                continue;
+            for (uint col = 0u; col < masonryColumns(part); ++col) {
+                if (masonryStoneGone(game, panel, row, col)) continue;
+                float3 lower, upper;
+                masonryStoneBox(part, row, col, lower, upper);
+                float2 gap = max(max(lower.xz - point.xz,
+                    point.xz - upper.xz), float2(0.0f));
+                if (length(gap) < housePlayerPad) return true;
+            }
+        }
+    }
+    return false;
+}
+
+// Fallen blocks share the wall's stone geometry and become solid once they
+// settle. A walker can step onto a block only within the tomb's climb limit.
+__attribute__((noinline))
+float streetTombDebrisStand(device const GameState &game, float2 p,
+    float foot, float ground) {
+    float top = ground;
+    for (uint i = 0u; i < masonryDebrisCount; ++i) {
+        if (game.masonryDebrisVelocity[i].w < 1.5f) continue;
+        device const HousePart &part = game.house.parts[
+            game.house.debrisParts[i]];
+        if (all(p >= part.lower.xz) && all(p <= part.upper.xz)
+            && part.upper.y <= foot + streetTombClimb)
+            top = max(top, part.upper.y);
+    }
+    return top;
+}
+
+__attribute__((noinline))
+bool streetTombDebrisBlocked(device const GameState &game, float2 p,
+    float foot) {
+    for (uint i = 0u; i < masonryDebrisCount; ++i) {
+        if (game.masonryDebrisVelocity[i].w < 1.5f) continue;
+        device const HousePart &part = game.house.parts[
+            game.house.debrisParts[i]];
+        float2 gap = max(max(part.lower.xz - p,
+            p - part.upper.xz), float2(0.0f));
+        if (length(gap) < housePlayerPad
+            && part.upper.y > foot + streetTombClimb
+            && part.lower.y < foot + 1.75f) return true;
+    }
+    return false;
 }
 
 // The ruin's hall in world x and z, lower corner then upper; the tomb is
@@ -985,9 +1046,8 @@ PointLight streetLairLight(device const GameState &game) {
             * houseHaunting(game).dim, false};
 }
 
-// Ruins the copy just made on c, whose group is still open: the ruin's
-// first blocks take the places of the copied plinth, cap, cella and corner
-// pilaster, and the rest and the candles follow them.
+// Ruins the copy just made on c, whose group is still open: replace its
+// plinth, cap and corner pilaster, then add the fallen blocks and candles.
 void ruinStreetTomb(device HouseModel &house, StreetProperty c) {
     if (house.counts.y == 0u) return;
     uint first = uint(house.groups[house.counts.y - 1u].lower.w);
@@ -1002,6 +1062,163 @@ void ruinStreetTomb(device HouseModel &house, StreetProperty c) {
             addHouseWorldPart(house, part);
     }
     addStreetLairCandles(house);
+}
+
+// Six wall panels make a hollow cella with its barred doorway. The panel
+// bounds cull rays; its stones are generated from rows and columns at hit
+// time, so removing a block never exposes a solid backing wall.
+void addStreetTombMasonry(device HouseModel &house, StreetProperty c,
+    uint instance) {
+    const float3 source = streetTombSource;
+    const float3 lower[6] = {
+        float3(-2.55f, 0.6f, 0.0f),
+        float3(-0.62f, 3.15f, 0.0f),
+        float3(0.62f, 0.6f, 0.0f),
+        float3(-2.55f, 0.6f, 5.0f),
+        float3(-2.55f, 0.6f, 0.3f),
+        float3(2.25f, 0.6f, 0.3f)};
+    const float3 upper[6] = {
+        float3(-0.62f, 4.3f, 0.3f),
+        float3(0.62f, 4.3f, 0.3f),
+        float3(2.55f, 4.3f, 0.3f),
+        float3(2.55f, 4.3f, 5.3f),
+        float3(-2.25f, 4.3f, 5.0f),
+        float3(2.55f, 4.3f, 5.0f)};
+    for (uint wall = 0u; wall < 6u; ++wall) {
+        HousePart part = streetCopyPart(houseBox(source + lower[wall],
+            source + upper[wall], houseMasonry), c, source);
+        float axis = (wall == 4u || wall == 5u) ? 1.0f : 0.0f;
+        part.windows = float4(1.25f, 0.8f, float(instance * 6u + wall), axis);
+        house.masonryParts[instance * 6u + wall] = house.counts.x;
+        addHouseWorldPart(house, part);
+    }
+    // Reserved parts are updated by the debris tick without changing the
+    // building's part ranges. Their bounds stay inside the padded group.
+    for (uint k = 0u; k < masonryDebrisCount / 2u; ++k) {
+        uint slot = instance * (masonryDebrisCount / 2u) + k;
+        house.debrisParts[slot] = house.counts.x;
+        addHouseWorldPart(house, houseBox(c.at.xyz, c.at.xyz, houseGrave));
+    }
+    uint group = house.counts.y - 1u;
+    house.groups[group].lower.xyz -= float3(12.0f, 0.0f, 12.0f);
+    house.groups[group].upper.xyz += float3(12.0f, 4.0f, 12.0f);
+}
+
+void resetStreetTombMasonry(device GameState &game) {
+    for (uint panel = 0u; panel < masonryPanelCount; ++panel)
+        for (uint row = 0u; row < masonryMaxRows; ++row)
+            game.masonryGone[panel][row] = 0u;
+    StreetProperty ruin = streetProperties[streetRuinedTomb];
+    for (uint wall = 3u; wall < 6u; wall += 2u) {
+        uint panel = wall;
+        device const HousePart &part = game.house.parts[
+            game.house.masonryParts[panel]];
+        for (uint row = 0u; row < masonryRows(part); ++row) {
+            for (uint col = 0u; col < masonryColumns(part); ++col) {
+                float3 lower, upper;
+                masonryStoneBox(part, row, col, lower, upper);
+                if (any(lower >= upper)) continue;
+                float3 middle = 0.5f * (lower + upper);
+                float2 local = streetTombLocal(ruin, middle.xz);
+                float height = (middle.y - ruin.at.y) / ruin.at.w;
+                float edge = 0.30f * (houseHash(float(row * 29u + col * 11u
+                    + wall * 73u)) - 0.5f);
+                bool gone = wall == 3u
+                    ? local.x > 0.6f && height < 1.55f
+                        + 0.92f * (local.x - 0.6f) + edge
+                    : local.y > 3.0f && height < 1.45f
+                        + 0.88f * (local.y - 3.0f) + edge;
+                if (gone) game.masonryGone[panel][row] |= 1u << col;
+            }
+        }
+    }
+    for (uint i = 0u; i < masonryDebrisCount; ++i)
+        game.masonryDebrisVelocity[i] = float4(0.0f);
+    for (uint i = 0u; i < masonryDebrisCount; ++i) {
+        StreetProperty c = streetProperties[streetTombFirst
+            + i / (masonryDebrisCount / 2u)];
+        game.house.parts[game.house.debrisParts[i]] = houseBox(c.at.xyz,
+            c.at.xyz, houseGrave);
+    }
+    game.masonryDebrisNext[0] = 0u;
+    game.masonryDebrisNext[1] = 0u;
+}
+
+void launchMasonryStone(device GameState &game, uint instance,
+    float3 centre, float3 halfSize, float3 blast, float seed) {
+    uint slot = instance * (masonryDebrisCount / 2u)
+        + game.masonryDebrisNext[instance]++ % (masonryDebrisCount / 2u);
+    uint partIndex = game.house.debrisParts[slot];
+    float3 radius = max(halfSize * 0.82f, float3(0.04f));
+    game.house.parts[partIndex] = houseBox(centre - radius,
+        centre + radius, houseGrave);
+    float3 away = centre - blast;
+    away = length(away) > 0.01f ? normalize(away)
+        : float3(0.0f, 0.5f, 1.0f);
+    game.masonryDebrisVelocity[slot] = float4(
+        away * (3.0f + 2.5f * seed) + float3(0.0f, 2.5f, 0.0f), 1.0f);
+}
+
+// The same occupancy bit that opens a sightline launches the detached block.
+// A local radius leaves whole stones at the edge; it can straddle two panels
+// at a corner and repeated strikes enlarge the opening.
+__attribute__((noinline))
+void damageStreetTombMasonry(device GameState &game, float3 blast) {
+    const float reach = 2.9f;
+    for (uint panel = 0u; panel < masonryPanelCount; ++panel) {
+        uint partIndex = game.house.masonryParts[panel];
+        device const HousePart &part = game.house.parts[partIndex];
+        HouseTurn turn = housePartTurn(game.house, partIndex);
+        float3 point = houseTurnPointIn(turn, blast);
+        if (distance(point, clamp(point, part.lower.xyz, part.upper.xyz))
+            >= reach) continue;
+        for (uint row = 0u; row < masonryRows(part); ++row) {
+            float y0 = part.lower.y + float(row) * part.windows.y;
+            if (abs(point.y - (y0 + 0.5f * part.windows.y))
+                > reach + part.windows.y) continue;
+            for (uint col = 0u; col < masonryColumns(part); ++col) {
+                if (masonryStoneGone(game, panel, row, col)) continue;
+                float3 lower, upper;
+                masonryStoneBox(part, row, col, lower, upper);
+                if (any(lower >= upper)) continue;
+                float seed = houseHash(float(panel * 101u + row * 29u
+                    + col * 13u));
+                if (distance(point, clamp(point, lower, upper))
+                    > reach * (0.82f + 0.22f * seed)) continue;
+                game.masonryGone[panel][row] |= 1u << col;
+                float3 centre = houseTurnPointOut(turn,
+                    0.5f * (lower + upper));
+                launchMasonryStone(game, panel / 6u, centre,
+                    0.5f * (upper - lower), blast, seed);
+            }
+        }
+    }
+}
+
+__attribute__((noinline))
+void advanceStreetTombDebris(device GameState &game, float dt) {
+    for (uint i = 0u; i < masonryDebrisCount; ++i) {
+        float4 motion = game.masonryDebrisVelocity[i];
+        if (motion.w < 0.5f || motion.w > 1.5f) continue;
+        uint partIndex = game.house.debrisParts[i];
+        device HousePart &part = game.house.parts[partIndex];
+        float3 radius = 0.5f * (part.upper.xyz - part.lower.xyz);
+        float3 centre = 0.5f * (part.upper.xyz + part.lower.xyz);
+        motion.y -= 9.8f * dt;
+        centre += motion.xyz * dt;
+        uint instance = i / (masonryDebrisCount / 2u);
+        float floorY = streetTombStand(centre.xz,
+            streetProperties[streetTombFirst + instance].at.y);
+        if (centre.y - radius.y <= floorY) {
+            centre.y = floorY + radius.y;
+            motion.xz *= 0.55f;
+            motion.y = abs(motion.y) > 1.1f ? -motion.y * 0.23f : 0.0f;
+            if (motion.y == 0.0f) motion.w = 2.0f;
+        }
+        part.lower.xyz = centre - radius;
+        part.upper.xyz = centre + radius;
+        game.masonryDebrisVelocity[i] = motion;
+    }
 }
 
 // ---------------------------------------------------------------- building
@@ -1023,7 +1240,13 @@ void buildStreet(device HouseModel &house) {
             } else if (c.kind == streetTomb) {
                 copyBuildingGroup(house, house.sites[streetHouseSite].y - 2u,
                     c);
+                uint group = house.counts.y - 1u;
+                uint part = uint(house.groups[group].lower.w)
+                    + mausoleumCellaPart;
+                house.parts[part] = houseBox(c.at.xyz, c.at.xyz,
+                    houseGrave);
                 if (i == streetRuinedTomb) ruinStreetTomb(house, c);
+                addStreetTombMasonry(house, c, i - streetTombFirst);
             } else {
                 copyBuildingGroup(house,
                     house.sites[streetShedYardSite].x + c.kind, c);

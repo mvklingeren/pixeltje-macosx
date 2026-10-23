@@ -58,6 +58,51 @@
       ]
     },
     {
+      "name": "giant-ruin-front",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [40, 6, 38, 0] },
+        { "buffer": "game", "offset": 16, "floats": [0.1] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "giant-ruin-back",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [40, 7, -35, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.12] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "giant-ruin-corner",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [10, 7, -32, 2.45] },
+        { "buffer": "game", "offset": 16, "floats": [0.1] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "giant-ruin-above",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [12, 18, -33, 2.45] },
+        { "buffer": "game", "offset": 16, "floats": [-0.32] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "giant-intact-back",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-40, 7, -35, 3.1416] },
+        { "buffer": "game", "offset": 16, "floats": [0.12] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
       "name": "yard-from-back-gate",
       "frames": 0,
       "writes": [

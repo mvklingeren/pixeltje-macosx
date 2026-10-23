@@ -194,64 +194,29 @@ struct MausoleumBlock {
     float2 tilt;
 };
 
-// The first mausoleumRuinReplaced blocks take the places of the copied
-// parts in mausoleumRuinReplaces; the rest are added after them.
-constant uint mausoleumRuinReplaced = 4u;
+// The first blocks replace the copied plinth, cap and broken pilaster.
+// The cella itself is rebuilt from removable masonry panels, not from these
+// static slabs; the remaining blocks are the fallen plinth and rubble.
+constant uint mausoleumRuinReplaced = 3u;
 constant uint mausoleumRuinReplaces[mausoleumRuinReplaced] = {
-    mausoleumPlinthPart, mausoleumCapPart, mausoleumCellaPart,
+    mausoleumPlinthPart, mausoleumCapPart,
     mausoleumCornerPilasterPart};
 
-constant uint mausoleumRuinBlockCount = 40u;
+constant uint mausoleumRuinBlockCount = 24u;
 constant MausoleumBlock mausoleumRuinBlocks[mausoleumRuinBlockCount] = {
-    // The plinth and its cap short of the gap, the cella's front wall and
-    // what the corner pilaster left hanging.
+    // The plinth and its cap short of the gap, and the corner pilaster's
+    // remnant hanging from the cornice.
     {float4(-3.15f, -0.2f, -2.55f, 0.0f), float4(1.0f, 0.5f, 5.65f, 0.0f),
         float2(0.0f)},
     {float4(-3.2f, 0.5f, -2.6f, 0.0f), float4(1.0f, 0.6f, 5.7f, 0.0f),
         float2(0.0f)},
-    {float4(-2.55f, 0.6f, 0.0f, 0.0f), float4(2.55f, 4.3f, 0.3f, 0.0f),
-        float2(0.0f)},
     {float4(2.55f, 3.45f, 4.88f, 1.0f), float4(2.67f, 4.3f, 5.3f, 0.0f),
         float2(0.0f, 0.5f)},
-    // The plinth and its cap in front of the gap, then the walls that
-    // still stand whole.
+    // The plinth and its cap in front of the gap.
     {float4(1.0f, -0.2f, -2.55f, 0.0f), float4(3.15f, 0.5f, 3.6f, 0.0f),
         float2(0.0f)},
     {float4(1.0f, 0.5f, -2.6f, 0.0f), float4(3.2f, 0.6f, 3.6f, 0.0f),
         float2(0.0f)},
-    {float4(-2.55f, 0.6f, 0.3f, 0.0f), float4(-2.25f, 4.3f, 5.0f, 0.0f),
-        float2(0.0f)},
-    {float4(-2.55f, 0.6f, 5.0f, 0.0f), float4(0.6f, 4.3f, 5.3f, 0.0f),
-        float2(0.0f)},
-    {float4(2.25f, 0.6f, 0.3f, 0.0f), float4(2.55f, 4.3f, 3.0f, 0.0f),
-        float2(0.0f)},
-    // The back wall over the gap, its broken edge climbing to the corner.
-    {float4(0.6f, 1.55f, 5.0f, 1.0f), float4(1.0f, 4.3f, 5.3f, 0.0f),
-        float2(0.9f, 0.0f)},
-    {float4(1.0f, 2.0f, 5.0f, 1.0f), float4(1.4f, 4.3f, 5.3f, 0.0f),
-        float2(-0.7f, 0.0f)},
-    {float4(1.4f, 2.45f, 5.0f, 1.0f), float4(1.8f, 4.3f, 5.3f, 0.0f),
-        float2(0.8f, 0.0f)},
-    {float4(1.8f, 2.8f, 5.0f, 1.0f), float4(2.2f, 4.3f, 5.3f, 0.0f),
-        float2(-0.6f, 0.0f)},
-    {float4(2.2f, 3.2f, 5.0f, 1.0f), float4(2.55f, 4.3f, 5.3f, 0.0f),
-        float2(0.7f, 0.2f)},
-    // The +x wall over the gap.
-    {float4(2.25f, 1.5f, 3.0f, 1.0f), float4(2.55f, 4.3f, 3.4f, 0.0f),
-        float2(0.0f, 0.9f)},
-    {float4(2.25f, 1.95f, 3.4f, 1.0f), float4(2.55f, 4.3f, 3.85f, 0.0f),
-        float2(0.0f, -0.7f)},
-    {float4(2.25f, 2.35f, 3.85f, 1.0f), float4(2.55f, 4.3f, 4.3f, 0.0f),
-        float2(0.0f, 0.8f)},
-    {float4(2.25f, 2.75f, 4.3f, 1.0f), float4(2.55f, 4.3f, 4.75f, 0.0f),
-        float2(0.0f, -0.6f)},
-    {float4(2.25f, 3.1f, 4.75f, 1.0f), float4(2.55f, 4.3f, 5.0f, 0.0f),
-        float2(0.2f, 0.7f)},
-    // Stumps of both walls at the gap's edges.
-    {float4(0.6f, 0.6f, 5.0f, 2.0f), float4(0.9f, 1.05f, 5.3f, 0.0f),
-        float2(0.5f, 0.1f)},
-    {float4(2.25f, 0.6f, 3.0f, 2.0f), float4(2.55f, 0.95f, 3.3f, 0.0f),
-        float2(0.1f, 0.5f)},
     // The heap, from the hall's floor down to the ground outside.
     {float4(1.0f, -0.05f, 3.6f, 2.0f), float4(1.7f, 0.57f, 4.3f, 0.0f),
         float2(0.1f, 0.08f)},
@@ -356,21 +321,14 @@ constant MausoleumFooting mausoleumFootings[mausoleumFootingCount] = {
     {float4(3.3f, 1.2f, 3.48f, 2.0f), 0.08f, mausoleumRuined},
 };
 
-// The portico's columns, then the cella: whole, or the ruin's walls and
-// the stumps at the gap's edges. Each reaches far over any walker's head.
-constant uint mausoleumWallCount = 11u;
+// The portico's columns stay fixed. The cella walls use the same removable
+// masonry stones for both rendering and collision in HauntedStreet.metal.
+constant uint mausoleumWallCount = 4u;
 constant MausoleumFooting mausoleumWalls[mausoleumWallCount] = {
     {float4(-2.96f, -2.11f, -2.24f, -1.39f), 0.0f, 0u},
     {float4(-1.31f, -2.11f, -0.59f, -1.39f), 0.0f, 0u},
     {float4(0.59f, -2.11f, 1.31f, -1.39f), 0.0f, 0u},
     {float4(2.24f, -2.11f, 2.96f, -1.39f), 0.0f, 0u},
-    {float4(-2.67f, -0.12f, 2.67f, 5.3f), 0.0f, mausoleumIntact},
-    {float4(-2.67f, -0.12f, 2.67f, 0.3f), 0.0f, mausoleumRuined},
-    {float4(-2.67f, 0.3f, -2.25f, 5.3f), 0.0f, mausoleumRuined},
-    {float4(-2.67f, 5.0f, 0.6f, 5.3f), 0.0f, mausoleumRuined},
-    {float4(2.25f, 0.3f, 2.67f, 3.0f), 0.0f, mausoleumRuined},
-    {float4(0.6f, 5.0f, 0.9f, 5.3f), 0.0f, mausoleumRuined},
-    {float4(2.25f, 3.0f, 2.55f, 3.3f), 0.0f, mausoleumRuined},
 };
 
 bool mausoleumHas(MausoleumFooting f, uint tomb, float2 p, float pad) {

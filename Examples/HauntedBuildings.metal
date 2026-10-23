@@ -58,12 +58,14 @@ void traceBuildingGroups(thread SceneHit &hit, float3 origin,
         }
         uint end = min(uint(group.upper.w), houseCapacity);
         for (uint i = uint(group.lower.w); i < end; ++i) {
+            uint style = uint(house.parts[i].lower.w);
             float3 normal;
-            float t = houseHitPart(house.parts[i], o, d, hit.distance,
-                normal);
+            float t = style == houseMasonry
+                ? masonryHitPart(house.parts[i], game, o, d,
+                    hit.distance, normal)
+                : houseHitPart(house.parts[i], o, d, hit.distance, normal);
             if (t < 0.0f) continue;
             float3 p = o + d * t;
-            uint style = uint(house.parts[i].lower.w);
             if (houseCutoutStyle(style)
                 && houseCutoutOpen(style, house.parts[i], p)) continue;
             // Rays pass through the clear glass of the house's rooms.
@@ -116,8 +118,11 @@ bool buildingsBlockLight(float3 origin, float3 direction,
             uint style = uint(house.parts[i].lower.w);
             if (houseCutoutStyle(style) || style == houseLantern) continue;
             float3 normal;
-            if (houseHitPart(house.parts[i], o, d, lightDistance, normal)
-                    > 0.0f) return true;
+            float t = style == houseMasonry
+                ? masonryHitPart(house.parts[i], game, o, d,
+                    lightDistance, normal)
+                : houseHitPart(house.parts[i], o, d, lightDistance, normal);
+            if (t > 0.0f) return true;
         }
     }
     return false;
@@ -310,8 +315,9 @@ float buildingsTombStand(float2 p, float ground) {
 }
 
 __attribute__((noinline))
-bool buildingsTombBlockedFrom(float2 p, float foot) {
-    return streetTombBlockedFrom(p, foot);
+bool buildingsTombBlockedFrom(device const GameState &game, float2 p,
+    float foot) {
+    return streetTombBlockedFrom(game, p, foot);
 }
 
 // The ruined mausoleum's hall, the broodmother's lair: whether p lies in

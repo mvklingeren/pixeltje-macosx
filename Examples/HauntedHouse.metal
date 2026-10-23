@@ -3552,6 +3552,8 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
             mood);
     }
 
+    if (style == houseMasonry)
+        return masonrySurfaceMaterial(part, p, n, blur);
     if (style == houseTimber) return houseTimberMaterial(part, p, n, blur, paint);
     if (style == houseLog) return houseLogMaterial(part, p, n, blur, inside);
     if (style == houseGrave)
