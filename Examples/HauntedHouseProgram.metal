@@ -20,7 +20,7 @@ using namespace metal;
 // everywhere; the hand punches, and knocks on doors. enableDrones and
 // renderBase below switch the drones and the drawn base off for now. With
 // enableDayNightTransition, the sun crosses the sky from noon to this night
-// over ten minutes, and the timeOfDay parameter picks where on that path a
+// over twenty minutes, and the timeOfDay parameter picks where on that path a
 // match starts; the house sleeps through the bright half of the afternoon
 // and wakes to shots only once it is getting dark.
 
@@ -86,8 +86,8 @@ constant float earthRadius = 0.028f;      // drawn 1.6°, larger than life
 // stars, then sinks toward the plain left of the house and sets just before
 // dayNightDuration seconds after noon, leaving the earthlit night above. A
 // match starts timeOfDay seconds after noon (parameters0.x): 0 starts at
-// noon, about 545 puts the sun's centre on the horizon, 553 starts just
-// after its disc has gone under, and 600 or more starts in the night. Set
+// noon, about 1090 puts the sun's centre on the horizon, 1106 starts just
+// after its disc has gone under, and 1200 or more starts in the night. Set
 // enableDayNightTransition false to keep the night from the start.
 constant bool enableDayNightTransition = true;
 // With the transition on, an Earth-like atmosphere hangs over the moon until
@@ -95,7 +95,7 @@ constant bool enableDayNightTransition = true;
 // sun that reddens as it sets and a twilight that fades to black. Set it
 // false for the airless black sky of the real moon.
 constant bool enableAtmosphere = true;
-constant float dayNightDuration = 600.0f;  // noon to night, in seconds
+constant float dayNightDuration = 1200.0f; // noon to night, in seconds
 // The sun's path is a great circle from its highest point, 68° up, to the
 // horizon point where it sets, 18° left of the house seen from the start.
 // The two directions are perpendicular.
@@ -3101,7 +3101,7 @@ kernel void bakeSunShadows(device const GameState *states [[buffer(1)]],
     bakeSunShadow(id.y * terrainMapRow + id.x, states[0], shadows);
 }
 
-// The sun moves a quarter turn in ten minutes, so one band per tick keeps
+// The sun moves a quarter turn in twenty minutes, so one band per tick keeps
 // its shadows current.
 kernel void refreshSunShadows(constant ProgramUniforms &u [[buffer(0)]],
     device const GameState *states [[buffer(1)]],

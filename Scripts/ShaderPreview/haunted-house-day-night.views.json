@@ -33,36 +33,6 @@
       ]
     },
     {
-      "name": "minute-01",
-      "frames": 0,
-      "parameters": { "timeOfDay": 0 },
-      "writes": [
-        {
-          "buffer": "game",
-          "floats": [
-            0,
-            1.7,
-            26,
-            3.1416
-          ]
-        },
-        {
-          "buffer": "game",
-          "offset": 16,
-          "floats": [
-            0.06
-          ]
-        },
-        {
-          "buffer": "game",
-          "offset": 560,
-          "floats": [
-            60.0
-          ]
-        }
-      ]
-    },
-    {
       "name": "minute-02",
       "frames": 0,
       "parameters": { "timeOfDay": 0 },
@@ -88,36 +58,6 @@
           "offset": 560,
           "floats": [
             120.0
-          ]
-        }
-      ]
-    },
-    {
-      "name": "minute-03",
-      "frames": 0,
-      "parameters": { "timeOfDay": 0 },
-      "writes": [
-        {
-          "buffer": "game",
-          "floats": [
-            0,
-            1.7,
-            26,
-            3.1416
-          ]
-        },
-        {
-          "buffer": "game",
-          "offset": 16,
-          "floats": [
-            0.06
-          ]
-        },
-        {
-          "buffer": "game",
-          "offset": 560,
-          "floats": [
-            180.0
           ]
         }
       ]
@@ -153,36 +93,6 @@
       ]
     },
     {
-      "name": "minute-05",
-      "frames": 0,
-      "parameters": { "timeOfDay": 0 },
-      "writes": [
-        {
-          "buffer": "game",
-          "floats": [
-            0,
-            1.7,
-            26,
-            3.1416
-          ]
-        },
-        {
-          "buffer": "game",
-          "offset": 16,
-          "floats": [
-            0.06
-          ]
-        },
-        {
-          "buffer": "game",
-          "offset": 560,
-          "floats": [
-            300.0
-          ]
-        }
-      ]
-    },
-    {
       "name": "minute-06",
       "frames": 0,
       "parameters": { "timeOfDay": 0 },
@@ -208,36 +118,6 @@
           "offset": 560,
           "floats": [
             360.0
-          ]
-        }
-      ]
-    },
-    {
-      "name": "minute-07",
-      "frames": 0,
-      "parameters": { "timeOfDay": 0 },
-      "writes": [
-        {
-          "buffer": "game",
-          "floats": [
-            0,
-            1.7,
-            26,
-            3.1416
-          ]
-        },
-        {
-          "buffer": "game",
-          "offset": 16,
-          "floats": [
-            0.06
-          ]
-        },
-        {
-          "buffer": "game",
-          "offset": 560,
-          "floats": [
-            420.0
           ]
         }
       ]
@@ -273,36 +153,6 @@
       ]
     },
     {
-      "name": "minute-09",
-      "frames": 0,
-      "parameters": { "timeOfDay": 0 },
-      "writes": [
-        {
-          "buffer": "game",
-          "floats": [
-            0,
-            1.7,
-            26,
-            3.1416
-          ]
-        },
-        {
-          "buffer": "game",
-          "offset": 16,
-          "floats": [
-            0.06
-          ]
-        },
-        {
-          "buffer": "game",
-          "offset": 560,
-          "floats": [
-            540.0
-          ]
-        }
-      ]
-    },
-    {
       "name": "minute-10",
       "frames": 0,
       "parameters": { "timeOfDay": 0 },
@@ -328,6 +178,156 @@
           "offset": 560,
           "floats": [
             600.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "minute-12",
+      "frames": 0,
+      "parameters": { "timeOfDay": 0 },
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            26,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.06
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            720.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "minute-14",
+      "frames": 0,
+      "parameters": { "timeOfDay": 0 },
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            26,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.06
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            840.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "minute-16",
+      "frames": 0,
+      "parameters": { "timeOfDay": 0 },
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            26,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.06
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            960.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "minute-18",
+      "frames": 0,
+      "parameters": { "timeOfDay": 0 },
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            26,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.06
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            1080.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "minute-20",
+      "frames": 0,
+      "parameters": { "timeOfDay": 0 },
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            1.7,
+            26,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.06
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            1200.0
           ]
         }
       ]

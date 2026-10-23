@@ -6,7 +6,7 @@
       "name": "belfry-flock",
       "frames": 1,
       "parameters": {
-        "timeOfDay": 562
+        "timeOfDay": 1114
       },
       "writes": [
         {
@@ -31,7 +31,7 @@
       "name": "street-flock-east",
       "frames": 1,
       "parameters": {
-        "timeOfDay": 595
+        "timeOfDay": 1147
       },
       "writes": [
         {
@@ -64,7 +64,7 @@
       "name": "close-up-downstroke",
       "frames": 1,
       "parameters": {
-        "timeOfDay": 557
+        "timeOfDay": 1109
       },
       "writes": [
         {
@@ -481,7 +481,7 @@
       "name": "close-up-bottom",
       "frames": 1,
       "parameters": {
-        "timeOfDay": 557
+        "timeOfDay": 1109
       },
       "writes": [
         {
