@@ -14,8 +14,10 @@ using namespace metal;
 // from the exit to a procedurally built Victorian haunted house whose ground
 // floor is open. An asphalt street lit by lantern posts crosses the path,
 // with copies of the cottage, barn and shed along it, each standing a few
-// degrees off square with the road. The player
-// starts outside on that path, facing the house.
+// degrees off square with the road. Behind the start two giant mausoleums
+// flank the exit; the walker climbs onto both, and the broodmother waits
+// in the hall of the eastern one, whose back corner has fallen in. The
+// player starts outside on that path, facing the house.
 // The hand, pistol, double-barrel shotgun and launcher are on keys 1 to 4
 // everywhere; the hand punches, and knocks on doors. enableDrones and
 // renderBase below switch the drones and the drawn base off for now. With
@@ -117,9 +119,12 @@ constant uint batCount = batFlockCount * batFlockSize;
 constant bool enableDrones = false;
 // Whether the view draws the base: its rooms, corridors, props, exit and
 // outer shell. Off for now, so the moon runs on across its footprint. It
-// only changes what is drawn; shots, sight lines, lasers and the walker
+// mostly changes what is drawn; shots, sight lines, lasers and the walker
 // still meet the base, and the spiders, sentries and pickups inside it
-// still show.
+// still show. Only on the pads of the street's mausoleums, which stand
+// over its front rooms, is the base gone: the walker meets the tombs,
+// rays from there meet only the buildings and the moon, and the spiders
+// and sentries the tombs would bury are not there.
 constant bool renderBase = false;
 // The player starts outside on the flagstone path, a few metres south of
 // the exit door, facing the haunted house. The trackpad's centre looks
@@ -306,7 +311,7 @@ struct HouseGroup {
     uint4 last;             // the last group these bounds enclose, unused
 };
 
-constant uint houseCapacity = 1536u;
+constant uint houseCapacity = 1664u;
 constant uint houseGroupCapacity = 72u;
 constant uint buildingSiteCapacity = 8u;
 
@@ -527,6 +532,20 @@ PointLight roomLight(uint index, float time) {
 #include "HauntedStreet.metal"
 #include "HauntedBuildings.metal"
 
+// The broodmother waits by the candles in the ruined mausoleum's hall and,
+// once the player climbs in, walks out toward the gap; see
+// SignalRangeSpider.metal. Her centre keeps clear of the hall's walls by
+// about her legs' reach, and her webs land inside it. The reveal views her
+// from high in the hall's broken corner.
+constant float bossLairFloor = streetLairLevels.x;
+constant float2 bossLairSpawn = float2(45.0f, 3.5f);
+constant float2 bossLairEntrance = float2(40.0f, -2.0f);
+constant float2 bossLairLower = streetLairHall.xy + float2(5.75f, 5.75f);
+constant float2 bossLairUpper = streetLairHall.zw - float2(5.75f, 5.75f);
+constant float2 bossWebLower = streetLairHall.xy + float2(1.5f, 1.5f);
+constant float2 bossWebUpper = streetLairHall.zw - float2(1.5f, 1.5f);
+constant float3 bossRevealEye = float3(31.0f, bossLairFloor + 4.0f, -11.5f);
+
 float stairHeight(float2 point);
 bool walkable(float2 point);
 bool outdoors(float2 point, float pad);
@@ -672,6 +691,12 @@ void gunCapsule(thread GunHit &hit, float3 origin, float3 direction,
 #include "SignalRangeDrone.metal"
 #include "SignalRangeArsenal.metal"
 
+// True where the street's mausoleums stand over the undrawn base: a spider
+// or sentry of the base there is not there at all.
+bool baseBuried(float2 point) {
+    return !renderBase && streetTombPadHolds(point);
+}
+
 void resetGame(device GameState &game, uint seed) {
     game.player = float4(spawnGround.x, 1.55f + stairHeight(spawnGround),
         spawnGround.y, spawnYaw);
@@ -721,6 +746,8 @@ void resetGame(device GameState &game, uint seed) {
             0.0f, 0.0f, 0.0f);
         // Range spiders hold their opening pose for a moment, then patrol.
         game.pathFollow[i] = npcPathFollower(2.2f + 0.9f * float(i));
+        if (baseBuried(game.enemy[i].xz) && i != bossSlot)
+            game.enemy[i].w = 0.0f;
     }
     // Every match generates a fresh network over the same rooms.
     npcPathGenerate(game.paths, rangePathAreas, pathAreaCount,
@@ -743,7 +770,9 @@ void resetGame(device GameState &game, uint seed) {
     for (uint i = 0u; i < sentryCount; ++i) {
         game.sentryFloor[i] = stairHeight(sentryGround[i]);
         game.sentryAim[i] = float4(sentryRestYaw(i), 0.0f, 0.0f, -1.0f);
-        game.sentryState[i] = float4(sentryHealth, 0.0f, -100.0f, 0.0f);
+        game.sentryState[i] = float4(
+            baseBuried(sentryGround[i]) ? 0.0f : sentryHealth,
+            0.0f, -100.0f, 0.0f);
     }
     for (uint i = 0u; i < boltCount; ++i) {
         game.boltPosition[i] = float4(0.0f, 0.0f, 0.0f, -100.0f);
@@ -1069,15 +1098,16 @@ bool walkable(float2 point) {
         && abs(z) <= roomLimit;
 }
 
-// The player alone climbs the haunted house's upper floors: inside its body
-// their footing and walls depend on how high their feet are, at foot.
+// The player alone climbs the haunted house's upper floors and the street's
+// mausoleums: there their footing and walls depend on how high their feet
+// are, at foot. On the mausoleums' pads the base's rooms are not there.
 float playerGround(float2 point, float foot) {
-    if (!houseBodyHolds(point)) return stairHeight(point);
+    if (!buildingsClimbHolds(point)) return stairHeight(point);
     return buildingsStandFrom(point, moonHeight(point, moonTraceDetail), foot);
 }
 
 bool playerWalkable(float2 point, float foot) {
-    if (!houseBodyHolds(point)) return walkable(point);
+    if (!buildingsClimbHolds(point)) return walkable(point);
     return !buildingsBlockedFrom(point, foot);
 }
 
@@ -1403,8 +1433,9 @@ kernel void advancePlayer(constant ProgramUniforms &u [[buffer(0)]],
         game.dodge.y = 0.0f;
     }
     next = position;
-    // Walking around the outside of the base must not trip the room rules.
-    bool outside = outdoors(next, 0.0f);
+    // Walking around the outside of the base, or over the mausoleums' pads,
+    // must not trip the room rules.
+    bool outside = outdoors(next, 0.0f) || streetTombPadHolds(next);
     if (!rangeCleared(game) && !outside
         && previousPosition.y >= -outerRoomFar + 0.3f)
         next.y = max(next.y, -outerRoomFar + 0.3f);
@@ -1423,9 +1454,9 @@ kernel void advancePlayer(constant ProgramUniforms &u [[buffer(0)]],
     game.motion.w = mix(game.motion.w, wasGrounded
             ? saturate(walked / max(dt * 4.6f, 0.00001f)) : 0.0f,
         1.0f - exp(-dt * 8.0f));
-    if (game.bossScene.x < 0.0f && !outside
-        && rangeCleared(game)
-        && next.y < bossRoomSouth - 2.6f) {
+    // The broodmother's reveal starts once the player stands in her hall.
+    if (game.bossScene.x < 0.0f
+        && buildingsLairHolds(float3(next.x, foot, next.y))) {
         game.bossScene.x = 0.0f;
     }
     if (next.y >= -outerRoomNear + 0.5f || outside) {
@@ -2206,8 +2237,9 @@ void traceOutside(thread SceneHit &hit, float3 origin, float3 direction,
         p.xz, epsilon), p, 40u, -1, 0u};
 }
 
-void traceEnvironment(thread SceneHit &hit, float3 origin,
-    float3 direction, ChromePose chrome, device const GameState &game) {
+// The base's rooms, corridors, doors and props, for traceEnvironment.
+void traceBase(thread SceneHit &hit, float3 origin, float3 direction,
+    ChromePose chrome, device const GameState &game) {
     traceRoom(hit, origin, direction, 0u,
         float3(-mainRoomHalfExtent, 0.0f, -mainRoomHalfExtent),
         float3(mainRoomHalfExtent, 5.5f, mainRoomHalfExtent), 1u, 2u);
@@ -2271,9 +2303,17 @@ void traceEnvironment(thread SceneHit &hit, float3 origin,
     for (uint i = 0u; i < ceilingLampCount; ++i)
         traceCeilingLamp(hit, origin, direction, ceilingLamps[i], i);
     traceExit(hit, origin, direction, game);
+}
+
+void traceEnvironment(thread SceneHit &hit, float3 origin,
+    float3 direction, ChromePose chrome, device const GameState &game) {
+    // A ray from a mausoleum's pad meets the tombs, not the undrawn base
+    // they stand over.
+    bool base = !baseBuried(origin.xz);
+    if (base) traceBase(hit, origin, direction, chrome, game);
     traceBuildings(hit, origin, direction, game);
     // Last, so the terrain march stops at the nearest other surface.
-    traceOutside(hit, origin, direction, true);
+    traceOutside(hit, origin, direction, base);
 }
 
 float hashTile(float2 p) {
@@ -3979,8 +4019,9 @@ float3 pistolSurroundings(float3 origin, float3 direction, bool outside,
 }
 
 // The viewmodel is lit by the same lights as the scene it moves through: the
-// room lights in the base, the lamps in the haunted house, and the Earth,
-// the sun and the lanterns on the moon.
+// room lights in the base, the lamps in the haunted house, the candles in
+// the ruined mausoleum, and the Earth, the sun and the lanterns on the
+// moon.
 float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
     float3 right, float3 up, float3 front, float3 direction,
     ChromePose chrome, device const GameState &game,
@@ -3995,7 +4036,9 @@ float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
         : (gun.part >= 10u ? launcherMaterial(gun)
             : (gun.part >= 6u ? shotgunMaterial(gun) : gunMaterial(gun)));
     bool inHouse = houseInteriorPoint(eye);
-    bool outside = outdoors(eye.xz, 0.0f) && !inHouse;
+    bool inLair = buildingsLairHolds(eye);
+    bool outside = (outdoors(eye.xz, 0.0f) || streetTombPadHolds(eye.xz))
+        && !inHouse && !inLair;
     Daylight sun = daylight(dayClock(game));
     float3 bounce = regolithBounce(sun);
     float3 color = material.albedo * (1.0f - material.metallic)
@@ -4030,12 +4073,13 @@ float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
         color += shadeDistantLights(hit, broad, -direction, chrome, game,
             earthShadow, sunShadow);
         color += houseOutdoorLighting(hit, material, -direction, chrome, game);
-    } else for (uint i = 0u; i < (inHouse ? houseIndoorLightCount : 8u);
-        ++i) {
+    } else for (uint i = 0u;
+        i < (inHouse ? houseIndoorLightCount : (inLair ? 1u : 8u)); ++i) {
         uint lightRoom = 0u;
         PointLight light = inHouse
             ? houseHauntedIndoorLight(i, game, lightRoom)
-            : roomLight(i, game.effects.x);
+            : (inLair ? buildingsLairLight(game)
+                : roomLight(i, game.effects.x));
         if (inHouse)
             light.power *= houseLightShare(lightRoom, houseRoom(eye),
                 houseLocal(eye));
@@ -4096,7 +4140,7 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         float time = game.bossScene.x;
         reveal = smoothstep(1.05f, 1.55f, time)
             * (1.0f - smoothstep(4.35f, 4.95f, time));
-        float3 closeOrigin = float3(6.5f, 3.65f, -88.0f);
+        float3 closeOrigin = bossRevealEye;
         float3 toBoss = game.enemy[bossSlot].xyz
             + float3(0.0f, 0.9f, 0.0f) - closeOrigin;
         float closeYaw = atan2(toBoss.x, -toBoss.z);
@@ -4143,20 +4187,26 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     // Earth and the lanterns light the shell, the moon, the drones over it,
     // the bats and the outside of the house.
     bool houseIndoors = house && houseInteriorPoint(hit.position);
-    bool exterior = hit.material == 40u || hit.material == 41u || drone
-        || bat || (house && !houseIndoors);
+    // The ruined mausoleum's hall, and whatever stands in it, is lit by its
+    // candles and what comes in through the gap.
+    bool lair = !houseIndoors && hit.material != 0u
+        && buildingsLairHolds(hit.position);
+    bool exterior = !lair && (hit.material == 40u || hit.material == 41u
+        || drone || bat || (house && !houseIndoors));
     // The airless moon has no sky light, only earthshine and sunlight
     // bounced off the plain, which reach slopes, boulder sides and walls more
     // than ground or roofs facing the sky. While there is an atmosphere, its
     // blue sky lights what faces it too, most of all ground and roofs. The
     // house's rooms keep a warm glow.
     Daylight sun = daylight(dayClock(game));
-    float3 ambient = exterior
-        ? regolithBounce(sun) * (0.004f + 0.045f * (1.0f - hit.normal.y))
-            + atmosphereSkyLight(sun) * 0.5f
-                * saturate(0.5f + 0.5f * hit.normal.y)
+    float3 outdoorAmbient = regolithBounce(sun)
+            * (0.004f + 0.045f * (1.0f - hit.normal.y))
+        + atmosphereSkyLight(sun) * 0.5f
+            * saturate(0.5f + 0.5f * hit.normal.y);
+    float3 ambient = exterior ? outdoorAmbient
+        : (lair ? 0.15f * outdoorAmbient + float3(0.004f, 0.0035f, 0.003f)
         : (houseIndoors ? float3(0.014f, 0.01f, 0.007f)
-            : float3(0.030f, 0.038f, 0.046f));
+            : float3(0.030f, 0.038f, 0.046f)));
     float3 color = material.emission
         + material.albedo * (1.0f - material.metallic) * ambient;
     if (drone) color += droneEmission(hit, game);
@@ -4168,6 +4218,11 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
             game);
     } else if (houseIndoors) {
         color += houseIndoorLighting(hit, material, -direction, chrome, game);
+    } else if (lair) {
+        color += shadeDistantLights(hit, material, -direction, chrome, game,
+            earthShadow, sunShadow);
+        color += shadePointLight(hit, material, -direction,
+            buildingsLairLight(game), chrome, game);
     } else for (uint i = 0u; i < 8u; ++i) {
         color += shadePointLight(hit, material, -direction,
             roomLight(i, game.effects.x), chrome, game);

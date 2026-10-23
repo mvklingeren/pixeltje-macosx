@@ -229,10 +229,16 @@ float buildingsStand(float2 p, float ground) {
     return houseStand(p, ground);
 }
 
-// The player alone climbs to the haunted house's upper floors. With their
-// feet at foot, these stand in for buildingsStand and buildingsBlocked over
-// the house's body, and give the height of what is over their head.
+// The player alone climbs to the haunted house's upper floors and onto the
+// street's mausoleums. With their feet at foot, these stand in for
+// buildingsStand and buildingsBlocked over the house's body and the
+// mausoleums' pads, and give the height of what is over their head.
+bool buildingsClimbHolds(float2 p) {
+    return houseBodyHolds(p) || streetTombPadHolds(p);
+}
+
 float buildingsStandFrom(float2 p, float ground, float foot) {
+    if (streetTombPadHolds(p)) return streetTombStand(p, ground);
     return houseStandFrom(p, ground, foot);
 }
 
@@ -243,6 +249,7 @@ float buildingsCeilingOver(float2 p, float foot) {
 bool buildingsBlocked(float2 p);
 
 bool buildingsBlockedFrom(float2 p, float foot) {
+    if (streetTombPadHolds(p)) return streetTombBlockedFrom(p, foot);
     if (!houseBodyHolds(p)) return buildingsBlocked(p);
     // The ground floor's walls and furniture stand in the house's table.
     if ((foot - houseOrigin.y) / houseScale < houseCeilingY
@@ -292,6 +299,18 @@ bool buildingsBlocked(float2 p) {
         if (all(local > r.xy - pad) && all(local < r.zw + pad)) return true;
     }
     return false;
+}
+
+// -------------------------------------------------------------------- lair
+
+// The ruined mausoleum's hall, the broodmother's lair: whether p lies in
+// it, and the candlelight that lights it.
+bool buildingsLairHolds(float3 p) {
+    return streetLairHolds(p);
+}
+
+PointLight buildingsLairLight(device const GameState &game) {
+    return streetLairLight(game);
 }
 
 // ------------------------------------------------------------------- smoke

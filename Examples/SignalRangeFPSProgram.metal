@@ -42,6 +42,15 @@ constant float bossRoomSouth = -70.0f;
 constant float bossRoomNorth = -110.0f;
 constant float bossDoorNorth = -110.0f;
 constant float bossCeilingY = 13.0f;
+// The boss waits behind the rear blast door and walks out into its room;
+// see SignalRangeSpider.metal.
+constant float bossLairFloor = 1.2f;
+constant float2 bossLairSpawn = float2(0.0f, -118.0f);
+constant float2 bossLairEntrance = float2(0.0f, -96.0f);
+constant float2 bossLairLower = float2(-12.8f, bossRoomNorth + 5.0f);
+constant float2 bossLairUpper = float2(12.8f, bossRoomSouth - 4.5f);
+constant float2 bossWebLower = float2(-18.5f, bossRoomNorth + 4.0f);
+constant float2 bossWebUpper = float2(18.5f, bossRoomSouth - 3.0f);
 constant uint ambushSlot = 2u;
 constant uint magazineSize = 12u;
 constant float reloadDuration = 1.6f;

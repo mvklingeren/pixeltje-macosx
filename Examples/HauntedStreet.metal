@@ -15,13 +15,17 @@
 // each a few degrees off square and set back by its own distance, as
 // buildings older than the road would stand.
 // Across the road from the house, two of the graveyards' mausoleums rise
-// five times their size, either side of the base exit.
+// five times their size, either side of the base exit. The walker climbs
+// their steps onto their plinths, and the east one is a ruin whose fallen
+// back corner opens its hall, where the broodmother waits by a few
+// candles; see HauntedMausoleum.metal.
 // buildStreet copies the originals' parts, already in the game buffer,
 // through a scale and a quarter turn, then turns the copy's groups by its
 // few degrees, so a copy is traced, shadowed and shaded like its original
 // and adds no code to the traces. Loose clapboards
 // stay on the original; a copy's clapboards are whole. The walker meets a
-// copy's walls through its original's footprint table. Nobody goes in.
+// copy's walls through its original's footprint table, and nobody goes
+// into the houses; the mausoleums' own footing serves theirs.
 //
 // Sixteen lantern posts nine metres tall stand along the road, alternating
 // sides: a cast-iron post in glossy black enamel whose top arches out over
@@ -106,6 +110,8 @@ constant uint streetCottage = 0u;
 constant uint streetBarn = 1u;      // the shed yard's first group
 constant uint streetOpenShed = 2u;  // and its second
 constant uint streetTomb = 3u;      // the west plot's mausoleum
+constant uint streetTombFirst = 7u; // the first mausoleum property
+constant uint streetRuinedTomb = 7u; // the ruined one, east of the exit
 
 struct StreetProperty {
     float4 at;      // world centre of the floor, scale
@@ -863,6 +869,139 @@ void addStreetSign(device HouseModel &house, uint i) {
         -0.06f), foot + float3(0.03f, top + 0.04f, 0.06f), houseCastIron));
 }
 
+// ------------------------------------------------------------------ tombs
+// The mausoleum copies stand where the base's front rooms are, which the
+// view does not draw: on their pads the walker climbs their steps and meets
+// their walls rather than the rooms' (see the program's playerGround). The
+// ruin's hall is the broodmother's lair, lit only by a few candles on its
+// floor and what comes in through the gap.
+
+static_assert(streetProperties[streetTombFirst].kind == streetTomb
+    && streetProperties[streetTombFirst + 1u].kind == streetTomb
+    && streetTombFirst + 2u == streetPropertyCount
+    && streetRuinedTomb >= streetTombFirst
+    && streetPropertyTurns[7].x == 1.0f && streetPropertyTurns[8].x == 1.0f,
+    "the tombs are the last two properties and stand square");
+static_assert(streetProperties[streetRuinedTomb].turns == 2u,
+    "streetLairHall turns the ruin's hall about");
+
+// The highest step a walker takes without jumping, in metres.
+constant float streetTombClimb = 0.8f;
+
+// The tomb on whose pad p lies, or streetPropertyCount.
+uint streetTombUnder(float2 p) {
+    for (uint i = streetTombFirst; i < streetPropertyCount; ++i)
+        if (all(p >= streetPads[i].xy) && all(p <= streetPads[i].zw))
+            return i;
+    return streetPropertyCount;
+}
+
+bool streetTombPadHolds(float2 p) {
+    return streetTombUnder(p) < streetPropertyCount;
+}
+
+// p in the frame addMausoleum built the original in, around its doorway's
+// foot.
+float2 streetTombLocal(StreetProperty c, float2 p) {
+    return streetTurn((p - c.at.xz) / c.at.w, 4u - (c.turns & 3u));
+}
+
+uint streetTombKind(uint i) {
+    return i == streetRuinedTomb ? mausoleumRuined : mausoleumIntact;
+}
+
+// The height a walker stands at over p on a tomb's pad: its steps, plinth
+// or heap, or ground.
+float streetTombStand(float2 p, float ground) {
+    uint i = streetTombUnder(p);
+    if (i >= streetPropertyCount) return ground;
+    StreetProperty c = streetProperties[i];
+    float top = mausoleumStand(streetTombLocal(c, p), streetTombKind(i));
+    return max(ground, c.at.y + top * c.at.w);
+}
+
+// True where a tomb's wall, or footing more than a step above their feet
+// at foot, keeps the walker out.
+bool streetTombBlockedFrom(float2 p, float foot) {
+    uint i = streetTombUnder(p);
+    if (i >= streetPropertyCount) return false;
+    StreetProperty c = streetProperties[i];
+    return mausoleumBlocked(streetTombLocal(c, p), streetTombKind(i),
+        (foot - c.at.y) / c.at.w, streetTombClimb / c.at.w,
+        housePlayerPad / c.at.w);
+}
+
+// The ruin's hall in world x and z, lower corner then upper; the tomb is
+// turned about, so its broken +x wall faces the other tomb and its back
+// the base. Then its floor and the entablature's underside over it.
+constant float4 streetRuinAt = streetProperties[streetRuinedTomb].at;
+constant float4 streetLairHall = float4(
+    streetRuinAt.x - streetRuinAt.w * mausoleumHall.z,
+    streetRuinAt.z - streetRuinAt.w * mausoleumHall.w,
+    streetRuinAt.x - streetRuinAt.w * mausoleumHall.x,
+    streetRuinAt.z - streetRuinAt.w * mausoleumHall.y);
+constant float2 streetLairLevels = float2(
+    streetRuinAt.y + streetRuinAt.w * mausoleumPlinthTop,
+    streetRuinAt.y + streetRuinAt.w * mausoleumEntablature);
+
+// True for a point in the hall, or on its walls, floor or ceiling.
+bool streetLairHolds(float3 p) {
+    const float margin = 0.05f;
+    return all(p.xz > streetLairHall.xy - margin)
+        && all(p.xz < streetLairHall.zw + margin)
+        && p.y > streetLairLevels.x - margin
+        && p.y < streetLairLevels.y + margin;
+}
+
+// The candles stand in a cluster on the hall's floor by its east wall,
+// at their real size: x and z from the cluster's centre, and height.
+constant float2 streetLairCandlesAt = float2(48.4f, -2.5f);
+constant uint streetLairCandleCount = 7u;
+constant float3 streetLairCandles[streetLairCandleCount] = {
+    float3(0.0f, 0.0f, 0.36f), float3(0.16f, 0.09f, 0.26f),
+    float3(-0.12f, 0.14f, 0.3f), float3(0.05f, -0.17f, 0.22f),
+    float3(-0.2f, -0.08f, 0.18f), float3(0.27f, -0.1f, 0.32f),
+    float3(-0.04f, 0.3f, 0.2f)};
+
+void addStreetLairCandles(device HouseModel &house) {
+    for (uint i = 0u; i < streetLairCandleCount; ++i) {
+        float3 c = streetLairCandles[i];
+        float3 foot = float3(streetLairCandlesAt.x + c.x, streetLairLevels.x,
+            streetLairCandlesAt.y + c.y);
+        addHouseWorldPart(house, houseBox(foot - float3(0.025f, 0.0f, 0.025f),
+            foot + float3(0.025f, c.z, 0.025f), houseCandle));
+    }
+}
+
+// The candles' light, a little above their flames. It reaches only the
+// hall; the haunting dims it with the house's lights.
+PointLight streetLairLight(device const GameState &game) {
+    return {float3(streetLairCandlesAt.x, streetLairLevels.x + 0.45f,
+            streetLairCandlesAt.y),
+        float3(1.0f, 0.6f, 0.26f),
+        90.0f * houseFlicker(game.effects.x, 3.1f, 0.25f)
+            * houseHaunting(game).dim, false};
+}
+
+// Ruins the copy just made on c, whose group is still open: the ruin's
+// first blocks take the places of the copied plinth, cap, cella and corner
+// pilaster, and the rest and the candles follow them.
+void ruinStreetTomb(device HouseModel &house, StreetProperty c) {
+    if (house.counts.y == 0u) return;
+    uint first = uint(house.groups[house.counts.y - 1u].lower.w);
+    float3 source = streetTombSource;
+    for (uint k = 0u; k < mausoleumRuinBlockCount; ++k) {
+        HousePart part = streetCopyPart(mausoleumRuinPart(k, source), c,
+            source);
+        if (k < mausoleumRuinReplaced)
+            house.parts[min(first + mausoleumRuinReplaces[k],
+                houseCapacity - 1u)] = part;
+        else
+            addHouseWorldPart(house, part);
+    }
+    addStreetLairCandles(house);
+}
+
 // ---------------------------------------------------------------- building
 
 // Runs in the initialize pass after the originals: the copies north of the
@@ -882,6 +1021,7 @@ void buildStreet(device HouseModel &house) {
             } else if (c.kind == streetTomb) {
                 copyBuildingGroup(house, house.sites[streetHouseSite].y - 2u,
                     c);
+                if (i == streetRuinedTomb) ruinStreetTomb(house, c);
             } else {
                 copyBuildingGroup(house,
                     house.sites[streetShedYardSite].x + c.kind, c);

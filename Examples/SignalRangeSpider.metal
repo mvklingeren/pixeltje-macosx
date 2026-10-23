@@ -1,6 +1,12 @@
 // Signal Range spider geometry, locomotion, and pursuit behavior.
 // Included by SignalRangeFPSProgram.metal after shared game state. Spiders
 // walk the generated waypoint network from NPCPathNetwork.metal.
+//
+// The boss keeps to a lair the including program describes: the floor it
+// stands on (bossLairFloor), where it waits (bossLairSpawn) and where its
+// entrance walk ends (bossLairEntrance), the box its centre keeps within
+// (bossLairLower to bossLairUpper) and the box its webs land in
+// (bossWebLower to bossWebUpper), all in world x and z.
 
 constant float spiderChaseSpeed = 3.8f;
 constant float spiderPatrolSpeed = 1.9f;
@@ -95,11 +101,12 @@ float3 spawnPosition(uint slot) {
         float2(35.0f, 7.0f), float2(44.0f, -5.0f),
         float2(-35.0f, -7.0f), float2(-44.0f, 5.0f),
         float2(-11.0f, -51.0f), float2(8.0f, -30.0f),
-        float2(0.0f, -118.0f)
+        bossLairSpawn
     };
     float2 xz = initial[slot];
     SpiderTraits traits = spiderTraits(spiderVariantForSlot(slot));
-    return float3(xz.x, stairHeight(xz) + 0.52f * traits.scale, xz.y);
+    float ground = slot == bossSlot ? bossLairFloor : stairHeight(xz);
+    return float3(xz.x, ground + 0.52f * traits.scale, xz.y);
 }
 
 // The path-network room each unaware spider patrols.
@@ -1083,10 +1090,8 @@ void advanceSpiders(device GameState &game, float dt) {
 }
 
 bool bossPositionClear(float2 position) {
-    // Keep the entire huge footprint inside the arena after the reveal.
-    return abs(position.x) < 12.8f
-        && position.y < bossRoomSouth - 4.5f
-        && position.y > bossRoomNorth + 5.0f;
+    // Keep the entire huge footprint inside the lair after the reveal.
+    return all(position > bossLairLower) && all(position < bossLairUpper);
 }
 
 void advanceBoss(device GameState &game, float dt) {
@@ -1099,10 +1104,11 @@ void advanceBoss(device GameState &game, float dt) {
     game.enemyClock[bossSlot].x = max(game.enemyClock[bossSlot].x - dt, 0.0f);
     float2 previous = game.enemy[bossSlot].xz;
     if (time < 5.0f) {
-        // The rear blast door rises, the boss walks out, then it drops shut.
+        // The boss walks out of where it waited to its lair's entrance.
         float emerge = smoothstep(1.25f, 4.25f, time);
-        game.enemy[bossSlot].z = mix(-118.0f, -96.0f, emerge);
-        game.enemyClock[bossSlot].w = rangePi;
+        float2 walk = bossLairEntrance - bossLairSpawn;
+        game.enemy[bossSlot].xz = bossLairSpawn + walk * emerge;
+        game.enemyClock[bossSlot].w = atan2(walk.x, -walk.y);
         game.gait[bossSlot].y = smoothstep(1.0f, 2.0f, time);
     } else {
         // Below half health the boss is enraged: shorter tells, faster
@@ -1143,13 +1149,13 @@ void advanceBoss(device GameState &game, float dt) {
                 uint slot = uint(game.bossWeb.y) % webCount;
                 float2 landing = clamp(game.player.xz
                         + (cloth == 1u ? game.motion.xy * 0.9f : float2(0.0f)),
-                    float2(-18.5f, bossRoomNorth + 4.0f),
-                    float2(18.5f, bossRoomSouth - 3.0f));
+                    bossWebLower, bossWebUpper);
                 game.webs[slot].startTime = float4(
                     game.enemy[bossSlot].xyz + float3(0.0f, 2.0f, 0.0f),
                     game.effects.x);
                 // Shorter-lived enraged webs keep all cloths within the slots.
-                game.webs[slot].targetExpiry = float4(landing.x, 1.27f,
+                game.webs[slot].targetExpiry = float4(landing.x,
+                    bossLairFloor + 0.07f,
                     landing.y, game.effects.x + (enraged ? 5.5f : 6.7f));
                 game.bossWeb.y += 1.0f;
             }
@@ -1170,7 +1176,7 @@ void advanceBoss(device GameState &game, float dt) {
     float travel = length(game.enemy[bossSlot].xz - previous);
     game.gait[bossSlot].x = fract(game.gait[bossSlot].x
         + 0.6f * travel / (traits.strideSpan * traits.scale));
-    game.enemy[bossSlot].y = 1.2f + traits.scale * (0.52f
+    game.enemy[bossSlot].y = bossLairFloor + traits.scale * (0.52f
         + spiderBodyBob(game.gait[bossSlot].x,
             game.gait[bossSlot].y, traits));
 }
