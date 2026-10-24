@@ -1,0 +1,72 @@
+{
+  "width": 960,
+  "height": 540,
+  "views": [
+    {
+      "name": "candy-store-street",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-100, 1.9, 44, -0.19] },
+        { "buffer": "game", "offset": 16, "floats": [0.19] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "candy-store-above",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-94, 29, 70, -0.29] },
+        { "buffer": "game", "offset": 16, "floats": [-0.46] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "candy-store-night",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [-100, 1.9, 44, -0.19] },
+        { "buffer": "game", "offset": 16, "floats": [0.19] },
+        { "buffer": "game", "offset": 560, "floats": [1250] }
+      ]
+    },
+    {
+      "name": "candy-store-plate-open",
+      "frames": 48,
+      "initialWrites": [
+        { "buffer": "game", "floats": [-105.5, 1.4, 35.95, 0] },
+        { "buffer": "game", "offset": 16, "floats": [0.1] }
+      ],
+      "writes": [
+        { "buffer": "game", "floats": [-105.5, 1.4, 36.0, 0] },
+        { "buffer": "game", "offset": 16, "floats": [0.1] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "candy-store-interior",
+      "frames": 48,
+      "initialWrites": [
+        { "buffer": "game", "floats": [-105.5, 1.4, 33.2, 0] },
+        { "buffer": "game", "offset": 16, "floats": [0.08] }
+      ],
+      "writes": [
+        { "buffer": "game", "floats": [-105.5, 1.4, 33.2, 0] },
+        { "buffer": "game", "offset": 16, "floats": [0.08] },
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    },
+    {
+      "name": "candy-store-walk-in",
+      "frames": 45,
+      "pointer": [0, 0.5, 0, 0],
+      "movement": [0, 1, 0, 0],
+      "initialWrites": [
+        { "buffer": "game", "floats": [-105.5, 1.4, 38.0, 0] },
+        { "buffer": "game", "offset": 16, "floats": [0.08] }
+      ],
+      "writes": [
+        { "buffer": "game", "offset": 560, "floats": [100] }
+      ]
+    }
+  ]
+}

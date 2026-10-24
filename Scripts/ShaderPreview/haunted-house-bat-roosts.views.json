@@ -1,0 +1,293 @@
+{
+  "width": 960,
+  "height": 600,
+  "views": [
+    {
+      "name": "belfry-roost",
+      "frames": 1,
+      "parameters": {
+        "timeOfDay": 990
+      },
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            28.5,
+            126,
+            0
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.02
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8812,
+          "floats": [
+            1
+          ]
+        }
+      ],
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            100
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 9552,
+          "floats": [
+            97.2,
+            0,
+            2.5,
+            119
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mausoleum-roost",
+      "frames": 1,
+      "parameters": {
+        "timeOfDay": 600
+      },
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            49,
+            18,
+            5,
+            5.2
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.08
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8812,
+          "floats": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "belfry-departure",
+      "frames": 18,
+      "parameters": {
+        "timeOfDay": 990
+      },
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            100
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 9552,
+          "floats": [
+            96.55,
+            0,
+            2.5,
+            119
+          ]
+        }
+      ],
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            0,
+            28,
+            105,
+            3.1416
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.04
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8812,
+          "floats": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mausoleum-opening",
+      "frames": 80,
+      "parameters": {
+        "timeOfDay": 990
+      },
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            100
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 9552,
+          "floats": [
+            96.55,
+            0,
+            2.5,
+            119
+          ]
+        }
+      ],
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            5,
+            20,
+            -7,
+            1.5708
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.02
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8812,
+          "floats": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "street-flight",
+      "frames": 230,
+      "parameters": {
+        "timeOfDay": 990
+      },
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            100
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 9552,
+          "floats": [
+            96.55,
+            0,
+            2.5,
+            119
+          ]
+        }
+      ],
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -20,
+            20,
+            35,
+            4.22
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.6
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8812,
+          "floats": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mausoleum-overflight",
+      "frames": 400,
+      "parameters": {
+        "timeOfDay": 1108
+      },
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "offset": 560,
+          "floats": [
+            100
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 9552,
+          "floats": [
+            96.55,
+            0,
+            2.5,
+            119
+          ]
+        }
+      ],
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            20,
+            25,
+            0,
+            2.03
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.6
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8812,
+          "floats": [
+            1
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -865,11 +865,30 @@ void buildHouseBody(device HouseModel &house) {
 
     // A slender belfry tower behind the gable, under a needle spire that
     // has settled off true.
-    HousePart tower = houseBox(float3(-1.15f, U + 3.2f, -2.75f),
-        float3(1.15f, U + 9.0f, -0.45f), houseBattens);
-    houseWindows(tower, float2(1.0f), float2(0.7f, 1.55f), 4.05f, 1.0f, 0.0f,
-        1.5f);
-    addHousePart(house, tower);
+    // The belfry is hollow. Its front aperture is a real gap so a hanging
+    // bat can be seen inside and leave without crossing a solid wall.
+    for (uint side = 0u; side < 2u; ++side) {
+        float x = side == 0u ? -1.15f : 0.98f;
+        HousePart wall = houseBox(float3(x, U + 3.2f, -2.75f),
+            float3(x + 0.17f, U + 9.0f, -0.45f), houseBattens);
+        houseWindows(wall, float2(0.0f, 1.0f), float2(0.7f, 1.55f),
+            4.05f, 1.0f, 0.0f, 1.5f);
+        addHousePart(house, wall);
+    }
+    addHousePart(house, houseBox(float3(-0.98f, U + 3.2f, -0.62f),
+        float3(0.98f, U + 9.0f, -0.45f), houseBattens));
+    addHousePart(house, houseBox(float3(-0.98f, U + 3.2f, -2.75f),
+        float3(0.98f, U + 7.45f, -2.58f), houseBattens));
+    addHousePart(house, houseBox(float3(-0.98f, U + 8.8f, -2.75f),
+        float3(0.98f, U + 9.0f, -2.58f), houseBattens));
+    for (uint side = 0u; side < 2u; ++side) {
+        float x = side == 0u ? -0.98f : 0.55f;
+        addHousePart(house, houseBox(float3(x, U + 7.45f, -2.75f),
+            float3(x + 0.43f, U + 8.8f, -2.58f), houseBattens));
+    }
+    // A timber roost just below the belfry cap, behind its front opening.
+    addHouseLog(house, houseWorld(float3(0.0f, U + 8.82f, -1.6f)),
+        float3(1.0f, 0.0f, 0.0f), 0.9f * houseScale, 0.055f);
     addHousePart(house, houseBox(float3(-1.35f, U + 9.0f, -2.95f),
         float3(1.35f, U + 9.3f, -0.25f), houseTrim));
     addHousePart(house, houseSpire(float3(-1.3f, U + 9.3f, -2.9f),
@@ -2561,9 +2580,9 @@ bool houseCanWake(device const GameState &game) {
 // The ghost waits in the hall, at head height.
 void houseWake(device GameState &game) {
     if (!houseCanWake(game)) return;
-    // A fresh haunting can be taunted again. Earlier summoned bats keep
-    // circling until the shotgun has cleared the entire raid.
-    game.gesture = float4(0.0f, -100.0f, -100.0f, 0.0f);
+    // A fresh haunting can be taunted again. Earlier released bats finish
+    // their flight unless they have all been shot down or hidden.
+    game.gesture.w = 0.0f;
     if (game.batRaid.x == 0u) game.batRaid.w = 0u;
     game.house.haunt = float4(game.effects.x,
         houseWorld(float3(0.0f, houseFloorY, -3.0f))
@@ -3610,6 +3629,13 @@ SurfaceMaterial houseSurfaceMaterial(SceneHit hit,
             blur);
     if (style == houseSign)
         return houseSignMaterial(part, p, n, blur, signFont);
+    if (style == houseCandyAwning) {
+        float band = step(0.5f, fract((p.x + 105.5f) * 1.45f));
+        float age = 0.78f + 0.22f * smoothNoise(p.xz * 2.5f);
+        float3 cloth = mix(float3(0.018f, 0.009f, 0.018f),
+            float3(0.48f, 0.095f, 0.012f), band) * age;
+        return {cloth, 0.9f, 0.0f, float3(0.0f)};
+    }
 
     if (style == houseFloor)
         return houseFloorMaterial(p, n, local, blur, inside);

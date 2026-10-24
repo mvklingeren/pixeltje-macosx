@@ -42,10 +42,24 @@ bool handGestureActive(device const GameState &game) {
         && game.effects.x - game.gesture.z < 2.2f;
 }
 
+float handWaveAmount(device const GameState &game) {
+    if (game.gesture.x < 0.0f) return 0.0f;
+    float open = smoothstep(0.0f, 0.35f,
+        game.effects.x - game.gesture.x);
+    float close = 1.0f - smoothstep(0.0f, 0.35f,
+        game.effects.x - game.gesture.y);
+    return open * close;
+}
+
+float handWristYaw(device const GameState &game) {
+    return 0.82f * handWaveAmount(game)
+        * sin((game.effects.x - game.gesture.x) * 9.0f);
+}
+
 // Turn the closed hand first, then extend the middle finger. Retract it
 // before the wrist returns to its guard pose.
 float handFingerExtension(device const GameState &game) {
-    if (!handGestureActive(game)) return 0.0f;
+    if (handWaveAmount(game) > 0.0f || !handGestureActive(game)) return 0.0f;
     float age = game.effects.x - game.gesture.z;
     return smoothstep(0.35f, 0.68f, age)
         * (1.0f - smoothstep(1.55f, 1.9f, age));
@@ -74,7 +88,15 @@ HandPose handPose(device const GameState &game) {
     float3 elbow = float3(0.08f, -0.32f, -0.12f);
     float pitch = 0.7f, yaw = -0.18f, roll = -0.55f;
     float age = handSwingAge(game);
-    if (handGestureActive(game)) {
+    float wave = handWaveAmount(game);
+    if (wave > 0.0f) {
+        pivot = mix(pivot, float3(0.02f, 0.035f, 0.42f), wave);
+        elbow = mix(elbow, float3(0.18f, -0.28f, -0.14f), wave);
+        // Raise the forearm and keep it steady while the wrist waves.
+        pitch = mix(pitch, 0.95f, wave);
+        yaw = mix(yaw, -0.18f, wave);
+        roll = mix(roll, -0.35f, wave);
+    } else if (handGestureActive(game)) {
         float gestureAge = game.effects.x - game.gesture.z;
         float turn = smoothstep(0.0f, 0.32f, gestureAge)
             * (1.0f - smoothstep(1.85f, 2.2f, gestureAge));
@@ -172,11 +194,15 @@ float handEllipsoid(float3 p, float3 centre, float3 radii) {
 // The bare fist: the palm and its two heels, the four fingers each curled
 // down from the knuckle and back under it, their tips buried in the palm,
 // and the thumb folded across the index and middle fingers.
-float handFist(float3 p, float extension) {
+float handFist(float3 p, float extension, float wave) {
     float3 box = abs(p - float3(-0.001f, -0.022f, -0.046f))
         - float3(0.029f, 0.013f, 0.036f) + 0.011f;
     float palm = length(max(box, 0.0f))
         + min(max(box.x, max(box.y, box.z)), 0.0f) - 0.011f;
+    float3 openBox = abs(p - float3(-0.001f, -0.022f, -0.042f))
+        - float3(0.030f, 0.014f, 0.052f) + 0.009f;
+    float flatPalm = length(max(openBox, 0.0f))
+        + min(max(openBox.x, max(openBox.y, openBox.z)), 0.0f) - 0.009f;
     palm = handSmoothMin(palm, handEllipsoid(p,
         float3(-0.024f, -0.033f, -0.060f), float3(0.016f, 0.015f, 0.026f)),
         0.012f);
@@ -187,13 +213,17 @@ float handFist(float3 p, float extension) {
     palm = handSmoothMin(palm, handEllipsoid(p,
         float3(-0.001f, -0.037f, -0.014f), float3(0.030f, 0.011f, 0.014f)),
         0.008f);
+    // The curled-finger fill and palm heels belong to the fist, not the
+    // open hand. The exposed palm stays broadly flat during a wave.
+    palm = mix(palm, flatPalm, wave);
     float fingers = 1.0e6f;
     for (uint i = 0u; i < 4u; ++i) {
         float3 knuckle = handKnuckles[i].xyz;
         float size = handKnuckles[i].w;
-        palm = handSmoothMin(palm, handTaper(p,
+        float metacarpal = handTaper(p,
             float3(knuckle.x * 0.55f, -0.009f, -0.080f), knuckle,
-            0.0095f, 0.0108f * size), 0.010f);
+            0.0095f, 0.0108f * size);
+        palm = mix(handSmoothMin(palm, metacarpal, 0.010f), palm, wave);
         float3 middle = knuckle + size * float3(0.0f, -0.040f, 0.006f);
         float3 last = middle + size * float3(0.0f, -0.002f, -0.026f);
         if (i == 1u && extension > 0.0f) {
@@ -204,21 +234,35 @@ float handFist(float3 p, float extension) {
             last = mix(last,
                 knuckle + float3(0.0f, -0.005f, 0.093f), extension);
         }
-        float finger = handTaper(p, knuckle, middle,
+        float closedFinger = handTaper(p, knuckle, middle,
             0.0106f * size, 0.0097f * size);
-        finger = handSmoothMin(finger, handTaper(p, middle, last,
-            0.0095f * size, 0.0087f * size), 0.004f);
+        closedFinger = handSmoothMin(closedFinger,
+            handTaper(p, middle, last,
+                0.0095f * size, 0.0087f * size), 0.004f);
+        // Each open finger is one straight taper, pivoted only at its
+        // fixed base knuckle. Its root is buried in the palm so no round
+        // knuckle cap shows through the inside of the open hand.
+        float spread = (float(i) - 1.5f) * 0.019f;
+        float3 openRoot = knuckle - float3(0.0f, 0.012f, 0.012f);
+        float3 openTip = knuckle + float3(spread, -0.004f, 0.099f * size);
+        float openFinger = handTaper(p, openRoot, openTip,
+            0.0098f * size, 0.0078f * size);
+        float finger = mix(closedFinger, openFinger, wave);
         fingers = min(fingers, finger);
     }
     float3 base = float3(-0.022f, -0.028f, -0.078f);
-    float3 joint = float3(-0.042f, -0.048f, -0.040f);
-    float3 bend = float3(-0.032f, -0.061f, -0.012f);
+    float3 joint = mix(float3(-0.042f, -0.048f, -0.040f),
+        float3(-0.060f, -0.036f, -0.040f), wave);
+    float3 bend = mix(float3(-0.032f, -0.061f, -0.012f),
+        float3(-0.079f, -0.038f, -0.015f), wave);
     float thumb = handTaper(p, base, joint, 0.0135f, 0.0122f);
     thumb = handSmoothMin(thumb, handTaper(p, joint, bend, 0.0122f, 0.0108f),
         0.004f);
     thumb = handSmoothMin(thumb, handTaper(p, bend,
-        float3(-0.011f, -0.062f, -0.003f), 0.0106f, 0.0092f), 0.004f);
-    return min(handSmoothMin(palm, fingers, 0.006f),
+        mix(float3(-0.011f, -0.062f, -0.003f),
+            float3(-0.086f, -0.035f, 0.012f), wave),
+        0.0106f, 0.0092f), 0.004f);
+    return min(handSmoothMin(palm, fingers, mix(0.006f, 0.014f, wave)),
         handSmoothMin(palm, thumb, 0.012f));
 }
 
@@ -227,16 +271,28 @@ struct HandDistance {
     uint part;
 };
 
+// Undo the wrist's side-to-side turn for the glove only. The cuff and sleeve
+// stay in the forearm's frame, so the motion hinges at their shared wrist.
+float3 handUnbend(float3 p, float wristYaw) {
+    float3 q = p - handWrist;
+    float s = sin(wristYaw), c = cos(wristYaw);
+    return handWrist + float3(c * q.x - s * q.z,
+        q.y, s * q.x + c * q.z);
+}
+
 // The whole arm: the fist, the glove's gauntlet cuff with its strap, and
 // the sleeve, which ends in a hem over the cuff and creases as it bunches
 // toward it. Cuff and sleeve are oval, wider across the back of the hand
 // than through it, and run from the wrist toward `elbow`.
-HandDistance handDistance(float3 p, float3 elbow, float extension) {
+HandDistance handDistance(float3 p, float3 elbow, float extension,
+    float wave, float wristYaw) {
     // The fist is only worked out near it.
+    float3 handPoint = handUnbend(p, wristYaw);
     float3 fistCentre = mix(float3(-0.008f, -0.028f, -0.038f),
-        float3(-0.008f, -0.025f, -0.010f), extension);
-    float fist = length(p - fistCentre) - (0.083f + 0.035f * extension);
-    if (fist < 0.01f) fist = handFist(p, extension);
+        float3(-0.008f, -0.025f, -0.010f), max(extension, wave));
+    float fist = length(handPoint - fistCentre)
+        - (0.083f + 0.055f * max(extension, wave));
+    if (fist < 0.01f) fist = handFist(handPoint, extension, wave);
     float3 along = normalize(elbow - handWrist);
     float3 side = normalize(float3(1.0f, 0.0f, 0.0f) - along * along.x);
     float3 q = p - handWrist;
@@ -273,7 +329,7 @@ HandDistance handDistance(float3 p, float3 elbow, float extension) {
 // hit carries how far the surface is shut in by the rest of the hand, from
 // a few steps out along its normal.
 GunHit traceHand(float3 origin, float3 direction, float3 elbow,
-    float extension) {
+    float extension, float wave, float wristYaw) {
     GunHit hit = {1.0e6f, float3(0.0f), 0u, float3(0.0f)};
     // Rays passing wide of both the fist and the forearm's axis miss.
     float3 toFist = origin - float3(-0.008f, -0.028f, -0.038f);
@@ -287,11 +343,12 @@ GunHit traceHand(float3 origin, float3 direction, float3 elbow,
     closest = saturate((armDirection * passing + dot(arm, fromWrist))
         / dot(arm, arm));
     if (length(toFist - direction * dot(toFist, direction))
-            > 0.085f + 0.045f * extension
+            > 0.085f + 0.060f * max(extension, wave)
         && length(fromWrist + direction * passing - arm * closest) > 0.06f)
         return hit;
     float3 offset = origin - 0.5f * elbow;
-    float bound = 0.5f * length(elbow) + 0.12f + 0.05f * extension;
+    float bound = 0.5f * length(elbow) + 0.12f
+        + 0.06f * max(extension, wave);
     float b = dot(offset, direction);
     float discriminant = b * b - dot(offset, offset) + bound * bound;
     if (discriminant < 0.0f) return hit;
@@ -299,19 +356,23 @@ GunHit traceHand(float3 origin, float3 direction, float3 elbow,
     float far = -b + sqrt(discriminant);
     for (uint step = 0u; step < 96u && t < far; ++step) {
         float3 p = origin + direction * t;
-        HandDistance d = handDistance(p, elbow, extension);
+        HandDistance d = handDistance(p, elbow, extension, wave, wristYaw);
         if (d.distance < 1.5e-4f) {
             const float2 e = float2(2.5e-4f, -2.5e-4f);
             float3 normal = normalize(
-                e.xyy * handDistance(p + e.xyy, elbow, extension).distance
-                + e.yyx * handDistance(p + e.yyx, elbow, extension).distance
-                + e.yxy * handDistance(p + e.yxy, elbow, extension).distance
-                + e.xxx * handDistance(p + e.xxx, elbow, extension).distance);
+                e.xyy * handDistance(p + e.xyy, elbow, extension, wave,
+                    wristYaw).distance
+                + e.yyx * handDistance(p + e.yyx, elbow, extension, wave,
+                    wristYaw).distance
+                + e.yxy * handDistance(p + e.yxy, elbow, extension, wave,
+                    wristYaw).distance
+                + e.xxx * handDistance(p + e.xxx, elbow, extension, wave,
+                    wristYaw).distance);
             float shut = 0.0f;
             for (uint i = 1u; i <= 3u; ++i) {
                 float h = 0.005f * float(i);
                 shut += (h - handDistance(p + normal * h, elbow,
-                    extension).distance)
+                    extension, wave, wristYaw).distance)
                     / float(i);
             }
             hit = {t, normal, d.part, p, saturate(shut * 70.0f)};

@@ -25,7 +25,8 @@
 // Runs once in the initialize pass: the house with its graveyards and
 // their mausoleums as site 0, the shed yard behind it and the cottage, then
 // the street's copies of them, its lamps and its signs.
-void buildBuildings(device HouseModel &house) {
+void buildBuildings(device GameState &game) {
+    device HouseModel &house = game.house;
     house.counts = uint4(0u);
     house.activeBuilding = 0u;
     beginBuildingSite(house);
@@ -34,6 +35,7 @@ void buildBuildings(device HouseModel &house) {
     buildShedYard(house);
     buildCottage(house);
     buildStreet(house);
+    buildCandyStore(house, game);
 }
 
 // ----------------------------------------------------------------- tracing
@@ -78,6 +80,7 @@ void traceBuildingGroups(thread SceneHit &hit, float3 origin,
             if (houseCutoutStyle(style)
                 && houseCutoutOpen(style, house.parts[i], p)) continue;
             // Rays pass through the clear glass of the house's rooms.
+            if (style == houseCandyGlass) continue;
             if ((style == houseSiding || style == houseBattens)
                 && houseSeeThrough(house.parts[i])
                 && houseWindow(house.parts[i], i, p, normal, 0.002f,
@@ -128,7 +131,8 @@ bool buildingsBlockLight(float3 origin, float3 direction,
         for (uint i = uint(group.lower.w); i < end; ++i) {
             if (physicsReservedPart(house, i)) continue;
             uint style = uint(house.parts[i].lower.w);
-            if (houseCutoutStyle(style) || style == houseLantern) continue;
+            if (houseCutoutStyle(style) || style == houseLantern
+                || style == houseCandyGlass) continue;
             float3 normal;
             float t = style == houseMasonry
                 ? masonryHitPart(house.parts[i], game, o, d,
@@ -167,15 +171,23 @@ float buildingsGlassCrossing(float3 origin, float3 direction, float limit,
         uint end = min(uint(group.upper.w), houseCapacity);
         for (uint i = uint(group.lower.w); i < end; ++i) {
             uint style = uint(house.parts[i].lower.w);
-            if ((style != houseSiding && style != houseBattens)
-                || !houseSeeThrough(house.parts[i])) continue;
+            bool candy = style == houseCandyGlass;
+            if (!candy && ((style != houseSiding && style != houseBattens)
+                || !houseSeeThrough(house.parts[i]))) continue;
             float3 faceNormal;
             float t = housePartHit(house.parts[i], o, d, limit, faceNormal);
             if (t < 0.0f) continue;
             if (buildingCellGone(game, i, house.parts[i], o + d * t))
                 continue;
-            HouseWindow w = houseWindow(house.parts[i], i, o + d * t,
-                faceNormal, 0.002f, wind);
+            HouseWindow w;
+            if (candy) {
+                w = {1.0f, 0.0f, 0.0f, float2(0.0f, 0.5f),
+                    -20.0f, 0.0f, 0.0f,
+                    float4(0.0f, 0.0f, 1.0f, 1.0f), 1.0f, 0.0f};
+            } else {
+                w = houseWindow(house.parts[i], i, o + d * t,
+                    faceNormal, 0.002f, wind);
+            }
             if (w.glass <= 0.5f) continue;
             nearest = t;
             limit = t;
@@ -192,6 +204,7 @@ float buildingsGlassCrossing(float3 origin, float3 direction, float limit,
 // under the street, rising to 1 away from them.
 float buildingsGroundBlend(float2 p) {
     return houseLotBlend(p) * shedYardBlend(p) * cottageGroundBlend(p)
+        * candyStoreGroundBlend(p)
         * streetGroundBlend(p);
 }
 
@@ -201,7 +214,8 @@ float buildingsGround(float2 p, float h) {
     h = streetGround(p, h);
     h = mix(houseOrigin.y, h, houseLotBlend(p));
     h = mix(shedYardOrigin.y, h, shedYardBlend(p));
-    return mix(cottageOrigin.y, h, cottageGroundBlend(p));
+    h = mix(cottageOrigin.y, h, cottageGroundBlend(p));
+    return mix(candyStoreOrigin.y, h, candyStoreGroundBlend(p));
 }
 
 // The flagstone paths: the house's, and the aisles of its graveyards.
@@ -223,11 +237,13 @@ float buildingsPaved(float2 p) {
 // The lanterns outside: the house's, then the porch lanterns of the cottage
 // and its copies. They go out while the house is haunted.
 constant uint buildingsOutdoorLightCount = houseOutdoorLightCount
-    + streetCottageCount;
+    + streetCottageCount + 1u;
 
 PointLight buildingsOutdoorLight(uint index, device const GameState &game) {
     if (index < houseOutdoorLightCount)
         return houseHauntedOutdoorLight(index, game);
+    if (index == houseOutdoorLightCount + streetCottageCount)
+        return candyStoreLight(game);
     PointLight light = streetCottageLantern(index - houseOutdoorLightCount,
         game.effects.x);
     light.power *= houseHaunting(game).dim;
@@ -250,14 +266,14 @@ PointLight buildingsStreetLamp(uint index, device const GameState &game,
 
 // The floor, deck, step or stair under p, or ground where there is none.
 float buildingsStand(float2 p, float ground) {
-    return houseStand(p, ground);
+    return candyStoreStand(p, houseStand(p, ground));
 }
 
 // The player alone climbs to the haunted house's upper floors. With their
 // feet at foot, these stand in for buildingsStand and buildingsBlocked over
 // the house's body, and give the height of what is over their head.
 float buildingsStandFrom(float2 p, float ground, float foot) {
-    return houseStandFrom(p, ground, foot);
+    return candyStoreStand(p, houseStandFrom(p, ground, foot));
 }
 
 float buildingsCeilingOver(float2 p, float foot) {
@@ -282,6 +298,8 @@ bool buildingsBlockedFrom(device const GameState &game, float2 p, float foot) {
 // loop serves them all. Off every site, the street's lamp posts, its
 // copies of the buildings and its sign posts.
 bool buildingsBlocked(float2 p) {
+    if (candyStoreGroundHolds(p))
+        return candyStoreBlocked(p, housePlayerPad);
     float2 local;
     float pad;
     constant float4 *footprints;
@@ -441,6 +459,7 @@ constant float buildingsHouseDoorsHold = 4.55f;
 void buildingsShutDoors(device GameState &game) {
     game.house.doors = float4(-100.0f, -100.0f, 0.0f, 0.0f);
     game.frontDoors = float4(-100.0f, 0.0f, -100.0f, 0.0f);
+    candyStoreReset(game);
 }
 
 // How far a door has swung open at t, the fraction of its swing time since
@@ -513,6 +532,7 @@ void buildingsHangDoors(device GameState &game) {
 // True where the house's front doors, while still too far shut to pass,
 // keep the walker out of the doorway.
 bool buildingsDoorsBar(device const GameState &game, float2 p) {
+    if (candyStoreDoorsBar(game, p)) return true;
     if (buildingsDoorOpen(game, 0u) > 0.7f) return false;
     float2 local = houseLocal(p);
     float pad = housePlayerPad / houseScale;

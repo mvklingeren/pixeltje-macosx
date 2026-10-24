@@ -13,18 +13,20 @@
 /// | Z   | 6   | 64    |
 /// | 1–9 | 7–15 | 128 << (digit − 1) |
 /// | H   | 16  | 65536 |
+/// | K   | 17  | 131072 |
 ///
 /// F, J, Space, Return and Escape keep their preview meanings and are not
 /// reported.
 public enum PipelineDirectionPadKeys {
-  public static let letters = ["q", "e", "r", "c", "v", "x", "z", "h"]
+  public static let letters = ["q", "e", "r", "c", "v", "x", "z", "h", "k"]
   public static let digits = ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
-  public static let allMask = (1 << 17) - 1
+  public static let allMask = (1 << 18) - 1
 
   /// The bit for one typed key, or nil when the pad does not report it.
   public static func bit(for key: String) -> Int? {
     let key = key.lowercased()
     if key == "h" { return 1 << 16 }
+    if key == "k" { return 1 << 17 }
     if let index = letters.firstIndex(of: key) { return 1 << index }
     if let index = digits.firstIndex(of: key) { return 1 << (7 + index) }
     return nil

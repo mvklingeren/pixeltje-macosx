@@ -52,7 +52,9 @@ constant uint houseStair = 22u;     // treads, strings, newels and soffits
 constant uint houseBanister = 23u;  // turned balusters under a handrail (cut out)
 constant uint houseSign = 24u;      // a street name blade
 constant uint houseMasonry = 25u;   // a compact grid of removable stone blocks
-constant uint houseStyleCount = 26u;
+constant uint houseCandyGlass = 26u; // clear storefront and sliding door panes
+constant uint houseCandyAwning = 27u; // faded orange and black canvas
+constant uint houseStyleCount = 28u;
 
 // The cut-out styles: rays pass through their openings, and they cast no
 // shadow.
@@ -819,10 +821,15 @@ SurfaceMaterial houseSignMaterial(device const HousePart &part, float3 p,
         * step(abs(at.x), 0.5f * line.z * size * houseSignCondense),
         smoothstep(0.08f, 0.25f, pixel));
     float grime = smoothNoise(float2(at.x * 3.0f + centre.x, at.y * 9.0f));
-    float3 green = float3(0.0f, 0.13f, 0.045f) * (0.85f + 0.2f * grime);
-    float3 white = float3(0.72f, 0.74f, 0.7f) * (0.9f + 0.1f * grime);
-    return {mix(green, white, max(border, letters)), 0.38f, 0.0f,
-        float3(0.0f)};
+    bool candy = part.rows.z > 0.5f;
+    float3 ground = candy ? float3(0.032f, 0.014f, 0.029f)
+        : float3(0.0f, 0.13f, 0.045f);
+    float3 ink = candy ? float3(0.8f, 0.21f, 0.035f)
+        : float3(0.72f, 0.74f, 0.7f);
+    ground *= 0.85f + 0.2f * grime;
+    ink *= 0.9f + 0.1f * grime;
+    return {mix(ground, ink, max(border, letters)), 0.38f, 0.0f,
+        candy ? ink * letters * 0.045f : float3(0.0f)};
 }
 
 // One line of worn engraved letters centred on q = 0, in metres: each

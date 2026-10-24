@@ -154,6 +154,7 @@ constant uint keyR = 4u;
 constant uint keyV = 16u;
 constant uint keyX = 32u;
 constant uint keyH = 65536u;
+constant uint keyK = 131072u;
 constant uint keyDigit1 = 128u;
 constant uint keyDigit2 = 256u;
 constant uint keyDigit3 = 512u;
@@ -327,7 +328,7 @@ constant uint masonryPanelsPerTomb = 15u;
 constant uint masonryPanelCount = 2u * masonryPanelsPerTomb;
 constant uint masonryMaxRows = 32u;
 constant uint masonryDebrisCount = 24u;
-constant uint buildingCount = 15u; // 0 is scenery; 1–14 are buildings
+constant uint buildingCount = 16u; // 0 is scenery; 1–15 are buildings
 constant uint buildingImpactCount = 16u;
 constant uint buildingFragmentCount = 32u;
 constant uint mausoleumSpallCount = 16u;
@@ -470,14 +471,16 @@ struct GameState {
     float surfaceImpactReadyAt;
     float landingSoundReadyAt;
     uint2 debrisLandingMask;
-    // Three H taps with the hand out during a ghost charge provoke one raid.
-    // Tap count, last tap time, raised-finger start, enraged flag.
+    // K wave start and close time, H finger start, enraged ghost flag.
     float4 gesture;
-    // Raid active, shotgun kills, total contact strikes, summoned this haunt.
+    // Raid active, shotgun kills, total contact strikes, released this haunt.
     uint4 batRaid;
     Bat raidBats[raidBatCount];
-    // Orbit angle, flight mode (circle/dive/return), next dive, dive start.
+    // Route leg, mode (release/wander/dive), release or dive time, next dive.
     float4 raidFlight[raidBatCount];
+    // The candy-store's two sliding glass leaves and pressure plate.
+    float4 candyDoor;       // open, last press, plate down, previous tick
+    uint candyDoorFirstPart;
 };
 
 static_assert(sizeof(GameState) <= 327680,
@@ -599,6 +602,7 @@ SurfaceMaterial shadeMausoleumSpalls(SurfaceMaterial material,
 #include "HauntedMausoleum.metal"
 #include "HauntedShed.metal"
 #include "HauntedCottage.metal"
+#include "HauntedCandyStore.metal"
 #include "HauntedFracture.metal"
 #include "HauntedStreet.metal"
 #include "HauntedBuildings.metal"
@@ -830,7 +834,7 @@ void resetGame(device GameState &game, uint seed) {
     // restart. The pistol is in hand; X swaps to the launcher.
     game.arsenal = float4(heldPistol, heldLauncher, rocketReserveStart, 1.0f);
     game.hand = float4(-100.0f, 0.0f, 0.0f, 0.0f);
-    game.gesture = float4(0.0f, -100.0f, -100.0f, 0.0f);
+    game.gesture = float4(-100.0f, -100.0f, -100.0f, 0.0f);
     game.batRaid = uint4(0u);
     for (uint i = 0u; i < raidBatCount; ++i) {
         game.raidBats[i].pose = float4(0.0f);
@@ -870,7 +874,7 @@ kernel void initializeRange(constant ProgramUniforms &u [[buffer(0)]],
     uint id [[thread_position_in_grid]]) {
     if (id != 0u) return;
     // The haunted buildings are generated once; restarts keep them.
-    buildBuildings(states[0].house);
+    buildBuildings(states[0]);
     // The missile flight cam starts on; V toggles it.
     states[0].controls = float4(0.0f, 1.0f, 0.0f, 0.0f);
     resetGame(states[0], u.frameSeed.y ^ u.frameSeed.z);
@@ -1459,18 +1463,21 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     if ((pressed & keyDigit4) != 0u) chosen = heldLauncher;
     if ((pressed & keyX) != 0u) chosen = game.arsenal.y;
     if (chosen != game.arsenal.x) game.arsenal.xy = float2(chosen, game.arsenal.x);
-    // Three separate H presses taunt an approaching
-    // ghost. Releasing H between presses is required by the key-edge mask.
-    if ((pressed & keyH) != 0u && holdingHand(game) && armsReady(game)
-        && houseGhostFade(game) > 0.2f
-        && game.house.hauntMotion.w < 0.0f && game.gesture.w < 0.5f) {
-        game.gesture.x += 1.0f;
-        game.gesture.y = game.effects.x;
-        if (game.gesture.x >= 3.0f) {
-            game.gesture.z = game.effects.x;
+    // H raises the finger once; K starts a complete, timed farewell wave.
+    bool handReady = holdingHand(game) && armsReady(game);
+    if ((pressed & keyH) != 0u && handReady) {
+        game.gesture.xyz = float3(-100.0f, -100.0f, game.effects.x);
+        if (houseGhostFade(game) > 0.2f
+            && game.house.hauntMotion.w < 0.0f
+            && game.gesture.w < 0.5f) {
             game.gesture.w = 1.0f;
             game.recoil.w = max(game.recoil.w, 0.35f);
         }
+    }
+    if ((pressed & keyK) != 0u && handReady) {
+        game.gesture.x = game.effects.x;
+        game.gesture.y = game.effects.x + 1.6f;
+        game.gesture.z = -100.0f;
     }
     if (game.house.haunt.x < 0.0f) game.gesture.w = 0.0f;
     // R reloads the weapon in hand early.
@@ -2035,6 +2042,7 @@ void swingDoors(device GameState &game, device RangeAudio &audio) {
         game.house.doors.w = 1.0f;
     }
     buildingsHangDoors(game);
+    advanceCandyStoreDoor(game);
 }
 
 // The hand swings in its own tick pass after fireRange, for the compile-time
@@ -4740,7 +4748,8 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         float3x3 toGun = transpose(gun.basis);
         GunHit gunHit = hand
             ? traceHand(toGun * -gun.pivot, toGun * viewDirection, elbow,
-                handFingerExtension(game))
+                handFingerExtension(game), handWaveAmount(game),
+                handWristYaw(game))
             : (launcher
                 ? traceLauncher(toGun * -gun.pivot, toGun * viewDirection)
                 : (shotgun

@@ -19,7 +19,8 @@
 // shoulder to the wrist and the hand's beyond it, hinged so that the hand
 // lags the beat and folds in on the upstroke. The skin is cut to a bat's
 // outline, scalloped between the finger tips, and the finger bones show on
-// it. Lit from behind, the skin glows a warm red.
+// it. Backlighting shows a trace of brown without turning the silhouette
+// orange against the night sky.
 
 constant uint batMembraneMaterial = 66u;
 constant uint batSkinMaterial = 67u;    // ears, legs and finger bones
@@ -271,91 +272,128 @@ kernel void advanceBats(constant ProgramUniforms &u [[buffer(0)]],
     }
 }
 
-// Summoned bats leave the unseen rear of the house. They orbit on both
-// sides, dive one or two at a time, and climb back to their circuit after
-// each pass. A contact costs one health but never removes the bat.
+// Two bats hang below the belfry cap and six on the bar in the ruined
+// mausoleum. When the ghost emerges they drop through their actual exits,
+// cross the street in different orders, pass over the mausoleum, and vanish
+// into the unlit outskirts. An occasional outdoor dive remains dangerous.
+float3 raidRoost(uint i) {
+    if (i < 2u) return houseWorld(float3(i == 0u ? -0.5f : 0.5f,
+        houseEavesY + 8.51f, -1.6f));
+    StreetProperty ruin = streetProperties[streetRuinedTomb];
+    return streetPlace(ruin, streetTombSource, streetTombSource
+        + float3(-1.5f + 0.6f * float(i - 2u), 3.94f, 3.55f));
+}
+
+void hangRaidBat(device Bat &bat, uint i) {
+    bat.pose = float4(raidRoost(i), 1.65f);
+    bat.heading = float4(0.0f, 0.0f, -1.0f, 0.0f);
+    bat.lift = float4(0.0f, -1.0f, 0.0f, -1.0f);
+}
+
+float3 raidLegTarget(uint i, uint leg, float seed) {
+    float side = houseHash(seed + 3.0f) < 0.5f ? -1.0f : 1.0f;
+    float jitter = 2.0f * houseHash(seed + float(leg) * 3.7f) - 1.0f;
+    if (leg == 0u) {
+        if (i < 2u) return houseWorld(float3(i == 0u ? -0.35f : 0.35f,
+            houseEavesY + 8.0f, -3.65f));
+        StreetProperty ruin = streetProperties[streetRuinedTomb];
+        return streetPlace(ruin, streetTombSource, streetTombSource
+            + float3(3.65f, 3.48f, 3.55f));
+    }
+    if (leg == 1u) return i < 2u
+        ? float3(side * (19.0f + 3.0f * jitter), 33.0f, 91.0f)
+        : float3(16.0f + 3.0f * jitter, 28.0f, -8.0f);
+    if (leg == 2u) return float3(side * (43.0f + 12.0f * jitter),
+        28.0f + 4.0f * houseHash(seed + 11.0f), 43.0f + 5.0f * jitter);
+    if (leg == 3u) return float3(39.0f + 7.0f * jitter,
+        40.0f + 4.0f * houseHash(seed + 13.0f), 10.0f + 4.0f * jitter);
+    if (leg == 4u) return float3(-side * (65.0f + 22.0f * jitter),
+        20.0f + 7.0f * houseHash(seed + 17.0f), 41.0f - 6.0f * jitter);
+    if (leg == 5u) return float3(side * (98.0f + 25.0f * jitter),
+        24.0f + 8.0f * houseHash(seed + 19.0f), 55.0f + 8.0f * jitter);
+    return float3(side * (220.0f + 30.0f * jitter),
+        38.0f + 9.0f * houseHash(seed + 23.0f), -65.0f);
+}
+
 kernel void advanceRaidBats(constant ProgramUniforms &u [[buffer(0)]],
     device GameState *states [[buffer(1)]],
     uint id [[thread_position_in_grid]]) {
     if (id != 0u) return;
     device GameState &game = states[0];
     if (game.progress.w != phasePlaying) return;
-    const float2 centre = float2(0.0f, 128.0f);
-    const float orbitRadius = 26.0f;
-    if (game.gesture.w > 0.5f && game.batRaid.x == 0u
-        && game.batRaid.w == 0u) {
+    if (game.batRaid.x == 0u && game.batRaid.w == 0u
+        && houseHauntAge(game) >= houseGhostEmerge
+        && game.house.hauntMotion.w < 0.0f) {
         game.batRaid.x = 1u;
         game.batRaid.yz = uint2(0u);
         game.batRaid.w = 1u;
         for (uint i = 0u; i < raidBatCount; ++i) {
-            float angle = 0.5f * rangePi
-                + (float(i) - 0.5f * float(raidBatCount - 1u)) * 0.085f;
-            float3 start = float3(orbitRadius * cos(angle),
-                20.0f + 1.0f * float(i % 3u),
-                centre.y + orbitRadius * sin(angle));
-            device Bat &bat = game.raidBats[i];
-            bat.pose = float4(start, 1.65f);
-            bat.heading = float4(0.0f, 0.0f, -1.0f, 0.0f);
-            bat.lift = float4(0.0f, 1.0f, 0.0f, 1.0f);
-            game.raidFlight[i] = float4(angle, 0.0f,
-                game.effects.x + 4.0f + 1.2f * float(i), -100.0f);
+            hangRaidBat(game.raidBats[i], i);
+            game.raidFlight[i] = float4(0.0f, 1.0f,
+                game.effects.x + 0.22f * float(i),
+                game.effects.x + 7.0f + 0.9f * float(i));
         }
     }
-    if (game.batRaid.x == 0u) return;
+    if (game.batRaid.x == 0u) {
+        if (game.batRaid.w == 0u)
+            for (uint i = 0u; i < raidBatCount; ++i)
+                hangRaidBat(game.raidBats[i], i);
+        return;
+    }
     float dt = clamp(u.pointer.w > 0.0f ? u.pointer.w : u.resolutionTime.w,
         0.0f, 0.10f);
     uint diving = 0u;
     for (uint i = 0u; i < raidBatCount; ++i)
         if (game.raidBats[i].pose.w > 0.0f
-            && game.raidFlight[i].y > 0.5f
-            && game.raidFlight[i].y < 1.5f) diving += 1u;
+            && game.raidFlight[i].y > 2.5f
+            && game.raidFlight[i].y < 3.5f) diving += 1u;
+    uint visible = 0u;
     for (uint i = 0u; i < raidBatCount; ++i) {
         device Bat &bat = game.raidBats[i];
         if (bat.pose.w <= 0.0f) continue;
         device float4 &flight = game.raidFlight[i];
-        float directionSign = i % 2u == 0u ? 1.0f : -1.0f;
-        float angularSpeed = directionSign * (0.39f + 0.025f * float(i % 3u));
-        float altitude = 20.0f + 1.0f * float(i % 3u);
-        float speed = 12.0f + 0.45f * float(i);
-        float3 target;
-        if (flight.y < 0.5f) {
-            flight.x += angularSpeed * dt;
-            target = float3(orbitRadius * cos(flight.x), altitude,
-                centre.y + orbitRadius * sin(flight.x));
-            float2 playerOffset = game.player.xz - centre;
-            float towardPlayer = dot(playerOffset
-                    / max(length(playerOffset), 0.001f),
-                normalize(target.xz - centre));
-            if (diving == 0u && game.effects.x >= flight.z
-                && length(playerOffset) > 21.0f && towardPlayer > 0.5f) {
-                flight.y = 1.0f;
-                flight.w = game.effects.x;
-                diving += 1u;
-            }
+        if (flight.y < 1.5f && game.effects.x < flight.z) {
+            visible += 1u;
+            continue;
         }
-        if (flight.y > 0.5f && flight.y < 1.5f) {
+        float seed = float(i) * 13.7f + game.house.haunt.x * 0.17f;
+        uint leg = uint(flight.x);
+        if (leg > 6u) {
+            bat.pose.w = 0.0f;
+            continue;
+        }
+        float3 target = raidLegTarget(i, leg, seed);
+        float speed = leg == 0u ? 7.0f : 12.0f + 1.1f * float(i % 4u);
+        if (flight.y > 2.5f && flight.y < 3.5f) {
             target = game.player.xyz + float3(0.0f, 0.15f, 0.0f);
+            speed = 17.0f;
             if (distance(target, bat.pose.xyz) < 1.0f) {
                 game.batRaid.z += 1u;
                 damagePlayer(game, 1.0f, bat.pose.xz, 0.28f);
                 flight.y = 2.0f;
-            } else if (game.effects.x - flight.w > 3.2f) {
+            } else if (game.effects.x - flight.z > 2.8f) {
                 flight.y = 2.0f;
             }
-            if (flight.y > 1.5f) {
-                flight.x = atan2(bat.pose.z - centre.y, bat.pose.x);
-                flight.z = game.effects.x + 7.0f + 1.0f * float(i);
+            if (flight.y < 2.5f) {
+                flight.w = game.effects.x + 9.0f + float(i);
+                target = raidLegTarget(i, leg, seed);
             }
         }
-        if (flight.y > 1.5f) {
-            target = float3(orbitRadius * cos(flight.x), altitude,
-                centre.y + orbitRadius * sin(flight.x));
-            if (distance(target, bat.pose.xyz) < 1.5f) flight.y = 0.0f;
+        if (flight.y > 1.5f && flight.y < 2.5f && leg >= 2u
+            && leg <= 5u && diving == 0u && game.effects.x >= flight.w
+            && !houseInteriorPoint(game.player.xyz)
+            && distance(game.player.xyz, bat.pose.xyz) < 30.0f) {
+            flight.y = 3.0f;
+            flight.z = game.effects.x;
+            diving += 1u;
+            target = game.player.xyz + float3(0.0f, 0.15f, 0.0f);
         }
         float3 toward = target - bat.pose.xyz;
         float remaining = length(toward);
-        float3 forward = remaining > 0.001f
+        float3 desired = remaining > 0.001f
             ? toward / remaining : bat.heading.xyz;
+        float3 forward = normalize(mix(bat.heading.xyz, desired,
+            min(dt * 3.8f, 1.0f)));
         bat.pose.xyz += forward * min(speed * dt, remaining);
         bat.heading = float4(forward,
             2.0f * rangePi * fract(batWingbeat * game.effects.x
@@ -365,7 +403,14 @@ kernel void advanceRaidBats(constant ProgramUniforms &u [[buffer(0)]],
         up = dot(up, up) > 1.0e-4f
             ? normalize(up) : float3(0.0f, 0.0f, 1.0f);
         bat.lift = float4(up, 1.0f);
+        if (flight.y < 2.5f && remaining < 2.0f) {
+            flight.x += 1.0f;
+            flight.y = 2.0f;
+            flight.z = game.effects.x;
+        }
+        visible += 1u;
     }
+    if (visible == 0u) game.batRaid.x = 0u;
 }
 
 // Shotgun pellets use a generous flying silhouette for fast, reliable hits.
@@ -373,6 +418,7 @@ kernel void advanceRaidBats(constant ProgramUniforms &u [[buffer(0)]],
 int traceRaidBatShot(float3 eye, float3 direction,
     device const GameState &game, thread float &limit,
     thread float3 &normal) {
+    if (game.batRaid.x == 0u) return -1;
     int target = -1;
     for (uint i = 0u; i < raidBatCount; ++i) {
         Bat bat = game.raidBats[i];
@@ -464,8 +510,11 @@ SpiderHit traceBatLocal(float3 o, float3 d, float limit, float phase,
         batFurMaterial);
     acceptSpiderEllipsoid(hit, o, d, float3(0.0f, 0.037f, 0.119f),
         float3(0.024f, 0.018f, 0.022f), batSkinMaterial);
-    float flap = 0.12f + 0.42f * amplitude * cos(phase);
-    float tipLift = 0.05f * amplitude * cos(phase - 1.1f);
+    bool hanging = amplitude < 0.0f;
+    float flap = hanging ? 1.08f
+        : 0.12f + 0.42f * amplitude * cos(phase);
+    float tipLift = hanging ? -0.12f
+        : 0.05f * amplitude * cos(phase - 1.1f);
     for (uint i = 0u; i < 2u; ++i) {
         float side = i == 0u ? -1.0f : 1.0f;
         acceptSpiderEllipsoid(hit, o, d,
@@ -526,35 +575,30 @@ void traceBats(thread SceneHit &hit, float3 origin, float3 direction,
 
 SurfaceMaterial batSurfaceMaterial(uint material, bool raiding) {
     if (material == batFurMaterial)
-        return {raiding ? float3(0.24f, 0.14f, 0.09f)
-                : float3(0.075f, 0.052f, 0.038f),
-            0.85f, 0.0f, raiding ? float3(0.055f, 0.028f, 0.013f)
-                : float3(0.0f)};
+        return {raiding ? float3(0.043f, 0.032f, 0.026f)
+                : float3(0.042f, 0.032f, 0.027f),
+            0.95f, 0.0f, float3(0.0f)};
     if (material == batSkinMaterial)
-        return {raiding ? float3(0.17f, 0.085f, 0.06f)
-                : float3(0.065f, 0.045f, 0.04f),
-            0.6f, 0.0f, raiding ? float3(0.035f, 0.016f, 0.008f)
-                : float3(0.0f)};
+        return {raiding ? float3(0.026f, 0.021f, 0.018f)
+                : float3(0.028f, 0.023f, 0.02f),
+            0.9f, 0.0f, float3(0.0f)};
     if (material == batEyeMaterial)
-        return {raiding ? float3(0.008f, 0.007f, 0.006f)
+        return {raiding ? float3(0.01f, 0.008f, 0.007f)
                 : float3(0.01f, 0.005f, 0.005f), 0.1f, 0.0f,
-            raiding ? float3(0.01f, 0.009f, 0.007f)
-                : float3(0.22f, 0.02f, 0.01f)};
-    return {raiding ? float3(0.23f, 0.115f, 0.075f)
-            : float3(0.05f, 0.034f, 0.03f),
-        0.5f, 0.0f, raiding ? float3(0.045f, 0.021f, 0.01f)
-            : float3(0.0f)};
+            float3(0.0f)};
+    return {raiding ? float3(0.019f, 0.017f, 0.016f)
+            : float3(0.022f, 0.019f, 0.018f),
+        0.95f, 0.0f, float3(0.0f)};
 }
 
-// Light the Earth and the sun shine through a wing from behind it, warmest
-// when the bat crosses in front of them.
+// A restrained brown edge shows the thin wings against bright sky.
 float3 batTranslucency(SceneHit hit, float3 direction,
     device const GameState &game) {
     if (hit.material != batMembraneMaterial) return float3(0.0f);
     float3 tint = hit.variant >= batCount
-        ? float3(0.11f, 0.045f, 0.025f)
-        : float3(0.1f, 0.028f, 0.012f);
-    float3 light = earthColor * 1.4f * saturate(-dot(hit.normal,
+        ? float3(0.004f, 0.003f, 0.002f)
+        : float3(0.005f, 0.003f, 0.002f);
+    float3 light = earthColor * 0.2f * saturate(-dot(hit.normal,
             earthDirection))
         * (1.0f + pow(saturate(dot(direction, earthDirection)), 8.0f));
     Daylight sun = daylight(dayClock(game));

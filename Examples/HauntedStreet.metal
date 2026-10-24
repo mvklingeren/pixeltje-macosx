@@ -1053,7 +1053,8 @@ PointLight streetLairLight(device const GameState &game) {
 }
 
 // Ruins the copy just made on c, whose group is still open: replace its
-// plinth, cap and corner pilaster, then add the fallen blocks and candles.
+// plinth, cap and corner pilaster, then add the fallen blocks, candles and
+// a roost bar beneath the roof beside the broken side wall.
 void ruinStreetTomb(device HouseModel &house, StreetProperty c) {
     if (house.counts.y == 0u) return;
     uint first = uint(house.groups[house.counts.y - 1u].lower.w);
@@ -1068,6 +1069,11 @@ void ruinStreetTomb(device HouseModel &house, StreetProperty c) {
             addHouseWorldPart(house, part);
     }
     addStreetLairCandles(house);
+    float3 from = streetPlace(c, source,
+        source + float3(-1.9f, 4.04f, 3.55f));
+    float3 to = streetPlace(c, source,
+        source + float3(1.9f, 4.04f, 3.55f));
+    addHouseRod(house, from, to, 0.085f);
 }
 
 // Six wall panels, six corner pilasters and the three doorway-frame pieces
@@ -1154,8 +1160,10 @@ void resetStreetTombMasonry(device GameState &game) {
                 bool gone = wall == 3u
                     ? local.x > 0.6f && height < 1.55f
                         + 0.92f * (local.x - 0.6f) + edge
-                    : local.y > 3.0f && height < 1.45f
-                        + 0.88f * (local.y - 3.0f) + edge;
+                    // The rear end of the side collapse reaches the eaves,
+                    // leaving a full-height opening for the roof-roost bats.
+                    : local.y > 3.0f && height < (local.y > 3.4f
+                        ? 4.28f : 1.45f + 0.88f * (local.y - 3.0f) + edge);
                 if (gone) game.masonryGone[panel][row] |= 1u << col;
             }
         }
