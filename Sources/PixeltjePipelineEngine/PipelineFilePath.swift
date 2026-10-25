@@ -3,7 +3,7 @@ import PixeltjePipelineDomain
 
 /// A path literal and a bounded UTF-8 reader for its optional contents output.
 enum PipelineFilePath {
-  static let maximumContentBytes = 1_048_576
+  static let maximumContentBytes = 4_194_304
 
   static func value(from node: PipelineNode) throws -> String {
     let path = node.parameters["path"]?.stringValue ?? ""
@@ -67,14 +67,14 @@ enum PipelineFilePath {
     }
     if let fileSize = attributes.fileSize, fileSize > maximumContentBytes {
       throw PipelineEngineError.invalidInvocation(
-        "File Path contents must be at most 1 MiB.")
+        "File Path contents must be at most 4 MiB.")
     }
     let handle = try FileHandle(forReadingFrom: url)
     defer { try? handle.close() }
     let data = try handle.read(upToCount: maximumContentBytes + 1) ?? Data()
     guard data.count <= maximumContentBytes else {
       throw PipelineEngineError.invalidInvocation(
-        "File Path contents must be at most 1 MiB.")
+        "File Path contents must be at most 4 MiB.")
     }
     guard let contents = String(data: data, encoding: .utf8) else {
       throw PipelineEngineError.invalidInvocation(

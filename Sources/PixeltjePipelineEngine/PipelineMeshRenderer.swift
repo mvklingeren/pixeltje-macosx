@@ -270,6 +270,11 @@ actor PipelineMeshRenderer {
       sourceMediaRoot: context.sourceMediaRoot)
   }
 
+  static let maximumShaderFileBytes = 4_194_304
+  static let maximumExpandedShaderBytes = 8_388_608
+  static let maximumShaderIncludeDepth = 16
+  static let maximumShaderIncludes = 64
+
   static func shaderSource(
     supplied: String?, fileName: String?, sourceMediaRoot: URL?
   ) throws -> String {
@@ -278,9 +283,9 @@ actor PipelineMeshRenderer {
         "Metal Render needs exactly one shader source: connect Source or Source File.")
     }
     if let supplied {
-      guard !supplied.isEmpty, supplied.utf8.count <= 1_048_576 else {
+      guard !supplied.isEmpty, supplied.utf8.count <= maximumExpandedShaderBytes else {
         throw PipelineEngineError.invalidInvocation(
-          "Metal Render source must contain 1 to 1,048,576 UTF-8 bytes.")
+          "Metal Render source must contain 1 to \(maximumExpandedShaderBytes) UTF-8 bytes.")
       }
       return PipelineMetalLibraries.resolving(supplied)
     }
@@ -297,9 +302,17 @@ actor PipelineMeshRenderer {
       return cached.source
     }
     var stamps: [(path: String, stamp: FileStamp)] = []
-    let source = try siblingMetalSource(named: fileName, in: root, stamps: &stamps)
-    let expanded = try expandSiblingMetalIncludes(in: source, root: root,
-      stamps: &stamps)
+    var activeStack: [String] = []
+    var includedOnce: Set<String> = []
+    var includeCount = 0
+    let expanded = try expandSiblingMetalFile(
+      named: fileName, in: root, stamps: &stamps,
+      activeStack: &activeStack, includedOnce: &includedOnce,
+      includeCount: &includeCount)
+    guard expanded.utf8.count <= maximumExpandedShaderBytes else {
+      throw PipelineEngineError.invalidInvocation(
+        "Metal Render source and includes exceed \(maximumExpandedShaderBytes) UTF-8 bytes.")
+    }
     let resolved = PipelineMetalLibraries.resolving(expanded)
     sourceCache.withLock { cache in
       if cache.count >= 16 { cache.removeAll() }
@@ -337,7 +350,7 @@ actor PipelineMeshRenderer {
   }
 
   private static func siblingMetalSource(named fileName: String, in root: URL,
-    stamps: inout [(path: String, stamp: FileStamp)]) throws -> String {
+    stamps: inout [(path: String, stamp: FileStamp)]) throws -> (source: String, canonicalPath: String) {
     guard !fileName.isEmpty, !fileName.contains("/"), !fileName.contains("\\"),
       fileName != ".", fileName != "..", fileName.hasSuffix(".metal") else {
       throw PipelineEngineError.invalidInvocation(
@@ -352,9 +365,9 @@ actor PipelineMeshRenderer {
       throw PipelineEngineError.invalidInvocation(
         "Metal Render source file \(fileName) is missing or outside the workflow folder.")
     }
-    guard let fileSize = attributes.fileSize, (1...1_048_576).contains(fileSize) else {
+    guard let fileSize = attributes.fileSize, (1...maximumShaderFileBytes).contains(fileSize) else {
       throw PipelineEngineError.invalidInvocation(
-        "Metal Render source file must contain 1 to 1,048,576 UTF-8 bytes.")
+        "Metal Render source file must contain 1 to \(maximumShaderFileBytes) UTF-8 bytes.")
     }
     // Stamped before reading, so a change during the read shows next time.
     for path in [root.appendingPathComponent(fileName).path, url.path] {
@@ -362,46 +375,82 @@ actor PipelineMeshRenderer {
         throw PipelineEngineError.invalidInvocation(
           "Metal Render source file \(fileName) is missing or outside the workflow folder.")
       }
-      stamps.append((path, stamp))
+      if !stamps.contains(where: { $0.path == path && $0.stamp == stamp }) {
+        stamps.append((path, stamp))
+      }
     }
     let data = try Data(contentsOf: url)
-    guard !data.isEmpty, data.count <= 1_048_576,
+    guard !data.isEmpty, data.count <= maximumShaderFileBytes,
       let source = String(data: data, encoding: .utf8) else {
       throw PipelineEngineError.invalidInvocation(
-        "Metal Render source file must contain 1 to 1,048,576 UTF-8 bytes.")
+        "Metal Render source file must contain 1 to \(maximumShaderFileBytes) UTF-8 bytes.")
     }
-    return source
+    return (source, url.path)
   }
 
-  private static func expandSiblingMetalIncludes(in source: String, root: URL,
-    stamps: inout [(path: String, stamp: FileStamp)]) throws -> String {
-    var lines: [String] = []
-    for line in source.split(separator: "\n", omittingEmptySubsequences: false) {
-      let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-      guard trimmed.hasPrefix("#include \"") else {
-        lines.append(String(line))
+  private static func expandSiblingMetalFile(
+    named fileName: String, in root: URL,
+    stamps: inout [(path: String, stamp: FileStamp)],
+    activeStack: inout [String],
+    includedOnce: inout Set<String>,
+    includeCount: inout Int
+  ) throws -> String {
+    guard activeStack.count <= maximumShaderIncludeDepth else {
+      throw PipelineEngineError.invalidInvocation(
+        "Metal Render local includes exceed the maximum nesting depth of \(maximumShaderIncludeDepth).")
+    }
+    let (source, canonicalPath) = try siblingMetalSource(
+      named: fileName, in: root, stamps: &stamps)
+    if includedOnce.contains(canonicalPath) {
+      return ""
+    }
+    if activeStack.contains(canonicalPath) {
+      let chain = (activeStack.map { URL(fileURLWithPath: $0).lastPathComponent } + [fileName])
+        .joined(separator: " -> ")
+      throw PipelineEngineError.invalidInvocation(
+        "Metal Render local includes form a cycle: \(chain).")
+    }
+    let rawLines = source.split(separator: "\n", omittingEmptySubsequences: false)
+    if rawLines.contains(where: {
+      $0.trimmingCharacters(in: .whitespacesAndNewlines) == "#pragma once"
+    }) {
+      includedOnce.insert(canonicalPath)
+    }
+    activeStack.append(canonicalPath)
+    defer { activeStack.removeLast() }
+
+    var lines: [String] = [PipelineMetalLibraries.lineDirective(1, fileName: fileName)]
+    for (index, rawLine) in rawLines.enumerated() {
+      let lineNumber = index + 1
+      let trimmed = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+      if trimmed == "#pragma once" {
+        lines.append("")
         continue
       }
-      guard trimmed.hasSuffix("\"") else {
-        throw PipelineEngineError.invalidInvocation(
-          "Metal Render has a malformed local include.")
+      guard trimmed.hasPrefix("#include \"") else {
+        lines.append(String(rawLine))
+        continue
       }
-      let fileName = String(trimmed.dropFirst(10).dropLast())
-      let included = try siblingMetalSource(named: fileName, in: root, stamps: &stamps)
-      guard !included.split(separator: "\n").contains(where: {
-        $0.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("#include \"")
-      }) else {
+      guard trimmed.hasSuffix("\""), trimmed.count > 11 else {
         throw PipelineEngineError.invalidInvocation(
-          "Metal Render local includes cannot include another file.")
+          "Metal Render has a malformed local include in \(fileName):\(lineNumber).")
       }
-      lines.append(included)
+      includeCount += 1
+      guard includeCount <= maximumShaderIncludes else {
+        throw PipelineEngineError.invalidInvocation(
+          "Metal Render local includes exceed \(maximumShaderIncludes) expansions.")
+      }
+      let childName = String(trimmed.dropFirst(10).dropLast())
+      let included = try expandSiblingMetalFile(
+        named: childName, in: root, stamps: &stamps,
+        activeStack: &activeStack, includedOnce: &includedOnce,
+        includeCount: &includeCount)
+      if !included.isEmpty {
+        lines.append(included)
+      }
+      lines.append(PipelineMetalLibraries.lineDirective(lineNumber + 1, fileName: fileName))
     }
-    let expanded = lines.joined(separator: "\n")
-    guard expanded.utf8.count <= 1_048_576 else {
-      throw PipelineEngineError.invalidInvocation(
-        "Metal Render source and includes exceed 1,048,576 UTF-8 bytes.")
-    }
-    return expanded
+    return lines.joined(separator: "\n")
   }
 
   private static func previewSize(from invocation: PipelineInvocation) throws

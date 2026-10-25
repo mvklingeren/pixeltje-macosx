@@ -74,3 +74,115 @@ import Testing
   try FileManager.default.removeItem(at: part)
   #expect(throws: PipelineEngineError.self) { try load() }
 }
+
+@Test func recursiveIncludesPragmaOnceLineDirectivesAndCycleDetection() throws {
+  let root = FileManager.default.temporaryDirectory
+    .appendingPathComponent(UUID().uuidString, isDirectory: true)
+  try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+  defer { try? FileManager.default.removeItem(at: root) }
+
+  let main = root.appendingPathComponent("Main.metal")
+  let midA = root.appendingPathComponent("MidA.metal")
+  let midB = root.appendingPathComponent("MidB.metal")
+  let leaf = root.appendingPathComponent("Leaf.metal")
+
+  try """
+    // pixeltje:easing-v1
+    #include <metal_stdlib>
+    #include "MidA.metal"
+    #include "MidB.metal"
+    kernel void checkNested(device float *out [[buffer(0)]]) {
+      out[0] = pixeltje_easing::linear(leafValue + midAValue + midBValue);
+    }
+    """.write(to: main, atomically: true, encoding: .utf8)
+
+  try """
+    #pragma once
+    #include "Leaf.metal"
+    constant float midAValue = leafValue + 1.0f;
+    """.write(to: midA, atomically: true, encoding: .utf8)
+
+  try """
+    #pragma once
+    #include "Leaf.metal"
+    constant float midBValue = leafValue + 2.0f;
+    """.write(to: midB, atomically: true, encoding: .utf8)
+
+  try """
+    #pragma once
+    constant float leafValue = 3.0f;
+    """.write(to: leaf, atomically: true, encoding: .utf8)
+
+  let resolved = try PipelineMeshRenderer.shaderSource(
+    supplied: nil, fileName: "Main.metal", sourceMediaRoot: root)
+  #expect(resolved.contains("namespace pixeltje_easing"))
+  #expect(resolved.contains("#line 1 \"Main.metal\""))
+  #expect(resolved.contains("#line 1 \"MidA.metal\""))
+  #expect(resolved.contains("#line 1 \"Leaf.metal\""))
+  #expect(resolved.contains("#line 4 \"Main.metal\""))
+  #expect(!resolved.contains("#pragma once"))
+  #expect(resolved.components(separatedBy: "constant float leafValue").count - 1 == 1)
+
+  let device = try #require(MTLCreateSystemDefaultDevice())
+  let library = try device.makeLibrary(source: resolved, options: nil)
+  #expect(library.makeFunction(name: "checkNested") != nil)
+
+  // Editing a deeply nested file invalidates the cached source.
+  try """
+    #pragma once
+    constant float leafValue = 9.0f;
+    """.write(to: leaf, atomically: true, encoding: .utf8)
+  let updated = try PipelineMeshRenderer.shaderSource(
+    supplied: nil, fileName: "Main.metal", sourceMediaRoot: root)
+  #expect(updated.contains("leafValue = 9.0f"))
+
+  // Introducing an include cycle fails with a clear cycle diagnostic.
+  try """
+    #include "Main.metal"
+    constant float leafValue = 9.0f;
+    """.write(to: leaf, atomically: true, encoding: .utf8)
+  #expect(throws: PipelineEngineError.self) {
+    _ = try PipelineMeshRenderer.shaderSource(
+      supplied: nil, fileName: "Main.metal", sourceMediaRoot: root)
+  }
+}
+
+@Test func shaderSourceAllowsMultiMegabyteSourceUpToLimit() throws {
+  let root = FileManager.default.temporaryDirectory
+    .appendingPathComponent(UUID().uuidString, isDirectory: true)
+  try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+  defer { try? FileManager.default.removeItem(at: root) }
+
+  let largeComment = "// " + String(repeating: "x", count: 1_500_000) + "\n"
+  let part = root.appendingPathComponent("LargePart.metal")
+  let main = root.appendingPathComponent("LargeMain.metal")
+  try (largeComment + "constant float largePartValue = 1.0f;\n")
+    .write(to: part, atomically: true, encoding: .utf8)
+  try ("#include <metal_stdlib>\n#include \"LargePart.metal\"\n" + largeComment)
+    .write(to: main, atomically: true, encoding: .utf8)
+
+  let expanded = try PipelineMeshRenderer.shaderSource(
+    supplied: nil, fileName: "LargeMain.metal", sourceMediaRoot: root)
+  #expect(expanded.utf8.count > 3_000_000)
+  #expect(expanded.contains("largePartValue = 1.0f"))
+}
+
+@Test func metalSourceFileNamesAreEscapedInLineDirectives() throws {
+  let root = FileManager.default.temporaryDirectory
+    .appendingPathComponent(UUID().uuidString, isDirectory: true)
+  try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+  defer { try? FileManager.default.removeItem(at: root) }
+  let device = try #require(MTLCreateSystemDefaultDevice())
+  let source = """
+    #include <metal_stdlib>
+    kernel void checkFileName(device float *out [[buffer(0)]]) { out[0] = 1.0f; }
+    """
+  for name in ["Quote\"Name.metal", "Line\nBreak.metal"] {
+    try source.write(to: root.appendingPathComponent(name), atomically: true, encoding: .utf8)
+    let resolved = try PipelineMeshRenderer.shaderSource(
+      supplied: nil, fileName: name, sourceMediaRoot: root)
+    #expect(resolved.contains(PipelineMetalLibraries.lineDirective(1, fileName: name)))
+    let library = try device.makeLibrary(source: resolved, options: nil)
+    #expect(library.makeFunction(name: "checkFileName") != nil)
+  }
+}

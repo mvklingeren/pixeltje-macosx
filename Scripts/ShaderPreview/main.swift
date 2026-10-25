@@ -155,8 +155,57 @@ guard programNodes.count == 1, let programNode = programNodes.first,
 }
 let nodeParameters = programNode["parameters"] as? [String: Any] ?? [:]
 
-func sibling(_ name: String) throws -> String {
-  try String(contentsOf: workflowFolder.appendingPathComponent(name), encoding: .utf8)
+func filePathContents(_ path: String, mode: String) throws -> String {
+  guard !path.isEmpty, !path.contains("\0") else {
+    throw Failure(description: "File Path needs a nonempty path.")
+  }
+  let absolute = (path as NSString).isAbsolutePath
+  let url: URL
+  switch mode {
+  case "relative" where !absolute:
+    let root = workflowFolder.resolvingSymlinksInPath().standardizedFileURL
+    url = root.appendingPathComponent(path).resolvingSymlinksInPath().standardizedFileURL
+    let prefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
+    guard url.path.hasPrefix(prefix) else {
+      throw Failure(description: "File Path contents must stay inside the workflow folder.")
+    }
+  case "absolute" where absolute:
+    url = URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL
+  default:
+    throw Failure(description: "File Path mode and path do not match.")
+  }
+  guard let attributes = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
+    attributes.isRegularFile == true, let size = attributes.fileSize,
+    size <= 4_194_304 else {
+    throw Failure(description: "File Path contents need a regular UTF-8 file of at most 4 MiB.")
+  }
+  let data = try Data(contentsOf: url)
+  guard data.count <= 4_194_304, let source = String(data: data, encoding: .utf8) else {
+    throw Failure(description: "File Path contents need a UTF-8 file of at most 4 MiB.")
+  }
+  return source
+}
+
+func metalSibling(_ name: String) throws -> (source: String, canonicalPath: String) {
+  guard !name.isEmpty, !name.contains("/"), !name.contains("\\"),
+    name != ".", name != "..", name.hasSuffix(".metal") else {
+    throw Failure(description: "Metal includes must name a .metal file beside the workflow.")
+  }
+  let root = workflowFolder.resolvingSymlinksInPath().standardizedFileURL
+  let url = workflowFolder.appendingPathComponent(name).resolvingSymlinksInPath()
+    .standardizedFileURL
+  guard url.deletingLastPathComponent() == root,
+    let attributes = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
+    attributes.isRegularFile == true,
+    let fileSize = attributes.fileSize, (1...4_194_304).contains(fileSize) else {
+    throw Failure(description: "Metal source file must be a nonempty .metal file of at most 4 MiB beside the workflow.")
+  }
+  let data = try Data(contentsOf: url)
+  guard !data.isEmpty, data.count <= 4_194_304,
+    let source = String(data: data, encoding: .utf8) else {
+    throw Failure(description: "Metal source file must contain 1 to 4,194,304 UTF-8 bytes.")
+  }
+  return (source, url.path)
 }
 
 // The value arriving at a node's input, followed through primitive nodes: a
@@ -172,7 +221,9 @@ func value(into nodeID: String, port: String) throws -> Any? {
     let parameters = node["parameters"] as? [String: Any] ?? [:]
     if node["kind"] as? String == "primitive.filePath",
       let name = unwrap(parameters["path"]) as? String {
-      return output["port"] as? String == "contents" ? try sibling(name) : name
+      let mode = unwrap(parameters["mode"]) as? String ?? "relative"
+      return output["port"] as? String == "contents"
+        ? try filePathContents(name, mode: mode) : name
     }
     return try value(into: id, port: "value") ?? unwrap(parameters["value"])
   }
@@ -198,21 +249,89 @@ if let json = try value(into: programNodeID, port: "parameters") as? String,
 
 // MARK: Shader source
 
-// Mirrors PipelineMeshRenderer: one level of #include "Sibling.metal".
-func expandIncludes(_ source: String) throws -> String {
-  try source.split(separator: "\n", omittingEmptySubsequences: false).map { line in
-    let trimmed = line.trimmingCharacters(in: .whitespaces)
-    guard trimmed.hasPrefix("#include \""), trimmed.hasSuffix("\"") else { return String(line) }
-    return try sibling(String(trimmed.dropFirst(10).dropLast()))
-  }.joined(separator: "\n")
+// Mirrors PipelineMeshRenderer: recursive #include "Sibling.metal" with
+// #pragma once, cycle detection, and #line directives.
+func expandIncludes(
+  _ source: String, fileName: String = "<source>",
+  identity: String,
+  activeStack: inout [String], includedOnce: inout Set<String>,
+  includeCount: inout Int
+) throws -> String {
+  guard activeStack.count <= 16 else {
+    throw Failure(description: "Metal local includes exceed the maximum nesting depth of 16.")
+  }
+  if includedOnce.contains(identity) { return "" }
+  if activeStack.contains(identity) {
+    let chain = (activeStack + [identity]).map { URL(fileURLWithPath: $0).lastPathComponent }
+      .joined(separator: " -> ")
+    throw Failure(description: "Metal local includes form a cycle: \(chain).")
+  }
+  let rawLines = source.split(separator: "\n", omittingEmptySubsequences: false)
+  if rawLines.contains(where: {
+    $0.trimmingCharacters(in: .whitespacesAndNewlines) == "#pragma once"
+  }) {
+    includedOnce.insert(identity)
+  }
+  activeStack.append(identity)
+  defer { activeStack.removeLast() }
+
+  var lines: [String] = [PipelineMetalLibraries.lineDirective(1, fileName: fileName)]
+  for (index, rawLine) in rawLines.enumerated() {
+    let lineNumber = index + 1
+    let trimmed = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed == "#pragma once" {
+      lines.append("")
+      continue
+    }
+    guard trimmed.hasPrefix("#include \"") else {
+      lines.append(String(rawLine))
+      continue
+    }
+    guard trimmed.hasSuffix("\""), trimmed.count > 11 else {
+      throw Failure(description: "Malformed local include in \(fileName):\(lineNumber).")
+    }
+    includeCount += 1
+    guard includeCount <= 64 else {
+      throw Failure(description: "Metal local includes exceed 64 expansions.")
+    }
+    let childName = String(trimmed.dropFirst(10).dropLast())
+    let child = try metalSibling(childName)
+    let included = try expandIncludes(
+      child.source, fileName: childName, identity: child.canonicalPath,
+      activeStack: &activeStack, includedOnce: &includedOnce,
+      includeCount: &includeCount)
+    if !included.isEmpty {
+      lines.append(included)
+    }
+    lines.append(PipelineMetalLibraries.lineDirective(lineNumber + 1, fileName: fileName))
+  }
+  let expanded = lines.joined(separator: "\n")
+  guard expanded.utf8.count <= 8_388_608 else {
+    throw Failure(description: "Metal source and includes exceed 8,388,608 UTF-8 bytes.")
+  }
+  return expanded
 }
 
-func currentSource() throws -> String {
-  if let inline = try value(into: programNodeID, port: "source") as? String { return inline }
+func expandIncludes(_ source: String, fileName: String, identity: String) throws -> String {
+  var activeStack: [String] = []
+  var includedOnce: Set<String> = []
+  var includeCount = 0
+  return try expandIncludes(
+    source, fileName: fileName, identity: identity,
+    activeStack: &activeStack, includedOnce: &includedOnce,
+    includeCount: &includeCount)
+}
+
+func currentSource() throws -> (source: String, fileName: String, identity: String,
+  expandsIncludes: Bool) {
+  if let inline = try value(into: programNodeID, port: "source") as? String {
+    return (inline, "<source>", "<source>", false)
+  }
   guard let name = try value(into: programNodeID, port: "sourceFile") as? String else {
     throw Failure(description: "The GPU Program has no source or sourceFile input.")
   }
-  return try sibling(name)
+  let file = try metalSibling(name)
+  return (file.source, name, file.canonicalPath, true)
 }
 
 // MARK: Rendering
@@ -309,9 +428,12 @@ final class Renderer {
   var computePipelines: [String: any MTLComputePipelineState] = [:]
   var renderPipelines: [String: any MTLRenderPipelineState] = [:]
 
-  init(source: String) throws {
+  init(source: String, fileName: String = "<source>", identity: String = "<source>",
+    expandsIncludes: Bool = true) throws {
+    let expanded = try expandsIncludes
+      ? expandIncludes(source, fileName: fileName, identity: identity) : source
     library = try device.makeLibrary(
-      source: PipelineMetalLibraries.resolving(try expandIncludes(source)), options: nil)
+      source: PipelineMetalLibraries.resolving(expanded), options: nil)
   }
 
   func encode(_ passes: [Program.Pass], resources: [String: Resource], uniforms: Uniforms) throws {
@@ -493,9 +615,14 @@ func writePNG(_ rgba: [UInt8], width: Int, to url: URL) {
 }
 
 try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
-let current = try Renderer(source: currentSource())
+let (currentText, currentFileName, currentIdentity, currentExpandsIncludes) = try currentSource()
+let current = try Renderer(source: currentText, fileName: currentFileName,
+  identity: currentIdentity, expandsIncludes: currentExpandsIncludes)
 let before = try beforePath.map {
-  try Renderer(source: String(contentsOfFile: $0, encoding: .utf8))
+  try Renderer(
+    source: String(contentsOfFile: $0, encoding: .utf8),
+    fileName: URL(fileURLWithPath: $0).lastPathComponent,
+    identity: URL(fileURLWithPath: $0).resolvingSymlinksInPath().standardizedFileURL.path)
 }
 for view in views.views {
   var image = try current.render(view)
