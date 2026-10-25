@@ -7,6 +7,13 @@ heavy cannonball. R rebuilds the scene. The yard holds a cottage with a brick
 chimney on its own footing, a stone tower of four drums, a garden wall, a
 post-and-lintel gate, a crate pyramid and a row of dominoes.
 
+Painted toy cubes and balls in the foreground, and a ball hanging on a rope
+from a steel frame, never break: a shot or a hit only pushes them, so they
+show how bodies interact. The steel frame ignores shots and the cannonball.
+The library has boxes only, so balls collide in the playground itself with
+one contact point each. The rope is a contact that only pulls the top of
+its ball toward the anchor, with no friction; it is slack below its length.
+
 Static structures are boxes divided into a grid of up to 8 × 8 cells. A shot
 removes the cell it hits and throws two shards. A support pass then works out,
 from nothing, which cells still reach the ground. Inside a part, cells hold

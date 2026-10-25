@@ -464,6 +464,205 @@
           ]
         }
       ]
+    },
+    {
+      "name": "toys",
+      "frames": 1,
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            3.5,
+            2.8,
+            17,
+            0.0,
+            -0.235,
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "pendulum-shot",
+      "frames": 25,
+      "pointer": [
+        0.63156,
+        0.53705,
+        0,
+        0
+      ],
+      "inputs": [
+        {
+          "frame": 3,
+          "pointer": [
+            0.63156,
+            0.53705,
+            1,
+            0
+          ]
+        }
+      ],
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            9,
+            2.6,
+            13,
+            -0.58,
+            -0.1,
+            1,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "pendulum-back",
+      "frames": 70,
+      "pointer": [
+        0.63156,
+        0.53705,
+        0,
+        0
+      ],
+      "inputs": [
+        {
+          "frame": 3,
+          "pointer": [
+            0.63156,
+            0.53705,
+            1,
+            0
+          ]
+        }
+      ],
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            9,
+            2.6,
+            13,
+            -0.58,
+            -0.1,
+            1,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ball-shot",
+      "frames": 60,
+      "pointer": [
+        0.65047,
+        0.69326,
+        0,
+        0
+      ],
+      "inputs": [
+        {
+          "frame": 3,
+          "pointer": [
+            0.65047,
+            0.69326,
+            1,
+            0
+          ]
+        }
+      ],
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            3.5,
+            2.8,
+            17,
+            0.0,
+            -0.235,
+            1,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cannonball-toys",
+      "frames": 45,
+      "pointer": [
+        0.57351,
+        0.60842,
+        0,
+        0
+      ],
+      "inputs": [
+        {
+          "frame": 3,
+          "movement": [
+            0,
+            0,
+            1,
+            0
+          ]
+        }
+      ],
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            3.5,
+            2.8,
+            17,
+            0.0,
+            -0.235,
+            0,
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cannonball-pendulum",
+      "frames": 30,
+      "pointer": [
+        0.63156,
+        0.53705,
+        0,
+        0
+      ],
+      "inputs": [
+        {
+          "frame": 3,
+          "movement": [
+            0,
+            0,
+            1,
+            0
+          ]
+        }
+      ],
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            9,
+            2.6,
+            13,
+            -0.58,
+            -0.1,
+            0,
+            0,
+            1
+          ]
+        }
+      ]
     }
   ]
 }

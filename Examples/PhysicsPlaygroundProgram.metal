@@ -8,8 +8,10 @@ using namespace metal;
 // A support pass then asks which cells still reach the ground and turns
 // every cell that does not into a falling rigid chunk. The chunks, loose
 // shards, crates and dominoes share one sequential-impulse solver with
-// four-point contact manifolds. The haunted house uses the same support
-// rules and solver for its buildings.
+// four-point contact manifolds. Painted toy cubes and balls, and a ball
+// hanging on a rope from a steel frame, never break: a shot only pushes
+// them. The haunted house uses the same support rules and solver for its
+// buildings.
 struct ProgramUniforms {
     float4 resolutionTime;
     uint4 frameSeed;
@@ -23,11 +25,12 @@ struct ProgramUniforms {
 
 constant uint partCapacity = 48u;
 constant uint linkCapacity = 8u;
-constant uint bodyCapacity = 64u;
-constant uint contactCapacity = 384u;
+constant uint bodyCapacity = 72u;
+constant uint contactCapacity = 448u;
 constant uint cannonSlot = 0u;
-constant uint propFirst = 1u;          // crates and dominoes, 1..10
-constant uint propCount = 10u;
+constant uint propFirst = 1u;          // crates and dominoes, 1..10, then
+constant uint propCount = 17u;         // toy cubes and balls, 11..17
+constant uint pendulumSlot = propFirst + propCount - 1u;
 constant uint chunkFirst = propFirst + propCount;
 constant uint chunkCount = 16u;
 constant uint shardFirst = chunkFirst + chunkCount;
@@ -44,6 +47,10 @@ constant uint styleWood = 3u;
 constant uint styleRoof = 4u;
 constant uint styleCrate = 5u;
 constant uint styleCannon = 6u;
+constant uint styleSteel = 7u;         // never breaks
+constant uint styleToy = 8u;
+constant uint styleRope = 9u;
+constant uint styleBall = 10u;
 
 constant ulong firstColumn = 0x0101010101010101ul;
 constant ulong lastColumn = 0x8080808080808080ul;
@@ -72,8 +79,8 @@ struct Piece {
     float4 lower;   // rest corner, style
     float4 upper;   // rest corner, source part + 1 (0 for none)
     ulong cells;
-    uint kind;      // 0 prop, 1 chunk, 2 shard, 3 cannonball
-    uint unused;
+    uint kind;      // 0 prop, 1 chunk, 2 shard, 3 cannonball, 4 ball
+    uint tint;      // paint of a toy
 };
 
 struct GameState {
@@ -93,6 +100,7 @@ struct GameState {
     Piece pieces[bodyCapacity];
     pixeltje_physics::World<bodyCapacity> world;
     pixeltje_physics::SolverContact contacts[contactCapacity];
+    float4 rope;        // anchor of the pendulum's rope, its length
 };
 
 static_assert(sizeof(GameState) <= 131072,
@@ -219,6 +227,21 @@ void addProp(device GameState &game, uint slot, float3 lower, float3 upper,
     game.world.sleepSeconds[slot] = 0.0f;
 }
 
+// A painted cube or ball that never breaks. A ball's box is its bounds;
+// its inertia is the box's, which matches a hollow ball.
+void addToy(device GameState &game, uint slot, float3 centre, float3 extent,
+    bool ball, uint tint, float mass) {
+    game.pieces[slot] = {float4(centre - extent,
+        float(ball ? styleBall : styleToy)),
+        float4(centre + extent, 0.0f), ~0ul, ball ? 4u : 0u, tint};
+    pixeltje_physics::RigidBody body = pixeltje_physics::makeRigidBody(
+        centre, extent, float4(0.0f, 0.0f, 0.0f, 1.0f), float3(0.0f),
+        1.0f / mass, ball ? 0.35f : 0.15f, 0.6f);
+    body.extentState.w = 2.0f;
+    game.world.bodies[slot] = body;
+    game.world.sleepSeconds[slot] = 0.0f;
+}
+
 __attribute__((noinline))
 void buildPlayground(device GameState &game) {
     game.player = float4(-1.0f, 1.7f, 15.0f, -0.12f);
@@ -285,6 +308,32 @@ void buildPlayground(device GameState &game) {
         addProp(game, slot++, float3(x - 0.1f, 0.0f, 4.6f),
             float3(x + 0.1f, 1.6f, 5.4f), 0.5f);
     }
+
+    // Toy cubes, one stacked on another, and three balls, to the right of
+    // the path from the start to the crates.
+    addToy(game, slot++, float3(0.6f, 0.5f, 10.5f), float3(0.5f), false,
+        0u, 2.0f);
+    addToy(game, slot++, float3(0.7f, 1.35f, 10.5f), float3(0.35f), false,
+        1u, 1.0f);
+    addToy(game, slot++, float3(2.2f, 0.3f, 11.5f), float3(0.3f), false,
+        2u, 0.8f);
+    addToy(game, slot++, float3(1.6f, 0.5f, 12.6f), float3(0.5f), true,
+        3u, 1.5f);
+    addToy(game, slot++, float3(2.8f, 0.35f, 12.8f), float3(0.35f), true,
+        1u, 0.6f);
+    addToy(game, slot++, float3(-0.2f, 0.25f, 11.6f), float3(0.25f), true,
+        2u, 0.3f);
+
+    // A steel frame with a ball hanging on a rope from its crossbeam.
+    addPart(game, float3(3.3f, 0.0f, 7.4f), float3(3.5f, 4.4f, 7.6f),
+        styleSteel);
+    addPart(game, float3(7.3f, 0.0f, 7.4f), float3(7.5f, 4.4f, 7.6f),
+        styleSteel);
+    addPart(game, float3(3.2f, 4.4f, 7.35f), float3(7.6f, 4.65f, 7.65f),
+        styleSteel);
+    game.rope = float4(5.4f, 4.4f, 7.5f, 2.6f);
+    addToy(game, slot++, float3(5.4f, 4.4f - 2.6f - 0.4f, 7.5f), float3(0.4f),
+        true, 0u, 2.0f);
 }
 
 bool restsOn(Part upper, Part lower) {
@@ -382,12 +431,14 @@ kernel void restartPlayground(device GameState *states [[buffer(1)]],
 struct SceneHit {
     float distance;
     float3 normal;
-    float3 local;   // rest-frame point for texturing
+    float3 local;   // rest-frame point for texturing; on a toy, the
+                    // point from its centre over its half extent
     uint style;
-    uint kind;      // 0 sky, 1 ground, 2 part, 3 body
+    uint kind;      // 0 sky, 1 ground, 2 part, 3 body, 4 rope
     uint index;
     uint cell;
     bool broken;    // an inner face exposed by a missing cell
+    uint tint;      // paint of a toy
 };
 
 // The first alive cell along the ray inside a celled box, by a 2D walk
@@ -485,6 +536,16 @@ void traceBodies(thread SceneHit &hit, float3 o, float3 d,
         bool broken = false;
         float t;
         uint style = uint(piece.lower.w);
+        if (piece.kind == 4u) {
+            float radius = 0.5f * (piece.upper.x - piece.lower.x);
+            t = pixeltje_3d::raySphere(lo, ld, restCentre, radius, 0.0f);
+            if (t >= 0.0f && t < hit.distance) {
+                float3 local = (lo + ld * t - restCentre) / radius;
+                hit = {t, pixeltje_physics::rotate(body.orientation, local),
+                    local, style, 3u, i, 0u, false, piece.tint};
+            }
+            continue;
+        }
         if (piece.kind == 1u) {
             // A chunk walks the cell grid of the part it broke from.
             Part source = game.parts[uint(piece.upper.w) - 1u];
@@ -528,10 +589,44 @@ void traceBodies(thread SceneHit &hit, float3 o, float3 d,
                 ~0ul, hit.distance, normal, cell, broken);
             broken = piece.kind == 2u;
         }
-        if (t >= 0.0f && t < hit.distance)
+        if (t >= 0.0f && t < hit.distance) {
+            float3 local = lo + ld * t;
+            if (style == styleToy)
+                local = (local - restCentre)
+                    / (0.5f * (piece.upper.xyz - piece.lower.xyz));
             hit = {t, pixeltje_physics::rotate(body.orientation, normal),
-                lo + ld * t, style, 3u, i, cell, broken};
+                local, style, 3u, i, cell, broken, piece.tint};
+        }
     }
+}
+
+// The pendulum's rope, a thin capsule from the anchor to the top of its
+// ball.
+void traceRope(thread SceneHit &hit, float3 o, float3 d,
+    device const GameState &game) {
+    pixeltje_physics::RigidBody ball = game.world.bodies[pendulumSlot];
+    if (ball.extentState.w == 0.0f || game.pieces[pendulumSlot].kind != 4u)
+        return;
+    const float radius = 0.025f;
+    float3 a = game.rope.xyz;
+    float3 b = ball.centreMass.xyz + pixeltje_physics::rotate(
+        ball.orientation, float3(0.0f, ball.extentState.y, 0.0f));
+    float3 ba = b - a, oa = o - a;
+    float baba = dot(ba, ba), bard = dot(ba, d), baoa = dot(ba, oa);
+    float rdoa = dot(d, oa), oaoa = dot(oa, oa);
+    float qa = baba - bard * bard;
+    float qb = baba * rdoa - baoa * bard;
+    float qc = baba * oaoa - baoa * baoa - radius * radius * baba;
+    float h = qb * qb - qa * qc;
+    if (h < 0.0f || qa < 1.0e-6f) return;
+    float t = (-qb - sqrt(h)) / qa;
+    float along = baoa + t * bard;
+    if (t <= 0.0f || t >= hit.distance || along < 0.0f || along > baba)
+        return;
+    float3 axis = a + ba * (along / baba);
+    float3 point = o + d * t;
+    hit = {t, normalize(point - axis), point, styleRope, 4u, 0u, 0u, false,
+        0u};
 }
 
 SceneHit traceScene(float3 o, float3 d, float limit,
@@ -546,6 +641,7 @@ SceneHit traceScene(float3 o, float3 d, float limit,
     }
     traceParts(hit, o, d, game);
     traceBodies(hit, o, d, game);
+    traceRope(hit, o, d, game);
     return hit;
 }
 
@@ -577,7 +673,8 @@ void launchShard(device GameState &game, Part source, uint bit,
 void breakCell(device GameState &game, uint index, uint bit,
     float3 outward) {
     ulong mask = 1ul << bit;
-    if ((partAlive(game, index) & mask) == 0ul) return;
+    if ((partAlive(game, index) & mask) == 0ul
+        || uint(game.parts[index].lower.w) == styleSteel) return;
     game.gone[index] |= mask;
     game.counts.y = 1u;
     game.push = float4(-outward, game.clock.x);
@@ -843,6 +940,81 @@ void addManifold(device GameState &game, uint a, uint b,
     }
 }
 
+// The box library has no balls, so they collide here. Each pairing gives
+// one point, which a ball needs: it touches only there.
+pixeltje_physics::RigidManifold onePoint(float3 normal, float3 point,
+    float depth) {
+    pixeltje_physics::RigidManifold manifold;
+    manifold.normal = normal;
+    manifold.count = depth > -contactSlop ? 1u : 0u;
+    manifold.points[0] = float4(point, depth);
+    return manifold;
+}
+
+// A ball against an oriented box; the normal points from the box to the
+// ball.
+pixeltje_physics::RigidManifold ballBoxManifold(
+    pixeltje_physics::RigidBody ball, pixeltje_physics::RigidBody box) {
+    float radius = ball.extentState.x;
+    float3 local = pixeltje_physics::unrotate(box.orientation,
+        ball.centreMass.xyz - box.centreMass.xyz);
+    float3 extent = box.extentState.xyz;
+    pixeltje_physics::Contact contact = pixeltje_physics::sphereBox(local,
+        radius, -extent, extent);
+    float3 normal = pixeltje_physics::rotate(box.orientation,
+        contact.normal);
+    return onePoint(normal, ball.centreMass.xyz
+        - normal * (radius - 0.5f * contact.depth), contact.depth);
+}
+
+// Any two bodies. The normal points from b to a, as for boxes.
+pixeltje_physics::RigidManifold bodyManifold(
+    pixeltje_physics::RigidBody a, bool ballA,
+    pixeltje_physics::RigidBody b, bool ballB) {
+    if (!ballA && !ballB)
+        return pixeltje_physics::boxBoxManifold(a, b, contactSlop);
+    if (ballA && ballB) {
+        pixeltje_physics::Contact contact = pixeltje_physics::sphereSphere(
+            a.centreMass.xyz, a.extentState.x, b.centreMass.xyz,
+            b.extentState.x);
+        return onePoint(contact.normal, b.centreMass.xyz + contact.normal
+            * (b.extentState.x - 0.5f * contact.depth), contact.depth);
+    }
+    if (ballA) return ballBoxManifold(a, b);
+    pixeltje_physics::RigidManifold manifold = ballBoxManifold(b, a);
+    manifold.normal = -manifold.normal;
+    return manifold;
+}
+
+bool isBall(device const GameState &game, uint index) {
+    return game.pieces[index].kind == 4u;
+}
+
+// The rope pulls the top of the pendulum's ball toward the anchor but
+// never pushes: a contact whose normal points at the anchor, with depth
+// the stretch and no friction. While slack it is speculative and lets the
+// ball move only until the rope is straight.
+void addRope(device GameState &game, float dt) {
+    pixeltje_physics::RigidBody ball = solverBody(game, pendulumSlot);
+    if (ball.extentState.w != 1.0f || !isBall(game, pendulumSlot))
+        return;
+    float3 end = ball.centreMass.xyz + pixeltje_physics::rotate(
+        ball.orientation, float3(0.0f, ball.extentState.y, 0.0f));
+    float3 toAnchor = game.rope.xyz - end;
+    float span = length(toAnchor);
+    if (span < game.rope.w - 0.25f || span < 1.0e-4f) return;
+    uint n = game.counts.w;
+    if (n >= contactCapacity) return;
+    pixeltje_physics::SolverContact contact
+        = pixeltje_physics::prepareContact(ball,
+            solverBody(game, pixeltje_physics::staticBody), pendulumSlot,
+            pixeltje_physics::staticBody, toAnchor / span,
+            float4(end, span - game.rope.w), dt);
+    contact.material.x = 0.0f;
+    game.contacts[n] = contact;
+    game.counts.w = n + 1u;
+}
+
 // A heavy fast body breaks the cells it strikes and keeps going.
 bool strikePart(device GameState &game, uint bodyIndex, uint part,
     float3 point, float3 normal, float closing) {
@@ -859,6 +1031,7 @@ bool strikePart(device GameState &game, uint bodyIndex, uint part,
 __attribute__((noinline))
 void collideBodyWithParts(device GameState &game, uint i, float dt) {
     pixeltje_physics::RigidBody body = solverBody(game, i);
+    bool ball = isBall(game, i);
     float3 reach = pixeltje_physics::boxHalfBounds(body) + contactSlop;
     uint count = min(game.counts.x, partCapacity);
     uint source = game.pieces[i].kind == 1u
@@ -903,8 +1076,7 @@ void collideBodyWithParts(device GameState &game, uint i, float dt) {
                         float4(0.0f, 0.0f, 0.0f, 1.0f), float3(0.0f),
                         0.0f, 0.1f, 0.7f);
                 pixeltje_physics::RigidManifold manifold
-                    = pixeltje_physics::boxBoxManifold(body, box,
-                        contactSlop);
+                    = bodyManifold(body, ball, box, false);
                 if (manifold.count == 0u) continue;
                 float closing = -dot(body.linearBounce.xyz, manifold.normal);
                 uint kind = game.pieces[i].kind;
@@ -938,13 +1110,27 @@ kernel void collidePlayground(constant ProgramUniforms &u [[buffer(0)]],
     for (uint i = 0u; i < bodyCapacity; ++i) {
         pixeltje_physics::RigidBody a = game.world.bodies[i];
         if (a.extentState.w != 1.0f) continue;
-        pixeltje_physics::RigidManifold floor
-            = pixeltje_physics::boxPlaneManifold(a, float3(0.0f),
+        pixeltje_physics::RigidManifold floor;
+        if (isBall(game, i)) {
+            float radius = a.extentState.x;
+            floor = onePoint(float3(0.0f, 1.0f, 0.0f), a.centreMass.xyz
+                - float3(0.0f, radius, 0.0f), radius - a.centreMass.y);
+            // A ball on the ground rolls to a stop rather than for ever.
+            if (floor.count != 0u) {
+                float drag = exp(-0.5f * dt);
+                a.linearBounce.xyz *= drag;
+                a.angularFriction.xyz *= drag;
+                game.world.bodies[i] = a;
+            }
+        } else {
+            floor = pixeltje_physics::boxPlaneManifold(a, float3(0.0f),
                 float3(0.0f, 1.0f, 0.0f), contactSlop);
+        }
         addManifold(game, i, pixeltje_physics::staticBody, a,
             solverBody(game, pixeltje_physics::staticBody), floor, dt);
         collideBodyWithParts(game, i, dt);
     }
+    addRope(game, dt);
     for (uint i = 0u; i < bodyCapacity; ++i) {
         pixeltje_physics::RigidBody a = game.world.bodies[i];
         if (a.extentState.w == 0.0f) continue;
@@ -958,8 +1144,8 @@ kernel void collidePlayground(constant ProgramUniforms &u [[buffer(0)]],
                 + length(b.extentState.xyz) + contactSlop;
             if (distance(a.centreMass.xyz, b.centreMass.xyz) > reach)
                 continue;
-            pixeltje_physics::RigidManifold manifold
-                = pixeltje_physics::boxBoxManifold(a, b, contactSlop);
+            pixeltje_physics::RigidManifold manifold = bodyManifold(a,
+                isBall(game, i), b, isBall(game, j));
             if (manifold.count == 0u) continue;
             // A moving neighbour wakes a sleeping one; a shard does not.
             float closing = length(a.linearBounce.xyz - b.linearBounce.xyz);
@@ -1085,6 +1271,32 @@ float3 surfaceColor(SceneHit hit) {
         float2 edge = abs(fract(face / 0.9f + 0.5f) - 0.5f);
         base = float3(0.55f, 0.38f, 0.18f) * (0.85f + 0.25f * grain)
             * (max(edge.x, edge.y) > 0.42f ? 0.6f : 1.0f);
+    } else if (hit.style == styleSteel) {
+        float band = fract(dot(p, float3(1.0f, 0.37f, 1.0f)) * 1.5f);
+        base = float3(0.2f, 0.27f, 0.34f) * (0.9f + 0.15f * band);
+    } else if (hit.style == styleToy || hit.style == styleBall) {
+        const float3 paints[4] = {float3(0.75f, 0.1f, 0.08f),
+            float3(0.1f, 0.3f, 0.75f), float3(0.9f, 0.62f, 0.06f),
+            float3(0.12f, 0.55f, 0.2f)};
+        float3 paint = paints[hit.tint % 4u];
+        if (hit.style == styleBall) {
+            // A ball: six wedges of paint and white, and a white band, so
+            // its roll shows.
+            float wedge = floor((atan2(p.z, p.x) + 3.1415927f)
+                / 1.0471976f);
+            bool white = fmod(wedge, 2.0f) > 0.5f || abs(p.y) < 0.18f;
+            base = white ? float3(0.82f, 0.8f, 0.76f) : paint;
+        } else {
+            // A cube: painted faces with a pale rim along their edges. The
+            // face is the rest-frame axis the point reaches, so a tumbling
+            // cube keeps its pattern.
+            float3 r = abs(p);
+            float2 q = r.x >= r.y && r.x >= r.z ? r.yz
+                : (r.y >= r.z ? r.xz : r.xy);
+            base = max(q.x, q.y) > 0.86f ? float3(0.82f, 0.8f, 0.76f) : paint;
+        }
+    } else if (hit.style == styleRope) {
+        base = float3(0.52f, 0.43f, 0.3f);
     } else {
         base = float3(0.08f, 0.08f, 0.09f);
     }
