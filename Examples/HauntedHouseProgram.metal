@@ -19,8 +19,8 @@ using namespace metal;
 // flank the exit; the walker climbs onto both, and the broodmother waits
 // in the hall of the eastern one, whose back corner has fallen in. The
 // player starts outside on that path, facing the house.
-// The hand, pistol, double-barrel shotgun and launcher are on keys 1 to 4
-// everywhere; the hand punches, and knocks on doors. enableDrones and
+// The hand, pistol, double-barrel shotgun, launcher and Winchester rifle
+// are on keys 1 to 5 everywhere; the hand punches, and knocks on doors. enableDrones and
 // renderBase below switch the drones and the drawn base off for now. With
 // enableDayNightTransition, the sun crosses the sky from noon to this night
 // over twenty minutes, and the timeOfDay parameter picks where on that path a
@@ -159,9 +159,11 @@ constant uint keyDigit1 = 128u;
 constant uint keyDigit2 = 256u;
 constant uint keyDigit3 = 512u;
 constant uint keyDigit4 = 1024u;
+constant uint keyDigit5 = 2048u;
 constant uint keyDigit7 = 8192u;
 // Keys 7, 8 and 9 switch off bokeh, bloom and lens fringing; controls.w
-// holds the bits of the effects switched off.
+// holds the bits of the effects switched off. Lens fringing starts off: its
+// three-tap composite costs more than it adds.
 constant uint effectBokeh = 1u;
 constant uint effectBloom = 2u;
 constant uint effectAberration = 4u;
@@ -283,9 +285,13 @@ struct RangeAudio {
     uint debrisImpact[12];
     uint surfaceImpact[2]; // wood, concrete
     uint landingImpact;
+    uint shotgunReload;
+    uint rifleShot;
+    uint rifleLever;
+    uint rifleLoad;
 };
 
-static_assert(sizeof(RangeAudio) == 224,
+static_assert(sizeof(RangeAudio) == 240,
     "The audio words must match the program's audioEvents and audioVoices");
 
 constant uint hudCapacity = 96u;
@@ -496,6 +502,10 @@ struct GameState {
     // keeps them current.
     HouseChunk houseChunks[houseChunkCapacity];
     uint houseChunkFirst[houseGroupCapacity];
+    // The Winchester: rounds loaded, time left on the cartridge being
+    // loaded (0 idle), lever cycle left, loading hold 0-1. Last, so every
+    // earlier offset stays where preview views write it.
+    float4 rifle;
 };
 
 static_assert(sizeof(GameState) <= 327680,
@@ -764,6 +774,7 @@ struct GunHit {
     float3 normal;          // gun frame
     uint part;              // 1 chrome, 2 polymer, 3 dark steel, 4 glove,
                             // 5 sleeve, 6 blued barrel, 7 walnut,
+                            // 8 rifle steel, 9 rifle receiver,
                             // 10 launch tube, 11 composite, 12 display,
                             // 13 hand leather, 14 hand strap, 15 hand sleeve
     float3 local;
@@ -779,6 +790,7 @@ void gunCapsule(thread GunHit &hit, float3 origin, float3 direction,
 #include "SignalRangeDoppler.metal"
 #include "SignalRangeShotgun.metal"
 #include "SignalRangeHand.metal"
+#include "HauntedRifle.metal"
 #include "SignalRangeDrone.metal"
 #include "SignalRangeArsenal.metal"
 
@@ -844,6 +856,7 @@ void resetGame(device GameState &game, uint seed) {
     npcPathGenerate(game.paths, rangePathAreas, pathAreaCount,
         rangePathJoins, pathJoinCount, npcPathHash(seed));
     resetArms(game);
+    resetRifle(game);
     resetDrones(game);
     // The previous keys, the flight-cam option and effect switches survive a
     // restart. The pistol is in hand; X swaps to the launcher.
@@ -890,8 +903,9 @@ kernel void initializeRange(constant ProgramUniforms &u [[buffer(0)]],
     if (id != 0u) return;
     // The haunted buildings are generated once; restarts keep them.
     buildBuildings(states[0]);
-    // The missile flight cam starts on; V toggles it.
-    states[0].controls = float4(0.0f, 1.0f, 0.0f, 0.0f);
+    // The missile flight cam starts on and the lens fringe off; V and 9
+    // toggle them.
+    states[0].controls = float4(0.0f, 1.0f, 0.0f, float(effectAberration));
     resetGame(states[0], u.frameSeed.y ^ u.frameSeed.z);
     states[0].sky = float4(max(0.0f, u.parameters0.x), 0.0f, 0.0f, 0.0f);
     // Voice words persist between frames; start every hover sound silent.
@@ -1446,6 +1460,7 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
         game.weapon.y = max(game.weapon.y - dt, 0.0f);
         if (game.weapon.y <= 0.0f) game.weapon.x = float(magazineSize);
     }
+    advanceRifle(game, audio[0], dt);
     game.controls.z = max(game.controls.z - dt, 0.0f);
     // The haunted house's ghost flies, and its wind blows, even after the
     // match ends.
@@ -1490,14 +1505,15 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
     game.view.x = basePitch + game.recoil.x;
     bool cutscene = bossCutscene(game);
 
-    // 1 picks the hand, 2 the pistol, 3 the shotgun and 4 the launcher,
-    // indoors and out; X swaps back to the one held before. switchArms
-    // lowers one weapon and raises the other.
+    // 1 picks the hand, 2 the pistol, 3 the shotgun, 4 the launcher and 5
+    // the rifle, indoors and out; X swaps back to the one held before.
+    // switchArms lowers one weapon and raises the other.
     float chosen = game.arsenal.x;
     if ((pressed & keyDigit1) != 0u) chosen = heldHand;
     if ((pressed & keyDigit2) != 0u) chosen = heldPistol;
     if ((pressed & keyDigit3) != 0u) chosen = heldShotgun;
     if ((pressed & keyDigit4) != 0u) chosen = heldLauncher;
+    if ((pressed & keyDigit5) != 0u) chosen = heldRifle;
     if ((pressed & keyX) != 0u) chosen = game.arsenal.y;
     if (chosen != game.arsenal.x) game.arsenal.xy = float2(chosen, game.arsenal.x);
     // H raises the finger once; K starts a complete, timed farewell wave.
@@ -1526,6 +1542,8 @@ kernel void advanceRange(constant ProgramUniforms &u [[buffer(0)]],
         } else if (holdingShotgun(game)) {
             if (game.arms.w <= 0.0f && game.arms.z < shotgunShells)
                 game.arms.w = shotgunReloadDuration;
+        } else if (holdingRifle(game)) {
+            startRifleLoading(game);
         } else if (!holdingHand(game) && game.weapon.y <= 0.0f
             && game.weapon.x < float(magazineSize)) {
             game.weapon.y = reloadDuration;
@@ -1677,7 +1695,13 @@ kernel void advancePlayer(constant ProgramUniforms &u [[buffer(0)]],
     }
     collectPickups(game);
 
+    // The shotgun's reload sound starts as the gun breaks open, just after
+    // the blast of the barrel that emptied it.
+    float shellReload = game.arms.w;
     switchArms(game, game.arsenal.x, dt);
+    float reloadSound = shotgunReloadDuration - 0.25f;
+    if (shellReload > reloadSound && game.arms.w <= reloadSound)
+        audio[0].shotgunReload += 1u;
 }
 
 // Each range spider's sight line to the player, traced in the tick pass
@@ -1839,6 +1863,7 @@ void fireRound(device GameState &game, float3 eye, float3 shotDirection,
     }
     game.impacts[(game.progress.y - 1u) % impactCount] = shot;
     emitSurfaceImpact(game, audio, impactMaterial);
+    float roundDamage = holdingRifle(game) ? rifleDamage : 1.0f;
     if (trace.bat >= 0 && holdingShotgun(game)) {
         uint bat = uint(trace.bat);
         game.batRaid.y |= 1u << bat;
@@ -1857,12 +1882,12 @@ void fireRound(device GameState &game, float3 eye, float3 shotDirection,
     }
     if (trace.drone >= 0)
         damageDrone(game, uint(trace.drone), shotDirection,
-            holdingShotgun(game) ? dronePelletDamage : 1.0f, audio);
+            holdingShotgun(game) ? dronePelletDamage : roundDamage, audio);
     if (trace.sentry >= 0) {
         // Armour takes one point; the sensor eye takes three.
         bool sensor = trace.material == sentrySensorMaterial;
         bool destroyed = damageSentry(game, uint(trace.sentry),
-            sensor ? 3.0f : 1.0f);
+            (sensor ? 3.0f : 1.0f) * roundDamage);
         game.weapon.zw = destroyed ? float2(0.40f, 3.0f)
             : (sensor ? float2(0.30f, 2.0f) : float2(0.22f, 1.0f));
     }
@@ -1874,7 +1899,8 @@ void fireRound(device GameState &game, float3 eye, float3 shotDirection,
         - float3(0.0f, 0.05f, -0.45f);
     bool headshot = length(head / float3(0.48f, 0.38f, 0.50f)) < 1.0f;
     float2 push = shotDirection.xz;
-    bool killed = damageSpider(game, slot, headshot ? 2.0f : 1.0f,
+    bool killed = damageSpider(game, slot,
+        (headshot ? 2.0f : 1.0f) * roundDamage,
         length(push) > 0.01f ? normalize(push) * 2.6f : float2(0.0f));
     game.weapon.zw = killed ? float2(0.40f, 3.0f)
         : (headshot ? float2(0.30f, 2.0f) : float2(0.22f, 1.0f));
@@ -1897,9 +1923,12 @@ kernel void fireRange(constant ProgramUniforms &u [[buffer(0)]],
     if (action > game.progress.z && !holdingHand(game)) {
         game.progress.z = action;
         bool shotgun = holdingShotgun(game);
+        bool rifle = holdingRifle(game);
+        // A round in the tube fires even while loading, which stops it.
         bool loaded = shotgun
             ? game.arms.z >= 1.0f && game.arms.w <= 0.0f
-            : game.weapon.x >= 1.0f && game.weapon.y <= 0.0f;
+            : (rifle ? game.rifle.x >= 1.0f
+                : game.weapon.x >= 1.0f && game.weapon.y <= 0.0f);
         if (holdingLauncher(game)) {
             // One missile flies at a time; the launch uses the jump-pad whoosh.
             if (armsReady(game) && !bossCutscene(game)
@@ -1909,7 +1938,7 @@ kernel void fireRange(constant ProgramUniforms &u [[buffer(0)]],
                 float3 aimRight = normalize(cross(aim,
                     float3(0.0f, 1.0f, 0.0f)));
                 float3 aimUp = cross(aimRight, aim);
-                float3 muzzle = heldMuzzle(game);
+                float3 muzzle = armedMuzzle(game);
                 launchMissile(game, eye + aimRight * muzzle.x
                     + aimUp * muzzle.y + aim * muzzle.z, aim);
                 audio[0].launch = 1u;
@@ -1925,6 +1954,14 @@ kernel void fireRange(constant ProgramUniforms &u [[buffer(0)]],
                 if (game.arms.z < 1.0f) game.arms.w = shotgunReloadDuration;
                 audio[0].shotgun = 1u;
                 pellets = shotgunPellets;
+            } else if (rifle) {
+                // Each shot works the lever before the next can fire.
+                game.view.z = rifleCycleTime;
+                game.view.w = 0.12f;
+                game.rifle.x -= 1.0f;
+                game.rifle.y = game.rifle.x < 1.0f ? rifleLoadTime : 0.0f;
+                game.rifle.z = rifleCycleTime;
+                audio[0].rifleShot = 1u;
             } else {
                 game.view.z = 0.22f;
                 game.view.w = 0.11f;
@@ -1939,7 +1976,7 @@ kernel void fireRange(constant ProgramUniforms &u [[buffer(0)]],
             float3 aimRight = normalize(cross(aim, float3(0.0f, 1.0f, 0.0f)));
             float3 aimUp = cross(aimRight, aim);
             // Tracers leave the barrel that just fired.
-            float3 muzzleView = heldMuzzle(game);
+            float3 muzzleView = armedMuzzle(game);
             float3 muzzle = eye + aimRight * muzzleView.x
                 + aimUp * muzzleView.y + aim * muzzleView.z;
             for (uint pellet = 0u; pellet < pellets; ++pellet) {
@@ -1961,11 +1998,13 @@ kernel void fireRange(constant ProgramUniforms &u [[buffer(0)]],
             // The kick lands after the shot, so the first round goes where
             // the crosshair was; follow-ups climb until the recoil recovers.
             // The shotgun throws the view up and shakes it.
-            game.recoil.x += shotgun ? 0.085f : 0.032f;
-            game.recoil.y += (shotgun ? 0.05f : 0.024f)
+            // The rifle kicks between the two.
+            game.recoil.x += shotgun ? 0.085f : (rifle ? 0.058f : 0.032f);
+            game.recoil.y += (shotgun ? 0.05f : (rifle ? 0.034f : 0.024f))
                 * (hashTile(float2(float(game.progress.y), 7.3f)) - 0.5f);
             game.recoil.z = 1.0f;
             if (shotgun) game.recoil.w = max(game.recoil.w, 0.45f);
+            if (rifle) game.recoil.w = max(game.recoil.w, 0.25f);
         }
     }
     if (game.enemy[bossSlot].w <= 0.0f) {
@@ -4537,7 +4576,8 @@ float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
         30u, -1, 0u};
     SurfaceMaterial material = gun.part >= 13u ? handMaterial(gun)
         : (gun.part >= 10u ? launcherMaterial(gun)
-            : (gun.part >= 6u ? shotgunMaterial(gun) : gunMaterial(gun)));
+            : (gun.part >= 8u ? rifleMaterial(gun)
+                : (gun.part >= 6u ? shotgunMaterial(gun) : gunMaterial(gun))));
     bool inHouse = houseInteriorPoint(eye);
     bool inLair = buildingsLairHolds(eye);
     bool outside = (outdoors(eye.xz, 0.0f) || buildingsTombPadHolds(eye.xz))
@@ -4898,7 +4938,8 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     bool shotgun = holdingShotgun(game);
     bool launcher = holdingLauncher(game);
     bool hand = holdingHand(game);
-    GunPose gun = heldPose(game);
+    bool rifle = holdingRifle(game);
+    GunPose gun = armedPose(game);
     float3 elbow = float3(0.0f);
     if (hand) {
         HandPose arm = handPose(game);
@@ -4906,7 +4947,8 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         elbow = arm.elbow;
     }
     float3 muzzleLocal = launcher ? launcherMuzzle
-        : (shotgun ? shotgunLastMuzzle(game) : gunMuzzle);
+        : (shotgun ? shotgunLastMuzzle(game)
+            : (rifle ? rifleMuzzle : gunMuzzle));
     float3 viewFront = pixeltje_3d::forward(viewYaw, viewPitch);
     float3 viewRight = normalize(cross(viewFront, float3(0.0f, 1.0f, 0.0f)));
     float3 viewUp = cross(viewRight, viewFront);
@@ -4922,8 +4964,11 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
                 ? traceLauncher(toGun * -gun.pivot, toGun * viewDirection)
                 : (shotgun
                     ? traceShotgun(toGun * -gun.pivot, toGun * viewDirection)
-                    : traceGun(toGun * -gun.pivot, toGun * viewDirection,
-                        gun.slide)));
+                    : (rifle
+                        ? traceRifle(toGun * -gun.pivot,
+                            toGun * viewDirection, rifleLeverSwing(game))
+                        : traceGun(toGun * -gun.pivot, toGun * viewDirection,
+                            gun.slide))));
         if (gunHit.part != 0u) {
             float3 behind = color;
             color = shadeGun(gunHit, gun, muzzleLocal, eye, viewRight, viewUp,
@@ -4945,13 +4990,15 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
         float radius = length(offset) / u.resolutionTime.y;
         float angle = atan2(offset.y, offset.x) + float(game.progress.y) * 1.7f;
         float spikes = pow(abs(cos(angle * 2.5f)), 6.0f);
-        // A shotgun barrel throws a wider, longer flash.
-        float size = shotgun ? 1.7f : 1.0f;
+        // A shotgun barrel throws a wider, longer flash, the rifle's
+        // black-powder-length barrel one between it and the pistol's.
+        float size = shotgun ? 1.7f : (rifle ? 1.35f : 1.0f);
         float flash = (1.0f - smoothstep(0.0f, 0.022f * size, radius))
             + 0.8f * spikes * (1.0f - smoothstep(0.0f, 0.075f * size, radius))
             + 0.25f * (1.0f - smoothstep(0.0f, 0.12f * size, radius));
         color += float3(1.0f, 0.62f, 0.24f) * flash
-            * saturate(game.view.w / (shotgun ? 0.14f : 0.11f)) * 2.5f;
+            * saturate(game.view.w / (shotgun ? 0.14f
+                : (rifle ? 0.12f : 0.11f))) * 2.5f;
     }
     // Linear scene light before exposure, which the composite pass tone
     // maps, and view distance for the bokeh pass.
@@ -5281,8 +5328,8 @@ fragment float4 compositeFragment(ScreenVertex in [[stage_in]],
             : (game.weapon.w > 1.5f ? float3(1.0f, 0.62f, 0.18f)
                 : float3(1.0f)), saturate(game.weapon.z / 0.12f));
     }
-    // Magazine rounds, shotgun shells or rockets at the bottom right, with a
-    // bar while reloading. The hand has none.
+    // Magazine rounds, shotgun shells, rifle cartridges or rockets at the
+    // bottom right, with a bar while reloading. The hand has none.
     if (game.progress.w == phasePlaying && holdingLauncher(game)) {
         float2 corner = u.resolutionTime.xy - float2(28.0f, 28.0f);
         uint rockets = uint(game.arsenal.w + game.arsenal.z + 0.5f);
@@ -5323,6 +5370,29 @@ fragment float4 compositeFragment(ScreenVertex in [[stage_in]],
             && pixel.x > corner.x - barWidth) {
             color = corner.x - pixel.x > barWidth
                     * (game.arms.w / shotgunReloadDuration)
+                ? float3(0.95f, 0.82f, 0.45f) : float3(0.10f, 0.13f, 0.14f);
+        }
+    } else if (game.progress.w == phasePlaying && holdingRifle(game)) {
+        // Slim brass cartridges with lead noses, one per round in the tube;
+        // the bar fills as the thumb pushes the next one in.
+        float2 corner = u.resolutionTime.xy - float2(28.0f, 28.0f);
+        for (uint i = 0u; i < uint(rifleCapacity); ++i) {
+            float right = corner.x - float(i) * 7.0f;
+            if (pixel.x > right - 4.0f && pixel.x < right
+                && pixel.y > corner.y - 20.0f && pixel.y < corner.y) {
+                bool nose = pixel.y < corner.y - 15.0f;
+                color = float(i) < game.rifle.x
+                    ? (nose ? float3(0.42f, 0.42f, 0.44f)
+                        : float3(0.85f, 0.66f, 0.30f))
+                    : float3(0.10f, 0.13f, 0.14f);
+            }
+        }
+        float barWidth = rifleCapacity * 7.0f - 3.0f;
+        if (game.rifle.y > 0.0f && pixel.y > corner.y + 5.0f
+            && pixel.y < corner.y + 8.0f && pixel.x < corner.x
+            && pixel.x > corner.x - barWidth) {
+            color = corner.x - pixel.x > barWidth
+                    * (game.rifle.y / rifleLoadTime)
                 ? float3(0.95f, 0.82f, 0.45f) : float3(0.10f, 0.13f, 0.14f);
         }
     } else if (game.progress.w == phasePlaying && !holdingHand(game)) {
@@ -5420,6 +5490,7 @@ constant uint textMedkit = 29u;
 constant uint textRockets = 30u;
 constant uint textHand = 31u;
 constant uint textKnock = 32u;
+constant uint textRifle = 33u;
 
 float4 fontRun(device const float4 *font, uint index) {
     return font[uint(font[0].y) + index];
@@ -5509,13 +5580,15 @@ kernel void buildRangeHUD(constant ProgramUniforms &u [[buffer(0)]],
         bool shotgun = holdingShotgun(game);
         bool launcher = holdingLauncher(game);
         bool hand = holdingHand(game);
+        bool rifle = holdingRifle(game);
         uint weaponName = hand ? textHand : (launcher ? textJavelin
-            : (shotgun ? textShotgun : textPistol));
+            : (shotgun ? textShotgun : (rifle ? textRifle : textPistol)));
         addRun(glyphs, count, font, weaponName,
             float2(size.x - 28.0f - runWidth(font, weaponName, 11.0f),
                 size.y - 104.0f), 11.0f, ink, 0.4f + 0.6f * game.arms.y);
         bool reloading = !hand && (launcher ? game.launcher.z > 0.0f
-            : (shotgun ? game.arms.w > 0.0f : game.weapon.y > 0.0f));
+            : (shotgun ? game.arms.w > 0.0f
+                : (rifle ? game.rifle.y > 0.0f : game.weapon.y > 0.0f)));
         if (hand) {
             // A door within reach invites a knock.
             if (game.hand.w > 0.5f && handSwingAge(game) < 0.0f)
@@ -5528,7 +5601,8 @@ kernel void buildRangeHUD(constant ProgramUniforms &u [[buffer(0)]],
         } else {
             uint rounds = launcher
                 ? uint(game.arsenal.w + game.arsenal.z + 0.5f)
-                : uint(shotgun ? game.arms.z : game.weapon.x);
+                : uint(shotgun ? game.arms.z
+                    : (rifle ? game.rifle.x : game.weapon.x));
             addNumber(glyphs, count, font, rounds,
                 float2(size.x - 28.0f - numberWidth(font, rounds, 30.0f),
                     size.y - 86.0f), 30.0f,

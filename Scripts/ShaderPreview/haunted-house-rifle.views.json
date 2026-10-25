@@ -1,0 +1,66 @@
+{
+  "width": 960,
+  "height": 540,
+  "views": [
+    {
+      "name": "start-rifle",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "offset": 8768, "floats": [4, 1, 2, 0] }
+      ]
+    },
+    {
+      "name": "arena-shotgun",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 12, 0] },
+        { "buffer": "game", "offset": 16, "floats": [-0.05] },
+        { "buffer": "game", "offset": 560, "floats": [100] },
+        { "buffer": "game", "offset": 8768, "floats": [1, 1, 2, 0] }
+      ]
+    },
+    {
+      "name": "arena-rifle",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 12, 0] },
+        { "buffer": "game", "offset": 16, "floats": [-0.05] },
+        { "buffer": "game", "offset": 560, "floats": [100] },
+        { "buffer": "game", "offset": 8768, "floats": [4, 1, 2, 0] }
+      ]
+    },
+    {
+      "name": "arena-rifle-shot",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 12, 0] },
+        { "buffer": "game", "offset": 16, "floats": [-0.05, 100, 0.6, 0.12] },
+        { "buffer": "game", "offset": 560, "floats": [100] },
+        { "buffer": "game", "offset": 8768, "floats": [4, 1, 2, 0] },
+        { "buffer": "game", "offset": 269520, "floats": [14, 0, 0.6, 0] }
+      ]
+    },
+    {
+      "name": "arena-rifle-lever-open",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 12, 0] },
+        { "buffer": "game", "offset": 16, "floats": [-0.05] },
+        { "buffer": "game", "offset": 560, "floats": [100] },
+        { "buffer": "game", "offset": 8768, "floats": [4, 1, 2, 0] },
+        { "buffer": "game", "offset": 269520, "floats": [14, 0, 0.24, 0] }
+      ]
+    },
+    {
+      "name": "arena-rifle-loading",
+      "frames": 0,
+      "writes": [
+        { "buffer": "game", "floats": [0, 1.55, 12, 0] },
+        { "buffer": "game", "offset": 16, "floats": [-0.05] },
+        { "buffer": "game", "offset": 560, "floats": [100] },
+        { "buffer": "game", "offset": 8768, "floats": [4, 1, 2, 0] },
+        { "buffer": "game", "offset": 269520, "floats": [7, 0.2, 0, 1] }
+      ]
+    }
+  ]
+}

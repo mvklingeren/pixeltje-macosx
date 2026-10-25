@@ -28,7 +28,7 @@ bool holdingLauncher(device const GameState &game) {
 }
 
 bool holdingHand(device const GameState &game) {
-    return game.arms.x > 2.5f;
+    return game.arms.x > 2.5f && game.arms.x < 3.5f;
 }
 
 // Fully raised; a weapon being lowered or raised cannot fire.
