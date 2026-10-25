@@ -323,6 +323,16 @@ struct HouseGroup {
 
 constant uint houseCapacity = 1664u;
 constant uint houseGroupCapacity = 72u;
+// A ray that enters a group tests its parts in runs: it skips a run whose
+// bounds it misses. Each group ends in at most one short run, so the runs
+// never outnumber this.
+constant uint houseChunkSize = 8u;
+constant uint houseChunkCapacity = houseCapacity / houseChunkSize
+    + houseGroupCapacity;
+struct HouseChunk {
+    float4 lower;
+    float4 upper;
+};
 constant uint buildingSiteCapacity = 8u;
 constant uint masonryPanelsPerTomb = 15u;
 constant uint masonryPanelCount = 2u * masonryPanelsPerTomb;
@@ -481,6 +491,11 @@ struct GameState {
     // The candy-store's two sliding glass leaves and pressure plate.
     float4 candyDoor;       // open, last press, plate down, previous tick
     uint candyDoorFirstPart;
+    // Bounds of each run of up to houseChunkSize parts within a group, in
+    // the group's frame, and each group's first run; boundHouseChunks
+    // keeps them current.
+    HouseChunk houseChunks[houseChunkCapacity];
+    uint houseChunkFirst[houseGroupCapacity];
 };
 
 static_assert(sizeof(GameState) <= 327680,
@@ -1055,35 +1070,53 @@ constant TerrainLevel terrainLevels[2] = {
     {float2(-2048.0f, -2048.0f), 8.0f, 512u, 589824u}};
 constant uint terrainMapTexels = 851968u;   // both levels
 constant uint terrainMapRow = 1024u;        // texels per row of a bake grid
+// The steepest the trace field rises anywhere, per metre: the rock faces.
+constant float terrainSlopeLimit = 2.5f;
 // The sun's map refreshes one band per tick, all of it every 16 ticks.
 constant uint sunShadowBands = 16u;
 constant uint sunShadowBandTexels = terrainMapTexels / sunShadowBands;
 
-// The highest point of the trace field over the cell under p, or infinity
-// where no level covers p.
-float terrainBound(device const float *bounds, float2 p) {
+// The highest point of the trace field over the cell under p and the
+// steepest the field rises there, per metre, or infinity where no level
+// covers p. span is how far a ray whose horizontal direction is d travels
+// before it leaves that cell, or 0 outside both levels.
+float2 terrainBound(device const float2 *bounds, float2 p, float2 d,
+    thread float &span) {
     for (uint l = 0u; l < 2u; ++l) {
         TerrainLevel level = terrainLevels[l];
         float2 q = (p - level.origin) / level.cell;
-        if (all(q >= 0.0f) && all(q < float(level.size)))
-            return bounds[level.offset + uint(q.y) * level.size + uint(q.x)];
+        if (all(q >= 0.0f) && all(q < float(level.size))) {
+            float2 cell = floor(q);
+            float2 edge = select(cell, cell + 1.0f, d > 0.0f);
+            float2 reach = select(float2(INFINITY),
+                (edge - q) * level.cell / d, d != 0.0f);
+            span = min(reach.x, reach.y);
+            return bounds[level.offset + uint(cell.y) * level.size
+                + uint(cell.x)];
+        }
     }
-    return INFINITY;
+    span = 0.0f;
+    return float2(INFINITY, terrainSlopeLimit);
 }
 
 // pixeltje_terrain::trace over MoonSurface{moonTraceDetail}, finding the
 // same surface. While the ray clears the bound by half a metre, and by more
-// with distance, the true gap is at least that clearance, so the step takes
-// it without the field. Bounded steps are shorter than exact ones, so the
-// march may take more of them than the field's own 160; each costs one read.
-float traceTerrainBounded(device const float *bounds, float3 origin,
+// with distance, it steps without the field: no point of the cell rises
+// above its bound, so the ray can come down to it. Nearer the ground the
+// field gives the gap, and the cell's slope says how fast the ray can close
+// it: gentle plain allows long steps, rock and crater rims short ones. A
+// step never leaves the cell whose bounds it trusted, and never falls short
+// of the field-wide step for slope 2.5.
+float traceTerrainBounded(device const float2 *bounds, float3 origin,
     float3 direction, float near, float far) {
     MoonSurface field = {moonTraceDetail};
     float t = near, previousT = near, previousGap = 0.0f;
     bool previousExact = false;
     for (int i = 0; i < 480; ++i) {
         float3 p = origin + direction * t;
-        float clearance = p.y - terrainBound(bounds, p.xz);
+        float span;
+        float2 cell = terrainBound(bounds, p.xz, direction.xz, span);
+        float clearance = p.y - cell.x;
         bool exact = clearance < 0.5f + 0.01f * t;
         float gap = clearance;
         if (exact) {
@@ -1103,7 +1136,11 @@ float traceTerrainBounded(device const float *bounds, float3 origin,
         previousT = t;
         previousGap = gap;
         previousExact = exact;
-        t = min(t + max(gap * 0.45f, 0.002f + 0.004f * t), far);
+        float closing = (exact ? cell.y : 0.0f) * length(direction.xz)
+            - direction.y;
+        float reach = closing > 0.0f ? gap / closing : INFINITY;
+        t = min(t + max(max(gap * 0.45f, 0.002f + 0.004f * t),
+            min(reach, span + 0.01f)), far);
     }
     return previousExact && previousGap < 0.03f * previousT
         ? previousT : -1.0f;
@@ -2435,8 +2472,11 @@ float2 footprintSpan(float3 origin, float3 direction) {
 // and the moon is traced up to the shell. From inside, a ray reaches the
 // moon only through the exit, so the terrain march starts where it leaves.
 // Without the base, the moon is traced across its footprint as well.
+void terrainHit(thread SceneHit &hit, float3 origin, float3 direction,
+    float t);
+
 void traceOutside(thread SceneHit &hit, float3 origin, float3 direction,
-    bool base, device const float *bounds = nullptr) {
+    bool base, device const float2 *bounds = nullptr) {
     bool inside = base && !outdoors(origin.xz, 0.0f);
     float2 span = footprintSpan(origin, direction);
     if (base && !inside) {
@@ -2456,10 +2496,15 @@ void traceOutside(thread SceneHit &hit, float3 origin, float3 direction,
     float far = base && !inside && span.x > 0.0f && span.x <= span.y
         ? min(hit.distance, span.x) : hit.distance;
     if (near >= far) return;
-    float t = bounds
+    terrainHit(hit, origin, direction, bounds
         ? traceTerrainBounded(bounds, origin, direction, near, far)
         : pixeltje_terrain::trace(MoonSurface{moonTraceDetail}, origin,
-            direction, near, far, moonCeiling, 160);
+            direction, near, far, moonCeiling, 160));
+}
+
+// The plain where the ray meets it at t, as hit; nothing when t < 0.
+void terrainHit(thread SceneHit &hit, float3 origin, float3 direction,
+    float t) {
     if (t < 0.0f) return;
     float3 p = origin + direction * t;
     float epsilon = 0.02f + 0.002f * t;
@@ -3290,6 +3335,37 @@ float3 shadeDistantLights(SceneHit hit, SurfaceMaterial material,
     return color;
 }
 
+// ------------------------------------------------------- building part runs
+
+// Bounds each run of houseChunkSize parts of group g. Parts move only while
+// the buildings are raised and when doors swing in fireRange, so this runs
+// after initializeRange and after fireRange.
+kernel void boundHouseChunks(device GameState *states [[buffer(1)]],
+    uint g [[thread_position_in_grid]]) {
+    device GameState &game = states[0];
+    device const HouseModel &house = game.house;
+    if (g >= min(house.counts.y, houseGroupCapacity)) return;
+    uint chunk = 0u;
+    for (uint k = 0u; k < g; ++k) {
+        uint first = uint(house.groups[k].lower.w);
+        uint end = max(min(uint(house.groups[k].upper.w), houseCapacity),
+            first);
+        chunk += (end - first + houseChunkSize - 1u) / houseChunkSize;
+    }
+    game.houseChunkFirst[g] = chunk;
+    uint end = min(uint(house.groups[g].upper.w), houseCapacity);
+    for (uint first = uint(house.groups[g].lower.w);
+            first < end && chunk < houseChunkCapacity;
+            first += houseChunkSize, ++chunk) {
+        float3 lower = float3(INFINITY), upper = float3(-INFINITY);
+        for (uint i = first; i < min(first + houseChunkSize, end); ++i) {
+            lower = min(lower, house.parts[i].lower.xyz);
+            upper = max(upper, house.parts[i].upper.xyz);
+        }
+        game.houseChunks[chunk] = {float4(lower, 0.0f), float4(upper, 0.0f)};
+    }
+}
+
 // ------------------------------------------------------- terrain map baking
 
 // The level and world x and z of texel index of the terrain maps.
@@ -3329,7 +3405,7 @@ float2 terrainShadowColumn(float2 centre, float3 light) {
     return float2(highest, max(distance, 0.1f));
 }
 
-kernel void bakeTerrainBounds(device float *bounds [[buffer(1)]],
+kernel void bakeTerrainBounds(device float2 *bounds [[buffer(1)]],
     uint2 id [[thread_position_in_grid]]) {
     uint index = id.y * terrainMapRow + id.x;
     if (index >= terrainMapTexels) return;
@@ -3340,12 +3416,28 @@ kernel void bakeTerrainBounds(device float *bounds [[buffer(1)]],
     uint samples = l == 0u ? 5u : 9u;
     float spacing = terrainLevels[l].cell / float(samples - 1u);
     MoonSurface field = {moonTraceDetail};
-    float highest = -INFINITY;
-    for (uint y = 0u; y < samples; ++y)
-        for (uint x = 0u; x < samples; ++x)
-            highest = max(highest,
-                field(corner + float2(float(x), float(y)) * spacing));
-    bounds[index] = highest + 2.5f * spacing * 0.7072f + 0.02f;
+    float highest = -INFINITY, steepest = 0.0f;
+    float above[9], row[9];
+    for (uint y = 0u; y < samples; ++y) {
+        for (uint x = 0u; x < samples; ++x) {
+            float h = field(corner + float2(float(x), float(y)) * spacing);
+            highest = max(highest, h);
+            if (x > 0u) steepest = max(steepest, abs(h - row[x - 1u]));
+            if (y > 0u) steepest = max(steepest, abs(h - above[x]));
+            row[x] = h;
+        }
+        for (uint x = 0u; x < samples; ++x) above[x] = row[x];
+    }
+    // A quarter-metre grid finds the fine level's rock faces and crater
+    // rims; the margin covers what rises between samples. The coarse
+    // level's metre grid can miss a small rock, so it keeps the limit. No
+    // point of the cell lies farther than 0.71 of a spacing from a sample,
+    // and the field rises no faster than the slope from there.
+    float slope = l == 0u
+        ? min(1.5f * steepest / spacing + 0.25f, terrainSlopeLimit)
+        : terrainSlopeLimit;
+    bounds[index] = float2(highest + slope * spacing * 0.7072f + 0.02f,
+        slope);
 }
 
 kernel void bakeEarthShadows(device float2 *shadows [[buffer(1)]],
@@ -3694,14 +3786,19 @@ float ambientOcclusion(SceneHit hit, device const GameState &game) {
 
 void traceScene(thread SceneHit &hit, thread float3 &furPosition,
     float3 origin, float3 direction, ChromePose chrome,
-    device const GameState &game, device const float *bounds = nullptr) {
+    device const GameState &game, device const float2 *bounds = nullptr,
+    float terrainDistance = -2.0f) {
     // Shots and sight lines always meet the base through traceEnvironment;
-    // renderBase only decides whether the view draws it.
+    // renderBase only decides whether the view draws it. A view ray brings
+    // the plain's distance from terrainDepthFragment; -1 is a miss.
     if (renderBase) {
         traceEnvironment(hit, origin, direction, chrome, game);
     } else {
         traceBuildings(hit, origin, direction, game);
-        traceOutside(hit, origin, direction, false, bounds);
+        if (terrainDistance < -1.5f)
+            traceOutside(hit, origin, direction, false, bounds);
+        else if (terrainDistance < hit.distance)
+            terrainHit(hit, origin, direction, terrainDistance);
     }
     for (uint i = 0u; i < enemyCount; ++i) {
         if (!spiderActive(game, i)) continue;
@@ -4490,17 +4587,21 @@ float3 shadeGun(GunHit gun, GunPose pose, float3 muzzleLocal, float3 eye,
 
 #include "HauntedBats.metal"
 
-fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
-    constant ProgramUniforms &u [[buffer(0)]],
-    device const GameState *states [[buffer(1)]],
-    device const float *terrainBounds [[buffer(2)]],
-    device const float2 *earthShadow [[buffer(3)]],
-    device const float2 *sunShadow [[buffer(4)]],
-    device const float4 *signFont [[buffer(5)]],
-    texture2d<float> crateA [[texture(1)]],
-    texture2d<float> crateB [[texture(2)]],
-    texture2d<float> impactTexture [[texture(3)]]) {
-    device const GameState &game = states[0];
+// The view ray through uv: from the player's eye, which recoil shakes,
+// or from the boss reveal's close lens, or the missile's seeker feed.
+struct RangeCamera {
+    float3 eye;
+    float3 origin;
+    float3 direction;
+    float viewYaw;
+    float viewPitch;
+    float reveal;
+    bool flightCam;
+    float lensFocal;
+};
+
+RangeCamera rangeCamera(float2 uv, constant ProgramUniforms &u,
+    device const GameState &game) {
     // Shake is visual only: shots keep following the steady crosshair.
     float shake = game.recoil.w * game.recoil.w * 0.03f;
     float jitter = game.effects.x * 31.0f;
@@ -4509,7 +4610,7 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     float viewPitch = game.view.x
         + shake * (sin(jitter * 1.7f + 2.0f) + 0.5f * sin(jitter * 3.1f));
     float focal = 1.1f;
-    float3 direction = pixeltje_3d::cameraDirection(in.uv,
+    float3 direction = pixeltje_3d::cameraDirection(uv,
         u.resolutionTime.xy, viewYaw, viewPitch, focal);
     float3 eye = game.player.xyz + eyeOffset(game);
     float3 origin = eye;
@@ -4523,7 +4624,7 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
             + float3(0.0f, 0.9f, 0.0f) - closeOrigin;
         float closeYaw = atan2(toBoss.x, -toBoss.z);
         float closePitch = atan2(toBoss.y, length(toBoss.xz));
-        float3 closeDirection = pixeltje_3d::cameraDirection(in.uv,
+        float3 closeDirection = pixeltje_3d::cameraDirection(uv,
             u.resolutionTime.xy, closeYaw, closePitch, 1.45f);
         origin = mix(origin, closeOrigin, reveal);
         direction = normalize(mix(direction, closeDirection, reveal));
@@ -4534,18 +4635,57 @@ fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
     if (flightCam) {
         float3 camFront;
         flightCamera(game, origin, camFront);
-        direction = pixeltje_3d::cameraDirection(in.uv, u.resolutionTime.xy,
+        direction = pixeltje_3d::cameraDirection(uv, u.resolutionTime.xy,
             atan2(camFront.x, -camFront.z),
             asin(clamp(camFront.y, -1.0f, 1.0f)), lensFocal);
     }
+    return {eye, origin, direction, viewYaw, viewPitch, reveal, flightCam,
+        lensFocal};
+}
+
+// The plain's distance along each pixel's view ray, or -1 where the ray
+// misses it, for rangeFragment. The march runs here, apart from the
+// shading, so that each shader stays small. A half-float texture holds the
+// distance as a high half and the remainder.
+fragment float4 terrainDepthFragment(ScreenVertex in [[stage_in]],
+    constant ProgramUniforms &u [[buffer(0)]],
+    device const GameState *states [[buffer(1)]],
+    device const float2 *terrainBounds [[buffer(2)]]) {
+    RangeCamera camera = rangeCamera(in.uv, u, states[0]);
+    float t = traceTerrainBounded(terrainBounds, camera.origin,
+        camera.direction, 0.0f, sceneRayLimit);
+    float high = float(half(t));
+    return float4(high, t - high, 0.0f, 0.0f);
+}
+
+fragment float4 rangeFragment(ScreenVertex in [[stage_in]],
+    constant ProgramUniforms &u [[buffer(0)]],
+    device const GameState *states [[buffer(1)]],
+    device const float2 *terrainBounds [[buffer(2)]],
+    device const float2 *earthShadow [[buffer(3)]],
+    device const float2 *sunShadow [[buffer(4)]],
+    device const float4 *signFont [[buffer(5)]],
+    texture2d<float> crateA [[texture(1)]],
+    texture2d<float> crateB [[texture(2)]],
+    texture2d<float> impactTexture [[texture(3)]],
+    texture2d<float> terrainDepth [[texture(4)]]) {
+    device const GameState &game = states[0];
+    RangeCamera camera = rangeCamera(in.uv, u, game);
+    float viewYaw = camera.viewYaw, viewPitch = camera.viewPitch;
+    float3 eye = camera.eye, origin = camera.origin;
+    float3 direction = camera.direction;
+    float reveal = camera.reveal;
+    bool flightCam = camera.flightCam;
+    float lensFocal = camera.lensFocal;
     // World width of one pixel per unit of ray distance, for texture filtering.
     float pixelSpread = 1.0f / (u.resolutionTime.y * lensFocal);
     ChromePose chrome = {game.chromeRotation, game.chromeCentre.xyz};
     float3 furPosition = float3(0.0f);
     SceneHit hit = {sceneRayLimit,
         float3(0.0f), float3(0.0f), 0u, -1, 0u};
+    float2 terrain = terrainDepth.read(uint2(in.position.xy)).xy;
     traceScene(hit, furPosition, origin, direction, chrome, game,
-        terrainBounds);
+        terrainBounds, terrain.x + terrain.y);
     traceBats(hit, origin, direction, game);
     float depth = hit.distance;
 

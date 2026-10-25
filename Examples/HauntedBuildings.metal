@@ -46,6 +46,19 @@ bool physicsMasonryAt(device const GameState &game,
 void traceStreetTombDebris(thread SceneHit &hit, float3 origin,
     float3 direction, device const GameState &game);
 
+// At the first part i of each run of group g's parts, false when the ray,
+// in the group's frame, misses the run's bounds before limit; the caller
+// then skips the run. True at every other part.
+bool houseChunkEntered(device const GameState &game, uint g, uint i,
+    float3 o, float3 d, float limit) {
+    uint offset = i - uint(game.house.groups[g].lower.w);
+    if (offset % houseChunkSize != 0u) return true;
+    uint chunk = game.houseChunkFirst[g] + offset / houseChunkSize;
+    if (chunk >= houseChunkCapacity) return true;
+    HouseChunk bounds = game.houseChunks[chunk];
+    return houseRayEntersBox(o, d, bounds.lower.xyz, bounds.upper.xyz, limit);
+}
+
 // Adds the nearest building surface along the ray, among groups
 // [groups.x, groups.y), to hit.
 void traceBuildingGroups(thread SceneHit &hit, float3 origin,
@@ -67,6 +80,10 @@ void traceBuildingGroups(thread SceneHit &hit, float3 origin,
         }
         uint end = min(uint(group.upper.w), houseCapacity);
         for (uint i = uint(group.lower.w); i < end; ++i) {
+            if (!houseChunkEntered(game, g, i, o, d, hit.distance)) {
+                i += houseChunkSize - 1u;
+                continue;
+            }
             if (physicsReservedPart(house, i)) continue;
             uint style = uint(house.parts[i].lower.w);
             float3 normal;
@@ -129,6 +146,10 @@ bool buildingsBlockLight(float3 origin, float3 direction,
         }
         uint end = min(uint(group.upper.w), houseCapacity);
         for (uint i = uint(group.lower.w); i < end; ++i) {
+            if (!houseChunkEntered(game, g, i, o, d, lightDistance)) {
+                i += houseChunkSize - 1u;
+                continue;
+            }
             if (physicsReservedPart(house, i)) continue;
             uint style = uint(house.parts[i].lower.w);
             if (houseCutoutStyle(style) || style == houseLantern
