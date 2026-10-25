@@ -200,7 +200,8 @@ actor PipelineGPUProgram {
   private var pendingAudioVoices: [PipelineNodeID: (runID: UUID?,
     voices: [PipelineGPUAudioVoice])] = [:]
   private var committedAudioVoices: [PipelineNodeID: [PipelineGPUAudioVoice]] = [:]
-  private var cachedLibrary: (source: String, library: any MTLLibrary)?
+  private var cachedLibrary: (source: String, library: any MTLLibrary,
+    archive: (any MTLBinaryArchive)?)?
   private var computePipelines: [String: any MTLComputePipelineState] = [:]
   private var renderPipelines: [String: any MTLRenderPipelineState] = [:]
   /// The binding slots each pipeline's shader can write, from Metal's
@@ -375,8 +376,14 @@ actor PipelineGPUProgram {
     let program = try JSONDecoder().decode(Definition.self, from: data)
     let size = try PipelineMetalRenderSize(width: 512, height: 512)
     try Self.validate(program, size: size, parameters: [:])
-    let library = try await queue.device.makeLibrary(
-      source: PipelineMetalLibraries.resolving(source), options: nil)
+    let resolved = PipelineMetalLibraries.resolving(source)
+    let library: any MTLLibrary
+    if let precompiled = PipelineGPUProgramPrecompiled.load(
+      source: resolved, device: queue.device) {
+      library = precompiled.library
+    } else {
+      library = try await queue.device.makeLibrary(source: resolved, options: nil)
+    }
     for pass in program.initialize + program.tick + program.present {
       let names = pass.kind == "compute" ? [pass.function!] : [pass.vertex!, pass.fragment!]
       for name in names where library.makeFunction(name: name) == nil {
@@ -548,11 +555,20 @@ actor PipelineGPUProgram {
       width: width, height: height, seed: seed, framesPerSecond: fps,
       inputImageHashes: inputImageHashes, fontFingerprints: fontFingerprints)
     let library: any MTLLibrary
+    let binaryArchive: (any MTLBinaryArchive)?
     if let cachedLibrary, cachedLibrary.source == source {
       library = cachedLibrary.library
+      binaryArchive = cachedLibrary.archive
     } else {
-      library = try await queue.device.makeLibrary(source: source, options: nil)
-      cachedLibrary = (source, library)
+      if let precompiled = PipelineGPUProgramPrecompiled.load(
+        source: source, device: queue.device) {
+        library = precompiled.library
+        binaryArchive = precompiled.archive
+      } else {
+        library = try await queue.device.makeLibrary(source: source, options: nil)
+        binaryArchive = nil
+      }
+      cachedLibrary = (source, library, binaryArchive)
       computePipelines = [:]
       renderPipelines = [:]
       computeWrites = [:]
@@ -605,7 +621,7 @@ actor PipelineGPUProgram {
       framePointer.w = Float(min(elapsed, 0.1))
     }
     if base == nil {
-      try await encode(definition.initialize, library: library,
+      try await encode(definition.initialize, library: library, archive: binaryArchive,
         resources: working.resources, uniforms: Self.uniforms(size: size,
           frame: 0, fps: fps, seed: seed,
           names: definition.parameters ?? [], values: dictionary, pointer: framePointer,
@@ -636,7 +652,7 @@ actor PipelineGPUProgram {
       }
       let includesPresent = definition.swaps.isEmpty && index == frame
       try await encode(includesPresent ? definition.tick + definition.present : definition.tick,
-        library: library,
+        library: library, archive: binaryArchive,
         resources: working.resources, uniforms: Self.uniforms(size: size,
           frame: index, fps: fps, seed: seed,
           names: definition.parameters ?? [], values: dictionary, pointer: framePointer,
@@ -649,7 +665,7 @@ actor PipelineGPUProgram {
     }
     working.nextFrame = frame + 1
     if !definition.swaps.isEmpty {
-      try await encode(definition.present, library: library,
+      try await encode(definition.present, library: library, archive: binaryArchive,
         resources: working.resources, uniforms: Self.uniforms(size: size,
           frame: frame, fps: fps, seed: seed,
           names: definition.parameters ?? [], values: dictionary, pointer: framePointer,
@@ -1266,6 +1282,7 @@ actor PipelineGPUProgram {
   }
 
   private func encode(_ passes: [Definition.Pass], library: any MTLLibrary,
+    archive: (any MTLBinaryArchive)?,
     resources: [String: Resource], uniforms: Uniforms) async throws {
     guard let command = queue.makeCommandBuffer() else {
       throw PipelineEngineError.invalidInvocation("GPU Program command allocation failed.")
@@ -1281,8 +1298,18 @@ actor PipelineGPUProgram {
         let pipeline: any MTLComputePipelineState
         if let cached = computePipelines[pass.function!] { pipeline = cached }
         else {
-          let (created, reflection) = try await queue.device.makeComputePipelineState(
-            function: function, options: .bindingInfo)
+          let (created, reflection): (any MTLComputePipelineState,
+            MTLComputePipelineReflection?)
+          if pass.function == "initializeRange", let archive {
+            let descriptor = MTLComputePipelineDescriptor()
+            descriptor.computeFunction = function
+            descriptor.binaryArchives = [archive]
+            (created, reflection) = try await queue.device.makeComputePipelineState(
+              descriptor: descriptor, options: .bindingInfo)
+          } else {
+            (created, reflection) = try await queue.device.makeComputePipelineState(
+              function: function, options: .bindingInfo)
+          }
           pipeline = created
           computePipelines[pass.function!] = pipeline
           computeWrites[pass.function!] = Self.writes(reflection?.bindings)
@@ -1311,6 +1338,9 @@ actor PipelineGPUProgram {
         let descriptor = MTLRenderPipelineDescriptor()
         descriptor.vertexFunction = vertex
         descriptor.fragmentFunction = fragment
+        if pass.fragment == "rangeFragment", let archive {
+          descriptor.binaryArchives = [archive]
+        }
         descriptor.colorAttachments[0].pixelFormat = .rgba16Float
         let attachment = descriptor.colorAttachments[0]!
         switch pass.blend ?? "replace" {

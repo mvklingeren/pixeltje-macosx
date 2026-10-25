@@ -5,6 +5,7 @@
 //
 // usage: render-preview.sh <workflow.pixpipeline.json> <views.json> <out-dir>
 //          [--node <gpu.program node id>] [--before <old.metal>]
+//          [--dump-source <resolved.metal>]
 //
 // The views file (relative texture paths resolve beside it):
 //   { "width": 960, "height": 540,                    optional size override
@@ -131,10 +132,11 @@ func option(_ name: String) -> String? {
 }
 let nodeOption = option("--node")
 let beforePath = option("--before")
+let dumpSourcePath = option("--dump-source")
 guard arguments.count == 3 else {
   FileHandle.standardError.write(Data("""
     usage: render-preview.sh <workflow.pixpipeline.json> <views.json> <out-dir> \
-    [--node <id>] [--before <old.metal>]\n
+    [--node <id>] [--before <old.metal>] [--dump-source <resolved.metal>]\n
     """.utf8))
   exit(64)
 }
@@ -332,6 +334,15 @@ func currentSource() throws -> (source: String, fileName: String, identity: Stri
   }
   let file = try metalSibling(name)
   return (file.source, name, file.canonicalPath, true)
+}
+
+if let dumpSourcePath {
+  let (text, fileName, identity, expandsIncludes) = try currentSource()
+  let expanded = try expandsIncludes
+    ? expandIncludes(text, fileName: fileName, identity: identity) : text
+  let resolved = PipelineMetalLibraries.resolving(expanded)
+  try resolved.write(toFile: dumpSourcePath, atomically: true, encoding: .utf8)
+  exit(0)
 }
 
 // MARK: Rendering

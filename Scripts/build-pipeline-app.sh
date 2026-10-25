@@ -28,6 +28,8 @@ cp "$binary_dir/pixeltje-pipeline-link-text" \
   "$bundle/Contents/MacOS/pixeltje-pipeline-link-text"
 cp "$project_root/Resources/PixeltjePipeline-Info.plist" "$bundle/Contents/Info.plist"
 cp -R "$project_root/Examples" "$bundle/Contents/Resources/Examples"
+"$project_root/Scripts/precompile-haunted-house.sh" \
+  "$bundle/Contents/Resources/Examples"
 model_setup="$bundle/Contents/Resources/ModelSetup"
 mkdir -p "$model_setup"
 for script in setup-flux2-klein-9b.command setup-flux2-klein-9b-coreai.py \
