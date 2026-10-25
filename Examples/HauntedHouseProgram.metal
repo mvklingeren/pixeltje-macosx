@@ -2064,6 +2064,29 @@ void swingFrontDoors(device GameState &game, device RangeAudio &audio) {
     }
 }
 
+// Bounds again the run of parts that holds part, as boundHouseChunks did,
+// after the part has moved.
+__attribute__((noinline))
+void boundHousePartRun(device GameState &game, uint part) {
+    device const HouseModel &house = game.house;
+    for (uint g = 0u; g < min(house.counts.y, houseGroupCapacity); ++g) {
+        uint first = uint(house.groups[g].lower.w);
+        uint end = min(uint(house.groups[g].upper.w), houseCapacity);
+        if (part < first || part >= end) continue;
+        uint run = (part - first) / houseChunkSize;
+        uint chunk = game.houseChunkFirst[g] + run;
+        if (chunk >= houseChunkCapacity) return;
+        first += run * houseChunkSize;
+        float3 lower = float3(INFINITY), upper = float3(-INFINITY);
+        for (uint i = first; i < min(first + houseChunkSize, end); ++i) {
+            lower = min(lower, house.parts[i].lower.xyz);
+            upper = max(upper, house.parts[i].upper.xyz);
+        }
+        game.houseChunks[chunk] = {float4(lower, 0.0f), float4(upper, 0.0f)};
+        return;
+    }
+}
+
 // The doors a knock opens swing on their own time, each sounding as it
 // starts to move: the cottage's creaks, the house's pair groans.
 void swingDoors(device GameState &game, device RangeAudio &audio) {
@@ -2080,6 +2103,11 @@ void swingDoors(device GameState &game, device RangeAudio &audio) {
     }
     buildingsHangDoors(game);
     advanceCandyStoreDoor(game);
+    // The parts the doors just moved keep their runs' bounds current.
+    for (uint k = 0u; k < 4u; ++k)
+        boundHousePartRun(game, game.house.doorParts[k]);
+    for (uint k = 0u; k < 2u * candyStoreDoorPartsPerLeaf; ++k)
+        boundHousePartRun(game, game.candyDoorFirstPart + k);
 }
 
 // The hand swings in its own tick pass after fireRange, for the compile-time
@@ -3337,9 +3365,9 @@ float3 shadeDistantLights(SceneHit hit, SurfaceMaterial material,
 
 // ------------------------------------------------------- building part runs
 
-// Bounds each run of houseChunkSize parts of group g. Parts move only while
-// the buildings are raised and when doors swing in fireRange, so this runs
-// after initializeRange and after fireRange.
+// Bounds each run of houseChunkSize parts of group g, after initializeRange
+// raises the buildings. Parts move after that only when doors swing in
+// fireRange, which bounds their runs again with boundHousePartRun.
 kernel void boundHouseChunks(device GameState *states [[buffer(1)]],
     uint g [[thread_position_in_grid]]) {
     device GameState &game = states[0];
