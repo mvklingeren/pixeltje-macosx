@@ -7,6 +7,16 @@
 //          [--node <gpu.program node id>] [--before <old.metal>]
 //          [--dump-source <resolved.metal>]
 //
+// PIXELTJE_PREVIEW_SIZE=1440x900 overrides the views file's size.
+// PIXELTJE_PASS_TIMINGS=<runs> times every view after its image is taken: it
+// runs present that many more times, each pass in its own command buffer, then
+// one more tick the same way, and prints each pass's median GPU time. Pass
+// timings include one command buffer's overhead each, so compare them with
+// one another rather than with an app frame.
+//
+// PIXELTJE_DUMP_BUFFERS=game,audio writes those buffers' bytes after present
+// to <out-dir>/<view>.<buffer>.bin.
+//
 // The views file (relative texture paths resolve beside it):
 //   { "width": 960, "height": 540,                    optional size override
 //     "textures": { "<asset port>": "image.png" },    optional; grey if absent
@@ -237,10 +247,14 @@ guard let programJSON = try value(into: programNodeID, port: "program") as? Stri
 }
 let program = try JSONDecoder().decode(Program.self, from: Data(programJSON.utf8))
 let views = try JSONDecoder().decode(Views.self, from: Data(contentsOf: viewsURL))
-let width = try views.width
+let sizeOverride = ProcessInfo.processInfo.environment["PIXELTJE_PREVIEW_SIZE"]
+  .map { $0.split(separator: "x").compactMap { Int($0) } }
+  .flatMap { $0.count == 2 ? $0 : nil }
+let width = try sizeOverride?[0] ?? views.width
   ?? (value(into: programNodeID, port: "width") as? NSNumber)?.intValue ?? 960
-let height = try views.height
+let height = try sizeOverride?[1] ?? views.height
   ?? (value(into: programNodeID, port: "height") as? NSNumber)?.intValue ?? 540
+let timingRuns = Int(ProcessInfo.processInfo.environment["PIXELTJE_PASS_TIMINGS"] ?? "") ?? 0
 let fps = (unwrap(nodeParameters["framesPerSecond"]) as? NSNumber)?.doubleValue ?? 60
 let seed = (unwrap(nodeParameters["seed"]) as? NSNumber)?.uint64Value ?? 1
 var workflowValues: [String: Float] = [:]
@@ -438,6 +452,7 @@ final class Renderer {
   let library: any MTLLibrary
   var computePipelines: [String: any MTLComputePipelineState] = [:]
   var renderPipelines: [String: any MTLRenderPipelineState] = [:]
+  var label = "current"
 
   init(source: String, fileName: String = "<source>", identity: String = "<source>",
     expandsIncludes: Bool = true) throws {
@@ -447,7 +462,10 @@ final class Renderer {
       source: PipelineMetalLibraries.resolving(expanded), options: nil)
   }
 
-  func encode(_ passes: [Program.Pass], resources: [String: Resource], uniforms: Uniforms) throws {
+  /// Returns the command buffer's GPU time in milliseconds.
+  @discardableResult
+  func encode(_ passes: [Program.Pass], resources: [String: Resource], uniforms: Uniforms) throws
+    -> Double {
     let command = queue.makeCommandBuffer()!
     var uniforms = uniforms
     func buffers(_ mapping: [String: String]?, _ set: (any MTLBuffer, Int) -> Void) {
@@ -542,6 +560,22 @@ final class Renderer {
     command.commit()
     command.waitUntilCompleted()
     if let error = command.error { throw error }
+    return (command.gpuEndTime - command.gpuStartTime) * 1000
+  }
+
+  /// Median GPU milliseconds of each pass over runs, each pass alone in its
+  /// own command buffer, in program order.
+  func timePasses(_ passes: [Program.Pass], runs: Int, resources: [String: Resource],
+    uniforms: Uniforms) throws -> [(name: String, milliseconds: Double)] {
+    var samples = [[Double]](repeating: [], count: passes.count)
+    for _ in 0..<runs {
+      for (index, pass) in passes.enumerated() {
+        samples[index].append(try encode([pass], resources: resources, uniforms: uniforms))
+      }
+    }
+    return zip(passes, samples).map { pass, times in
+      (pass.function ?? pass.fragment ?? "?", times.sorted()[times.count / 2])
+    }
   }
 
   // Returns 8-bit RGBA rows of the output texture, whose values the engine
@@ -608,6 +642,27 @@ final class Renderer {
     var half = [Float16](repeating: 0, count: width * height * 4)
     output.getBytes(&half, bytesPerRow: width * 8,
       from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
+    for name in (ProcessInfo.processInfo.environment["PIXELTJE_DUMP_BUFFERS"] ?? "")
+      .split(separator: ",").map(String.init) {
+      guard case .buffer(let buffer)? = resources[name] else { continue }
+      try Data(bytes: buffer.contents(), count: buffer.length).write(to:
+        outputDirectory.appendingPathComponent("\(view.name).\(name).bin"))
+    }
+    if timingRuns > 0 {
+      let frame = max(frames - 1, 0)
+      let present = try timePasses(program.present, runs: timingRuns,
+        resources: resources, uniforms: uniforms(frame: frame, view: view))
+      let tick = try timePasses(program.tick, runs: 1,
+        resources: resources, uniforms: uniforms(frame: frames, view: view))
+      func line(_ timings: [(name: String, milliseconds: Double)]) -> String {
+        timings.map { "\($0.name)=\(String(format: "%.2f", $0.milliseconds))" }
+          .joined(separator: " ")
+      }
+      let total = present.reduce(0) { $0 + $1.milliseconds }
+      let tickTotal = tick.reduce(0) { $0 + $1.milliseconds }
+      print("timing \(label) \(view.name) present=\(String(format: "%.2f", total)) ms "
+        + "tick=\(String(format: "%.2f", tickTotal)) ms | \(line(present)) | \(line(tick))")
+    }
     return half.map { UInt8((min(max(Float($0), 0), 1) * 255).rounded()) }
   }
 }
@@ -635,6 +690,7 @@ let before = try beforePath.map {
     fileName: URL(fileURLWithPath: $0).lastPathComponent,
     identity: URL(fileURLWithPath: $0).resolvingSymlinksInPath().standardizedFileURL.path)
 }
+before?.label = "before"
 for view in views.views {
   var image = try current.render(view)
   var imageWidth = width
