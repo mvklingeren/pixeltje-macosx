@@ -2,6 +2,7 @@ import PixeltjePipelineDomain
 
 extension PipelineNodeKind {
   public static let meshFromVertices = PipelineNodeKind(rawValue: "geometry.meshFromVertices")
+  public static let loadSkinnedModel = PipelineNodeKind(rawValue: "geometry.loadSkinnedModel")
   public static let transformMatrix = PipelineNodeKind(rawValue: "math.transformMatrix")
   public static let cameraMatrices = PipelineNodeKind(rawValue: "camera.matrices")
   public static let renderMetal = PipelineNodeKind(rawValue: "render.metal")
@@ -42,6 +43,14 @@ extension PipelineNodeRegistry {
         outputs: [.init(name: "mesh", type: .mesh3D)],
         parameters: [
           .init(name: "normalMode", valueType: .string, defaultValue: .string("flat"))
+        ]),
+      .init(kind: .loadSkinnedModel, displayName: "Load Skinned Model", category: "Geometry",
+        inputs: [.init(name: "path", type: .string)],
+        outputs: [.init(name: "model", type: .skinnedModel)],
+        parameters: [
+          .init(name: "animation", valueType: .string, defaultValue: .string("")),
+          .init(name: "framesPerSecond", valueType: .number, defaultValue: .number(30)),
+          .init(name: "rootMotion", valueType: .string, defaultValue: .string("inPlace")),
         ]),
       .init(kind: .transformMatrix, displayName: "Transform Matrix", category: "Geometry",
         inputs: numericPorts(transform.map(\.0)),

@@ -11,7 +11,8 @@ using namespace metal;
 // four-point contact manifolds. Painted toy cubes and balls, and a ball
 // hanging on a rope from a steel frame, never break: a shot only pushes
 // them. The haunted house uses the same support rules and solver for its
-// buildings.
+// buildings. F switches to a third-person camera behind a skinned, jogging
+// character loaded from an FBX file.
 struct ProgramUniforms {
     float4 resolutionTime;
     uint4 frameSeed;
@@ -51,6 +52,8 @@ constant uint styleSteel = 7u;         // never breaks
 constant uint styleToy = 8u;
 constant uint styleRope = 9u;
 constant uint styleBall = 10u;
+
+constant uint fKey = 262144u;         // WASD Pad bit for F
 
 constant ulong firstColumn = 0x0101010101010101ul;
 constant ulong lastColumn = 0x8080808080808080ul;
@@ -101,6 +104,8 @@ struct GameState {
     pixeltje_physics::World<bodyCapacity> world;
     pixeltje_physics::SolverContact contacts[contactCapacity];
     float4 rope;        // anchor of the pendulum's rope, its length
+    float4 camera;      // camera position, 1 in third person
+    float4 stride;      // character facing yaw, jog seconds, unused, unused
 };
 
 static_assert(sizeof(GameState) <= 131072,
@@ -409,6 +414,8 @@ kernel void initializePlayground(device GameState *states [[buffer(1)]],
     states[0].view = float4(0.0f);
     states[0].clock = float4(0.0f);
     buildPlayground(states[0]);
+    states[0].camera = float4(states[0].player.xyz, 0.0f);
+    states[0].stride = float4(states[0].player.w, 0.0f, 0.0f, 0.0f);
 }
 
 kernel void linkPlaygroundParts(device GameState *states [[buffer(1)]],
@@ -725,6 +732,8 @@ kernel void advancePlayer(constant ProgramUniforms &u [[buffer(0)]],
     uint keys = uint(u.movement.w);
     uint previousKeys = uint(game.clock.y);
     game.clock.y = float(keys);
+    if ((keys & fKey) != 0u && (previousKeys & fKey) == 0u)
+        game.camera.w = 1.0f - game.camera.w;
     if ((keys & 4u) != 0u && (previousKeys & 4u) == 0u) {
         game.control.x = 1u; // R: the restart pass rebuilds the scene
         return;
@@ -747,17 +756,28 @@ kernel void advancePlayer(constant ProgramUniforms &u [[buffer(0)]],
         position.y += delta.y;
     game.player.xz = position;
 
+    // The character turns toward where it moves and jogs while it moves.
+    if (length(move) > 0.01f) {
+        float target = atan2(delta.x, -delta.y);
+        float turn = target - game.stride.x;
+        turn -= 6.2831853f * floor((turn + 3.1415927f) / 6.2831853f);
+        game.stride.x += clamp(turn, -10.0f * dt, 10.0f * dt);
+        game.stride.y += dt * 1.25f * length(move);
+    }
+
+    // In third person, shots leave from the camera along the crosshair.
+    float3 eye = game.camera.w > 0.5f ? game.camera.xyz : game.player.xyz;
     float3 direction = pixeltje_3d::forward(yaw, game.view.x);
     uint action = uint(u.pointer.z);
     if (action > uint(game.view.y)) {
         game.view.z = 0.12f;
         game.clock.z += 1.0f;
-        SceneHit hit = traceScene(game.player.xyz, direction, 120.0f, game);
+        SceneHit hit = traceScene(eye, direction, 120.0f, game);
         if (hit.kind == 2u) {
             breakCell(game, hit.index, hit.cell, hit.normal);
         } else if (hit.kind == 3u) {
             pixeltje_physics::RigidBody body = game.world.bodies[hit.index];
-            float3 point = game.player.xyz + direction * hit.distance;
+            float3 point = eye + direction * hit.distance;
             pixeltje_physics::applyImpulse(body, direction * 4.0f,
                 point - body.centreMass.xyz);
             game.world.bodies[hit.index] = body;
@@ -1218,6 +1238,43 @@ kernel void solvePlayground(constant ProgramUniforms &u [[buffer(0)]],
 
 // ------------------------------------------------------------------ render
 
+// ------------------------------------------------------------------ camera
+
+// First person looks from the eye. Third person looks over the character's
+// right shoulder from behind, pulled in front of anything in the way. This
+// runs in present, after a preview view's writes have placed the player.
+kernel void placeCamera(device GameState *states [[buffer(1)]],
+    uint id [[thread_position_in_grid]]) {
+    if (id != 0u) return;
+    device GameState &game = states[0];
+    if (game.camera.w < 0.5f) {
+        game.camera.xyz = game.player.xyz;
+        return;
+    }
+    float3 look = pixeltje_3d::forward(game.player.w, game.view.x);
+    float3 right = normalize(cross(look, float3(0.0f, 1.0f, 0.0f)));
+    float3 pivot = float3(game.player.x, 1.9f, game.player.z) + right * 0.55f;
+    const float reach = 4.6f;
+    SceneHit hit = traceScene(pivot, -look, reach, game);
+    float distance = clamp(hit.distance - 0.25f, 0.4f, reach);
+    float3 camera = pivot - look * distance;
+    camera.y = max(camera.y, 0.25f);
+    game.camera.xyz = camera;
+}
+
+// Clip-space position of a world point for the camera the ray tracer uses:
+// pixeltje_3d::cameraDirection with a focal length of 1.1.
+float4 cameraClip(float3 p, device const GameState &game, float2 resolution) {
+    float3 front = pixeltje_3d::forward(game.player.w, game.view.x);
+    float3 right = normalize(cross(front, float3(0.0f, 1.0f, 0.0f)));
+    float3 up = cross(right, front);
+    float3 v = p - game.camera.xyz;
+    const float focal = 1.1f, near = 0.05f, far = 400.0f;
+    float depth = dot(v, front);
+    return float4(2.0f * focal * dot(v, right) * resolution.y / resolution.x,
+        2.0f * focal * dot(v, up), far / (far - near) * (depth - near), depth);
+}
+
 struct ScreenVertex {
     float4 position [[position]];
     float2 uv;
@@ -1307,19 +1364,29 @@ float3 surfaceColor(SceneHit hit) {
     return base;
 }
 
-fragment float4 playgroundFragment(ScreenVertex in [[stage_in]],
+// The colour and the depth of what the ray hit, so the character's raster
+// pass hides behind walls and props.
+struct SceneFragment {
+    float4 color [[color(0)]];
+    float depth [[depth(any)]];
+};
+
+fragment SceneFragment playgroundFragment(ScreenVertex in [[stage_in]],
     constant ProgramUniforms &u [[buffer(0)]],
     device const GameState *states [[buffer(1)]]) {
     device const GameState &game = states[0];
-    float3 origin = game.player.xyz;
+    float3 origin = game.camera.xyz;
     float3 direction = pixeltje_3d::cameraDirection(in.uv,
         u.resolutionTime.xy, game.player.w, game.view.x, 1.1f);
     SceneHit hit = traceScene(origin, direction, 200.0f, game);
     float3 color;
+    float depth = 1.0f;
     if (hit.kind == 0u) {
         color = skyColor(direction);
     } else {
         float3 point = origin + direction * hit.distance;
+        float4 clip = cameraClip(point, game, u.resolutionTime.xy);
+        depth = clamp(clip.z / clip.w, 0.0f, 1.0f);
         float3 base;
         if (hit.kind == 1u) {
             float2 tile = floor(point.xz / 2.0f);
@@ -1340,6 +1407,10 @@ fragment float4 playgroundFragment(ScreenVertex in [[stage_in]],
         float sky = 0.5f + 0.5f * hit.normal.y;
         color = base * (float3(1.0f, 0.92f, 0.78f) * 1.5f * diffuse
             + float3(0.26f, 0.32f, 0.44f) * (0.3f + 0.45f * sky));
+        // A soft contact shadow under the third-person character.
+        if (hit.kind == 1u && game.camera.w > 0.5f)
+            color *= 0.45f + 0.55f * smoothstep(0.12f, 0.7f,
+                length(point.xz - game.player.xz));
         float fog = 1.0f - exp(-hit.distance * 0.006f);
         color = mix(color, skyColor(direction) * 0.9f, fog);
     }
@@ -1350,6 +1421,100 @@ fragment float4 playgroundFragment(ScreenVertex in [[stage_in]],
         || (cross.y < 1.2f && cross.x > 3.0f && cross.x < 10.0f))
         color = float3(1.0f, 0.95f, 0.85f);
     color += game.view.z * float3(1.0f, 0.6f, 0.25f) * 0.6f;
+    return {float4(clamp(pixeltje_3d::linearToSRGB(
+        clamp(color, float3(0.0f), float3(1.0f))),
+        float3(0.0f), float3(1.0f)), 1.0f), depth};
+}
+
+// --------------------------------------------------------------- character
+
+// The layout of a GPU Program skinnedModel resource; see
+// PipelineSkinnedModel.swift.
+struct SkinnedModelHeader {
+    uint vertexCount;
+    uint boneCount;
+    uint frameCount;
+    float framesPerSecond;
+    float4 boundsMin;   // w = loop seconds
+    float4 boundsMax;
+    uint verticesOffset;
+    uint framesOffset;
+    uint2 reserved;
+};
+
+struct SkinnedVertex {
+    packed_float3 position;
+    uint color;
+    packed_float3 normal;
+    uint joints;
+    float4 weights;
+};
+
+struct CharacterVertex {
+    float4 position [[position]];
+    float3 world;
+    float3 normal;
+    float3 albedo;
+};
+
+// Skins one vertex between the two sampled frames around the jog clock,
+// then turns the character to its facing and stands it at the player.
+vertex CharacterVertex characterVertex(uint id [[vertex_id]],
+    constant ProgramUniforms &u [[buffer(0)]],
+    device const GameState *states [[buffer(1)]],
+    device const uchar *model [[buffer(2)]]) {
+    device const GameState &game = states[0];
+    device const SkinnedModelHeader &header =
+        *(device const SkinnedModelHeader *)model;
+    // Hidden in first person: the camera is inside the head.
+    if (game.camera.w < 0.5f || id >= header.vertexCount)
+        return {float4(0.0f, 0.0f, -2.0f, 1.0f), float3(0.0f), float3(0.0f),
+            float3(0.0f)};
+    SkinnedVertex v = ((device const SkinnedVertex *)(model
+        + header.verticesOffset))[id];
+    device const float4x4 *bones = (device const float4x4 *)(model
+        + header.framesOffset);
+    float frame = game.stride.y * header.framesPerSecond;
+    uint first = uint(floor(frame)) % header.frameCount;
+    uint second = (first + 1u) % header.frameCount;
+    float blend = fract(frame);
+    float4x4 skin = float4x4(0.0f);
+    for (uint k = 0u; k < 4u; ++k) {
+        float weight = v.weights[k];
+        if (weight <= 0.0f) continue;
+        uint joint = (v.joints >> (8u * k)) & 0xFFu;
+        skin = skin + bones[first * header.boneCount + joint]
+            * (weight * (1.0f - blend))
+            + bones[second * header.boneCount + joint] * (weight * blend);
+    }
+    float3 local = (skin * float4(float3(v.position), 1.0f)).xyz;
+    float3 normal = (skin * float4(float3(v.normal), 0.0f)).xyz;
+    // The model faces +Z; turn it to face pixeltje_3d::forward(stride.x).
+    float turn = 3.1415927f - game.stride.x;
+    float c = cos(turn), s = sin(turn);
+    float3 world = float3(c * local.x + s * local.z, local.y,
+        -s * local.x + c * local.z) + float3(game.player.x, 0.0f,
+        game.player.z);
+    normal = float3(c * normal.x + s * normal.z, normal.y,
+        -s * normal.x + c * normal.z);
+    return {cameraClip(world, game, u.resolutionTime.xy), world, normal,
+        unpack_unorm4x8_to_float(v.color).rgb};
+}
+
+// Lit like the traced scene, without its traced shadows.
+fragment float4 characterFragment(CharacterVertex in [[stage_in]],
+    device const GameState *states [[buffer(1)]]) {
+    device const GameState &game = states[0];
+    float3 n = normalize(in.normal);
+    float3 sun = normalize(sunDirection);
+    float diffuse = max(dot(n, sun), 0.0f);
+    float sky = 0.5f + 0.5f * n.y;
+    float3 color = in.albedo * (float3(1.0f, 0.92f, 0.78f) * 1.5f * diffuse
+        + float3(0.26f, 0.32f, 0.44f) * (0.3f + 0.45f * sky));
+    float3 view = in.world - game.camera.xyz;
+    float fog = 1.0f - exp(-length(view) * 0.006f);
+    color = mix(color, skyColor(normalize(view)) * 0.9f, fog);
+    color = pixeltje_3d::filmicToneMap(color);
     return float4(clamp(pixeltje_3d::linearToSRGB(
         clamp(color, float3(0.0f), float3(1.0f))),
         float3(0.0f), float3(1.0f)), 1.0f);

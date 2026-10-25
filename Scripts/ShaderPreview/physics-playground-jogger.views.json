@@ -1,0 +1,24 @@
+{
+  "width": 960,
+  "height": 600,
+  "views": [
+    { "name": "third-person-start", "frames": 2,
+      "movement": [0, 0, 0, 262144] },
+    { "name": "third-person-jog", "frames": 24,
+      "movement": [0, 1, 0, 262144] },
+    { "name": "third-person-side", "frames": 30,
+      "movement": [1, 0, 0, 262144] },
+    { "name": "third-person-toward", "frames": 40,
+      "movement": [0, -1, 0, 262144] },
+    { "name": "third-person-toys", "frames": 2,
+      "movement": [0, 0, 0, 262144],
+      "writes": [ { "buffer": "game", "floats": [3.5, 1.7, 19.5, 0.0, -0.18, 0] } ] },
+    { "name": "third-person-wall-behind", "frames": 2,
+      "movement": [0, 0, 0, 262144],
+      "writes": [ { "buffer": "game", "floats": [-8.0, 1.7, 3.0, 3.14159, -0.1, 0] } ] },
+    { "name": "first-person-after-toggle", "frames": 3,
+      "inputs": [ { "frame": 0, "movement": [0, 0, 0, 262144] },
+                  { "frame": 1, "movement": [0, 0, 0, 0] },
+                  { "frame": 2, "movement": [0, 0, 0, 262144] } ] }
+  ]
+}

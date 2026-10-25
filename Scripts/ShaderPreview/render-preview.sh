@@ -13,15 +13,22 @@ sources=(
   "$engine/PipelineMetalPostFX.swift"
   "$engine/PipelineMetalPhysics.swift"
   "$engine/PipelineSystemFont.swift"
+  "$engine/PipelineSkinnedModel.swift"
 )
+ufbx=$project_root/Sources/CUFBX
 binary=${TMPDIR:-/tmp}/pixeltje-shader-preview/render-preview
 
 rebuild=false
 [[ -x $binary ]] || rebuild=true
-for source in $sources; do [[ $source -nt $binary ]] && rebuild=true; done
+for source in $sources $ufbx/ufbx.c; do [[ $source -nt $binary ]] && rebuild=true; done
 if $rebuild; then
-  mkdir -p ${binary:h}
-  DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode-beta.app/Contents/Developer} \
-    xcrun swiftc -O $sources -o $binary
+  build=${binary:h}
+  mkdir -p $build/CUFBX
+  export DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode-beta.app/Contents/Developer}
+  # The engine's FBX loader imports ufbx as the CUFBX module.
+  print "module CUFBX { header \"$ufbx/include/ufbx.h\"\n export * }" \
+    > $build/CUFBX/module.modulemap
+  xcrun clang -O2 -c $ufbx/ufbx.c -I $ufbx/include -o $build/ufbx.o
+  xcrun swiftc -O $sources -I $build/CUFBX $build/ufbx.o -o $binary
 fi
 exec $binary "$@"

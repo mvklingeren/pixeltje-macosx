@@ -287,9 +287,9 @@ public enum PipelineGraphValidator {
       }
       if inputNode.kind.rawValue == "cache.assets",
         outputPort.type != .image && outputPort.type != .audio
-          && outputPort.type != .any {
+          && outputPort.type != .skinnedModel && outputPort.type != .any {
         add(.error, .incompatiblePorts,
-          "Asset Cache accepts image or audio values.",
+          "Asset Cache accepts image, audio or skinned model values.",
           nodeID: inputNode.id, connectionIndex: index)
         continue
       }

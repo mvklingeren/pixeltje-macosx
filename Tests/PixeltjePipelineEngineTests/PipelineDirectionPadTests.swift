@@ -57,9 +57,9 @@ import Testing
   #expect(PipelineDirectionPadKeys.bit(for: "H") == 65_536)
   #expect(PipelineDirectionPadKeys.bit(for: "K") == 131_072)
   #expect(PipelineDirectionPadKeys.bit(for: "w") == nil)
-  #expect(PipelineDirectionPadKeys.bit(for: "f") == nil)
+  #expect(PipelineDirectionPadKeys.bit(for: "F") == 262_144)
   #expect(PipelineDirectionPadKeys.bit(for: "j") == nil)
-  #expect(PipelineDirectionPadKeys.allMask == 262_143)
+  #expect(PipelineDirectionPadKeys.allMask == 524_287)
 
   #expect(try await keys(.init()) == 0)
   let held = PipelineDirectionPadKeys.bit(for: "e")! | PipelineDirectionPadKeys.bit(for: "2")!
@@ -73,7 +73,7 @@ import Testing
   }
   await #expect(throws: PipelineEngineError.self) {
     _ = try await keys(.init(values: [
-      PipelineInvocation.directionPadKeysKey: .integer(262_144),
+      PipelineInvocation.directionPadKeysKey: .integer(524_288),
     ]))
   }
 }

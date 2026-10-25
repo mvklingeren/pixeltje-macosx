@@ -173,7 +173,7 @@ final class PipelineEditorWindowController: NSWindowController, NSMenuItemValida
     }
     let fpsHUD = PipelinePreviewFPSHUD()
     if isGPUProgram {
-      preview.onUnmodifiedF = { fpsHUD.showsFPS.toggle() }
+      preview.onToggleFPS = { fpsHUD.showsFPS.toggle() }
     }
     preview.onUnmodifiedSpace = { [weak model] in
       guard let model, let trackpadNodeID else { return false }
@@ -782,7 +782,8 @@ private final class PipelinePreviewFPSHUD: ObservableObject {
 @MainActor
 private final class PipelineFullScreenPreviewWindow: NSWindow {
   var canCloseOnEnter: (() -> Bool)?
-  var onUnmodifiedF: (() -> Void)?
+  /// Shift-F, or F when no WASD Pad takes it as a program key.
+  var onToggleFPS: (() -> Void)?
   var onUnmodifiedSpace: (() -> Bool)?
   var onPrimaryClick: (() -> Bool)?
   var onUnmodifiedJ: (() -> Bool)?
@@ -841,6 +842,12 @@ private final class PipelineFullScreenPreviewWindow: NSWindow {
       default: break
       }
     }
+    if event.type == .keyDown, !event.isARepeat,
+      event.modifierFlags.intersection([.command, .control, .option, .shift]) == .shift,
+      event.charactersIgnoringModifiers?.lowercased() == "f", let onToggleFPS {
+      onToggleFPS()
+      return
+    }
     if (event.type == .keyDown || event.type == .keyUp),
       (event.type == .keyUp || event.modifierFlags
         .intersection([.command, .control, .option]).isEmpty),
@@ -848,8 +855,8 @@ private final class PipelineFullScreenPreviewWindow: NSWindow {
         event.type == .keyDown) == true { return }
     if event.type == .keyDown, !event.isARepeat,
       event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty {
-      if event.charactersIgnoringModifiers?.lowercased() == "f", let onUnmodifiedF {
-        onUnmodifiedF()
+      if event.charactersIgnoringModifiers?.lowercased() == "f", let onToggleFPS {
+        onToggleFPS()
         return
       }
       if event.keyCode == 49, onUnmodifiedSpace?() == true {

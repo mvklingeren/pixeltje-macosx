@@ -259,9 +259,18 @@ actor PipelineAssetCache {
         } else {
           values[name] = PipelineNodeValue(copy, type: .audio)
         }
+      case .skinnedModel:
+        // Held in memory only; the persistent store keeps image and audio
+        // bundles, and the model reloads from its linked file.
+        guard let model = value.value(as: PipelineSkinnedModel.self) else {
+          throw PipelineEngineError.invalidInvocation(
+            "Asset Cache \(name) needs a skinned model.")
+        }
+        bytes += model.bytes.count
+        values[name] = value
       default:
         throw PipelineEngineError.invalidInvocation(
-          "Asset Cache supports image and audio slots; \(name) is \(value.type.rawValue).")
+          "Asset Cache supports image, audio and skinned model slots; \(name) is \(value.type.rawValue).")
       }
       guard byteCount + bytes <= 134_217_728 else {
         throw PipelineEngineError.invalidInvocation("Asset Cache exceeds 128 MiB.")

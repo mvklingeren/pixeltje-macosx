@@ -81,10 +81,16 @@ let package = Package(
       path: "Sources/PixeltjePipelineDomain",
       linkerSettings: [.linkedFramework("CryptoKit")]
     ),
+    // Vendored FBX reader (MIT); see Sources/CUFBX/README.md.
+    .target(
+      name: "CUFBX",
+      path: "Sources/CUFBX",
+      exclude: ["LICENSE", "README.md"]
+    ),
     .target(
       name: "PixeltjePipelineEngine",
       dependencies: [
-        "PixeltjeMacDomain", "PixeltjePipelineDomain", "PixeltjeModelDesign",
+        "CUFBX", "PixeltjeMacDomain", "PixeltjePipelineDomain", "PixeltjeModelDesign",
         .product(name: "Tokenizers", package: "swift-transformers"),
       ],
       path: "Sources/PixeltjePipelineEngine",

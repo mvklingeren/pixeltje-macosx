@@ -24,6 +24,8 @@ public struct PipelinePortType: Codable, Hashable, RawRepresentable, Sendable {
   public static let number = PipelinePortType(rawValue: "number")
   public static let curve1D = PipelinePortType(rawValue: "curve1D")
   public static let mesh3D = PipelinePortType(rawValue: "mesh3D")
+  /// Triangles, bone weights and sampled skinning matrices for a GPU Program.
+  public static let skinnedModel = PipelinePortType(rawValue: "skinnedModel")
   public static let matrix4x4 = PipelinePortType(rawValue: "matrix4x4")
   public static let string = PipelinePortType(rawValue: "string")
   public static let stringList = PipelinePortType(rawValue: "stringList")

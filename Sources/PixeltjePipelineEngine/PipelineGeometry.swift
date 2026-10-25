@@ -173,6 +173,13 @@ struct PipelineGeometryParameters {
   }
 }
 
+extension PipelineSkinnedModel: PipelineTraceRepresentable {
+  public func pipelineTraceValue() -> PipelineTraceValue {
+    .init(type: "skinnedModel", summary: "Skinned model: \(vertexCount / 3) triangles, "
+      + "\(boneCount) bones, \(frameCount) frames at \(framesPerSecond) fps")
+  }
+}
+
 enum PipelineGeometryNodes {
   static let executors: [PipelineNodeExecutor] = [
     .init(kind: .meshFromVertices) { node, inputs, _ in
@@ -182,6 +189,30 @@ enum PipelineGeometryNodes {
       let mode = try PipelineGeometryParameters(node: node).string("normalMode", default: "flat")
       return PipelineNodeResult(outputs: [
         "mesh": PipelineNodeValue(try PipelineMesh3D.decode(data, normalMode: mode), type: .mesh3D)
+      ])
+    },
+    .init(kind: .loadSkinnedModel, validate: { node in
+      let rootMotion = node.parameters["rootMotion"]?.stringValue ?? "inPlace"
+      guard PipelineSkinnedModel.RootMotion(rawValue: rootMotion) != nil else {
+        return [.init(severity: .error, code: .invalidParameter,
+          message: "Load Skinned Model root motion must be inPlace or keep.",
+          nodeID: node.id)]
+      }
+      return []
+    }) { node, inputs, context in
+      guard let path = inputs["path"]?.value(as: String.self) else {
+        throw PipelineEngineError.invalidInvocation("Load Skinned Model needs a file path.")
+      }
+      let parameters = PipelineGeometryParameters(node: node)
+      let rootMotion = try parameters.string("rootMotion", default: "inPlace")
+      let url = try PipelineSkinnedModelLoader.url(for: path,
+        sourceMediaRoot: context.sourceMediaRoot)
+      let model = try PipelineSkinnedModelLoader.model(at: url,
+        animation: try parameters.string("animation", default: ""),
+        framesPerSecond: Double(try parameters.number("framesPerSecond", default: 30)),
+        rootMotion: PipelineSkinnedModel.RootMotion(rawValue: rootMotion) ?? .inPlace)
+      return PipelineNodeResult(outputs: [
+        "model": PipelineNodeValue(model, type: .skinnedModel)
       ])
     },
     .init(kind: .transformMatrix) { node, inputs, _ in

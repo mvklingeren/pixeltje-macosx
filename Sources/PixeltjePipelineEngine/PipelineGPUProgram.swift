@@ -94,7 +94,12 @@ actor PipelineGPUProgram {
       let blend: String?
       let threads: [Int]?
       let vertexCount: Int?
+      /// Draws every vertex of this skinnedModel resource instead.
+      let vertexCountFrom: String?
       let instanceCount: Int?
+      /// A depth resource the pass tests and writes. It is cleared or kept
+      /// with the colour target, as `load` says.
+      let depth: String?
       let buffers: [String: String]?
       let textures: [String: String]?
       let vertexBuffers: [String: String]?
@@ -145,6 +150,8 @@ actor PipelineGPUProgram {
     case immutableBuffer(any MTLBuffer)
     case texture(any MTLTexture)
     case inputTexture(any MTLTexture)
+    case model(any MTLBuffer, vertexCount: Int)
+    case depth(any MTLTexture)
   }
 
   private struct Identity: Equatable {
@@ -160,6 +167,7 @@ actor PipelineGPUProgram {
     let framesPerSecond: Double
     let inputImageHashes: [String: String]
     let fontFingerprints: [String: String]
+    let modelFingerprints: [String: String]
   }
 
   private struct Session {
@@ -203,6 +211,7 @@ actor PipelineGPUProgram {
   private var cachedLibrary: (source: String, library: any MTLLibrary,
     archive: (any MTLBinaryArchive)?)?
   private var computePipelines: [String: any MTLComputePipelineState] = [:]
+  private var depthState: (any MTLDepthStencilState)?
   private var renderPipelines: [String: any MTLRenderPipelineState] = [:]
   /// The binding slots each pipeline's shader can write, from Metal's
   /// reflection; nil where Metal reported none, which counts as all of them.
@@ -511,6 +520,15 @@ actor PipelineGPUProgram {
     if let assets {
       cachedAssetHashes = (assets.id, inputImageHashes)
     }
+    var models: [String: PipelineSkinnedModel] = [:]
+    for resource in definition.resources where resource.kind == "skinnedModel" {
+      guard let port = resource.input,
+        let model = assets?[port]?.value(as: PipelineSkinnedModel.self) else {
+        throw PipelineEngineError.invalidInvocation(
+          "GPU Program needs skinned model asset \(resource.input ?? resource.name).")
+      }
+      models[port] = model
+    }
     var fonts: [String: PipelineSystemFont.Prepared] = [:]
     var fontFingerprints: [String: String] = [:]
     for resource in definition.resources where resource.kind == "systemFont" {
@@ -533,14 +551,16 @@ actor PipelineGPUProgram {
     }
     let declaredBytes = definition.resources.reduce(0) { total, resource in
       total + (resource.kind == "buffer" ? resource.bytes ?? 0
-        : resource.kind == "texture" ? size.pixels * 8 : 0)
+        : resource.kind == "texture" ? size.pixels * 8
+        : resource.kind == "depth" ? size.pixels * 4 : 0)
     }
     // A full mip chain adds at most a third to each input texture.
     let inputBytes = inputImages.values.reduce(0) {
       $0 + $1.width * $1.height * 8 * 4 / 3
     }
     let fontBytes = fonts.values.reduce(0) { $0 + $1.bytes.count }
-    guard declaredBytes + inputBytes + fontBytes <= 134_217_728 else {
+    let modelBytes = models.values.reduce(0) { $0 + $1.bytes.count }
+    guard declaredBytes + inputBytes + fontBytes + modelBytes <= 134_217_728 else {
       throw PipelineEngineError.invalidInvocation("GPU Program resources exceed 128 MiB.")
     }
     let frame = try context.invocation.integer(
@@ -553,7 +573,8 @@ actor PipelineGPUProgram {
       semanticSHA256: context.semanticSHA256, program: programJSON,
       source: source, parameterJSON: parameterJSON,
       width: width, height: height, seed: seed, framesPerSecond: fps,
-      inputImageHashes: inputImageHashes, fontFingerprints: fontFingerprints)
+      inputImageHashes: inputImageHashes, fontFingerprints: fontFingerprints,
+      modelFingerprints: models.mapValues(\.fingerprint))
     let library: any MTLLibrary
     let binaryArchive: (any MTLBinaryArchive)?
     if let cachedLibrary, cachedLibrary.source == source {
@@ -597,7 +618,7 @@ actor PipelineGPUProgram {
     } else {
       working = Session(identity: identity,
         resources: try makeResources(definition, size: size, inputImages: inputImages,
-          fonts: fonts,
+          fonts: fonts, models: models,
           excluding: directPreview ? definition.output : nil),
         nextFrame: 0)
       try await prepareTextures(working.resources)
@@ -912,6 +933,20 @@ actor PipelineGPUProgram {
             $0.name != resource.name && $0.kind == "inputTexture" && $0.input == input
           }) else { throw fail("input textures need distinct asset names.") }
         // Input dimensions are checked against the total budget at execution.
+      case "skinnedModel":
+        guard resource.bytes == nil, resource.design == nil,
+          resource.weight == nil, resource.strings == nil,
+          let input = resource.input, identifier(input) else {
+          throw fail("skinnedModel needs an asset name.")
+        }
+        // Model sizes are checked against the total budget at execution.
+      case "depth":
+        guard resource.bytes == nil, resource.input == nil,
+          resource.design == nil, resource.weight == nil,
+          resource.strings == nil else {
+          throw fail("depth resources use output dimensions.")
+        }
+        memory += size.pixels * 4
       case "systemFont":
         guard program.version == 2, resource.bytes == nil, resource.input == nil,
           ["system", "monospaced", "monospacedDigits"].contains(resource.design ?? ""),
@@ -991,7 +1026,8 @@ actor PipelineGPUProgram {
       func bindings(_ mapping: [String: String]?, kind: String) throws {
         for (slot, name) in mapping ?? [:] {
           guard let index = Int(slot), (1...15).contains(index),
-            (kinds[name] == kind || kind == "buffer" && kinds[name] == "systemFont"
+            (kinds[name] == kind
+              || kind == "buffer" && ["systemFont", "skinnedModel"].contains(kinds[name])
               || kind == "texture" && kinds[name] == "inputTexture") else {
             throw fail("binding slots must be 1–15 and match resource types.")
           }
@@ -1006,7 +1042,8 @@ actor PipelineGPUProgram {
       switch pass.kind {
       case "compute":
         guard pass.vertex == nil, pass.fragment == nil, pass.target == nil,
-          pass.vertexCount == nil, pass.instanceCount == nil,
+          pass.vertexCount == nil, pass.vertexCountFrom == nil,
+          pass.instanceCount == nil, pass.depth == nil,
           pass.load == nil, pass.blend == nil,
           (pass.vertexBuffers ?? [:]).isEmpty,
           (pass.fragmentBuffers ?? [:]).isEmpty,
@@ -1029,7 +1066,10 @@ actor PipelineGPUProgram {
         guard let vertex = pass.vertex, let fragment = pass.fragment,
           identifier(vertex), identifier(fragment),
           let target = pass.target, kinds[target] == "texture",
-          let count = pass.vertexCount, (1...1_048_576).contains(count),
+          (pass.vertexCount == nil) != (pass.vertexCountFrom == nil),
+          (1...1_048_576).contains(pass.vertexCount ?? 1),
+          pass.vertexCountFrom.map({ kinds[$0] == "skinnedModel" }) ?? true,
+          pass.depth.map({ kinds[$0] == "depth" }) ?? true,
           (1...65_536).contains(pass.instanceCount ?? 1),
           [nil, "clear", "load"].contains(pass.load),
           [nil, "replace", "additive", "alpha"].contains(pass.blend) else {
@@ -1038,12 +1078,24 @@ actor PipelineGPUProgram {
       default: throw fail("pass kind must be compute or render.")
       }
     }
+    // A depth buffer holds no state between frames: the first pass that
+    // uses it must clear it.
+    for resource in program.resources where resource.kind == "depth" {
+      guard let first = (program.tick + program.present).first(where: {
+        $0.depth == resource.name
+      }) else { continue }
+      guard first.load != "load",
+        !program.initialize.contains(where: { $0.depth == resource.name }) else {
+        throw fail("the first pass using a depth resource must clear it.")
+      }
+    }
   }
 
   private func makeResources(_ program: Definition,
     size: PipelineMetalRenderSize,
     inputImages: [String: PipelineImageInput],
     fonts: [String: PipelineSystemFont.Prepared],
+    models: [String: PipelineSkinnedModel],
     excluding excluded: String? = nil) throws -> [String: Resource] {
     var result: [String: Resource] = [:]
     for item in program.resources {
@@ -1094,6 +1146,17 @@ actor PipelineGPUProgram {
             mipmapLevel: 0, withBytes: bytes.baseAddress!, bytesPerRow: image.width * 8)
         }
         result[item.name] = .inputTexture(texture)
+      } else if item.kind == "skinnedModel" {
+        guard let port = item.input, let model = models[port],
+          let buffer = model.bytes.withUnsafeBytes({ bytes in
+            queue.device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count,
+              options: .storageModeShared)
+          }) else {
+          throw PipelineEngineError.invalidInvocation("GPU Program skinned model allocation failed.")
+        }
+        result[item.name] = .model(buffer, vertexCount: model.vertexCount)
+      } else if item.kind == "depth" {
+        result[item.name] = .depth(try makeDepth(size.width, size.height))
       } else {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
           pixelFormat: .rgba16Float, width: size.width,
@@ -1107,6 +1170,17 @@ actor PipelineGPUProgram {
       }
     }
     return result
+  }
+
+  private func makeDepth(_ width: Int, _ height: Int) throws -> any MTLTexture {
+    let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+      pixelFormat: .depth32Float, width: width, height: height, mipmapped: false)
+    descriptor.storageMode = .private
+    descriptor.usage = [.renderTarget]
+    guard let texture = queue.device.makeTexture(descriptor: descriptor) else {
+      throw PipelineEngineError.invalidInvocation("GPU Program depth allocation failed.")
+    }
+    return texture
   }
 
   /// Resources a frame never has to copy. Read-only ones keep what
@@ -1137,8 +1211,7 @@ actor PipelineGPUProgram {
         mark(pass.textures, writes?.textures)
       } else {
         written.insert(pass.target!)
-        let writes = renderWrites[
-          "\(pass.vertex!)|\(pass.fragment!)|\(pass.blend ?? "replace")"]
+        let writes = renderWrites[Self.renderKey(pass)]
         mark(pass.vertexBuffers, writes?.vertex?.buffers)
         mark(pass.fragmentBuffers, writes?.fragment?.buffers)
         mark(pass.vertexTextures, writes?.vertex?.textures)
@@ -1153,7 +1226,8 @@ actor PipelineGPUProgram {
         $0?.values.contains(name) == true
       }
     }
-    var scratch = Set<String>()
+    // Validation makes every frame clear a depth buffer before using it.
+    var scratch = Set(program.resources.filter { $0.kind == "depth" }.map(\.name))
     for resource in program.resources where resource.kind == "texture"
       && resource.name != program.output && !swapped.contains(resource.name) {
       guard let first = passes.first(where: {
@@ -1223,6 +1297,10 @@ actor PipelineGPUProgram {
         copies[name] = .texture(copy)
       case .inputTexture(let source):
         copies[name] = .inputTexture(source)
+      case .model(let source, let vertexCount):
+        copies[name] = .model(source, vertexCount: vertexCount)
+      case .depth(let source):
+        copies[name] = .depth(try makeDepth(source.width, source.height))
       }
     }
     if let blit, let command {
@@ -1342,6 +1420,7 @@ actor PipelineGPUProgram {
           descriptor.binaryArchives = [archive]
         }
         descriptor.colorAttachments[0].pixelFormat = .rgba16Float
+        if pass.depth != nil { descriptor.depthAttachmentPixelFormat = .depth32Float }
         let attachment = descriptor.colorAttachments[0]!
         switch pass.blend ?? "replace" {
         case "additive":
@@ -1358,7 +1437,7 @@ actor PipelineGPUProgram {
           attachment.destinationAlphaBlendFactor = .oneMinusSourceAlpha
         default: break
         }
-        let key = "\(pass.vertex!)|\(pass.fragment!)|\(pass.blend ?? "replace")"
+        let key = Self.renderKey(pass)
         let pipeline: any MTLRenderPipelineState
         if let cached = renderPipelines[key] { pipeline = cached }
         else {
@@ -1374,10 +1453,28 @@ actor PipelineGPUProgram {
         render.colorAttachments[0].loadAction = pass.load == "load" ? .load : .clear
         render.colorAttachments[0].storeAction = .store
         render.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0)
+        if let name = pass.depth {
+          guard case .depth(let depth)? = resources[name] else {
+            throw PipelineEngineError.invalidInvocation("GPU Program depth resource is missing.")
+          }
+          render.depthAttachment.texture = depth
+          render.depthAttachment.loadAction = pass.load == "load" ? .load : .clear
+          render.depthAttachment.storeAction = .store
+          render.depthAttachment.clearDepth = 1
+        }
         guard let encoder = command.makeRenderCommandEncoder(descriptor: render) else {
           throw PipelineEngineError.invalidInvocation("GPU Program render encoding failed.")
         }
         encoder.setRenderPipelineState(pipeline)
+        if pass.depth != nil {
+          if depthState == nil {
+            let state = MTLDepthStencilDescriptor()
+            state.depthCompareFunction = .lessEqual
+            state.isDepthWriteEnabled = true
+            depthState = queue.device.makeDepthStencilState(descriptor: state)
+          }
+          encoder.setDepthStencilState(depthState)
+        }
         encoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 0)
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 0)
         bindBuffers(pass.vertexBuffers, resources: resources) {
@@ -1392,12 +1489,24 @@ actor PipelineGPUProgram {
         bindTextures(pass.fragmentTextures, resources: resources) {
           encoder.setFragmentTexture($0, index: $1)
         }
+        var vertexCount = pass.vertexCount ?? 0
+        if let name = pass.vertexCountFrom {
+          guard case .model(_, let count)? = resources[name] else {
+            throw PipelineEngineError.invalidInvocation("GPU Program skinned model is missing.")
+          }
+          vertexCount = count
+        }
         encoder.drawPrimitives(type: .triangle, vertexStart: 0,
-          vertexCount: pass.vertexCount!, instanceCount: pass.instanceCount ?? 1)
+          vertexCount: vertexCount, instanceCount: pass.instanceCount ?? 1)
         encoder.endEncoding()
       }
     }
     try await finish(command)
+  }
+
+  private static func renderKey(_ pass: Definition.Pass) -> String {
+    "\(pass.vertex!)|\(pass.fragment!)|\(pass.blend ?? "replace")"
+      + (pass.depth == nil ? "" : "|depth")
   }
 
   private static func writes(_ bindings: [any MTLBinding]?) -> Writes? {
@@ -1418,7 +1527,8 @@ actor PipelineGPUProgram {
     for (slot, name) in mapping ?? [:] {
       if let index = Int(slot) {
         switch resources[name] {
-        case .buffer(let buffer)?, .immutableBuffer(let buffer)?: set(buffer, index)
+        case .buffer(let buffer)?, .immutableBuffer(let buffer)?, .model(let buffer, _)?:
+          set(buffer, index)
         default: break
         }
       }

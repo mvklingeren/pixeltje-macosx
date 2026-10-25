@@ -114,10 +114,10 @@
       "id": "program-text",
       "kind": "primitive.string",
       "parameters": {
-        "value": "{\"version\":1,\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":131072},{\"name\":\"display\",\"kind\":\"texture\"}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"linkPlaygroundParts\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advancePlayer\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"restartPlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"supportPlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"collidePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"solvePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"collidePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"solvePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"present\":[{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"playgroundFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"}}],\"swaps\":[],\"output\":\"display\"}"
+        "value": "{\"version\":1,\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":131072},{\"name\":\"display\",\"kind\":\"texture\"},{\"name\":\"jogger\",\"kind\":\"skinnedModel\",\"input\":\"asset0\"},{\"name\":\"sceneDepth\",\"kind\":\"depth\"}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"linkPlaygroundParts\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advancePlayer\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"restartPlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"supportPlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"collidePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"solvePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"collidePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"solvePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"present\":[{\"kind\":\"compute\",\"function\":\"placeCamera\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"playgroundFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"depth\":\"sceneDepth\"},{\"kind\":\"render\",\"vertex\":\"characterVertex\",\"fragment\":\"characterFragment\",\"target\":\"display\",\"load\":\"load\",\"vertexCountFrom\":\"jogger\",\"depth\":\"sceneDepth\",\"vertexBuffers\":{\"1\":\"game\",\"2\":\"jogger\"},\"fragmentBuffers\":{\"1\":\"game\"}}],\"swaps\":[],\"output\":\"display\"}"
       },
       "resources": {},
-      "title": "Playground state and GPU passes"
+      "title": "Playground state, GPU passes and jogger"
     },
     {
       "executionState": "enabled",
@@ -143,7 +143,46 @@
       "kind": "input.directionPad",
       "parameters": {},
       "resources": {},
-      "title": "WASD movement · R rebuilds"
+      "title": "WASD movement · R rebuilds · F third person"
+    },
+    {
+      "executionState": "enabled",
+      "id": "jogger-path",
+      "kind": "primitive.string",
+      "parameters": {
+        "value": "~/Downloads/Jogging.fbx"
+      },
+      "resources": {},
+      "title": "Character FBX (Mixamo Jogging)"
+    },
+    {
+      "executionState": "enabled",
+      "id": "jogger",
+      "kind": "geometry.loadSkinnedModel",
+      "parameters": {
+        "animation": "",
+        "framesPerSecond": {
+          "$type": "number",
+          "value": 30
+        },
+        "rootMotion": "inPlace"
+      },
+      "resources": {},
+      "title": "Jogger · skinned model"
+    },
+    {
+      "executionState": "enabled",
+      "id": "character-assets",
+      "kind": "cache.assets",
+      "parameters": {
+        "keepBetweenRuns": false,
+        "slotCount": {
+          "$type": "integer",
+          "value": 1
+        }
+      },
+      "resources": {},
+      "title": "Character asset"
     }
   ],
   "connections": [
@@ -278,6 +317,39 @@
         "nodeID": "direction-pad",
         "port": "keys"
       }
+    },
+    {
+      "id": "jogger-path.value->jogger.path",
+      "input": {
+        "nodeID": "jogger",
+        "port": "path"
+      },
+      "output": {
+        "nodeID": "jogger-path",
+        "port": "value"
+      }
+    },
+    {
+      "id": "jogger.model->character-assets.asset0",
+      "input": {
+        "nodeID": "character-assets",
+        "port": "asset0"
+      },
+      "output": {
+        "nodeID": "jogger",
+        "port": "model"
+      }
+    },
+    {
+      "id": "character-assets.assets->render.assets",
+      "input": {
+        "nodeID": "render",
+        "port": "assets"
+      },
+      "output": {
+        "nodeID": "character-assets",
+        "port": "assets"
+      }
     }
   ],
   "controlConnections": [
@@ -346,6 +418,18 @@
       "loop": {
         "x": 1530,
         "y": 580
+      },
+      "jogger-path": {
+        "x": 50,
+        "y": 800
+      },
+      "jogger": {
+        "x": 50,
+        "y": 960
+      },
+      "character-assets": {
+        "x": 450,
+        "y": 1120
       }
     },
     "nodeSizes": {

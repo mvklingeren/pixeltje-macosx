@@ -20,6 +20,8 @@
 // The views file (relative texture paths resolve beside it):
 //   { "width": 960, "height": 540,                    optional size override
 //     "textures": { "<asset port>": "image.png" },    optional; grey if absent
+//     "models": { "<asset port>": "~/model.fbx" },    optional; otherwise the
+//                        workflow's Load Skinned Model node behind that asset
 //     "views": [ { "name": "start",
 //       "frames": 1,               ticks before present; 0 = initialize only
 //       "pointer": [x, y, actionCount, dt], "movement": [x, y, secondary, keys],
@@ -64,7 +66,9 @@ struct Program: Decodable {
     let blend: String?
     let threads: [Int]?
     let vertexCount: Int?
+    let vertexCountFrom: String?
     let instanceCount: Int?
+    let depth: String?
     let buffers: [String: String]?
     let textures: [String: String]?
     let vertexBuffers: [String: String]?
@@ -109,6 +113,7 @@ struct Views: Decodable {
   let width: Int?
   let height: Int?
   let textures: [String: String]?
+  let models: [String: String]?
   let views: [View]
 }
 
@@ -263,6 +268,45 @@ if let json = try value(into: programNodeID, port: "parameters") as? String,
   workflowValues = object.mapValues(\.floatValue)
 }
 
+// The FBX behind a skinnedModel asset: the views file's own path, or the path
+// feeding the Load Skinned Model node that fills that Asset Cache slot.
+func skinnedModel(port: String, programID: String) throws -> PipelineSkinnedModel {
+  var path = views.models?[port]
+  var parameters: [String: Any] = [:]
+  var root = viewsURL.deletingLastPathComponent()
+  if path == nil {
+    for connection in connections {
+      guard let input = connection["input"] as? [String: Any],
+        input["port"] as? String == port,
+        let cacheID = input["nodeID"] as? String,
+        connections.contains(where: {
+          ($0["input"] as? [String: Any])?["nodeID"] as? String == programID
+            && ($0["output"] as? [String: Any])?["nodeID"] as? String == cacheID
+        }),
+        let output = connection["output"] as? [String: Any],
+        let loaderID = output["nodeID"] as? String,
+        let loader = nodes.first(where: { $0["id"] as? String == loaderID }),
+        loader["kind"] as? String == "geometry.loadSkinnedModel" else { continue }
+      path = try value(into: loaderID, port: "path") as? String
+      parameters = loader["parameters"] as? [String: Any] ?? [:]
+      root = workflowFolder
+    }
+  }
+  guard let path else {
+    throw Failure(description: "No skinned model for asset \(port); add it to the views file's models.")
+  }
+  let url = try PipelineSkinnedModelLoader.url(for: path, sourceMediaRoot: root)
+  return try PipelineSkinnedModelLoader.model(at: url,
+    animation: unwrap(parameters["animation"]) as? String ?? "",
+    framesPerSecond: (unwrap(parameters["framesPerSecond"]) as? NSNumber)?.doubleValue ?? 30,
+    rootMotion: PipelineSkinnedModel.RootMotion(
+      rawValue: unwrap(parameters["rootMotion"]) as? String ?? "inPlace") ?? .inPlace)
+}
+
+let skinnedModels = try Dictionary(uniqueKeysWithValues: program.resources
+  .filter { $0.kind == "skinnedModel" }
+  .map { ($0.name, try skinnedModel(port: $0.input ?? $0.name, programID: programNodeID)) })
+
 // MARK: Shader source
 
 // Mirrors PipelineMeshRenderer: recursive #include "Sibling.metal" with
@@ -367,7 +411,16 @@ let queue = device.makeCommandQueue()!
 enum Resource {
   case buffer(any MTLBuffer)
   case texture(any MTLTexture)
+  case model(any MTLBuffer, vertexCount: Int)
+  case depth(any MTLTexture)
 }
+
+let depthState: any MTLDepthStencilState = {
+  let descriptor = MTLDepthStencilDescriptor()
+  descriptor.depthCompareFunction = .lessEqual
+  descriptor.isDepthWriteEnabled = true
+  return device.makeDepthStencilState(descriptor: descriptor)!
+}()
 
 func makeTexture(width: Int, height: Int, usage: MTLTextureUsage) -> any MTLTexture {
   let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float,
@@ -422,6 +475,17 @@ func makeResources() throws -> [String: Resource] {
       })
     case "inputTexture":
       result[item.name] = .texture(try inputTexture(port: item.input ?? item.name))
+    case "skinnedModel":
+      let model = skinnedModels[item.name]!
+      result[item.name] = .model(model.bytes.withUnsafeBytes {
+        device.makeBuffer(bytes: $0.baseAddress!, length: $0.count, options: .storageModeShared)!
+      }, vertexCount: model.vertexCount)
+    case "depth":
+      let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .depth32Float,
+        width: width, height: height, mipmapped: false)
+      descriptor.storageMode = .private
+      descriptor.usage = [.renderTarget]
+      result[item.name] = .depth(device.makeTexture(descriptor: descriptor)!)
     default:
       result[item.name] = .texture(makeTexture(width: width, height: height,
         usage: [.shaderRead, .shaderWrite, .renderTarget]))
@@ -470,7 +534,11 @@ final class Renderer {
     var uniforms = uniforms
     func buffers(_ mapping: [String: String]?, _ set: (any MTLBuffer, Int) -> Void) {
       for (slot, name) in mapping ?? [:] {
-        if let index = Int(slot), case .buffer(let buffer)? = resources[name] { set(buffer, index) }
+        guard let index = Int(slot) else { continue }
+        switch resources[name] {
+        case .buffer(let buffer)?, .model(let buffer, _)?: set(buffer, index)
+        default: break
+        }
       }
     }
     func textures(_ mapping: [String: String]?, _ set: (any MTLTexture, Int) -> Void) {
@@ -512,6 +580,7 @@ final class Renderer {
         }
         let blend = pass.blend ?? "replace"
         let key = "\(pass.vertex!)|\(pass.fragment!)|\(blend)"
+          + (pass.depth == nil ? "" : "|depth")
         let pipeline: any MTLRenderPipelineState
         if let cached = renderPipelines[key] { pipeline = cached } else {
           guard let vertex = library.makeFunction(name: pass.vertex!),
@@ -523,6 +592,7 @@ final class Renderer {
           descriptor.fragmentFunction = fragment
           let attachment = descriptor.colorAttachments[0]!
           attachment.pixelFormat = .rgba16Float
+          if pass.depth != nil { descriptor.depthAttachmentPixelFormat = .depth32Float }
           if blend != "replace" {
             attachment.isBlendingEnabled = true
             attachment.sourceRGBBlendFactor = blend == "alpha" ? .sourceAlpha : .one
@@ -544,16 +614,27 @@ final class Renderer {
         render.colorAttachments[0].loadAction = pass.load == "load" ? .load : .clear
         render.colorAttachments[0].storeAction = .store
         render.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0)
+        if let name = pass.depth, case .depth(let depth)? = resources[name] {
+          render.depthAttachment.texture = depth
+          render.depthAttachment.loadAction = pass.load == "load" ? .load : .clear
+          render.depthAttachment.storeAction = .store
+          render.depthAttachment.clearDepth = 1
+        }
         let encoder = command.makeRenderCommandEncoder(descriptor: render)!
         encoder.setRenderPipelineState(pipeline)
+        if pass.depth != nil { encoder.setDepthStencilState(depthState) }
         encoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 0)
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 0)
         buffers(pass.vertexBuffers) { encoder.setVertexBuffer($0, offset: 0, index: $1) }
         buffers(pass.fragmentBuffers) { encoder.setFragmentBuffer($0, offset: 0, index: $1) }
         textures(pass.vertexTextures) { encoder.setVertexTexture($0, index: $1) }
         textures(pass.fragmentTextures) { encoder.setFragmentTexture($0, index: $1) }
+        var vertexCount = pass.vertexCount ?? 0
+        if let name = pass.vertexCountFrom, case .model(_, let count)? = resources[name] {
+          vertexCount = count
+        }
         encoder.drawPrimitives(type: .triangle, vertexStart: 0,
-          vertexCount: pass.vertexCount!, instanceCount: pass.instanceCount ?? 1)
+          vertexCount: vertexCount, instanceCount: pass.instanceCount ?? 1)
         encoder.endEncoding()
       }
     }
