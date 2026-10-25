@@ -352,6 +352,10 @@ constant uint buildingShardsPerCell = 4u;
 constant uint buildingBlastCellCount = buildingFragmentCount
     / buildingShardsPerCell;
 constant uint physicsBodyCount = buildingFragmentCount + masonryDebrisCount;
+// Shards take the first fragment slots in turn; the rest hold the chunks
+// that lose their support (HauntedSupport.metal).
+constant uint buildingShardSlots = 24u;
+constant uint physicsContactCapacity = 256u;
 
 constant uint houseCandleCapacity = 4u;
 
@@ -506,6 +510,17 @@ struct GameState {
     // loaded (0 idle), lever cycle left, loading hold 0-1. Last, so every
     // earlier offset stays where preview views write it.
     float4 rifle;
+    // Structural support (HauntedSupport.metal): one bit per building
+    // whose support must be worked out again, the next chunk slot, the
+    // direction and time of the latest break, and each part's cells that
+    // still reach the ground.
+    uint buildingSupportDirty;
+    uint buildingChunkNext;
+    float4 buildingPush;
+    ulong buildingSupported[houseCapacity];
+    // The physics world's contacts for one substep.
+    pixeltje_physics::SolverContact physicsContacts[physicsContactCapacity];
+    uint physicsContactCount;
 };
 
 static_assert(sizeof(GameState) <= 327680,
@@ -632,6 +647,7 @@ SurfaceMaterial shadeMausoleumSpalls(SurfaceMaterial material,
 #include "HauntedStreet.metal"
 #include "HauntedBuildings.metal"
 #include "HauntedPhysicsWorld.metal"
+#include "HauntedSupport.metal"
 
 // The broodmother waits by the candles in the ruined mausoleum's hall and,
 // once the player climbs in, walks out toward the gap; see
@@ -2244,6 +2260,7 @@ kernel void advanceMasonry(constant ProgramUniforms &u [[buffer(0)]],
 // none of the building search enters their hot kernels.
 kernel void damageBuildings(constant ProgramUniforms &u [[buffer(0)]],
     device GameState *states [[buffer(1)]],
+    device const BuildingSupport *support [[buffer(2)]],
     device RangeAudio *audio [[buffer(3)]],
     uint id [[thread_position_in_grid]]) {
     if (id != 0u || states[0].progress.w != phasePlaying) return;
@@ -2278,6 +2295,9 @@ kernel void damageBuildings(constant ProgramUniforms &u [[buffer(0)]],
         damageBuildingsBlast(game, audio[0], game.blast.xyz);
         game.buildingLastBlast = game.blast.w;
     }
+    // What the damage left without a path to the ground comes loose.
+    if (game.buildingSupportDirty != 0u)
+        settleDamagedBuildings(game, audio[0], support[0]);
 }
 
 kernel void advanceBuildingDebris(constant ProgramUniforms &u [[buffer(0)]],

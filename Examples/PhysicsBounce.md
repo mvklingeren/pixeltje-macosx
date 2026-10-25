@@ -14,8 +14,10 @@ penetration depth; depth at or below zero means no overlap. `resolve` separates
 the moving sphere and applies restitution (0–1) and impact friction (a
 non-negative Coulomb coefficient).
 
-The helpers have no global state, world, broad phase, swept collision, joints,
-or resting friction. The GPU Program owns its bodies, passes, fixed step,
-and collision order. Use small steps for fast bodies. A future Haunted House
+The helpers have no global state, world, broad phase, swept collision or
+joints. The GPU Program owns its bodies, passes, fixed step, and collision
+order. For stacks and resting contact between oriented boxes, use the
+manifold and accumulated-impulse helpers that the Physics Playground
+(`PhysicsPlayground.md`) demonstrates. Use small steps for fast bodies. A future Haunted House
 integration can start with the player's collision shape against floor and
 wall boxes while leaving its scene and gameplay state in that workflow.

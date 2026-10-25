@@ -1,0 +1,360 @@
+{
+  "width": 640,
+  "height": 400,
+  "views": [
+    {
+      "name": "cottage-chimney-intact",
+      "frames": 2,
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            -66,
+            2.0,
+            56,
+            1.871
+          ]
+        }
+      ],
+      "pointer": [
+        0.5,
+        0.5,
+        0,
+        0.03333333333333333
+      ],
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -66,
+            2.0,
+            56,
+            1.871
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.32
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cottage-chimney-cracked",
+      "frames": 4,
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            -66,
+            2.0,
+            56,
+            1.871
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.32
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8912,
+          "floats": [
+            -48.76,
+            2.2,
+            61.5,
+            0
+          ]
+        }
+      ],
+      "pointer": [
+        0.5,
+        0.5,
+        0,
+        0.03333333333333333
+      ],
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -66,
+            2.0,
+            56,
+            1.871
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.32
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8836,
+          "floats": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cottage-chimney-toppling",
+      "frames": 12,
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            -66,
+            2.0,
+            56,
+            1.871
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.32
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8912,
+          "floats": [
+            -48.76,
+            2.2,
+            61.5,
+            0
+          ]
+        }
+      ],
+      "pointer": [
+        0.5,
+        0.5,
+        0,
+        0.03333333333333333
+      ],
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -66,
+            2.0,
+            56,
+            1.871
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.32
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8836,
+          "floats": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cottage-chimney-falling",
+      "frames": 20,
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            -66,
+            2.0,
+            56,
+            1.871
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.32
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8912,
+          "floats": [
+            -48.76,
+            2.2,
+            61.5,
+            0
+          ]
+        }
+      ],
+      "pointer": [
+        0.5,
+        0.5,
+        0,
+        0.03333333333333333
+      ],
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -66,
+            2.0,
+            56,
+            1.871
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.32
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8836,
+          "floats": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cottage-chimney-down",
+      "frames": 40,
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            -66,
+            2.0,
+            56,
+            1.871
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.32
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8912,
+          "floats": [
+            -48.76,
+            2.2,
+            61.5,
+            0
+          ]
+        }
+      ],
+      "pointer": [
+        0.5,
+        0.5,
+        0,
+        0.03333333333333333
+      ],
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -66,
+            2.0,
+            56,
+            1.871
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.32
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8836,
+          "floats": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cottage-chimney-rest",
+      "frames": 150,
+      "initialWrites": [
+        {
+          "buffer": "game",
+          "floats": [
+            -66,
+            2.0,
+            56,
+            1.871
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.32
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8912,
+          "floats": [
+            -48.76,
+            2.2,
+            61.5,
+            0
+          ]
+        }
+      ],
+      "pointer": [
+        0.5,
+        0.5,
+        0,
+        0.03333333333333333
+      ],
+      "writes": [
+        {
+          "buffer": "game",
+          "floats": [
+            -66,
+            2.0,
+            56,
+            1.871
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 16,
+          "floats": [
+            0.32
+          ]
+        },
+        {
+          "buffer": "game",
+          "offset": 8836,
+          "floats": [
+            0
+          ]
+        }
+      ]
+    }
+  ]
+}

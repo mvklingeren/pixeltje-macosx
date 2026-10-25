@@ -13,6 +13,13 @@ uint buildingPartOwner(device const HouseModel &house, uint index) {
     return 0u;
 }
 
+// Every removed cell asks the support pass to look at its building again.
+void markBuildingUnsettled(device GameState &game, uint index) {
+    uint owner = buildingPartOwner(game.house, index);
+    if (owner > 0u && owner < buildingCount)
+        game.buildingSupportDirty |= 1u << owner;
+}
+
 bool buildingBreakable(uint style) {
     return style == houseSiding || style == houseBattens
         || style == houseRoof || style == houseTrim || style == houseStone
@@ -193,7 +200,7 @@ void launchBuildingFragment(device GameState &game, uint index, uint2 cell,
             piece.upper.w = 0.0f;
         }
     }
-    uint slot = game.buildingFragmentNext++ % buildingFragmentCount;
+    uint slot = game.buildingFragmentNext++ % buildingShardSlots;
     game.buildingFragments[slot] = piece;
     game.buildingFragmentSource[slot] = index;
     game.buildingFragmentGone[slot] = 0ul;
@@ -365,6 +372,7 @@ void buildingMaybeCollapse(device GameState &game, device RangeAudio &audio,
             sounded[material] = true;
         }
         game.buildingGone[index] = ~0ul;
+        markBuildingUnsettled(game, index);
     }
 }
 
@@ -372,11 +380,13 @@ bool markBuildingCell(device GameState &game, uint index, uint2 cell) {
     if (houseRoundStyle(uint(game.house.parts[index].lower.w))) {
         if (game.buildingGone[index] != 0ul) return false;
         game.buildingGone[index] = ~0ul;
+        markBuildingUnsettled(game, index);
         return true;
     }
     ulong bit = 1ul << (cell.y * 8u + cell.x);
     if ((game.buildingGone[index] & bit) != 0ul) return false;
     game.buildingGone[index] |= bit;
+    markBuildingUnsettled(game, index);
     return true;
 }
 
@@ -396,6 +406,8 @@ void damageBuildingHit(device GameState &game, device RangeAudio &audio,
     float3 local = houseTurnPointIn(turn, impact.pointDamage.xyz);
     uint2 cell = buildingCell(part, local);
     if (!markBuildingCell(game, index, cell)) return;
+    // What a shot frees drifts and tips the way the shot was going.
+    game.buildingPush = float4(-impact.normal.xyz, game.effects.x);
     game.buildingDamage[owner] += impact.pointDamage.w;
     float3 velocity = impact.normal.xyz * 2.8f
         + float3(0.0f, 0.15f, 0.0f);
@@ -469,6 +481,9 @@ void damageBuildingsBlast(device GameState &game, device RangeAudio &audio,
         uint owner = buildingPartOwner(game.house, index);
         uint2 cell = nearestCell[k];
         if (!markBuildingCell(game, index, cell)) continue;
+        game.buildingPush = float4(normalize(houseTurnPointOut(
+            housePartTurn(game.house, index),
+            game.house.parts[index].lower.xyz) - blast), game.effects.x);
         if (added[owner] < 10.0f) {
             game.buildingDamage[owner] += 1.0f;
             added[owner] += 1.0f;
@@ -512,6 +527,9 @@ void resetBuildingDamage(device GameState &game) {
     }
     game.buildingFragmentNext = 0u;
     game.buildingFragmentActive = 0u;
+    game.buildingSupportDirty = 0u;
+    game.buildingChunkNext = 0u;
+    game.buildingPush = float4(0.0f, 0.0f, 0.0f, -100.0f);
     game.debrisSoundReadyAt = -100.0f;
     game.surfaceImpactReadyAt = -100.0f;
     game.landingSoundReadyAt = -100.0f;
@@ -542,11 +560,12 @@ void traceBuildingFragments(thread SceneHit &hit, float3 origin,
             hit.distance, normal);
         if (t > 0.0f) {
             float3 point = localOrigin + localDirection * t;
-            uint2 cell = buildingCell(part, point);
-            if ((game.buildingFragmentGone[i]
-                    & (1ul << (cell.y * 8u + cell.x))) != 0ul) continue;
             uint source = game.buildingFragmentSource[i];
             device const HousePart &original = game.house.parts[source];
+            // A chunk lists the cells of its source part that it lacks.
+            uint2 cell = buildingCell(original, point);
+            if ((game.buildingFragmentGone[i]
+                    & (1ul << (cell.y * 8u + cell.x))) != 0ul) continue;
             float3 originalPoint = point;
             uint style = uint(part.lower.w);
             if (houseCutoutStyle(style)

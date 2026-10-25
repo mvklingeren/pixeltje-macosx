@@ -312,6 +312,240 @@ enum PipelineMetalPhysics {
         applyImpulse(a, -tangent * frictionImpulse, ra);
         applyImpulse(b, tangent * frictionImpulse, rb);
       }
+
+      // Stacking needs a contact patch, not one point, and impulses that
+      // accumulate over several iterations. A manifold holds up to four
+      // points sharing one normal from the second body toward the first.
+      // Depth may be slightly negative: such a speculative point lets the
+      // solver stop an approach before the boxes overlap.
+      struct RigidManifold {
+        float3 normal;
+        uint count;
+        float4 points[4]; // world point, depth
+      };
+
+      inline float3 boxCorner(RigidBody body, uint corner) {
+        float3 side = float3((corner & 1u) != 0u ? 1.0f : -1.0f,
+          (corner & 2u) != 0u ? 1.0f : -1.0f,
+          (corner & 4u) != 0u ? 1.0f : -1.0f);
+        return body.centreMass.xyz
+          + rotate(body.orientation, side * body.extentState.xyz);
+      }
+
+      inline bool boxContains(RigidBody body, float3 point, float slop) {
+        float3 local = unrotate(body.orientation,
+          point - body.centreMass.xyz);
+        return all(abs(local) <= body.extentState.xyz + slop);
+      }
+
+      // Keeps the candidates at the four diagonal extremes of the contact
+      // plane: for two overlapping rectangles these are the patch corners.
+      inline RigidManifold reduceManifold(float3 normal,
+                                          thread const float4 *candidates,
+                                          uint count) {
+        RigidManifold manifold;
+        manifold.normal = normal;
+        manifold.count = 0u;
+        if (count <= 4u) {
+          for (uint i = 0u; i < count; ++i)
+            manifold.points[i] = candidates[i];
+          manifold.count = count;
+          return manifold;
+        }
+        float3 t1 = normalize(abs(normal.x) > 0.57f
+          ? float3(normal.y, -normal.x, 0.0f)
+          : float3(0.0f, normal.z, -normal.y));
+        float3 t2 = cross(normal, t1);
+        uint picks[4] = {0u, 0u, 0u, 0u};
+        float best[4] = {-INFINITY, -INFINITY, -INFINITY, -INFINITY};
+        for (uint i = 0u; i < count; ++i) {
+          float a = dot(candidates[i].xyz, t1);
+          float b = dot(candidates[i].xyz, t2);
+          float score[4] = {a + b, a - b, b - a, -a - b};
+          for (uint k = 0u; k < 4u; ++k)
+            if (score[k] > best[k]) { best[k] = score[k]; picks[k] = i; }
+        }
+        for (uint k = 0u; k < 4u; ++k) {
+          bool repeated = false;
+          for (uint j = 0u; j < k; ++j) repeated |= picks[j] == picks[k];
+          if (!repeated)
+            manifold.points[manifold.count++] = candidates[picks[k]];
+        }
+        return manifold;
+      }
+
+      // Corners of each box that lie inside the other, measured against the
+      // separating-axis normal. Edge-on-edge contacts have no such corner and
+      // fall back to the single point from boxBox.
+      inline RigidManifold boxBoxManifold(RigidBody a, RigidBody b,
+                                          float slop) {
+        // Inflate both boxes by half the slop so that a pair just apart
+        // still finds its separating normal.
+        RigidBody inflatedA = a, inflatedB = b;
+        inflatedA.extentState.xyz += 0.5f * slop;
+        inflatedB.extentState.xyz += 0.5f * slop;
+        RigidContact contact = boxBox(inflatedA, inflatedB);
+        RigidManifold manifold;
+        manifold.normal = contact.normal;
+        manifold.count = 0u;
+        if (contact.depth <= 0.0f) return manifold;
+        contact.depth -= slop;
+        float3 n = contact.normal;
+        float topB = dot(b.centreMass.xyz, n) + projectedRadius(b, n);
+        float bottomA = dot(a.centreMass.xyz, n) - projectedRadius(a, n);
+        float4 candidates[16];
+        uint count = 0u;
+        for (uint i = 0u; i < 8u; ++i) {
+          float3 p = boxCorner(a, i);
+          float depth = topB - dot(p, n);
+          if (depth > -slop && boxContains(b, p, slop))
+            candidates[count++] = float4(p, min(depth, contact.depth));
+        }
+        for (uint i = 0u; i < 8u; ++i) {
+          float3 q = boxCorner(b, i);
+          float depth = dot(q, n) - bottomA;
+          if (depth > -slop && boxContains(a, q, slop))
+            candidates[count++] = float4(q, min(depth, contact.depth));
+        }
+        if (count == 0u) {
+          if (contact.depth <= 0.0f) return manifold;
+          candidates[0] = float4(contact.point, contact.depth);
+          count = 1u;
+        }
+        return reduceManifold(n, candidates, count);
+      }
+
+      // The plane is a solid half-space below normal; its normal points
+      // toward the body (the manifold's second body is the plane).
+      inline RigidManifold boxPlaneManifold(RigidBody body, float3 planePoint,
+                                            float3 normal, float slop) {
+        float4 candidates[8];
+        uint count = 0u;
+        for (uint i = 0u; i < 8u; ++i) {
+          float3 p = boxCorner(body, i);
+          float depth = dot(planePoint - p, normal);
+          if (depth > -slop) candidates[count++] = float4(p, depth);
+        }
+        return reduceManifold(normal, candidates, count);
+      }
+
+      // One manifold point prepared for sequential impulses. Bodies are
+      // caller indices; a static collider uses staticBody and no state.
+      constant uint staticBody = 0xffffffffu;
+
+      struct SolverContact {
+        float4 point;     // world point, depth
+        float4 normal;    // from the second body toward the first, impulse
+        float4 tangent;   // first friction direction, impulse
+        float4 bitangent; // second friction direction, impulse
+        float4 masses;    // normal, tangent, bitangent effective mass,
+                          // target normal velocity
+        float4 material;  // Coulomb friction, closing speed, unused
+        uint2 bodies;
+      };
+
+      inline RigidBody staticRigidBody() {
+        return makeRigidBody(float3(0.0f), float3(1.0f),
+          float4(0.0f, 0.0f, 0.0f, 1.0f), float3(0.0f), 0.0f, 0.0f, 0.0f);
+      }
+
+      inline float3 pointVelocity(RigidBody body, float3 point) {
+        return body.linearBounce.xyz + cross(body.angularFriction.xyz,
+          point - body.centreMass.xyz);
+      }
+
+      // Depth beyond slop is removed at baumgarte per step, at most
+      // maxPush m/s. Restitution applies only above one metre per second,
+      // so resting contacts do not bounce.
+      inline SolverContact prepareContact(RigidBody a, RigidBody b,
+                                          uint indexA, uint indexB,
+                                          float3 normal, float4 pointDepth,
+                                          float dt) {
+        SolverContact c;
+        c.bodies = uint2(indexA, indexB);
+        c.point = pointDepth;
+        float3 p = pointDepth.xyz;
+        float3 t1 = normalize(abs(normal.x) > 0.57f
+          ? float3(normal.y, -normal.x, 0.0f)
+          : float3(0.0f, normal.z, -normal.y));
+        float3 t2 = cross(normal, t1);
+        c.normal = float4(normal, 0.0f);
+        c.tangent = float4(t1, 0.0f);
+        c.bitangent = float4(t2, 0.0f);
+        float3 ra = p - a.centreMass.xyz;
+        float3 rb = p - b.centreMass.xyz;
+        float kn = impulseDenominator(a, ra, normal)
+          + impulseDenominator(b, rb, normal);
+        float kt = impulseDenominator(a, ra, t1)
+          + impulseDenominator(b, rb, t1);
+        float kb = impulseDenominator(a, ra, t2)
+          + impulseDenominator(b, rb, t2);
+        float closing = dot(pointVelocity(a, p) - pointVelocity(b, p),
+          normal);
+        float depth = pointDepth.w;
+        dt = max(dt, 1.0e-4f);
+        float target = depth > 0.0f
+          ? min(0.25f * max(depth - 0.004f, 0.0f) / dt, 2.0f)
+          : depth / dt;
+        float restitution = min(a.linearBounce.w, b.linearBounce.w);
+        if (closing < -1.0f) target = max(target, -restitution * closing);
+        c.masses = float4(kn > 1.0e-7f ? 1.0f / kn : 0.0f,
+          kt > 1.0e-7f ? 1.0f / kt : 0.0f,
+          kb > 1.0e-7f ? 1.0f / kb : 0.0f, target);
+        c.material = float4(sqrt(a.angularFriction.w * b.angularFriction.w),
+          closing, 0.0f, 0.0f);
+        return c;
+      }
+
+      // Accumulated impulses: the normal total never pulls, and friction
+      // stays inside the Coulomb cone of the current normal total, which
+      // gives resting (static) friction as well as sliding friction.
+      inline void solveContact(thread RigidBody &a, thread RigidBody &b,
+                               thread SolverContact &c) {
+        float3 p = c.point.xyz;
+        float3 ra = p - a.centreMass.xyz;
+        float3 rb = p - b.centreMass.xyz;
+        float3 n = c.normal.xyz;
+        float vn = dot(pointVelocity(a, p) - pointVelocity(b, p), n);
+        float previous = c.normal.w;
+        c.normal.w = max(previous + c.masses.x * (c.masses.w - vn), 0.0f);
+        float3 impulse = n * (c.normal.w - previous);
+        applyImpulse(a, impulse, ra);
+        applyImpulse(b, -impulse, rb);
+        float limit = c.material.x * c.normal.w;
+        float3 relative = pointVelocity(a, p) - pointVelocity(b, p);
+        previous = c.tangent.w;
+        c.tangent.w = clamp(previous
+          - c.masses.y * dot(relative, c.tangent.xyz), -limit, limit);
+        impulse = c.tangent.xyz * (c.tangent.w - previous);
+        previous = c.bitangent.w;
+        c.bitangent.w = clamp(previous
+          - c.masses.z * dot(relative, c.bitangent.xyz), -limit, limit);
+        impulse += c.bitangent.xyz * (c.bitangent.w - previous);
+        applyImpulse(a, impulse, ra);
+        applyImpulse(b, -impulse, rb);
+      }
+
+      // integrateRigid in two halves, for solvers that resolve contacts
+      // between the velocity and position updates.
+      inline void integrateVelocity(thread RigidBody &body,
+                                    float3 acceleration, float linearDamping,
+                                    float angularDamping, float dt) {
+        if (body.extentState.w != 1.0f) return;
+        dt = max(dt, 0.0f);
+        body.linearBounce.xyz = (body.linearBounce.xyz + acceleration * dt)
+          * exp(-max(linearDamping, 0.0f) * dt);
+        body.angularFriction.xyz *= exp(-max(angularDamping, 0.0f) * dt);
+      }
+
+      inline void integratePosition(thread RigidBody &body, float dt) {
+        if (body.extentState.w != 1.0f) return;
+        dt = max(dt, 0.0f);
+        body.centreMass.xyz += body.linearBounce.xyz * dt;
+        float4 spin = float4(body.angularFriction.xyz, 0.0f);
+        body.orientation = normalize(body.orientation
+          + 0.5f * dt * multiplyRotation(spin, body.orientation));
+      }
     }
     """
 }
