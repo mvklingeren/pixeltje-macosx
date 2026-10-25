@@ -30,6 +30,12 @@ project under terms that conflict with that license.
 The complete copyright and permission notice is retained at the top of the
 file.
 
+## Vendored MIT-licensed source
+
+| Files | Origin | License |
+| --- | --- | --- |
+| `Sources/CUFBX/ufbx.c`, `Sources/CUFBX/include/ufbx.h` | [ufbx v0.23.1](https://github.com/ufbx/ufbx) | MIT; notice in [`Sources/CUFBX/LICENSE`](Sources/CUFBX/LICENSE) |
+
 ## Acknowledgements
 
 `Examples/FlurryProgram.metal`, `Examples/FlarefunProgram.metal`, and the

@@ -105,7 +105,7 @@ struct GameState {
     pixeltje_physics::SolverContact contacts[contactCapacity];
     float4 rope;        // anchor of the pendulum's rope, its length
     float4 camera;      // camera position, 1 in third person
-    float4 stride;      // character facing yaw, jog seconds, unused, unused
+    float4 stride;      // character facing yaw, jog seconds, camera too close, unused
 };
 
 static_assert(sizeof(GameState) <= 131072,
@@ -1249,6 +1249,7 @@ kernel void placeCamera(device GameState *states [[buffer(1)]],
     device GameState &game = states[0];
     if (game.camera.w < 0.5f) {
         game.camera.xyz = game.player.xyz;
+        game.stride.z = 0.0f;
         return;
     }
     float3 look = pixeltje_3d::forward(game.player.w, game.view.x);
@@ -1257,6 +1258,15 @@ kernel void placeCamera(device GameState *states [[buffer(1)]],
     const float reach = 4.6f;
     SceneHit hit = traceScene(pivot, -look, reach, game);
     float distance = clamp(hit.distance - 0.25f, 0.4f, reach);
+    // A wall can force the camera inside the character. Temporarily use the
+    // eye view until there is room for a third-person camera again.
+    float eyeThreshold = game.stride.z > 0.5f ? 1.2f : 1.0f;
+    if (distance < eyeThreshold) {
+        game.camera.xyz = game.player.xyz;
+        game.stride.z = 1.0f;
+        return;
+    }
+    game.stride.z = 0.0f;
     float3 camera = pivot - look * distance;
     camera.y = max(camera.y, 0.25f);
     game.camera.xyz = camera;
@@ -1408,7 +1418,8 @@ fragment SceneFragment playgroundFragment(ScreenVertex in [[stage_in]],
         color = base * (float3(1.0f, 0.92f, 0.78f) * 1.5f * diffuse
             + float3(0.26f, 0.32f, 0.44f) * (0.3f + 0.45f * sky));
         // A soft contact shadow under the third-person character.
-        if (hit.kind == 1u && game.camera.w > 0.5f)
+        if (hit.kind == 1u && game.camera.w > 0.5f
+            && game.stride.z < 0.5f)
             color *= 0.45f + 0.55f * smoothstep(0.12f, 0.7f,
                 length(point.xz - game.player.xz));
         float fog = 1.0f - exp(-hit.distance * 0.006f);
@@ -1467,7 +1478,8 @@ vertex CharacterVertex characterVertex(uint id [[vertex_id]],
     device const SkinnedModelHeader &header =
         *(device const SkinnedModelHeader *)model;
     // Hidden in first person: the camera is inside the head.
-    if (game.camera.w < 0.5f || id >= header.vertexCount)
+    if (game.camera.w < 0.5f || game.stride.z > 0.5f
+        || id >= header.vertexCount)
         return {float4(0.0f, 0.0f, -2.0f, 1.0f), float3(0.0f), float3(0.0f),
             float3(0.0f)};
     SkinnedVertex v = ((device const SkinnedVertex *)(model

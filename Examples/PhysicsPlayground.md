@@ -56,8 +56,10 @@ node to use another rigged model; the longest animation that moves anything
 plays.
 
 In third person the camera looks over the character's right shoulder and
-moves in front of anything behind it; `placeCamera` runs in present so it
-follows a preview view's writes. The ray-traced scene writes its depth to a
+moves in front of anything behind it. If an obstacle pushes the camera inside
+the character, it temporarily uses the eye view and hides the character until
+there is room again. `placeCamera` runs in present so it follows a preview
+view's writes. The ray-traced scene writes its depth to a
 depth resource, and `characterVertex` skins every vertex between two sampled
 frames in a second, depth-tested render pass. The character turns toward
 where it moves and jogs only while it moves; standing still holds the last

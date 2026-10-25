@@ -111,7 +111,10 @@ public struct PipelineSkinnedModel: Sendable {
     for mesh in list(scene.pointee.meshes) {
       guard let mesh else { continue }
       let skins = list(mesh.pointee.skin_deformers)
-      let skin = skins.first.flatMap { $0 }
+      // An empty skin has no valid joint to index. Treat its mesh as rigid.
+      let skin = skins.first.flatMap { $0 }.flatMap {
+        $0.pointee.clusters.count > 0 ? $0 : nil
+      }
       // Each mesh's clusters get their own bone slots: two meshes can bind
       // the same joint with different geometry_to_bone matrices.
       let firstBone = bones.count
@@ -208,7 +211,13 @@ public struct PipelineSkinnedModel: Sendable {
     }
     let begin = stack?.pointee.time_begin ?? 0
     let seconds = stack.map(duration) ?? 0
-    let frameCount = max(1, Int((seconds * framesPerSecond).rounded()))
+    let samples = seconds * framesPerSecond
+    guard begin.isFinite, samples.isFinite,
+      (0...Double(maximumFrames)).contains(samples) else {
+      throw PipelineEngineError.invalidInvocation(
+        "Load Skinned Model animation has an invalid or excessive time range.")
+    }
+    let frameCount = max(1, Int(samples.rounded()))
     guard frameCount <= maximumFrames,
       headerBytes + vertices.count * vertexBytes
         + frameCount * bones.count * 64 <= maximumBytes else {
