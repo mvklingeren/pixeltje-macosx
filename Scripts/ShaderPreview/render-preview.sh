@@ -14,6 +14,7 @@ sources=(
   "$engine/PipelineMetalPhysics.swift"
   "$engine/PipelineSystemFont.swift"
   "$engine/PipelineSkinnedModel.swift"
+  "$engine/PipelineRadianceHDR.swift"
 )
 ufbx=$project_root/Sources/CUFBX
 binary=${TMPDIR:-/tmp}/pixeltje-shader-preview/render-preview

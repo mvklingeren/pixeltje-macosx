@@ -114,7 +114,7 @@
       "id": "program-text",
       "kind": "primitive.string",
       "parameters": {
-        "value": "{\"version\":1,\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":131072},{\"name\":\"display\",\"kind\":\"texture\"},{\"name\":\"jogger\",\"kind\":\"skinnedModel\",\"input\":\"asset0\"},{\"name\":\"sceneDepth\",\"kind\":\"depth\"}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"linkPlaygroundParts\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advancePlayer\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"restartPlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"supportPlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"collidePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"solvePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"collidePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"solvePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"present\":[{\"kind\":\"compute\",\"function\":\"placeCamera\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"playgroundFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"depth\":\"sceneDepth\"},{\"kind\":\"render\",\"vertex\":\"characterVertex\",\"fragment\":\"characterFragment\",\"target\":\"display\",\"load\":\"load\",\"vertexCountFrom\":\"jogger\",\"depth\":\"sceneDepth\",\"vertexBuffers\":{\"1\":\"game\",\"2\":\"jogger\"},\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"jogger\"}}],\"swaps\":[],\"output\":\"display\"}"
+        "value": "{\"version\":1,\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":131072},{\"name\":\"display\",\"kind\":\"texture\"},{\"name\":\"jogger\",\"kind\":\"skinnedModel\",\"input\":\"asset0\"},{\"name\":\"sceneDepth\",\"kind\":\"depth\"},{\"name\":\"environment\",\"kind\":\"fileTexture\",\"input\":\"textureFile\"}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"linkPlaygroundParts\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advancePlayer\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"restartPlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"supportPlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"collidePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"solvePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"collidePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"solvePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"present\":[{\"kind\":\"compute\",\"function\":\"placeCamera\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"playgroundFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"depth\":\"sceneDepth\",\"fragmentTextures\":{\"2\":\"environment\"}},{\"kind\":\"render\",\"vertex\":\"characterVertex\",\"fragment\":\"characterFragment\",\"target\":\"display\",\"load\":\"load\",\"vertexCountFrom\":\"jogger\",\"depth\":\"sceneDepth\",\"vertexBuffers\":{\"1\":\"game\",\"2\":\"jogger\"},\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"jogger\",\"2\":\"environment\"}}],\"swaps\":[],\"output\":\"display\"}"
       },
       "resources": {},
       "title": "Playground state, GPU passes and character"
@@ -184,6 +184,17 @@
       },
       "resources": {},
       "title": "Character asset"
+    },
+    {
+      "executionState": "enabled",
+      "id": "environment-path",
+      "kind": "primitive.filePath",
+      "parameters": {
+        "mode": "absolute",
+        "path": "/Users/mvklingeren/Downloads/suburban_garden_1k.hdr"
+      },
+      "resources": {},
+      "title": "Environment HDR (Radiance RGBE)"
     }
   ],
   "connections": [
@@ -350,6 +361,17 @@
       "output": {
         "nodeID": "character-assets",
         "port": "assets"
+      }
+    },
+    {
+      "id": "environment-path.value->render.textureFile",
+      "input": {
+        "nodeID": "render",
+        "port": "textureFile"
+      },
+      "output": {
+        "nodeID": "environment-path",
+        "port": "value"
       }
     }
   ],

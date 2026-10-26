@@ -166,6 +166,7 @@ actor PipelineGPUProgram {
     let seed: UInt64
     let framesPerSecond: Double
     let inputImageHashes: [String: String]
+    let fileTextureFingerprint: String?
     let fontFingerprints: [String: String]
     let modelFingerprints: [String: String]
   }
@@ -227,6 +228,8 @@ actor PipelineGPUProgram {
   private var lastLiveTickNanoseconds: UInt64?
   private var pendingLiveTickNanoseconds: UInt64?
   private var cachedAssetHashes: (bundleID: UUID, hashes: [String: String])?
+  private var cachedFileTexture: (url: URL, size: Int, modified: Date,
+    image: PipelineRadianceHDR)?
   private var preparedFonts: [FontKey: PipelineSystemFont.Prepared] = [:]
   private var preparedFontOrder: [FontKey] = []
   private var fontBuffers: [String: any MTLBuffer] = [:]
@@ -475,6 +478,28 @@ actor PipelineGPUProgram {
       fileName: inputs["sourceFile"]?.value(as: String.self),
       sourceMediaRoot: context.sourceMediaRoot)
     try Self.validate(definition, size: size, parameters: dictionary)
+    var fileTexture: PipelineRadianceHDR?
+    if definition.resources.contains(where: { $0.kind == "fileTexture" }) {
+      guard let path = inputs["textureFile"]?.value(as: String.self) else {
+        throw PipelineEngineError.invalidInvocation(
+          "GPU Program file texture needs its Texture File input.")
+      }
+      let url = try PipelineRadianceHDR.url(for: path,
+        sourceMediaRoot: context.sourceMediaRoot)
+      let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+      guard let size = (attributes[.size] as? NSNumber)?.intValue,
+        let modified = attributes[.modificationDate] as? Date else {
+        throw PipelineEngineError.invalidInvocation("GPU Program cannot read file texture.")
+      }
+      if let cached = cachedFileTexture, cached.url == url,
+        cached.size == size, cached.modified == modified {
+        fileTexture = cached.image
+      } else {
+        let image = try PipelineRadianceHDR.load(at: url)
+        cachedFileTexture = (url, size, modified, image)
+        fileTexture = image
+      }
+    }
     let directPreview = previewOnly && Self.canRenderDirectlyToPreview(definition)
     var inputImages: [String: PipelineImageInput] = [:]
     var inputImageHashes: [String: String] = [:]
@@ -558,11 +583,13 @@ actor PipelineGPUProgram {
     let inputBytes = inputImages.values.reduce(0) {
       $0 + $1.width * $1.height * 8 * 4 / 3
     }
+    let fileTextureBytes = fileTexture.map { $0.width * $0.height * 8 * 4 / 3 } ?? 0
     let fontBytes = fonts.values.reduce(0) { $0 + $1.bytes.count }
     let modelBytes = models.values.reduce(0) {
       $0 + $1.bytes.count + $1.textureRGBA8.count
     }
-    guard declaredBytes + inputBytes + fontBytes + modelBytes <= 134_217_728 else {
+    guard declaredBytes + inputBytes + fileTextureBytes + fontBytes + modelBytes
+      <= 134_217_728 else {
       throw PipelineEngineError.invalidInvocation("GPU Program resources exceed 128 MiB.")
     }
     let frame = try context.invocation.integer(
@@ -575,7 +602,9 @@ actor PipelineGPUProgram {
       semanticSHA256: context.semanticSHA256, program: programJSON,
       source: source, parameterJSON: parameterJSON,
       width: width, height: height, seed: seed, framesPerSecond: fps,
-      inputImageHashes: inputImageHashes, fontFingerprints: fontFingerprints,
+      inputImageHashes: inputImageHashes,
+      fileTextureFingerprint: fileTexture?.fingerprint,
+      fontFingerprints: fontFingerprints,
       modelFingerprints: models.mapValues(\.fingerprint))
     let library: any MTLLibrary
     let binaryArchive: (any MTLBinaryArchive)?
@@ -620,6 +649,7 @@ actor PipelineGPUProgram {
     } else {
       working = Session(identity: identity,
         resources: try makeResources(definition, size: size, inputImages: inputImages,
+          fileTexture: fileTexture,
           fonts: fonts, models: models,
           excluding: directPreview ? definition.output : nil),
         nextFrame: 0)
@@ -935,6 +965,15 @@ actor PipelineGPUProgram {
             $0.name != resource.name && $0.kind == "inputTexture" && $0.input == input
           }) else { throw fail("input textures need distinct asset names.") }
         // Input dimensions are checked against the total budget at execution.
+      case "fileTexture":
+        guard resource.bytes == nil, resource.design == nil,
+          resource.weight == nil, resource.strings == nil,
+          resource.input == "textureFile",
+          !program.resources.contains(where: {
+            $0.name != resource.name && $0.kind == "fileTexture"
+          }) else {
+          throw fail("fileTexture needs the unique textureFile input.")
+        }
       case "skinnedModel":
         guard resource.bytes == nil, resource.design == nil,
           resource.weight == nil, resource.strings == nil,
@@ -1030,7 +1069,7 @@ actor PipelineGPUProgram {
           guard let index = Int(slot), (1...15).contains(index),
             (kinds[name] == kind
               || kind == "buffer" && ["systemFont", "skinnedModel"].contains(kinds[name])
-              || kind == "texture" && ["inputTexture", "skinnedModel"]
+              || kind == "texture" && ["inputTexture", "fileTexture", "skinnedModel"]
                 .contains(kinds[name])) else {
             throw fail("binding slots must be 1–15 and match resource types.")
           }
@@ -1097,6 +1136,7 @@ actor PipelineGPUProgram {
   private func makeResources(_ program: Definition,
     size: PipelineMetalRenderSize,
     inputImages: [String: PipelineImageInput],
+    fileTexture: PipelineRadianceHDR?,
     fonts: [String: PipelineSystemFont.Prepared],
     models: [String: PipelineSkinnedModel],
     excluding excluded: String? = nil) throws -> [String: Resource] {
@@ -1144,6 +1184,24 @@ actor PipelineGPUProgram {
           throw PipelineEngineError.invalidInvocation("GPU Program input texture allocation failed.")
         }
         let half = image.rgba.map(Float16.init)
+        half.withUnsafeBytes { bytes in
+          texture.replace(region: MTLRegionMake2D(0, 0, image.width, image.height),
+            mipmapLevel: 0, withBytes: bytes.baseAddress!, bytesPerRow: image.width * 8)
+        }
+        result[item.name] = .inputTexture(texture)
+      } else if item.kind == "fileTexture" {
+        guard let image = fileTexture else {
+          throw PipelineEngineError.invalidInvocation("GPU Program file texture is missing.")
+        }
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+          pixelFormat: .rgba16Float, width: image.width,
+          height: image.height, mipmapped: true)
+        descriptor.storageMode = .shared
+        descriptor.usage = [.shaderRead]
+        guard let texture = queue.device.makeTexture(descriptor: descriptor) else {
+          throw PipelineEngineError.invalidInvocation("GPU Program HDR texture allocation failed.")
+        }
+        let half = image.rgba.map { Float16(min($0, 65_504)) }
         half.withUnsafeBytes { bytes in
           texture.replace(region: MTLRegionMake2D(0, 0, image.width, image.height),
             mipmapLevel: 0, withBytes: bytes.baseAddress!, bytesPerRow: image.width * 8)

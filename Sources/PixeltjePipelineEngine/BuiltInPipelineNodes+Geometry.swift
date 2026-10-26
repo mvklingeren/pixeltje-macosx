@@ -89,6 +89,7 @@ extension PipelineNodeRegistry {
           .init(name: "program", type: .string),
           .init(name: "source", type: .string, isRequired: false),
           .init(name: "sourceFile", type: .string, isRequired: false),
+          .init(name: "textureFile", type: .string, isRequired: false),
           .init(name: "parameters", type: .string, isRequired: false),
           .init(name: "pointerX", type: .number, isRequired: false),
           .init(name: "pointerY", type: .number, isRequired: false),

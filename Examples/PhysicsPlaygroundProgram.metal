@@ -1323,12 +1323,111 @@ vertex ScreenVertex fullscreenVertex(uint vertexID [[vertex_id]]) {
 
 constant float3 sunDirection = float3(0.46f, 0.78f, 0.42f);
 
+// Radiance equirectangular maps arrive as linear half-float textures with a
+// mip chain. Longitude wraps and latitude clamps at the poles.
+float3 environmentRadiance(texture2d<float> environment, float3 d, float lod) {
+    float2 uv = float2(atan2(d.z, d.x) * 0.159154943f + 0.5f,
+        acos(clamp(d.y, -1.0f, 1.0f)) * 0.318309886f);
+    constexpr sampler environmentSampler(coord::normalized,
+        s_address::repeat, t_address::clamp_to_edge,
+        filter::linear, mip_filter::linear);
+    return environment.sample(environmentSampler, uv, level(lod)).rgb;
+}
+
+// The visible sky stays procedural; the HDR map only lights surfaces.
 float3 skyColor(float3 d) {
-    float3 horizon = float3(0.62f, 0.7f, 0.78f);
-    float3 zenith = float3(0.22f, 0.38f, 0.62f);
-    float3 color = mix(horizon, zenith, pow(clamp(d.y, 0.0f, 1.0f), 0.6f));
+    float3 horizon = float3(0.42f, 0.6f, 0.86f);
+    float3 zenith = float3(0.04f, 0.18f, 0.6f);
+    float3 color = mix(horizon, zenith, pow(clamp(d.y, 0.0f, 1.0f), 0.35f));
     float sun = max(dot(d, normalize(sunDirection)), 0.0f);
     return color + float3(1.0f, 0.85f, 0.6f) * pow(sun, 400.0f) * 8.0f;
+}
+
+struct PlaygroundMaterial {
+    float3 albedo;
+    float roughness;
+    float metallic;
+};
+
+PlaygroundMaterial materialForStyle(uint style, float3 albedo, bool broken) {
+    float roughness = 0.88f;
+    float metallic = 0.0f;
+    if (style == styleSteel) {
+        roughness = 0.32f;
+        metallic = 0.9f;
+    } else if (style == styleToy || style == styleBall) {
+        roughness = 0.28f;
+    } else if (style == styleRoof) {
+        roughness = 0.63f;
+        metallic = 0.15f;
+    } else if (style == styleRope) {
+        roughness = 0.95f;
+    } else if (style == styleStone || style == styleBrick) {
+        roughness = 0.92f;
+    }
+    if (broken) {
+        roughness = 0.98f;
+        metallic = 0.0f;
+    }
+    return {albedo, roughness, metallic};
+}
+
+// GGX microfacet sun light with Schlick Fresnel and Smith masking. Diffuse
+// environment light averages five directions on the normal hemisphere;
+// specular light samples roughness-dependent mip levels of the HDR map.
+// Mip filtering is a compact approximation to GGX environment convolution.
+float3 lightMaterial(PlaygroundMaterial material, float3 normal,
+    float3 view, float sunVisibility, texture2d<float> environment) {
+    const float invPi = 0.318309886f;
+    float3 n = normalize(normal);
+    float3 v = normalize(view);
+    float3 l = normalize(sunDirection);
+    float3 h = normalize(v + l);
+    float noV = max(dot(n, v), 0.001f);
+    float noL = max(dot(n, l), 0.0f);
+    float noH = max(dot(n, h), 0.0f);
+    float voH = max(dot(v, h), 0.0f);
+    float roughness = clamp(material.roughness, 0.08f, 1.0f);
+    float alpha = roughness * roughness;
+    float alpha2 = alpha * alpha;
+    float divisor = noH * noH * (alpha2 - 1.0f) + 1.0f;
+    float distribution = alpha2 * invPi / max(divisor * divisor, 0.0001f);
+    float k = (roughness + 1.0f) * (roughness + 1.0f) * 0.125f;
+    float geometry = noV / (noV * (1.0f - k) + k)
+        * noL / max(noL * (1.0f - k) + k, 0.001f);
+    float3 f0 = mix(float3(0.04f), material.albedo, material.metallic);
+    float3 fresnel = pixeltje_3d::fresnelSchlick(voH, f0);
+    float3 diffuse = (1.0f - fresnel) * (1.0f - material.metallic)
+        * material.albedo * invPi;
+    float3 specular = distribution * geometry * fresnel
+        / max(4.0f * noV * noL, 0.001f);
+    float3 sun = (diffuse + specular) * noL * sunVisibility
+        * float3(1.0f, 0.92f, 0.78f) * 3.5f;
+
+    float3 environmentFresnel = f0 + (max(float3(1.0f - roughness), f0)
+        - f0) * pow(1.0f - noV, 5.0f);
+    float environmentLod = float(environment.get_num_mip_levels() - 1u);
+    float diffuseLod = min(environmentLod, 5.0f);
+    float3 tangent = normalize(cross(abs(n.y) < 0.9f
+        ? float3(0.0f, 1.0f, 0.0f) : float3(1.0f, 0.0f, 0.0f), n));
+    float3 bitangent = cross(n, tangent);
+    float3 irradiance = environmentRadiance(environment, n, diffuseLod) * 0.36f;
+    irradiance += environmentRadiance(environment,
+        normalize(n + tangent * 1.2f), diffuseLod) * 0.16f;
+    irradiance += environmentRadiance(environment,
+        normalize(n - tangent * 1.2f), diffuseLod) * 0.16f;
+    irradiance += environmentRadiance(environment,
+        normalize(n + bitangent * 1.2f), diffuseLod) * 0.16f;
+    irradiance += environmentRadiance(environment,
+        normalize(n - bitangent * 1.2f), diffuseLod) * 0.16f;
+    float3 ambientDiffuse = (1.0f - environmentFresnel)
+        * (1.0f - material.metallic) * material.albedo * irradiance;
+    float3 reflected = reflect(-v, n);
+    float specularLod = roughness * roughness * environmentLod;
+    float3 ambientSpecular = environmentFresnel
+        * environmentRadiance(environment, reflected, specularLod)
+        * (1.0f - 0.45f * roughness);
+    return sun + ambientDiffuse + ambientSpecular;
 }
 
 // Mortar courses for brick and stone, planks for wood, all in rest-frame
@@ -1408,7 +1507,8 @@ struct SceneFragment {
 
 fragment SceneFragment playgroundFragment(ScreenVertex in [[stage_in]],
     constant ProgramUniforms &u [[buffer(0)]],
-    device const GameState *states [[buffer(1)]]) {
+    device const GameState *states [[buffer(1)]],
+    texture2d<float> environment [[texture(2)]]) {
     device const GameState &game = states[0];
     float3 origin = game.camera.xyz;
     float3 direction = pixeltje_3d::cameraDirection(in.uv,
@@ -1433,23 +1533,23 @@ fragment SceneFragment playgroundFragment(ScreenVertex in [[stage_in]],
             base = surfaceColor(hit);
         }
         float3 sun = normalize(sunDirection);
-        float diffuse = max(dot(hit.normal, sun), 0.0f);
-        if (diffuse > 0.0f) {
+        float sunVisibility = 1.0f;
+        if (dot(hit.normal, sun) > 0.0f) {
             SceneHit blocker = traceScene(point + hit.normal * 0.01f, sun,
                 60.0f, game);
-            if (blocker.kind != 0u) diffuse = 0.0f;
+            if (blocker.kind != 0u) sunVisibility = 0.0f;
         }
-        float sky = 0.5f + 0.5f * hit.normal.y;
-        color = base * (float3(1.0f, 0.92f, 0.78f) * 1.5f * diffuse
-            + float3(0.26f, 0.32f, 0.44f) * (0.3f + 0.45f * sky));
+        PlaygroundMaterial material = hit.kind == 1u
+            ? materialForStyle(0u, base, false)
+            : materialForStyle(hit.style, base, hit.broken);
+        color = lightMaterial(material, hit.normal, -direction, sunVisibility,
+            environment);
         // A soft contact shadow under the third-person character.
         if (hit.kind == 1u && game.camera.w > 0.5f
             && game.stride.z < 0.5f)
             color *= mix(0.45f + 0.55f * smoothstep(0.12f, 0.7f,
                 length(point.xz - game.player.xz)), 1.0f,
                 clamp((game.player.y - playerEyeHeight) / 2.0f, 0.0f, 1.0f));
-        float fog = 1.0f - exp(-hit.distance * 0.006f);
-        color = mix(color, skyColor(direction) * 0.9f, fog);
     }
     color = pixeltje_3d::filmicToneMap(color);
     float2 pixel = in.uv * u.resolutionTime.xy;
@@ -1542,23 +1642,20 @@ vertex CharacterVertex characterVertex(uint id [[vertex_id]],
         unpack_unorm4x8_to_float(v.color).rgb, float2(v.uv)};
 }
 
-// Lit like the traced scene, without its traced shadows.
+// Lit by the same sun and environment as the traced scene, without its traced
+// shadows. The sRGB atlas is converted to linear by its Metal texture format.
 fragment float4 characterFragment(CharacterVertex in [[stage_in]],
     device const GameState *states [[buffer(1)]],
-    texture2d<float> diffuseAtlas [[texture(1)]]) {
+    texture2d<float> diffuseAtlas [[texture(1)]],
+    texture2d<float> environment [[texture(2)]]) {
     device const GameState &game = states[0];
     constexpr sampler diffuseSampler(coord::normalized, filter::linear,
         address::clamp_to_edge);
     float3 albedo = in.albedo * diffuseAtlas.sample(diffuseSampler, in.uv).rgb;
-    float3 n = normalize(in.normal);
-    float3 sun = normalize(sunDirection);
-    float diffuse = max(dot(n, sun), 0.0f);
-    float sky = 0.5f + 0.5f * n.y;
-    float3 color = albedo * (float3(1.0f, 0.92f, 0.78f) * 1.5f * diffuse
-        + float3(0.26f, 0.32f, 0.44f) * (0.3f + 0.45f * sky));
     float3 view = in.world - game.camera.xyz;
-    float fog = 1.0f - exp(-length(view) * 0.006f);
-    color = mix(color, skyColor(normalize(view)) * 0.9f, fog);
+    PlaygroundMaterial material = {albedo, 0.72f, 0.0f};
+    float3 color = lightMaterial(material, in.normal, -view, 1.0f,
+        environment);
     color = pixeltje_3d::filmicToneMap(color);
     return float4(clamp(pixeltje_3d::linearToSRGB(
         clamp(color, float3(0.0f), float3(1.0f))),

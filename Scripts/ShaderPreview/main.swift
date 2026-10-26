@@ -306,6 +306,14 @@ func skinnedModel(port: String, programID: String) throws -> PipelineSkinnedMode
 let skinnedModels = try Dictionary(uniqueKeysWithValues: program.resources
   .filter { $0.kind == "skinnedModel" }
   .map { ($0.name, try skinnedModel(port: $0.input ?? $0.name, programID: programNodeID)) })
+let fileTextureImage: PipelineRadianceHDR? = try {
+  guard program.resources.contains(where: { $0.kind == "fileTexture" }) else { return nil }
+  guard let path = try value(into: programNodeID, port: "textureFile") as? String else {
+    throw Failure(description: "GPU Program needs its Texture File input.")
+  }
+  let url = try PipelineRadianceHDR.url(for: path, sourceMediaRoot: workflowFolder)
+  return try PipelineRadianceHDR.load(at: url)
+}()
 
 // MARK: Shader source
 
@@ -475,6 +483,28 @@ func makeResources() throws -> [String: Resource] {
       })
     case "inputTexture":
       result[item.name] = .texture(try inputTexture(port: item.input ?? item.name))
+    case "fileTexture":
+      guard let image = fileTextureImage else {
+        throw Failure(description: "GPU Program file texture is missing.")
+      }
+      let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+        pixelFormat: .rgba16Float, width: image.width,
+        height: image.height, mipmapped: true)
+      descriptor.storageMode = .shared
+      descriptor.usage = [.shaderRead]
+      let texture = device.makeTexture(descriptor: descriptor)!
+      let half = image.rgba.map { Float16(min($0, 65_504)) }
+      half.withUnsafeBytes {
+        texture.replace(region: MTLRegionMake2D(0, 0, image.width, image.height),
+          mipmapLevel: 0, withBytes: $0.baseAddress!, bytesPerRow: image.width * 8)
+      }
+      let command = queue.makeCommandBuffer()!
+      let blit = command.makeBlitCommandEncoder()!
+      blit.generateMipmaps(for: texture)
+      blit.endEncoding()
+      command.commit()
+      command.waitUntilCompleted()
+      result[item.name] = .texture(texture)
     case "skinnedModel":
       let model = skinnedModels[item.name]!
       let descriptor = MTLTextureDescriptor.texture2DDescriptor(
