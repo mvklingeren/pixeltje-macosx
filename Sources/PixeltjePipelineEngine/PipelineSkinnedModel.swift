@@ -1,12 +1,15 @@
 // The Shader Preview harness compiles this file on its own, so it depends
 // only on ufbx and Apple frameworks; see Scripts/ShaderPreview.
 import CUFBX
+import CoreGraphics
 import CryptoKit
 import Foundation
+import ImageIO
 import simd
 import Synchronization
 
-/// A skinned, animated triangle model packed for one read-only GPU buffer.
+/// A skinned, animated triangle model packed for one GPU buffer and one
+/// diffuse atlas texture.
 /// Positions are meters in a right-handed, +Y-up space with the model's feet
 /// on y = 0 and its first frame centred on x = z = 0.
 ///
@@ -24,19 +27,20 @@ import Synchronization
 ///   uint framesOffset;
 ///   uint2 reserved;
 /// };
-/// struct SkinnedVertex {           // 48 bytes, bind pose
+/// struct SkinnedVertex {           // 64 bytes, bind pose (8 bytes tail padding)
 ///   packed_float3 position;
 ///   uint color;                    // RGBA8 unorm material colour
 ///   packed_float3 normal;
 ///   uint joints;                   // four 8-bit bone indices
 ///   float4 weights;                // sum to 1
+///   packed_float2 uv;              // diffuse atlas UV, top-left origin
 /// };
 /// // frameCount * boneCount float4x4 skinning matrices, frame-major. Each
 /// // maps a bind-pose position to the model space of that frame.
 /// ```
 public struct PipelineSkinnedModel: Sendable {
   public static let headerBytes = 64
-  public static let vertexBytes = 48
+  public static let vertexBytes = 64
   public static let maximumVertices = 1_048_575
   public static let maximumBones = 256
   public static let maximumFrames = 4_096
@@ -49,7 +53,12 @@ public struct PipelineSkinnedModel: Sendable {
   public let framesPerSecond: Float
   public let boundsMin: SIMD3<Float>
   public let boundsMax: SIMD3<Float>
-  /// SHA-256 of `bytes`, so a GPU Program restarts when the model changes.
+  /// An sRGB RGBA8 atlas of embedded FBX diffuse textures. A white texel is
+  /// used when the FBX has no usable embedded diffuse texture.
+  public let textureRGBA8: Data
+  public let textureWidth: Int
+  public let textureHeight: Int
+  /// SHA-256 of geometry, animation and texture pixels.
   public let fingerprint: String
 
   public enum RootMotion: String, Sendable {
@@ -101,10 +110,121 @@ public struct PipelineSkinnedModel: Sendable {
     var color: UInt32
     var joints: SIMD4<UInt8>
     var weights: SIMD4<Float>
+    var uv: SIMD2<Float>
+  }
+
+  private struct DiffuseAtlas {
+    struct Placement {
+      let width: Int
+      let height: Int
+      let top: Int
+    }
+
+    let pixels: Data
+    let width: Int
+    let height: Int
+    let placements: [UInt32: Placement]
+
+    func uv(_ source: ufbx_vec2, texture: UnsafeMutablePointer<ufbx_texture>?)
+      -> SIMD2<Float> {
+      guard let texture, let place = placements[texture.pointee.typed_id],
+        source.x.isFinite, source.y.isFinite else {
+        return SIMD2(0.5 / Float(width), 0.5 / Float(height))
+      }
+      let rawU = Float(source.x), rawV = Float(source.y)
+      let u = texture.pointee.wrap_u == UFBX_WRAP_REPEAT
+        ? rawU - floor(rawU) : min(max(rawU, 0), 1)
+      let mappedV = texture.pointee.wrap_v == UFBX_WRAP_REPEAT
+        ? rawV - floor(rawV) : min(max(rawV, 0), 1)
+      let v = 1 - mappedV
+      return SIMD2((0.5 + u * Float(place.width - 1)) / Float(width),
+        (Float(place.top) + 0.5 + v * Float(place.height - 1)) / Float(height))
+    }
+  }
+
+  private static func diffuseTexture(_ material: UnsafeMutablePointer<ufbx_material>?)
+    -> UnsafeMutablePointer<ufbx_texture>? {
+    guard let material else { return nil }
+    let pbr = material.pointee.pbr.base_color
+    if pbr.texture_enabled, let texture = pbr.texture { return texture }
+    let fbx = material.pointee.fbx.diffuse_color
+    return fbx.texture_enabled ? fbx.texture : nil
+  }
+
+  private static func makeDiffuseAtlas(_ scene: UnsafeMutablePointer<ufbx_scene>)
+    throws -> DiffuseAtlas {
+    struct Image {
+      let id: UInt32
+      let width: Int
+      let height: Int
+      let pixels: Data
+    }
+    let wanted = Set(list(scene.pointee.materials).compactMap {
+      diffuseTexture($0)?.pointee.typed_id
+    })
+    var images: [Image] = []
+    let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+    for texture in list(scene.pointee.textures) {
+      guard let texture, wanted.contains(texture.pointee.typed_id),
+        let content = texture.pointee.content.data,
+        texture.pointee.content.size > 0 else { continue }
+      let encoded = Data(bytes: content, count: texture.pointee.content.size)
+      guard let source = CGImageSourceCreateWithData(encoded as CFData, nil),
+        let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+        throw PipelineEngineError.invalidInvocation(
+          "Load Skinned Model cannot decode an embedded diffuse texture.")
+      }
+      let width = image.width, height = image.height
+      guard (1...8_192).contains(width), (1...8_192).contains(height),
+        width * height <= 16_777_216 else {
+        throw PipelineEngineError.invalidInvocation(
+          "Load Skinned Model diffuse texture exceeds 8,192 pixels per side or 64 MiB.")
+      }
+      var pixels = Data(count: width * height * 4)
+      let drawn = pixels.withUnsafeMutableBytes { raw -> Bool in
+        guard let context = CGContext(data: raw.baseAddress, width: width,
+          height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+          space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            | CGBitmapInfo.byteOrder32Big.rawValue) else { return false }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return true
+      }
+      guard drawn else {
+        throw PipelineEngineError.invalidInvocation(
+          "Load Skinned Model cannot draw an embedded diffuse texture.")
+      }
+      images.append(Image(id: texture.pointee.typed_id, width: width,
+        height: height, pixels: pixels))
+    }
+    let width = max(1, images.map(\.width).max() ?? 1)
+    let height = 1 + images.reduce(0) { $0 + $1.height }
+    guard height <= 8_192, width * height <= 16_777_216 else {
+      throw PipelineEngineError.invalidInvocation(
+        "Load Skinned Model diffuse atlas exceeds 8,192 pixels per side or 64 MiB.")
+    }
+    var pixels = Data(repeating: 255, count: width * height * 4)
+    var placements: [UInt32: DiffuseAtlas.Placement] = [:]
+    var top = 1
+    pixels.withUnsafeMutableBytes { destination in
+      for image in images {
+        placements[image.id] = .init(width: image.width, height: image.height, top: top)
+        image.pixels.withUnsafeBytes { source in
+          for row in 0..<image.height {
+            destination.baseAddress!.advanced(by: (top + row) * width * 4)
+              .copyMemory(from: source.baseAddress!.advanced(by: row * image.width * 4),
+                byteCount: image.width * 4)
+          }
+        }
+        top += image.height
+      }
+    }
+    return DiffuseAtlas(pixels: pixels, width: width, height: height,
+      placements: placements)
   }
 
   private static func pack(_ scene: UnsafeMutablePointer<ufbx_scene>,
     animation: String?, framesPerSecond: Double, rootMotion: RootMotion) throws -> Self {
+    let atlas = try makeDiffuseAtlas(scene)
     var bones: [Bone] = []
     var vertices: [Vertex] = []
     var faceIndices = [UInt32]()
@@ -153,12 +273,18 @@ public struct PipelineSkinnedModel: Sendable {
           ? Int(faceMaterials.data[faceIndex]) : 0
         let color = material < colors.count ? colors[material]
           : packColor(SIMD3(repeating: 0.8))
+        let texture = material < materials.count
+          ? diffuseTexture(materials[material]) : nil
         for corner in 0..<Int(triangles) * 3 {
           let index = Int(faceIndices[corner])
           let position = vector(positions.values.data[Int(positions.indices.data[index])])
           let normal = normals.exists
             ? vector(normals.values.data[Int(normals.indices.data[index])])
             : SIMD3<Float>(0, 1, 0)
+          let uv = mesh.pointee.vertex_uv.exists
+            ? atlas.uv(mesh.pointee.vertex_uv.values.data[
+                Int(mesh.pointee.vertex_uv.indices.data[index])], texture: texture)
+            : atlas.uv(ufbx_vec2(), texture: nil)
           var joints = SIMD4<UInt8>(repeating: 0)
           var weights = SIMD4<Float>(1, 0, 0, 0)
           joints[0] = UInt8(firstBone)
@@ -182,7 +308,7 @@ public struct PipelineSkinnedModel: Sendable {
             }
           }
           vertices.append(Vertex(position: position, normal: normal, color: color,
-            joints: joints, weights: weights))
+            joints: joints, weights: weights, uv: uv))
         }
         guard vertices.count <= maximumVertices else {
           throw PipelineEngineError.invalidInvocation(
@@ -218,11 +344,14 @@ public struct PipelineSkinnedModel: Sendable {
         "Load Skinned Model animation has an invalid or excessive time range.")
     }
     let frameCount = max(1, Int(samples.rounded()))
-    guard frameCount <= maximumFrames,
-      headerBytes + vertices.count * vertexBytes
-        + frameCount * bones.count * 64 <= maximumBytes else {
+    guard frameCount <= maximumFrames else {
       throw PipelineEngineError.invalidInvocation(
         "Load Skinned Model animation is too long; lower its frame rate.")
+    }
+    guard headerBytes + vertices.count * vertexBytes
+      + frameCount * bones.count * 64 + atlas.pixels.count <= maximumBytes else {
+      throw PipelineEngineError.invalidInvocation(
+        "Load Skinned Model geometry, animation and diffuse textures exceed 64 MiB.")
     }
 
     // Sample one extra frame at the loop's end to measure the hips' travel.
@@ -309,15 +438,22 @@ public struct PipelineSkinnedModel: Sendable {
       append(vertex.normal.x); append(vertex.normal.y); append(vertex.normal.z)
       append(vertex.joints)
       append(vertex.weights)
+      append(vertex.uv.x); append(vertex.uv.y)
+      append(SIMD2<UInt32>.zero)
     }
     for frame in matrices {
       for bone in frame { append(bone) }
     }
     precondition(data.count == framesOffset + frameCount * bones.count * 64)
+    var hash = SHA256()
+    hash.update(data: data)
+    hash.update(data: atlas.pixels)
     return Self(bytes: data, vertexCount: vertices.count, boneCount: bones.count,
       frameCount: frameCount, framesPerSecond: Float(framesPerSecond),
       boundsMin: low, boundsMax: high,
-      fingerprint: SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined())
+      textureRGBA8: atlas.pixels, textureWidth: atlas.width,
+      textureHeight: atlas.height,
+      fingerprint: hash.finalize().map { String(format: "%02x", $0) }.joined())
   }
 
   /// The skinned bone nearest the scene root, such as a Mixamo rig's Hips.
@@ -388,6 +524,7 @@ extension ufbx_mesh_list: UFBXList {}
 extension ufbx_skin_deformer_list: UFBXList {}
 extension ufbx_skin_cluster_list: UFBXList {}
 extension ufbx_material_list: UFBXList {}
+extension ufbx_texture_list: UFBXList {}
 extension ufbx_node_list: UFBXList {}
 extension ufbx_face_list: UFBXList {}
 extension ufbx_anim_stack_list: UFBXList {}

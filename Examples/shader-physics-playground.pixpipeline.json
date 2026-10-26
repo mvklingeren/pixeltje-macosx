@@ -114,10 +114,10 @@
       "id": "program-text",
       "kind": "primitive.string",
       "parameters": {
-        "value": "{\"version\":1,\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":131072},{\"name\":\"display\",\"kind\":\"texture\"},{\"name\":\"jogger\",\"kind\":\"skinnedModel\",\"input\":\"asset0\"},{\"name\":\"sceneDepth\",\"kind\":\"depth\"}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"linkPlaygroundParts\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advancePlayer\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"restartPlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"supportPlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"collidePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"solvePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"collidePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"solvePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"present\":[{\"kind\":\"compute\",\"function\":\"placeCamera\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"playgroundFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"depth\":\"sceneDepth\"},{\"kind\":\"render\",\"vertex\":\"characterVertex\",\"fragment\":\"characterFragment\",\"target\":\"display\",\"load\":\"load\",\"vertexCountFrom\":\"jogger\",\"depth\":\"sceneDepth\",\"vertexBuffers\":{\"1\":\"game\",\"2\":\"jogger\"},\"fragmentBuffers\":{\"1\":\"game\"}}],\"swaps\":[],\"output\":\"display\"}"
+        "value": "{\"version\":1,\"resources\":[{\"name\":\"game\",\"kind\":\"buffer\",\"bytes\":131072},{\"name\":\"display\",\"kind\":\"texture\"},{\"name\":\"jogger\",\"kind\":\"skinnedModel\",\"input\":\"asset0\"},{\"name\":\"sceneDepth\",\"kind\":\"depth\"}],\"initialize\":[{\"kind\":\"compute\",\"function\":\"initializePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"linkPlaygroundParts\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"tick\":[{\"kind\":\"compute\",\"function\":\"advancePlayer\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"restartPlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"supportPlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"collidePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"solvePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"collidePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"compute\",\"function\":\"solvePlayground\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}}],\"present\":[{\"kind\":\"compute\",\"function\":\"placeCamera\",\"threads\":[1],\"buffers\":{\"1\":\"game\"}},{\"kind\":\"render\",\"vertex\":\"fullscreenVertex\",\"fragment\":\"playgroundFragment\",\"target\":\"display\",\"load\":\"clear\",\"vertexCount\":3,\"fragmentBuffers\":{\"1\":\"game\"},\"depth\":\"sceneDepth\"},{\"kind\":\"render\",\"vertex\":\"characterVertex\",\"fragment\":\"characterFragment\",\"target\":\"display\",\"load\":\"load\",\"vertexCountFrom\":\"jogger\",\"depth\":\"sceneDepth\",\"vertexBuffers\":{\"1\":\"game\",\"2\":\"jogger\"},\"fragmentBuffers\":{\"1\":\"game\"},\"fragmentTextures\":{\"1\":\"jogger\"}}],\"swaps\":[],\"output\":\"display\"}"
       },
       "resources": {},
-      "title": "Playground state, GPU passes and jogger"
+      "title": "Playground state, GPU passes and character"
     },
     {
       "executionState": "enabled",
@@ -135,7 +135,7 @@
         "spaceAction": "secondary"
       },
       "resources": {},
-      "title": "Look · click shoots · Space fires a cannonball"
+      "title": "Look · click shoots · Space jumps"
     },
     {
       "executionState": "enabled",
@@ -143,17 +143,18 @@
       "kind": "input.directionPad",
       "parameters": {},
       "resources": {},
-      "title": "WASD movement · R rebuilds · F third person"
+      "title": "WASD move · C cannonball · R rebuild · F third person"
     },
     {
       "executionState": "enabled",
       "id": "jogger-path",
-      "kind": "primitive.string",
+      "kind": "primitive.filePath",
       "parameters": {
-        "value": "~/Downloads/Jogging.fbx"
+        "mode": "absolute",
+        "path": "/Users/mvklingeren/Downloads/Yaku-Walking.fbx"
       },
       "resources": {},
-      "title": "Character FBX (Mixamo Jogging)"
+      "title": "Character FBX (Mixamo Yaku Walking)"
     },
     {
       "executionState": "enabled",
@@ -168,7 +169,7 @@
         "rootMotion": "inPlace"
       },
       "resources": {},
-      "title": "Jogger · skinned model"
+      "title": "Walking character · skinned model"
     },
     {
       "executionState": "enabled",

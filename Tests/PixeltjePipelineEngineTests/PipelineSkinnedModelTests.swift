@@ -8,6 +8,8 @@ import Testing
 /// A local Mixamo export; it cannot be committed, so the test skips without it.
 private let joggingFBX = FileManager.default.homeDirectoryForCurrentUser
   .appendingPathComponent("Downloads/Jogging.fbx")
+private let yakuFBX = FileManager.default.homeDirectoryForCurrentUser
+  .appendingPathComponent("Downloads/Yaku-Walking.fbx")
 
 @Test func loadSkinnedModelPacksMixamoJogLoop() throws {
   guard FileManager.default.fileExists(atPath: joggingFBX.path) else { return }
@@ -21,6 +23,7 @@ private let joggingFBX = FileManager.default.homeDirectoryForCurrentUser
   #expect(model.bytes.count == PipelineSkinnedModel.headerBytes
     + model.vertexCount * PipelineSkinnedModel.vertexBytes
     + model.frameCount * model.boneCount * 64)
+  #expect(model.textureRGBA8.count == model.textureWidth * model.textureHeight * 4)
 
   model.bytes.withUnsafeBytes { raw in
     #expect(raw.load(fromByteOffset: 0, as: UInt32.self) == UInt32(model.vertexCount))
@@ -33,6 +36,17 @@ private let joggingFBX = FileManager.default.homeDirectoryForCurrentUser
       #expect(Int(joints.max()) < model.boneCount)
     }
   }
+}
+
+@Test func loadSkinnedModelReadsYakuEmbeddedDiffuseTextures() throws {
+  guard FileManager.default.fileExists(atPath: yakuFBX.path) else { return }
+  let model = try PipelineSkinnedModel.load(fbx: yakuFBX)
+  #expect(model.textureWidth > 1)
+  #expect(model.textureHeight > 1)
+  #expect(model.textureRGBA8.count == model.textureWidth * model.textureHeight * 4)
+  let samples = stride(from: 0, to: model.textureRGBA8.count, by: 4_001)
+    .map { model.textureRGBA8[$0] }
+  #expect(Set(samples).count > 16)
 }
 
 @Test func loadSkinnedModelNodeResolvesHomePaths() throws {
@@ -53,17 +67,19 @@ private func triangleModel(z: Float) -> PipelineSkinnedModel {
   func append<T>(_ value: T) { withUnsafeBytes(of: value) { data.append(contentsOf: $0) } }
   append(UInt32(3)); append(UInt32(1)); append(UInt32(1)); append(Float(30))
   append(SIMD4<Float>(-1, -1, z, 0)); append(SIMD4<Float>(1, 1, z, 0))
-  append(UInt32(64)); append(UInt32(64 + 3 * 48)); append(SIMD2<UInt32>.zero)
+  append(UInt32(64)); append(UInt32(64 + 3 * 64)); append(SIMD2<UInt32>.zero)
   for corner in [SIMD2<Float>(-1, -1), SIMD2(3, -1), SIMD2(-1, 3)] {
     append(corner.x); append(corner.y); append(z)
-    append(UInt32(0xFF00_00FF))
+    append(UInt32(0xFFFF_FFFF))
     append(Float(0)); append(Float(0)); append(Float(1))
     append(SIMD4<UInt8>.zero)
     append(SIMD4<Float>(1, 0, 0, 0))
+    append(Float(0.5)); append(Float(0.5)); append(SIMD2<UInt32>.zero)
   }
   append(matrix_identity_float4x4)
   return PipelineSkinnedModel(bytes: data, vertexCount: 3, boneCount: 1, frameCount: 1,
     framesPerSecond: 30, boundsMin: SIMD3(-1, -1, z), boundsMax: SIMD3(1, 1, z),
+    textureRGBA8: Data([255, 0, 0, 255]), textureWidth: 1, textureHeight: 1,
     fingerprint: "triangle-\(z)")
 }
 
@@ -79,8 +95,8 @@ private func triangleModel(z: Float) -> PipelineSkinnedModel {
   struct Header { uint vertexCount, boneCount, frameCount; float fps;
     float4 boundsMin, boundsMax; uint verticesOffset, framesOffset; uint2 reserved; };
   struct SkinnedVertex { packed_float3 position; uint color; packed_float3 normal;
-    uint joints; float4 weights; };
-  struct Out { float4 position [[position]]; float4 color; };
+    uint joints; float4 weights; packed_float2 uv; };
+  struct Out { float4 position [[position]]; float4 color; float2 uv; };
   struct Back { float4 color [[color(0)]]; float depth [[depth(any)]]; };
   vertex float4 fullscreenVertex(uint index [[vertex_id]]) {
     float2 p = float2((index << 1u) & 2u, index & 2u);
@@ -97,9 +113,13 @@ private func triangleModel(z: Float) -> PipelineSkinnedModel {
     device const float4x4 *bones = (device const float4x4 *)(model + header.framesOffset);
     SkinnedVertex v = vertices[id];
     float4 p = bones[v.joints & 0xFFu] * float4(float3(v.position), 1.0f);
-    return { float4(p.xy, p.z, 1.0f), unpack_unorm4x8_to_float(v.color) };
+    return { float4(p.xy, p.z, 1.0f), unpack_unorm4x8_to_float(v.color), float2(v.uv) };
   }
-  fragment float4 modelFragment(Out in [[stage_in]]) { return in.color; }
+  fragment float4 modelFragment(Out in [[stage_in]],
+    texture2d<float> diffuse [[texture(1)]]) {
+    constexpr sampler s(coord::normalized, filter::linear);
+    return in.color * diffuse.sample(s, in.uv);
+  }
   """
   let program = """
   {"version":1,"resources":[{"name":"model","kind":"skinnedModel","input":"asset0"},
@@ -110,7 +130,8 @@ private func triangleModel(z: Float) -> PipelineSkinnedModel {
   "target":"display","load":"clear","vertexCount":3,"depth":"sceneDepth"},
   {"kind":"render","vertex":"modelVertex","fragment":"modelFragment","target":"display",
   "load":"load","vertexCountFrom":"model","depth":"sceneDepth",
-  "vertexBuffers":{"1":"model"}}],"swaps":[],"output":"display"}
+  "vertexBuffers":{"1":"model"},"fragmentTextures":{"1":"model"}}],
+  "swaps":[],"output":"display"}
   """
   let fullSource = source + "\nkernel void noop(device uint *u [[buffer(1)]]) {}\n"
   let device = try #require(MTLCreateSystemDefaultDevice())

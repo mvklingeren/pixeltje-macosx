@@ -2,11 +2,13 @@
 
 Open `shader-physics-playground.pixpipeline.json` in the Pipeline Editor with
 `PhysicsPlaygroundProgram.metal` beside it and run its Loop. Move the pointer
-to look around, hold W/A/S/D to walk, click to shoot and press Space to fire a
-heavy cannonball. R rebuilds the scene. F switches between first person and a third-person
-camera behind a jogging character. The yard holds a cottage with a brick
-chimney on its own footing, a stone tower of four drums, a garden wall, a
-post-and-lintel gate, a crate pyramid and a row of dominoes.
+to look around, hold W/A/S/D to walk, click to shoot, press Space to jump, and
+press C to fire a heavy cannonball. Right click and J also trigger the jump
+because they share the Trackpad's second action with Space. R rebuilds the scene. F switches between
+first person and a third-person camera behind a walking character. The yard
+holds a cottage with a brick chimney on its own footing, a stone tower of four
+drums, a garden wall, a post-and-lintel gate, a crate pyramid and a row of
+dominoes.
 
 Painted toy cubes and balls in the foreground, and a ball hanging on a rope
 from a steel frame, never break: a shot or a hit only pushes them, so they
@@ -47,13 +49,22 @@ the same support rules (`HauntedSupport.metal`) and solver
 
 ## Third-person character
 
-The character is a skinned FBX model. A Load Skinned Model node reads
-`~/Downloads/Jogging.fbx` (a Mixamo "Jogging" export, not part of the
-repository) through the vendored ufbx library, samples its animation at 30
-fps with the hips' net travel removed, and an Asset Cache hands it to the GPU
-Program as a `skinnedModel` resource. Change the path in the "Character FBX"
-node to use another rigged model; the longest animation that moves anything
-plays.
+The character is a skinned FBX model. A File Path node points to
+`/Users/mvklingeren/Downloads/Yaku-Walking.fbx` (a Mixamo export outside the
+repository). Its file picker can choose another FBX; choose **Absolute** for
+a file outside the workflow folder or **Relative** for one inside it. The
+Load Skinned Model node reads it through the vendored ufbx library, samples
+one animation at 30 fps with the hips' net travel removed, and packs its
+embedded diffuse textures into an atlas. An Asset Cache hands the geometry,
+animation and texture to the GPU Program as one `skinnedModel` resource.
+Yaku-Walking has one
+animation stack, `mixamo.com`, lasting about 1.02 seconds. The loader's
+Animation field can select a named stack when an FBX has several; when it is
+empty the loader chooses the longest moving stack. Only one stack is packed
+for a Run, so this example cannot change animation clips during play. Space
+currently lifts the character with a physical jump while holding its current
+walking pose; a separate jump clip would need to be supplied and wired for
+runtime clip switching.
 
 In third person the camera looks over the character's right shoulder and
 moves in front of anything behind it. If an obstacle pushes the camera inside
@@ -62,8 +73,8 @@ there is room again. `placeCamera` runs in present so it follows a preview
 view's writes. The ray-traced scene writes its depth to a
 depth resource, and `characterVertex` skins every vertex between two sampled
 frames in a second, depth-tested render pass. The character turns toward
-where it moves and jogs only while it moves; standing still holds the last
-stride. It is lit like the scene and casts a soft contact shadow, but not the
-scene's traced sun shadow, and shots pass through it. Offline views are in
-`Scripts/ShaderPreview/physics-playground-jogger.views.json`; they hold F on
+where it moves and walks only while grounded; standing still or jumping holds
+the last stride. It is lit like the scene and casts a soft contact shadow, but
+not the scene's traced sun shadow, and shots pass through it. Offline views are
+in `Scripts/ShaderPreview/physics-playground-character.views.json`; they hold F on
 their first frame to switch to third person.

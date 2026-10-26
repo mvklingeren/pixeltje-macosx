@@ -11,8 +11,8 @@ using namespace metal;
 // four-point contact manifolds. Painted toy cubes and balls, and a ball
 // hanging on a rope from a steel frame, never break: a shot only pushes
 // them. The haunted house uses the same support rules and solver for its
-// buildings. F switches to a third-person camera behind a skinned, jogging
-// character loaded from an FBX file.
+// buildings. F switches to a third-person camera behind a skinned character
+// loaded from an FBX file. Space jumps, and C launches a cannonball.
 struct ProgramUniforms {
     float4 resolutionTime;
     uint4 frameSeed;
@@ -54,6 +54,8 @@ constant uint styleRope = 9u;
 constant uint styleBall = 10u;
 
 constant uint fKey = 262144u;         // WASD Pad bit for F
+constant uint cKey = 8u;              // WASD Pad bit for C
+constant float playerEyeHeight = 1.7f;
 
 constant ulong firstColumn = 0x0101010101010101ul;
 constant ulong lastColumn = 0x8080808080808080ul;
@@ -105,7 +107,8 @@ struct GameState {
     pixeltje_physics::SolverContact contacts[contactCapacity];
     float4 rope;        // anchor of the pendulum's rope, its length
     float4 camera;      // camera position, 1 in third person
-    float4 stride;      // character facing yaw, jog seconds, camera too close, unused
+    float4 stride;      // character facing yaw, walk seconds, camera too close,
+                        // vertical jump speed
 };
 
 static_assert(sizeof(GameState) <= 131072,
@@ -249,7 +252,8 @@ void addToy(device GameState &game, uint slot, float3 centre, float3 extent,
 
 __attribute__((noinline))
 void buildPlayground(device GameState &game) {
-    game.player = float4(-1.0f, 1.7f, 15.0f, -0.12f);
+    game.player = float4(-1.0f, playerEyeHeight, 15.0f, -0.12f);
+    game.stride.w = 0.0f;
     game.view = float4(0.04f, game.view.y, 0.0f, game.view.w);
     game.clock = float4(0.0f, game.clock.y, 0.0f, 0.0f);
     game.counts = uint4(0u, 0u, 0u, 0u);
@@ -756,13 +760,31 @@ kernel void advancePlayer(constant ProgramUniforms &u [[buffer(0)]],
         position.y += delta.y;
     game.player.xz = position;
 
-    // The character turns toward where it moves and jogs while it moves.
+    // The Trackpad's Space action is delivered as a transient secondary
+    // action count. Jump only from the ground; gravity returns the eye and
+    // the skinned character to their shared rest height.
+    uint secondary = uint(u.movement.z);
+    if (secondary > uint(game.view.w)
+        && game.player.y <= playerEyeHeight + 0.001f)
+        game.stride.w = 5.6f;
+    game.view.w = float(secondary);
+    if (game.player.y > playerEyeHeight || game.stride.w > 0.0f) {
+        game.player.y += game.stride.w * dt - 4.9f * dt * dt;
+        game.stride.w -= 9.8f * dt;
+        if (game.player.y <= playerEyeHeight) {
+            game.player.y = playerEyeHeight;
+            game.stride.w = 0.0f;
+        }
+    }
+
+    // The character turns toward movement and walks only while grounded.
     if (length(move) > 0.01f) {
         float target = atan2(delta.x, -delta.y);
         float turn = target - game.stride.x;
         turn -= 6.2831853f * floor((turn + 3.1415927f) / 6.2831853f);
         game.stride.x += clamp(turn, -10.0f * dt, 10.0f * dt);
-        game.stride.y += dt * 1.25f * length(move);
+        if (game.player.y <= playerEyeHeight)
+            game.stride.y += dt * length(move);
     }
 
     // In third person, shots leave from the camera along the crosshair.
@@ -785,11 +807,9 @@ kernel void advancePlayer(constant ProgramUniforms &u [[buffer(0)]],
         }
     }
     game.view.y = float(action);
-    uint secondary = uint(u.movement.z);
-    if (secondary > uint(game.view.w))
+    if ((keys & cKey) != 0u && (previousKeys & cKey) == 0u)
         launchCannonball(game, game.player.xyz - float3(0.0f, 0.3f, 0.0f),
             direction);
-    game.view.w = float(secondary);
 }
 
 // ----------------------------------------------------------------- support
@@ -1254,7 +1274,10 @@ kernel void placeCamera(device GameState *states [[buffer(1)]],
     }
     float3 look = pixeltje_3d::forward(game.player.w, game.view.x);
     float3 right = normalize(cross(look, float3(0.0f, 1.0f, 0.0f)));
-    float3 pivot = float3(game.player.x, 1.9f, game.player.z) + right * 0.55f;
+    // Follow some of the rise, leaving the avatar visibly above the ground.
+    float rise = max(game.player.y - playerEyeHeight, 0.0f);
+    float3 pivot = float3(game.player.x, 1.9f + 0.35f * rise,
+        game.player.z) + right * 0.55f;
     const float reach = 4.6f;
     SceneHit hit = traceScene(pivot, -look, reach, game);
     float distance = clamp(hit.distance - 0.25f, 0.4f, reach);
@@ -1420,8 +1443,9 @@ fragment SceneFragment playgroundFragment(ScreenVertex in [[stage_in]],
         // A soft contact shadow under the third-person character.
         if (hit.kind == 1u && game.camera.w > 0.5f
             && game.stride.z < 0.5f)
-            color *= 0.45f + 0.55f * smoothstep(0.12f, 0.7f,
-                length(point.xz - game.player.xz));
+            color *= mix(0.45f + 0.55f * smoothstep(0.12f, 0.7f,
+                length(point.xz - game.player.xz)), 1.0f,
+                clamp((game.player.y - playerEyeHeight) / 2.0f, 0.0f, 1.0f));
         float fog = 1.0f - exp(-hit.distance * 0.006f);
         color = mix(color, skyColor(direction) * 0.9f, fog);
     }
@@ -1459,6 +1483,7 @@ struct SkinnedVertex {
     packed_float3 normal;
     uint joints;
     float4 weights;
+    packed_float2 uv;
 };
 
 struct CharacterVertex {
@@ -1466,9 +1491,10 @@ struct CharacterVertex {
     float3 world;
     float3 normal;
     float3 albedo;
+    float2 uv;
 };
 
-// Skins one vertex between the two sampled frames around the jog clock,
+// Skins one vertex between the two sampled frames around the walk clock,
 // then turns the character to its facing and stands it at the player.
 vertex CharacterVertex characterVertex(uint id [[vertex_id]],
     constant ProgramUniforms &u [[buffer(0)]],
@@ -1481,7 +1507,7 @@ vertex CharacterVertex characterVertex(uint id [[vertex_id]],
     if (game.camera.w < 0.5f || game.stride.z > 0.5f
         || id >= header.vertexCount)
         return {float4(0.0f, 0.0f, -2.0f, 1.0f), float3(0.0f), float3(0.0f),
-            float3(0.0f)};
+            float3(0.0f), float2(0.0f)};
     SkinnedVertex v = ((device const SkinnedVertex *)(model
         + header.verticesOffset))[id];
     device const float4x4 *bones = (device const float4x4 *)(model
@@ -1505,23 +1531,28 @@ vertex CharacterVertex characterVertex(uint id [[vertex_id]],
     float turn = 3.1415927f - game.stride.x;
     float c = cos(turn), s = sin(turn);
     float3 world = float3(c * local.x + s * local.z, local.y,
-        -s * local.x + c * local.z) + float3(game.player.x, 0.0f,
+        -s * local.x + c * local.z) + float3(game.player.x,
+        game.player.y - playerEyeHeight,
         game.player.z);
     normal = float3(c * normal.x + s * normal.z, normal.y,
         -s * normal.x + c * normal.z);
     return {cameraClip(world, game, u.resolutionTime.xy), world, normal,
-        unpack_unorm4x8_to_float(v.color).rgb};
+        unpack_unorm4x8_to_float(v.color).rgb, float2(v.uv)};
 }
 
 // Lit like the traced scene, without its traced shadows.
 fragment float4 characterFragment(CharacterVertex in [[stage_in]],
-    device const GameState *states [[buffer(1)]]) {
+    device const GameState *states [[buffer(1)]],
+    texture2d<float> diffuseAtlas [[texture(1)]]) {
     device const GameState &game = states[0];
+    constexpr sampler diffuseSampler(coord::normalized, filter::linear,
+        address::clamp_to_edge);
+    float3 albedo = in.albedo * diffuseAtlas.sample(diffuseSampler, in.uv).rgb;
     float3 n = normalize(in.normal);
     float3 sun = normalize(sunDirection);
     float diffuse = max(dot(n, sun), 0.0f);
     float sky = 0.5f + 0.5f * n.y;
-    float3 color = in.albedo * (float3(1.0f, 0.92f, 0.78f) * 1.5f * diffuse
+    float3 color = albedo * (float3(1.0f, 0.92f, 0.78f) * 1.5f * diffuse
         + float3(0.26f, 0.32f, 0.44f) * (0.3f + 0.45f * sky));
     float3 view = in.world - game.camera.xyz;
     float fog = 1.0f - exp(-length(view) * 0.006f);

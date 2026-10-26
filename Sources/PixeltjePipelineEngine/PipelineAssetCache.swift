@@ -266,7 +266,7 @@ actor PipelineAssetCache {
           throw PipelineEngineError.invalidInvocation(
             "Asset Cache \(name) needs a skinned model.")
         }
-        bytes += model.bytes.count
+        bytes += model.bytes.count + model.textureRGBA8.count
         values[name] = value
       default:
         throw PipelineEngineError.invalidInvocation(

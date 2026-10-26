@@ -411,7 +411,7 @@ let queue = device.makeCommandQueue()!
 enum Resource {
   case buffer(any MTLBuffer)
   case texture(any MTLTexture)
-  case model(any MTLBuffer, vertexCount: Int)
+  case model(any MTLBuffer, texture: any MTLTexture, vertexCount: Int)
   case depth(any MTLTexture)
 }
 
@@ -477,9 +477,20 @@ func makeResources() throws -> [String: Resource] {
       result[item.name] = .texture(try inputTexture(port: item.input ?? item.name))
     case "skinnedModel":
       let model = skinnedModels[item.name]!
+      let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+        pixelFormat: .rgba8Unorm_srgb, width: model.textureWidth,
+        height: model.textureHeight, mipmapped: false)
+      descriptor.storageMode = .shared
+      descriptor.usage = [.shaderRead]
+      let texture = device.makeTexture(descriptor: descriptor)!
+      model.textureRGBA8.withUnsafeBytes { pixels in
+        texture.replace(region: MTLRegionMake2D(0, 0,
+          model.textureWidth, model.textureHeight), mipmapLevel: 0,
+          withBytes: pixels.baseAddress!, bytesPerRow: model.textureWidth * 4)
+      }
       result[item.name] = .model(model.bytes.withUnsafeBytes {
         device.makeBuffer(bytes: $0.baseAddress!, length: $0.count, options: .storageModeShared)!
-      }, vertexCount: model.vertexCount)
+      }, texture: texture, vertexCount: model.vertexCount)
     case "depth":
       let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .depth32Float,
         width: width, height: height, mipmapped: false)
@@ -536,14 +547,18 @@ final class Renderer {
       for (slot, name) in mapping ?? [:] {
         guard let index = Int(slot) else { continue }
         switch resources[name] {
-        case .buffer(let buffer)?, .model(let buffer, _)?: set(buffer, index)
+        case .buffer(let buffer)?, .model(let buffer, _, _)?: set(buffer, index)
         default: break
         }
       }
     }
     func textures(_ mapping: [String: String]?, _ set: (any MTLTexture, Int) -> Void) {
       for (slot, name) in mapping ?? [:] {
-        if let index = Int(slot), case .texture(let texture)? = resources[name] { set(texture, index) }
+        guard let index = Int(slot) else { continue }
+        switch resources[name] {
+        case .texture(let texture)?, .model(_, let texture, _)?: set(texture, index)
+        default: break
+        }
       }
     }
     for pass in passes {
@@ -630,7 +645,7 @@ final class Renderer {
         textures(pass.vertexTextures) { encoder.setVertexTexture($0, index: $1) }
         textures(pass.fragmentTextures) { encoder.setFragmentTexture($0, index: $1) }
         var vertexCount = pass.vertexCount ?? 0
-        if let name = pass.vertexCountFrom, case .model(_, let count)? = resources[name] {
+        if let name = pass.vertexCountFrom, case .model(_, _, let count)? = resources[name] {
           vertexCount = count
         }
         encoder.drawPrimitives(type: .triangle, vertexStart: 0,

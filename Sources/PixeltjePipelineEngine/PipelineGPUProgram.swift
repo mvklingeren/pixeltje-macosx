@@ -150,7 +150,7 @@ actor PipelineGPUProgram {
     case immutableBuffer(any MTLBuffer)
     case texture(any MTLTexture)
     case inputTexture(any MTLTexture)
-    case model(any MTLBuffer, vertexCount: Int)
+    case model(any MTLBuffer, texture: any MTLTexture, vertexCount: Int)
     case depth(any MTLTexture)
   }
 
@@ -559,7 +559,9 @@ actor PipelineGPUProgram {
       $0 + $1.width * $1.height * 8 * 4 / 3
     }
     let fontBytes = fonts.values.reduce(0) { $0 + $1.bytes.count }
-    let modelBytes = models.values.reduce(0) { $0 + $1.bytes.count }
+    let modelBytes = models.values.reduce(0) {
+      $0 + $1.bytes.count + $1.textureRGBA8.count
+    }
     guard declaredBytes + inputBytes + fontBytes + modelBytes <= 134_217_728 else {
       throw PipelineEngineError.invalidInvocation("GPU Program resources exceed 128 MiB.")
     }
@@ -1028,7 +1030,8 @@ actor PipelineGPUProgram {
           guard let index = Int(slot), (1...15).contains(index),
             (kinds[name] == kind
               || kind == "buffer" && ["systemFont", "skinnedModel"].contains(kinds[name])
-              || kind == "texture" && kinds[name] == "inputTexture") else {
+              || kind == "texture" && ["inputTexture", "skinnedModel"]
+                .contains(kinds[name])) else {
             throw fail("binding slots must be 1–15 and match resource types.")
           }
         }
@@ -1154,7 +1157,22 @@ actor PipelineGPUProgram {
           }) else {
           throw PipelineEngineError.invalidInvocation("GPU Program skinned model allocation failed.")
         }
-        result[item.name] = .model(buffer, vertexCount: model.vertexCount)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+          pixelFormat: .rgba8Unorm_srgb, width: model.textureWidth,
+          height: model.textureHeight, mipmapped: false)
+        descriptor.storageMode = .shared
+        descriptor.usage = [.shaderRead]
+        guard let texture = queue.device.makeTexture(descriptor: descriptor) else {
+          throw PipelineEngineError.invalidInvocation(
+            "GPU Program skinned model diffuse texture allocation failed.")
+        }
+        model.textureRGBA8.withUnsafeBytes { pixels in
+          texture.replace(region: MTLRegionMake2D(0, 0,
+            model.textureWidth, model.textureHeight), mipmapLevel: 0,
+            withBytes: pixels.baseAddress!, bytesPerRow: model.textureWidth * 4)
+        }
+        result[item.name] = .model(buffer, texture: texture,
+          vertexCount: model.vertexCount)
       } else if item.kind == "depth" {
         result[item.name] = .depth(try makeDepth(size.width, size.height))
       } else {
@@ -1297,8 +1315,8 @@ actor PipelineGPUProgram {
         copies[name] = .texture(copy)
       case .inputTexture(let source):
         copies[name] = .inputTexture(source)
-      case .model(let source, let vertexCount):
-        copies[name] = .model(source, vertexCount: vertexCount)
+      case .model(let source, let texture, let vertexCount):
+        copies[name] = .model(source, texture: texture, vertexCount: vertexCount)
       case .depth(let source):
         copies[name] = .depth(try makeDepth(source.width, source.height))
       }
@@ -1491,7 +1509,7 @@ actor PipelineGPUProgram {
         }
         var vertexCount = pass.vertexCount ?? 0
         if let name = pass.vertexCountFrom {
-          guard case .model(_, let count)? = resources[name] else {
+          guard case .model(_, _, let count)? = resources[name] else {
             throw PipelineEngineError.invalidInvocation("GPU Program skinned model is missing.")
           }
           vertexCount = count
@@ -1527,7 +1545,7 @@ actor PipelineGPUProgram {
     for (slot, name) in mapping ?? [:] {
       if let index = Int(slot) {
         switch resources[name] {
-        case .buffer(let buffer)?, .immutableBuffer(let buffer)?, .model(let buffer, _)?:
+        case .buffer(let buffer)?, .immutableBuffer(let buffer)?, .model(let buffer, _, _)?:
           set(buffer, index)
         default: break
         }
@@ -1540,7 +1558,8 @@ actor PipelineGPUProgram {
     for (slot, name) in mapping ?? [:] {
       guard let index = Int(slot) else { continue }
       switch resources[name] {
-      case .texture(let texture)?, .inputTexture(let texture)?: set(texture, index)
+      case .texture(let texture)?, .inputTexture(let texture)?,
+        .model(_, let texture, _)?: set(texture, index)
       default: break
       }
     }
