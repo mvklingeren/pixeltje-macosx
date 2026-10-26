@@ -1334,6 +1334,13 @@ float3 environmentRadiance(texture2d<float> environment, float3 d, float lod) {
     return environment.sample(environmentSampler, uv, level(lod)).rgb;
 }
 
+// Diffuse fill from a blurred level of the map, capped so the map's own sun
+// (peaks near 21000 in suburban_garden_1k) does not light surfaces a second
+// time beside the directional sun. Sharper levels read as glossy streaks.
+float3 environmentFill(texture2d<float> environment, float3 d, float lod) {
+    return min(environmentRadiance(environment, d, lod), float3(1.0f));
+}
+
 // The visible sky stays procedural; the HDR map only lights surfaces.
 float3 skyColor(float3 d) {
     float3 horizon = float3(0.42f, 0.6f, 0.86f);
@@ -1347,6 +1354,7 @@ struct PlaygroundMaterial {
     float3 albedo;
     float roughness;
     float metallic;
+    float specular; // scales sun and environment highlights
 };
 
 PlaygroundMaterial materialForStyle(uint style, float3 albedo, bool broken) {
@@ -1369,7 +1377,7 @@ PlaygroundMaterial materialForStyle(uint style, float3 albedo, bool broken) {
         roughness = 0.98f;
         metallic = 0.0f;
     }
-    return {albedo, roughness, metallic};
+    return {albedo, roughness, metallic, 1.0f};
 }
 
 // GGX microfacet sun light with Schlick Fresnel and Smith masking. Diffuse
@@ -1400,25 +1408,25 @@ float3 lightMaterial(PlaygroundMaterial material, float3 normal,
     float3 diffuse = (1.0f - fresnel) * (1.0f - material.metallic)
         * material.albedo * invPi;
     float3 specular = distribution * geometry * fresnel
-        / max(4.0f * noV * noL, 0.001f);
+        / max(4.0f * noV * noL, 0.001f) * material.specular;
     float3 sun = (diffuse + specular) * noL * sunVisibility
         * float3(1.0f, 0.92f, 0.78f) * 3.5f;
 
     float3 environmentFresnel = f0 + (max(float3(1.0f - roughness), f0)
         - f0) * pow(1.0f - noV, 5.0f);
     float environmentLod = float(environment.get_num_mip_levels() - 1u);
-    float diffuseLod = min(environmentLod, 5.0f);
+    float diffuseLod = max(environmentLod - 3.0f, 0.0f); // 8x4 for a 1k map
     float3 tangent = normalize(cross(abs(n.y) < 0.9f
         ? float3(0.0f, 1.0f, 0.0f) : float3(1.0f, 0.0f, 0.0f), n));
     float3 bitangent = cross(n, tangent);
-    float3 irradiance = environmentRadiance(environment, n, diffuseLod) * 0.36f;
-    irradiance += environmentRadiance(environment,
+    float3 irradiance = environmentFill(environment, n, diffuseLod) * 0.36f;
+    irradiance += environmentFill(environment,
         normalize(n + tangent * 1.2f), diffuseLod) * 0.16f;
-    irradiance += environmentRadiance(environment,
+    irradiance += environmentFill(environment,
         normalize(n - tangent * 1.2f), diffuseLod) * 0.16f;
-    irradiance += environmentRadiance(environment,
+    irradiance += environmentFill(environment,
         normalize(n + bitangent * 1.2f), diffuseLod) * 0.16f;
-    irradiance += environmentRadiance(environment,
+    irradiance += environmentFill(environment,
         normalize(n - bitangent * 1.2f), diffuseLod) * 0.16f;
     float3 ambientDiffuse = (1.0f - environmentFresnel)
         * (1.0f - material.metallic) * material.albedo * irradiance;
@@ -1426,7 +1434,7 @@ float3 lightMaterial(PlaygroundMaterial material, float3 normal,
     float specularLod = roughness * roughness * environmentLod;
     float3 ambientSpecular = environmentFresnel
         * environmentRadiance(environment, reflected, specularLod)
-        * (1.0f - 0.45f * roughness);
+        * (1.0f - 0.45f * roughness) * material.specular;
     return sun + ambientDiffuse + ambientSpecular;
 }
 
@@ -1653,7 +1661,8 @@ fragment float4 characterFragment(CharacterVertex in [[stage_in]],
         address::clamp_to_edge);
     float3 albedo = in.albedo * diffuseAtlas.sample(diffuseSampler, in.uv).rgb;
     float3 view = in.world - game.camera.xyz;
-    PlaygroundMaterial material = {albedo, 0.72f, 0.0f};
+    // Skin and cloth: matte, with faint highlights so rims stay soft.
+    PlaygroundMaterial material = {albedo, 0.8f, 0.0f, 0.2f};
     float3 color = lightMaterial(material, in.normal, -view, 1.0f,
         environment);
     color = pixeltje_3d::filmicToneMap(color);

@@ -56,10 +56,12 @@ file there if needed. The GPU Program decodes the linked file in linear light
 and uses it only for diffuse fill and roughness-filtered reflections; the
 visible sky stays procedural and there is no distance fog. The file stays
 outside the repository and must be present to run the example. Mip filtering
-and five-direction diffuse sampling approximate environment convolution; scene
-objects do not appear in reflections. Traced
-sun shadows still cover the scene; the character uses the same lighting model
-with a fixed nonmetallic material but does not receive those traced shadows.
+and five-direction diffuse sampling approximate environment convolution; the
+diffuse fill is capped so the map's own sun does not light surfaces twice.
+Scene objects do not appear in reflections. The character's material is matte
+with faint highlights. Traced sun shadows still cover the scene; the character
+uses the same lighting model with a fixed nonmetallic material but does not
+receive those traced shadows.
 
 ## Third-person character
 
