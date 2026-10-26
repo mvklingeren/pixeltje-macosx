@@ -3,7 +3,7 @@
 Open `shader-physics-playground.pixpipeline.json` in the Pipeline Editor with
 `PhysicsPlaygroundProgram.metal` beside it and run its Loop. Move the pointer
 to look around, hold W/A/S/D to walk, click to shoot, press Space to jump, and
-press C to fire a heavy cannonball. Right click and J also trigger the jump
+press C to launch the heavy box. Right click and J also trigger the jump
 because they share the Trackpad's second action with Space. R rebuilds the scene. F switches between
 first person and a third-person camera behind a walking character. The yard
 holds a cottage with a brick chimney on its own footing, a stone tower of four
@@ -74,7 +74,8 @@ view's writes. The ray-traced scene writes its depth to a
 depth resource, and `characterVertex` skins every vertex between two sampled
 frames in a second, depth-tested render pass. The character turns toward
 where it moves and walks only while grounded; standing still or jumping holds
-the last stride. It is lit like the scene and casts a soft contact shadow, but
+the last stride. Movement is about 1.93 m/s, matching the distance covered by
+Yaku's walking cycle. It is lit like the scene and casts a soft contact shadow, but
 not the scene's traced sun shadow, and shots pass through it. Offline views are
 in `Scripts/ShaderPreview/physics-playground-character.views.json`; they hold F on
 their first frame to switch to third person.

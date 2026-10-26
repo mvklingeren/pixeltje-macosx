@@ -12,7 +12,7 @@ using namespace metal;
 // hanging on a rope from a steel frame, never break: a shot only pushes
 // them. The haunted house uses the same support rules and solver for its
 // buildings. F switches to a third-person camera behind a skinned character
-// loaded from an FBX file. Space jumps, and C launches a cannonball.
+// loaded from an FBX file. Space jumps, and C launches the heavy box.
 struct ProgramUniforms {
     float4 resolutionTime;
     uint4 frameSeed;
@@ -56,6 +56,8 @@ constant uint styleBall = 10u;
 constant uint fKey = 262144u;         // WASD Pad bit for F
 constant uint cKey = 8u;              // WASD Pad bit for C
 constant float playerEyeHeight = 1.7f;
+// Yaku's 1.99 m walking cycle is sampled into a 31-frame loop at 30 fps.
+constant float walkingSpeed = 1.93f;
 
 constant ulong firstColumn = 0x0101010101010101ul;
 constant ulong lastColumn = 0x8080808080808080ul;
@@ -752,7 +754,7 @@ kernel void advancePlayer(constant ProgramUniforms &u [[buffer(0)]],
     if (length(move) > 1.0f) move = normalize(move);
     float yaw = game.player.w;
     float2 delta = (float2(cos(yaw), sin(yaw)) * move.x
-        + float2(sin(yaw), -cos(yaw)) * move.y) * 5.0f * dt;
+        + float2(sin(yaw), -cos(yaw)) * move.y) * walkingSpeed * dt;
     float2 position = game.player.xz;
     if (!playerBlocked(game, position + float2(delta.x, 0.0f)))
         position.x += delta.x;

@@ -143,7 +143,7 @@
       "kind": "input.directionPad",
       "parameters": {},
       "resources": {},
-      "title": "WASD move · C cannonball · R rebuild · F third person"
+      "title": "WASD walk · C shoots heavy box · R rebuild · F third person"
     },
     {
       "executionState": "enabled",
