@@ -1,0 +1,30 @@
+{
+  "width": 960,
+  "height": 600,
+  "views": [
+    { "name": "crate-climb", "frames": 110,
+      "pointer": [0.519099, 0.5737, 0, 0],
+      "initialWrites": [ { "buffer": "game", "floats": [-6.4, 1.7, 7.0, 0] } ],
+      "inputs": [ { "frame": 0, "movement": [0, 1, 0, 262144] },
+                  { "frame": 45, "movement": [0, 1, 1, 262144] },
+                  { "frame": 65, "movement": [0, 0, 1, 262144] } ] },
+    { "name": "wall-hole", "frames": 128,
+      "pointer": [0.519099, 0.5737, 0, 0],
+      "movement": [0, 1, 0, 262144],
+      "initialWrites": [
+        { "buffer": "game", "floats": [8.0, 1.7, 0.5, 0] },
+        { "buffer": "game", "offset": 1736, "uints": [6168, 0] },
+        { "buffer": "game", "offset": 52, "uints": [1] } ] },
+    { "name": "tower-rubble-climb", "frames": 470,
+      "pointer": [0.519099, 0.5737, 0, 0],
+      "initialWrites": [
+        { "buffer": "game", "floats": [-3.1, 1.7, -1.0, 0] },
+        { "buffer": "game", "offset": 1704, "uints": [257, 0] },
+        { "buffer": "game", "offset": 52, "uints": [1] },
+        { "buffer": "game", "offset": 80, "floats": [0, 0, -1, 0] } ],
+      "inputs": [ { "frame": 0, "movement": [0, 0, 0, 262144] },
+                  { "frame": 300, "movement": [0, 1, 0, 262144] },
+                  { "frame": 365, "movement": [0, 1, 1, 262144] },
+                  { "frame": 405, "movement": [0, 0, 1, 262144] } ] }
+  ]
+}

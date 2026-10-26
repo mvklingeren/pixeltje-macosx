@@ -42,7 +42,14 @@ The bodies use the `// pixeltje:physics-v1` solver: `boxBoxManifold` and
 `boxPlaneManifold` return up to four contact points, `prepareContact` and
 `solveContact` apply accumulated impulses with resting friction, and
 `integrateVelocity` and `integratePosition` bracket the solve. The tick runs
-two substeps, each as a collide pass and a solve pass. Offline views are in
+two substeps, each as a collide pass and a solve pass.
+
+The player collides with the same geometry: the alive cells of each part and
+every body where it lies now. `movePlayer`, a tick pass after `advancePlayer`,
+blocks the player against anything taller than a 0.45 m step, lifts them onto
+anything lower, and lands a jump or a fall on the highest top beneath them, so
+rubble, crates and fallen chunks can be climbed. A tilted body counts as its
+world bounds. Offline views are in
 `Scripts/ShaderPreview/physics-playground.views.json`. The haunted house uses
 the same support rules (`HauntedSupport.metal`) and solver
 (`HauntedPhysicsWorld.metal`).

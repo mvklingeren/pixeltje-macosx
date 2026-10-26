@@ -56,6 +56,9 @@ constant uint styleBall = 10u;
 constant uint fKey = 262144u;         // WASD Pad bit for F
 constant uint cKey = 8u;              // WASD Pad bit for C
 constant float playerEyeHeight = 1.7f;
+constant float playerHeight = 1.8f;
+constant float playerRadius = 0.35f;
+constant float playerStep = 0.45f;    // highest ledge walked onto unjumped
 // Yaku's 1.99 m walking cycle is sampled into a 31-frame loop at 30 fps.
 constant float walkingSpeed = 1.93f;
 
@@ -700,17 +703,53 @@ void breakCell(device GameState &game, uint index, uint bit,
 
 // ------------------------------------------------------------------ player
 
-bool playerBlocked(device const GameState &game, float2 p) {
-    if (any(abs(p) > float2(30.0f))) return true;
+// What the player meets standing on `feet` at p: the highest top within a
+// step, to stand on, and whether anything taller overlaps the body.
+struct PlayerProbe {
+    float floor;
+    bool blocked;
+};
+
+bool besidePlayer(float3 lower, float3 upper, float2 p, float feet) {
+    float2 gap = max(max(lower.xz - p, p - upper.xz), float2(0.0f));
+    return length(gap) < playerRadius && lower.y < feet + playerHeight;
+}
+
+void probeBox(thread PlayerProbe &probe, float3 lower, float3 upper,
+    float2 p, float feet) {
+    if (!besidePlayer(lower, upper, p, feet)) return;
+    if (upper.y <= feet + playerStep) probe.floor = max(probe.floor, upper.y);
+    else probe.blocked = true;
+}
+
+// The player collides with what the solver collides with: the alive cells
+// of the parts and the bodies where they are now, not the initial boxes.
+// shortcut: a tilted body counts as its world bounds, so the player stands
+// a little high on tipped rubble; trace its rotated box if that shows.
+__attribute__((noinline))
+PlayerProbe probePlayer(device const GameState &game, float2 p, float feet) {
+    PlayerProbe probe = {0.0f, any(abs(p) > float2(30.0f))};
     uint count = min(game.counts.x, partCapacity);
     for (uint i = 0u; i < count; ++i) {
         Part part = game.parts[i];
-        if (part.lower.y > 1.8f || partAlive(game, i) == 0ul) continue;
-        float2 gap = max(max(part.lower.xz - p, p - part.upper.xz),
-            float2(0.0f));
-        if (length(gap) < 0.35f) return true;
+        if (!besidePlayer(part.lower.xyz, part.upper.xyz, p, feet)) continue;
+        for (ulong cells = partAlive(game, i); cells != 0ul;
+            cells &= cells - 1ul) {
+            float3 lower, upper;
+            cellBox(part, uint(ctz(cells)), lower, upper);
+            probeBox(probe, lower, upper, p, feet);
+        }
     }
-    return false;
+    for (uint i = 0u; i < bodyCapacity; ++i) {
+        pixeltje_physics::RigidBody body = game.world.bodies[i];
+        if (body.extentState.w == 0.0f) continue;
+        float3 reach = game.pieces[i].kind == 4u
+            ? float3(body.extentState.x)
+            : pixeltje_physics::boxHalfBounds(body);
+        probeBox(probe, body.centreMass.xyz - reach,
+            body.centreMass.xyz + reach, p, feet);
+    }
+    return probe;
 }
 
 void launchCannonball(device GameState &game, float3 origin,
@@ -750,48 +789,9 @@ kernel void advancePlayer(constant ProgramUniforms &u [[buffer(0)]],
     game.view.x = (0.5f - clamp(u.pointer.y, 0.0f, 1.0f)) * 1.9f + 0.04f;
     game.view.z = max(game.view.z - dt, 0.0f);
 
-    float2 move = clamp(u.movement.xy, float2(-1.0f), float2(1.0f));
-    if (length(move) > 1.0f) move = normalize(move);
-    float yaw = game.player.w;
-    float2 delta = (float2(cos(yaw), sin(yaw)) * move.x
-        + float2(sin(yaw), -cos(yaw)) * move.y) * walkingSpeed * dt;
-    float2 position = game.player.xz;
-    if (!playerBlocked(game, position + float2(delta.x, 0.0f)))
-        position.x += delta.x;
-    if (!playerBlocked(game, position + float2(0.0f, delta.y)))
-        position.y += delta.y;
-    game.player.xz = position;
-
-    // The Trackpad's Space action is delivered as a transient secondary
-    // action count. Jump only from the ground; gravity returns the eye and
-    // the skinned character to their shared rest height.
-    uint secondary = uint(u.movement.z);
-    if (secondary > uint(game.view.w)
-        && game.player.y <= playerEyeHeight + 0.001f)
-        game.stride.w = 5.6f;
-    game.view.w = float(secondary);
-    if (game.player.y > playerEyeHeight || game.stride.w > 0.0f) {
-        game.player.y += game.stride.w * dt - 4.9f * dt * dt;
-        game.stride.w -= 9.8f * dt;
-        if (game.player.y <= playerEyeHeight) {
-            game.player.y = playerEyeHeight;
-            game.stride.w = 0.0f;
-        }
-    }
-
-    // The character turns toward movement and walks only while grounded.
-    if (length(move) > 0.01f) {
-        float target = atan2(delta.x, -delta.y);
-        float turn = target - game.stride.x;
-        turn -= 6.2831853f * floor((turn + 3.1415927f) / 6.2831853f);
-        game.stride.x += clamp(turn, -10.0f * dt, 10.0f * dt);
-        if (game.player.y <= playerEyeHeight)
-            game.stride.y += dt * length(move);
-    }
-
     // In third person, shots leave from the camera along the crosshair.
     float3 eye = game.camera.w > 0.5f ? game.camera.xyz : game.player.xyz;
-    float3 direction = pixeltje_3d::forward(yaw, game.view.x);
+    float3 direction = pixeltje_3d::forward(game.player.w, game.view.x);
     uint action = uint(u.pointer.z);
     if (action > uint(game.view.y)) {
         game.view.z = 0.12f;
@@ -812,6 +812,71 @@ kernel void advancePlayer(constant ProgramUniforms &u [[buffer(0)]],
     if ((keys & cKey) != 0u && (previousKeys & cKey) == 0u)
         launchCannonball(game, game.player.xyz - float3(0.0f, 0.3f, 0.0f),
             direction);
+}
+
+// Walking and jumping, a pass of their own so the player's collision probes
+// do not compile into one kernel with the shot's scene trace.
+kernel void movePlayer(constant ProgramUniforms &u [[buffer(0)]],
+    device GameState *states [[buffer(1)]],
+    uint id [[thread_position_in_grid]]) {
+    if (id != 0u || states[0].control.x != 0u) return;
+    device GameState &game = states[0];
+    float dt = clamp(u.pointer.w > 0.0f ? u.pointer.w : u.resolutionTime.w,
+        0.0f, 0.1f);
+    float2 move = clamp(u.movement.xy, float2(-1.0f), float2(1.0f));
+    if (length(move) > 1.0f) move = normalize(move);
+    float yaw = game.player.w;
+    float2 delta = (float2(cos(yaw), sin(yaw)) * move.x
+        + float2(sin(yaw), -cos(yaw)) * move.y) * walkingSpeed * dt;
+    float2 position = game.player.xz;
+    float feet = game.player.y - playerEyeHeight;
+    // shortcut: a body that lands on the player frees every move until they
+    // step out of it; push the player out instead if walking through shows.
+    bool stuck = probePlayer(game, position, feet).blocked;
+    if (stuck || !probePlayer(game, position + float2(delta.x, 0.0f),
+        feet).blocked)
+        position.x += delta.x;
+    if (stuck || !probePlayer(game, position + float2(0.0f, delta.y),
+        feet).blocked)
+        position.y += delta.y;
+    game.player.xz = position;
+
+    // The Trackpad's Space action is delivered as a transient secondary
+    // action count. Jump only from something underfoot; gravity lands the
+    // eye and the skinned character on the highest top beneath them, and a
+    // ledge within a step lifts them onto it.
+    float ground = probePlayer(game, position, feet).floor;
+    uint secondary = uint(u.movement.z);
+    if (secondary > uint(game.view.w) && feet <= ground + 0.001f)
+        game.stride.w = 5.6f;
+    game.view.w = float(secondary);
+    if (feet > ground || game.stride.w > 0.0f) {
+        float rise = game.stride.w * dt - 4.9f * dt * dt;
+        game.stride.w -= 9.8f * dt;
+        if (rise > 0.0f && !stuck
+            && probePlayer(game, position, feet + rise).blocked) {
+            rise = 0.0f; // the head meets something overhead
+            game.stride.w = 0.0f;
+        }
+        feet += rise;
+        if (feet <= ground) {
+            feet = ground;
+            game.stride.w = 0.0f;
+        }
+    } else {
+        feet = ground;
+    }
+    game.player.y = feet + playerEyeHeight;
+
+    // The character turns toward movement and walks only while grounded.
+    if (length(move) > 0.01f) {
+        float target = atan2(delta.x, -delta.y);
+        float turn = target - game.stride.x;
+        turn -= 6.2831853f * floor((turn + 3.1415927f) / 6.2831853f);
+        game.stride.x += clamp(turn, -10.0f * dt, 10.0f * dt);
+        if (feet <= ground)
+            game.stride.y += dt * length(move);
+    }
 }
 
 // ----------------------------------------------------------------- support
