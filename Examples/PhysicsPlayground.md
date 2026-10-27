@@ -54,9 +54,26 @@ world bounds. Offline views are in
 the same support rules (`HauntedSupport.metal`) and solver
 (`HauntedPhysicsWorld.metal`).
 
-The scene uses a GGX microfacet BRDF for its directional sun. Brick, stone,
-wood, roof, steel, rope, and painted toys each have roughness and metallic
-values; newly exposed fracture faces become rough and nonmetallic. The
+The scene uses a GGX microfacet BRDF for its directional sun. Its materials
+are procedural and live in the rest frame, so a falling chunk carries its
+pattern:
+
+- Brick, stone and the cottage's boards lie in running-bond courses with
+  recessed joints. Each brick, block or board has its own shade, and smooth
+  value noise mottles it. Crates have a raised frame and slatted boards.
+- Joints, seams and noise relief bend the shading normal through finite
+  differences one pixel wide. Box edges round over 2 cm, so they catch the
+  light.
+- Roughness varies with the mortar, the grain and the mottling. The frame is
+  bare brushed steel, and the roof is a dark nonmetallic sheet. The grass has
+  lush and dry patches instead of a checkerboard.
+- Newly exposed fracture faces become paler, rough and nonmetallic.
+
+Every pattern knows how wide a pixel is on the surface and fades detail
+smaller than that to its average, so mortar and grass do not shimmer in the
+distance. The scene and the character render into `sceneColor`, and an
+FXAA-style pass, the same as the haunted house's, smooths the edges that one
+ray per pixel leaves into `display`. The crosshair is drawn after it. The
 `Environment HDR` File Path node links to
 `~/Downloads/suburban_garden_1k.hdr`; choose another Radiance RGBE `.hdr`
 file there if needed. The GPU Program decodes the linked file in linear light
@@ -83,8 +100,8 @@ objects do not appear in reflections. Ambient occlusion darkens the fill and
 the reflections where parts and bodies crowd a surface: a present pass,
 `gatherOccluders`, lists each part as the box of its alive cells and every
 body but the shards, and the fragment combines the exact cosine-weighted form
-factors of the boxes and balls within 3 m, faded out from 2 m. The character's material is matte with
-faint highlights. It uses the same lighting model with a fixed nonmetallic
+factors of the boxes and balls within 3 m, faded out from 2 m. The
+character's material is matte with faint highlights. It uses the same lighting model with a fixed nonmetallic
 material, but receives neither the traced shadows nor ambient occlusion.
 
 ## Third-person character

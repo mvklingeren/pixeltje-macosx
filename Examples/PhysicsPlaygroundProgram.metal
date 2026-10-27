@@ -1450,7 +1450,7 @@ float3 skyFill(device const GameState &game, float3 n) {
 }
 
 // The average colour of the yard's grass, which lights from below.
-constant float3 grassAlbedo = float3(0.26f, 0.32f, 0.185f);
+constant float3 grassAlbedo = float3(0.26f, 0.31f, 0.14f);
 
 // Splits the environment once into a sun and a sky. Texels far brighter than
 // the map's mean are the sun: their direction and irradiance light the scene
@@ -1655,29 +1655,6 @@ struct PlaygroundMaterial {
     float specular; // scales sun and environment highlights
 };
 
-PlaygroundMaterial materialForStyle(uint style, float3 albedo, bool broken) {
-    float roughness = 0.88f;
-    float metallic = 0.0f;
-    if (style == styleSteel) {
-        roughness = 0.32f;
-        metallic = 0.9f;
-    } else if (style == styleToy || style == styleBall) {
-        roughness = 0.28f;
-    } else if (style == styleRoof) {
-        roughness = 0.63f;
-        metallic = 0.15f;
-    } else if (style == styleRope) {
-        roughness = 0.95f;
-    } else if (style == styleStone || style == styleBrick) {
-        roughness = 0.92f;
-    }
-    if (broken) {
-        roughness = 0.98f;
-        metallic = 0.0f;
-    }
-    return {albedo, roughness, metallic, 1.0f};
-}
-
 // GGX microfacet sun light with Schlick Fresnel and Smith masking, from the
 // sun lightFromEnvironment found. Diffuse ambient light comes from the
 // environment's spherical harmonics; specular light samples
@@ -1733,72 +1710,272 @@ float3 lightMaterial(PlaygroundMaterial material, float3 normal,
     return sun + ambientDiffuse + ambientSpecular;
 }
 
-// Mortar courses for brick and stone, planks for wood, all in rest-frame
-// coordinates so a falling chunk carries its pattern with it.
-float3 surfaceColor(SceneHit hit) {
-    float3 p = hit.local;
-    float3 n = abs(hit.normal);
-    float2 face = n.x > 0.5f ? p.zy : (n.z > 0.5f ? p.xy : p.xz);
-    float3 base;
-    float grain = hash11(floor(face.x * 3.0f) + floor(face.y * 7.0f) * 17.0f);
-    if (hit.style == styleBrick) {
-        float2 brick = float2(face.x / 0.5f
-            + 0.5f * fmod(floor(face.y / 0.22f), 2.0f), face.y / 0.22f);
-        float2 edge = abs(fract(brick) - 0.5f);
-        float mortar = step(0.44f, edge.x) + step(0.4f, edge.y);
-        base = mix(float3(0.42f, 0.16f, 0.11f) * (0.8f + 0.4f * grain),
-            float3(0.55f, 0.52f, 0.47f), clamp(mortar, 0.0f, 1.0f));
-    } else if (hit.style == styleStone) {
-        float2 block = float2(face.x / 0.8f
-            + 0.5f * fmod(floor(face.y / 0.55f), 2.0f), face.y / 0.55f);
-        float2 edge = abs(fract(block) - 0.5f);
-        float joint = step(0.47f, max(edge.x, edge.y));
-        base = mix(float3(0.5f, 0.48f, 0.44f) * (0.85f + 0.3f * grain),
-            float3(0.3f, 0.29f, 0.27f), joint);
-    } else if (hit.style == styleWood) {
-        float plank = fract(face.y / 0.3f);
-        base = float3(0.36f, 0.24f, 0.14f) * (0.8f + 0.35f * grain)
-            * (plank < 0.06f ? 0.55f : 1.0f);
-    } else if (hit.style == styleRoof) {
-        base = float3(0.2f, 0.22f, 0.25f) * (0.85f + 0.3f * grain);
-    } else if (hit.style == styleCrate) {
-        float2 edge = abs(fract(face / 0.9f + 0.5f) - 0.5f);
-        base = float3(0.55f, 0.38f, 0.18f) * (0.85f + 0.25f * grain)
-            * (max(edge.x, edge.y) > 0.42f ? 0.6f : 1.0f);
-    } else if (hit.style == styleSteel) {
-        float band = fract(dot(p, float3(1.0f, 0.37f, 1.0f)) * 1.5f);
-        base = float3(0.2f, 0.27f, 0.34f) * (0.9f + 0.15f * band);
-    } else if (hit.style == styleToy || hit.style == styleBall) {
+// ---------------------------------------------------------------- materials
+
+// Integer lattice hash in [0, 1).
+float latticeHash(int2 c) {
+    uint n = uint(c.x) * 3u + uint(c.y) * 113u;
+    n = (n << 13u) ^ n;
+    n = n * (n * n * 15731u + 789221u) + 1376312589u;
+    return float(n & 0x0fffffffu) / 268435456.0f;
+}
+
+float valueNoise(float2 p) {
+    int2 c = int2(floor(p));
+    float2 f = fract(p);
+    float2 s = f * f * (3.0f - 2.0f * f);
+    return mix(mix(latticeHash(c), latticeHash(c + int2(1, 0)), s.x),
+        mix(latticeHash(c + int2(0, 1)), latticeHash(c + int2(1, 1)), s.x),
+        s.y);
+}
+
+// Four octaves of value noise with cells of 1 / frequency metres and
+// smaller, mean 0.5. An octave fades to its mean once its cells shrink to a
+// few pixels, so distant surfaces stay calm instead of shimmering.
+float fbm(float2 p, float frequency, float footprint) {
+    float sum = 0.0f, amplitude = 0.5f;
+    for (uint i = 0u; i < 4u; ++i) {
+        float detail = 1.0f - smoothstep(0.2f, 0.5f, footprint * frequency);
+        sum += amplitude * mix(0.5f,
+            valueNoise(p * frequency + float(i) * 7.31f), detail);
+        frequency *= 2.0f;
+        amplitude *= 0.5f;
+    }
+    return sum / 0.9375f;
+}
+
+// Running bond: blocks `size` metres with joints `joint` wide, every other
+// course shifted half a block. Returns 0 in a joint and 1 on a block, and
+// the block's id. Once blocks shrink to a few pixels the pattern becomes
+// its average, so mortar never flickers in the distance.
+float coursedBlocks(float2 face, float2 size, float joint, float footprint,
+    thread float2 &id) {
+    float course = floor(face.y / size.y);
+    float2 q = float2(face.x / size.x + 0.5f * fmod(abs(course), 2.0f),
+        face.y / size.y);
+    id = floor(q);
+    float2 edge = (0.5f - abs(fract(q) - 0.5f)) * size;
+    float sharp = smoothstep(0.5f * joint,
+        0.5f * joint + max(footprint, 0.004f), min(edge.x, edge.y));
+    float mean = (1.0f - joint / size.x) * (1.0f - joint / size.y);
+    return mix(sharp, mean, smoothstep(0.1f, 0.4f, footprint / size.y));
+}
+
+// How each style's surface is raised and how rough it is: the depth of its
+// joints or seams, the depth and frequency of its noise relief, and its
+// roughness. Index 0 is the grass.
+struct StyleLook {
+    float jointDepth;
+    float grainDepth;
+    float grainFrequency;
+    float roughness;
+};
+
+constant StyleLook styleLooks[11] = {
+    {0.0f, 0.002f, 25.0f, 0.95f},       // grass
+    {0.006f, 0.0015f, 18.0f, 0.88f},    // brick
+    {0.01f, 0.004f, 6.0f, 0.85f},       // stone
+    {0.006f, 0.0008f, 12.0f, 0.75f},    // wood
+    {0.0f, 0.0015f, 6.0f, 0.7f},        // roof
+    {0.012f, 0.0008f, 12.0f, 0.7f},     // crate
+    {0.0f, 0.001f, 8.0f, 0.55f},        // cannon box
+    {0.0f, 0.0f, 1.0f, 0.5f},           // steel
+    {0.0f, 0.0f, 1.0f, 0.3f},           // toy
+    {0.0f, 0.0f, 1.0f, 0.95f},          // rope
+    {0.0f, 0.0f, 1.0f, 0.3f}};          // ball
+
+// The 0-1 relief of a face: brick, stone and boards in courses on the
+// scene's rest coordinates so neighbouring parts line up, and a crate's
+// raised frame and slats on its own face, centred at faceCentre with half
+// size faceHalf.
+float faceRelief(uint style, float2 face, float2 faceCentre, float2 faceHalf,
+    float footprint, thread float2 &id) {
+    id = float2(0.0f);
+    if (style == styleBrick)
+        return coursedBlocks(face, float2(0.5f, 0.22f), 0.012f, footprint,
+            id);
+    if (style == styleStone)
+        return coursedBlocks(face, float2(0.8f, 0.55f), 0.014f, footprint,
+            id);
+    if (style == styleWood)
+        return coursedBlocks(face, float2(2.4f, 0.3f), 0.01f, footprint, id);
+    if (style != styleCrate) return 1.0f;
+    float2 centred = face - faceCentre;
+    float2 inset = faceHalf - abs(centred);
+    float width = max(footprint, 0.003f);
+    float frame = 1.0f - smoothstep(0.07f, 0.07f + width,
+        min(inset.x, inset.y));
+    float gap = (0.5f - abs(fract(centred.x / 0.15f) - 0.5f)) * 0.15f;
+    float sharp = mix(0.65f * smoothstep(0.003f, 0.003f + width, gap), 1.0f,
+        frame);
+    id = float2(floor(centred.x / 0.15f), frame > 0.5f ? 1.0f : 0.0f);
+    return mix(sharp, 0.7f, smoothstep(0.1f, 0.4f, footprint / 0.15f));
+}
+
+// The height of a face above its base plane in metres: joints and seams
+// below the face, noise relief on top. Fracture faces are rough throughout.
+float faceHeight(uint style, bool broken, float2 face, float2 faceCentre,
+    float2 faceHalf, float footprint, thread float2 &id,
+    thread float &relief) {
+    StyleLook look = styleLooks[min(style, 10u)];
+    relief = faceRelief(style, face, faceCentre, faceHalf, footprint, id);
+    return relief * look.jointDepth + (broken ? 0.02f : look.grainDepth)
+        * fbm(face, broken ? 5.0f : look.grainFrequency, footprint);
+}
+
+struct SurfacePoint {
+    PlaygroundMaterial material;
+    float3 normal;   // world shading normal with relief and rounded edges
+};
+
+// The material and shading normal where a ray hit, worked out in the rest
+// frame so a falling chunk carries its pattern. footprint is the width of
+// the pixel on the surface in metres; detail smaller than that fades to its
+// average.
+SurfacePoint shadeSurface(SceneHit hit, float3 point, float footprint,
+    device const GameState &game) {
+    float4 orientation = hit.kind == 3u
+        ? game.world.bodies[hit.index].orientation
+        : float4(0.0f, 0.0f, 0.0f, 1.0f);
+    float3 normal = pixeltje_physics::unrotate(orientation, hit.normal);
+    uint style = hit.kind == 1u ? 0u : hit.style;
+    float3 p = hit.kind == 1u ? point : hit.local;
+
+    // The box the point lies on, for rounded edges and a crate's boards.
+    float3 lower = p, upper = p;
+    if (hit.kind == 2u) {
+        lower = game.parts[hit.index].lower.xyz;
+        upper = game.parts[hit.index].upper.xyz;
+    } else if (hit.kind == 3u && style != styleBall) {
+        Piece piece = game.pieces[hit.index];
+        lower = piece.lower.xyz;
+        upper = piece.upper.xyz;
+        if (piece.kind == 1u) {
+            Part source = game.parts[uint(piece.upper.w) - 1u];
+            lower = max(lower, source.lower.xyz);
+            upper = min(upper, source.upper.xyz);
+        }
+        // Toys report the point over their half extent.
+        if (style == styleToy)
+            p = 0.5f * (lower + upper) + p * 0.5f * (upper - lower);
+    }
+    float3 centre = 0.5f * (lower + upper), extent = 0.5f * (upper - lower);
+
+    float3 a = abs(normal);
+    uint axis = a.x > a.y && a.x > a.z ? 0u : (a.y > a.z ? 1u : 2u);
+    uint2 plane = axis == 0u ? uint2(2u, 1u)
+        : (axis == 2u ? uint2(0u, 1u) : uint2(0u, 2u));
+    float2 face = float2(p[plane.x], p[plane.y]);
+    float2 faceCentre = float2(centre[plane.x], centre[plane.y]);
+    float2 faceHalf = float2(extent[plane.x], extent[plane.y]);
+
+    // Relief by finite differences one pixel wide, which also filters it.
+    float2 id, unusedID;
+    float relief, unusedRelief;
+    float height = faceHeight(style, hit.broken, face, faceCentre, faceHalf,
+        footprint, id, relief);
+    float delta = max(footprint, 0.002f);
+    float2 slope = float2(faceHeight(style, hit.broken,
+            face + float2(delta, 0.0f), faceCentre, faceHalf, footprint,
+            unusedID, unusedRelief),
+        faceHeight(style, hit.broken, face + float2(0.0f, delta), faceCentre,
+            faceHalf, footprint, unusedID, unusedRelief)) - height;
+    slope /= delta;
+
+    // Box edges round over 2 cm, so they catch the light; the rounding
+    // fades once it is narrower than a pixel.
+    if (any(extent > 0.0f) && style != styleBall && !hit.broken) {
+        float radius = min(0.02f,
+            0.3f * min(extent.x, min(extent.y, extent.z)));
+        float3 q = p - centre;
+        float3 rounded = sign(q) * max(abs(q) - (extent - radius), 0.0f);
+        if (dot(rounded, rounded) > 0.0f)
+            normal = normalize(mix(normal, normalize(rounded),
+                1.0f - smoothstep(radius, 3.0f * radius, footprint)));
+    }
+    float3 tangent = float3(0.0f), bitangent = float3(0.0f);
+    tangent[plane.x] = 1.0f;
+    bitangent[plane.y] = 1.0f;
+    normal = normalize(normal - slope.x * tangent - slope.y * bitangent);
+
+    float shade = latticeHash(int2(id) + int2(hit.index * 31u, 0));
+    float mottle = fbm(face, 4.0f, footprint);
+    float roughness = styleLooks[min(style, 10u)].roughness;
+    float metallic = 0.0f;
+    float3 albedo;
+    if (style == 0u) {
+        float patch = fbm(point.xz, 0.35f, footprint);
+        albedo = mix(float3(0.2f, 0.29f, 0.11f), float3(0.33f, 0.33f, 0.17f),
+            smoothstep(0.35f, 0.75f, patch))
+            * (0.85f + 0.3f * fbm(point.xz, 2.0f, footprint))
+            * (0.75f + 0.5f * fbm(point.xz, 25.0f, footprint));
+    } else if (style == styleBrick) {
+        albedo = mix(float3(0.5f, 0.48f, 0.44f),
+            mix(float3(0.36f, 0.13f, 0.09f), float3(0.5f, 0.22f, 0.14f), shade)
+                * (0.85f + 0.3f * mottle), relief);
+        roughness = mix(0.95f, roughness, relief);
+    } else if (style == styleStone) {
+        albedo = mix(float3(0.32f, 0.31f, 0.29f),
+            mix(float3(0.44f, 0.42f, 0.38f), float3(0.56f, 0.54f, 0.5f), shade)
+                * (0.8f + 0.4f * mottle), relief);
+    } else if (style == styleWood || style == styleCrate) {
+        // Grain runs along the boards: stretched noise across them.
+        float grain = fbm(face * float2(0.05f, 1.0f), 30.0f, footprint);
+        float3 board = style == styleWood
+            ? mix(float3(0.33f, 0.22f, 0.13f), float3(0.42f, 0.29f, 0.17f),
+                shade)
+            : mix(float3(0.55f, 0.4f, 0.22f), float3(0.62f, 0.46f, 0.26f),
+                shade);
+        albedo = mix(board * 0.3f, board * (0.8f + 0.4f * grain),
+            smoothstep(0.0f, 0.5f, relief));
+        roughness *= 0.85f + 0.3f * grain;
+    } else if (style == styleRoof) {
+        albedo = float3(0.16f, 0.17f, 0.19f) * (0.8f + 0.4f * mottle);
+        roughness *= 0.85f + 0.3f * mottle;
+    } else if (style == styleSteel) {
+        // Bare steel, brushed along the frame.
+        float brushed = fbm(face * float2(0.05f, 1.0f), 60.0f, footprint);
+        albedo = float3(0.56f, 0.57f, 0.58f) * (0.94f + 0.12f * brushed);
+        roughness = 0.42f + 0.16f * brushed;
+        metallic = 1.0f;
+    } else if (style == styleToy || style == styleBall) {
         const float3 paints[4] = {float3(0.75f, 0.1f, 0.08f),
             float3(0.1f, 0.3f, 0.75f), float3(0.9f, 0.62f, 0.06f),
             float3(0.12f, 0.55f, 0.2f)};
         float3 paint = paints[hit.tint % 4u];
-        if (hit.style == styleBall) {
+        float3 q = hit.local;
+        if (style == styleBall) {
             // A ball: six wedges of paint and white, and a white band, so
             // its roll shows.
-            float wedge = floor((atan2(p.z, p.x) + 3.1415927f)
+            float wedge = floor((atan2(q.z, q.x) + 3.1415927f)
                 / 1.0471976f);
-            bool white = fmod(wedge, 2.0f) > 0.5f || abs(p.y) < 0.18f;
-            base = white ? float3(0.82f, 0.8f, 0.76f) : paint;
+            bool white = fmod(wedge, 2.0f) > 0.5f || abs(q.y) < 0.18f;
+            albedo = white ? float3(0.82f, 0.8f, 0.76f) : paint;
         } else {
             // A cube: painted faces with a pale rim along their edges. The
             // face is the rest-frame axis the point reaches, so a tumbling
             // cube keeps its pattern.
-            float3 r = abs(p);
-            float2 q = r.x >= r.y && r.x >= r.z ? r.yz
+            float3 r = abs(q);
+            float2 rim = r.x >= r.y && r.x >= r.z ? r.yz
                 : (r.y >= r.z ? r.xz : r.xy);
-            base = max(q.x, q.y) > 0.86f ? float3(0.82f, 0.8f, 0.76f) : paint;
+            albedo = max(rim.x, rim.y) > 0.86f ? float3(0.82f, 0.8f, 0.76f)
+                : paint;
         }
-    } else if (hit.style == styleRope) {
-        base = float3(0.52f, 0.43f, 0.3f);
+        roughness *= 0.9f + 0.2f * mottle;
+    } else if (style == styleRope) {
+        albedo = float3(0.52f, 0.43f, 0.3f);
     } else {
-        base = float3(0.08f, 0.08f, 0.09f);
+        albedo = float3(0.08f, 0.08f, 0.09f) * (0.85f + 0.3f * mottle);
     }
     // Fracture faces show the rough, paler inside of the material.
-    if (hit.broken) base = mix(base, float3(0.45f, 0.42f, 0.38f), 0.45f)
-        * (0.75f + 0.5f * hash11(floor(face.x * 9.0f) + floor(face.y * 9.0f)
-            * 31.0f));
-    return base;
+    if (hit.broken) {
+        albedo = mix(albedo, float3(0.45f, 0.42f, 0.38f), 0.45f)
+            * (0.75f + 0.5f * mottle);
+        roughness = 0.97f;
+        metallic = 0.0f;
+    }
+    return {{albedo, roughness, metallic, 1.0f},
+        pixeltje_physics::rotate(orientation, normal)};
 }
 
 // The colour and the depth of what the ray hit, so the character's raster
@@ -1825,30 +2002,21 @@ fragment SceneFragment playgroundFragment(ScreenVertex in [[stage_in]],
         float3 point = origin + direction * hit.distance;
         float4 clip = cameraClip(point, game, u.resolutionTime.xy);
         depth = clamp(clip.z / clip.w, 0.0f, 1.0f);
-        float3 base;
-        if (hit.kind == 1u) {
-            float2 tile = floor(point.xz / 2.0f);
-            float checker = fmod(abs(tile.x + tile.y), 2.0f);
-            base = mix(float3(0.24f, 0.3f, 0.17f), float3(0.28f, 0.34f, 0.2f),
-                checker) * (0.9f + 0.2f * hash11(floor(point.x * 4.0f)
-                + floor(point.z * 4.0f) * 13.0f));
-        } else {
-            base = surfaceColor(hit);
-        }
+        // The width of this pixel on the surface, longer at grazing angles.
+        float footprint = hit.distance / (1.1f * u.resolutionTime.y)
+            / max(abs(dot(hit.normal, direction)), 0.25f);
+        SurfacePoint surface = shadeSurface(hit, point, footprint, game);
+        // Relief may tilt a normal toward the sun on a face turned away from
+        // it; such a face stays in shadow.
         float3 sun = game.sunLight.xyz;
-        float sunVisibility = 1.0f;
-        if (dot(hit.normal, sun) > 0.0f) {
-            SceneHit blocker = traceScene(point + hit.normal * 0.01f, sun,
-                60.0f, game);
-            if (blocker.kind != 0u) sunVisibility = 0.0f;
-        }
-        PlaygroundMaterial material = hit.kind == 1u
-            ? materialForStyle(0u, base, false)
-            : materialForStyle(hit.style, base, hit.broken);
+        float sunVisibility = 0.0f;
+        if (dot(hit.normal, sun) > 0.0f)
+            sunVisibility = traceScene(point + hit.normal * 0.01f, sun,
+                60.0f, game).kind == 0u ? 1.0f : 0.0f;
         float occlusion = ambientOcclusion(point + hit.normal * 0.01f,
             hit.normal, game);
-        color = lightMaterial(material, hit.normal, -direction, sunVisibility,
-            occlusion, game, environment) * game.sunLight.w
+        color = lightMaterial(surface.material, surface.normal, -direction,
+            sunVisibility, occlusion, game, environment) * game.sunLight.w
             * exp2(exposureStops);
         // A soft contact shadow under the third-person character.
         if (hit.kind == 1u && game.camera.w > 0.5f
@@ -1858,15 +2026,111 @@ fragment SceneFragment playgroundFragment(ScreenVertex in [[stage_in]],
                 clamp((game.player.y - playerEyeHeight) / 2.0f, 0.0f, 1.0f));
     }
     color = neutralToneMap(color);
-    float2 pixel = in.uv * u.resolutionTime.xy;
-    float2 cross = abs(pixel - u.resolutionTime.xy * 0.5f);
-    if ((cross.x < 1.2f && cross.y > 3.0f && cross.y < 10.0f)
-        || (cross.y < 1.2f && cross.x > 3.0f && cross.x < 10.0f))
-        color = float3(1.0f, 0.95f, 0.85f);
     color += game.view.z * float3(1.0f, 0.6f, 0.25f) * 0.6f;
     return {float4(clamp(pixeltje_3d::linearToSRGB(
         clamp(color, float3(0.0f), float3(1.0f))),
         float3(0.0f), float3(1.0f)), 1.0f), depth};
+}
+
+// ------------------------------------------------------------ antialiasing
+
+constexpr sampler postSampler(coord::normalized, address::clamp_to_edge,
+    filter::linear);
+
+float antialiasLuma(texture2d<float> scene, float2 uv) {
+    return dot(scene.sample(postSampler, uv).rgb,
+        float3(0.2126f, 0.7152f, 0.0722f));
+}
+
+// FXAA-style edge smoothing, as in the haunted house, over the tone-mapped
+// scene and character. The scene is ray-cast once per pixel, so geometry
+// edges alias; this finds each edge, walks along it to estimate where the
+// pixel sits on the stair step, and resamples across it. The crosshair is
+// drawn after, so it stays crisp.
+fragment float4 antialiasFragment(ScreenVertex in [[stage_in]],
+    constant ProgramUniforms &u [[buffer(0)]],
+    texture2d<float> scene [[texture(1)]]) {
+    float2 pixel = in.uv * u.resolutionTime.xy;
+    float2 cross = abs(pixel - u.resolutionTime.xy * 0.5f);
+    if ((cross.x < 1.2f && cross.y > 3.0f && cross.y < 10.0f)
+        || (cross.y < 1.2f && cross.x > 3.0f && cross.x < 10.0f))
+        return float4(pixeltje_3d::linearToSRGB(float3(1.0f, 0.95f, 0.85f)),
+            1.0f);
+    float2 texel = 1.0f / u.resolutionTime.xy;
+    float4 centre = scene.sample(postSampler, in.uv);
+    float lumaM = antialiasLuma(scene, in.uv);
+    float lumaN = antialiasLuma(scene, in.uv + float2(0.0f, -texel.y));
+    float lumaS = antialiasLuma(scene, in.uv + float2(0.0f, texel.y));
+    float lumaW = antialiasLuma(scene, in.uv + float2(-texel.x, 0.0f));
+    float lumaE = antialiasLuma(scene, in.uv + float2(texel.x, 0.0f));
+    float lumaMax = max(lumaM, max(max(lumaN, lumaS), max(lumaW, lumaE)));
+    float range = lumaMax
+        - min(lumaM, min(min(lumaN, lumaS), min(lumaW, lumaE)));
+    if (range < max(0.0312f, lumaMax * 0.125f)) return centre;
+
+    float lumaNW = antialiasLuma(scene, in.uv + float2(-texel.x, -texel.y));
+    float lumaNE = antialiasLuma(scene, in.uv + float2(texel.x, -texel.y));
+    float lumaSW = antialiasLuma(scene, in.uv + float2(-texel.x, texel.y));
+    float lumaSE = antialiasLuma(scene, in.uv + float2(texel.x, texel.y));
+    bool horizontal = abs(lumaNW + lumaSW - 2.0f * lumaW)
+            + 2.0f * abs(lumaN + lumaS - 2.0f * lumaM)
+            + abs(lumaNE + lumaSE - 2.0f * lumaE)
+        >= abs(lumaNW + lumaNE - 2.0f * lumaN)
+            + 2.0f * abs(lumaW + lumaE - 2.0f * lumaM)
+            + abs(lumaSW + lumaSE - 2.0f * lumaS);
+
+    // Step toward the neighbour across the edge with the steeper gradient.
+    float lumaNegative = horizontal ? lumaN : lumaW;
+    float lumaPositive = horizontal ? lumaS : lumaE;
+    bool negativeSteeper = abs(lumaNegative - lumaM)
+        >= abs(lumaPositive - lumaM);
+    float threshold = 0.25f * max(abs(lumaNegative - lumaM),
+        abs(lumaPositive - lumaM));
+    float stepLength = horizontal ? texel.y : texel.x;
+    float edgeLuma = 0.5f
+        * (lumaM + (negativeSteeper ? lumaNegative : lumaPositive));
+    if (negativeSteeper) stepLength = -stepLength;
+
+    // Walk both ways along the edge until its luma departs from the average.
+    float2 edgeUV = in.uv + (horizontal ? float2(0.0f, 0.5f * stepLength)
+        : float2(0.5f * stepLength, 0.0f));
+    float2 along = horizontal ? float2(texel.x, 0.0f) : float2(0.0f, texel.y);
+    constexpr float strides[8] = {1.0f, 1.5f, 2.0f, 2.0f, 2.0f, 2.0f, 4.0f,
+        8.0f};
+    float2 uvBack = edgeUV, uvForward = edgeUV;
+    float endBack = 0.0f, endForward = 0.0f;
+    bool doneBack = false, doneForward = false;
+    for (int i = 0; i < 8 && !(doneBack && doneForward); ++i) {
+        if (!doneBack) {
+            uvBack -= along * strides[i];
+            endBack = antialiasLuma(scene, uvBack) - edgeLuma;
+            doneBack = abs(endBack) >= threshold;
+        }
+        if (!doneForward) {
+            uvForward += along * strides[i];
+            endForward = antialiasLuma(scene, uvForward) - edgeLuma;
+            doneForward = abs(endForward) >= threshold;
+        }
+    }
+    float distanceBack = horizontal ? in.uv.x - uvBack.x : in.uv.y - uvBack.y;
+    float distanceForward = horizontal ? uvForward.x - in.uv.x
+        : uvForward.y - in.uv.y;
+    bool backNearer = distanceBack < distanceForward;
+    // Only blend when the nearer end turns the same way as this pixel.
+    bool matches = ((backNearer ? endBack : endForward) < 0.0f)
+        != (lumaM < edgeLuma);
+    float edgeOffset = matches ? 0.5f - min(distanceBack, distanceForward)
+        / (distanceBack + distanceForward) : 0.0f;
+
+    // Thin features shorter than the walk still get a sub-pixel blend.
+    float average = (2.0f * (lumaN + lumaS + lumaW + lumaE)
+        + lumaNW + lumaNE + lumaSW + lumaSE) / 12.0f;
+    float subpixel = saturate(abs(average - lumaM) / range);
+    subpixel = (-2.0f * subpixel + 3.0f) * subpixel * subpixel;
+    float offset = max(edgeOffset, 0.75f * subpixel * subpixel);
+    float2 resolved = in.uv + (horizontal ? float2(0.0f, offset * stepLength)
+        : float2(offset * stepLength, 0.0f));
+    return float4(scene.sample(postSampler, resolved).rgb, centre.a);
 }
 
 // --------------------------------------------------------------- character
