@@ -60,15 +60,32 @@ values; newly exposed fracture faces become rough and nonmetallic. The
 `Environment HDR` File Path node links to
 `~/Downloads/suburban_garden_1k.hdr`; choose another Radiance RGBE `.hdr`
 file there if needed. The GPU Program decodes the linked file in linear light
-and uses it only for diffuse fill and roughness-filtered reflections; the
-visible sky stays procedural and there is no distance fog. The file stays
-outside the repository and must be present to run the example. Mip filtering
-and five-direction diffuse sampling approximate environment convolution; the
-diffuse fill is capped so the map's own sun does not light surfaces twice.
-Scene objects do not appear in reflections. The character's material is matte
-with faint highlights. Traced sun shadows still cover the scene; the character
-uses the same lighting model with a fixed nonmetallic material but does not
-receive those traced shadows.
+and lights the scene from it; the visible sky stays procedural and there is
+no distance fog. The file stays outside the repository and must be present to
+run the example.
+
+An initialize pass, `lightFromEnvironment`, reads the map once at its 128 × 64
+mip level. Texels more than 32 times the map's mean brightness are its sun:
+their direction and summed irradiance become the directional sun, with the
+GGX term and the traced shadow. In `suburban_garden_1k` that is two texels,
+about 500 times brighter than the brightest sky. The rest of the upper half
+becomes band-2 spherical harmonics of irradiance, the ambient fill. The lower
+half is replaced by the yard's own sunlit grass, because the map's ground is
+a shaded garden about four times darker. A map without a sun, such as an
+overcast sky, lights the scene through the fill alone. The same pass sets the
+exposure so that a white surface facing up shows as 1 before the tone map;
+`exposureStops` in the shader adds 0.5 stops on top. Khronos PBR Neutral tone
+maps the result, so colours below its highlight shoulder pass unchanged.
+
+Reflections sample roughness-filtered mip levels of the map, held to its
+brightest sky so the sun's highlight comes from the GGX term alone. Scene
+objects do not appear in reflections. Ambient occlusion darkens the fill and
+the reflections where parts and bodies crowd a surface: a present pass,
+`gatherOccluders`, lists each part as the box of its alive cells and every
+body but the shards, and the fragment combines the exact cosine-weighted form
+factors of the boxes and balls within 3 m, faded out from 2 m. The character's material is matte with
+faint highlights. It uses the same lighting model with a fixed nonmetallic
+material, but receives neither the traced shadows nor ambient occlusion.
 
 ## Third-person character
 

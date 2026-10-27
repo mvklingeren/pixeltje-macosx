@@ -93,6 +93,14 @@ struct Piece {
     uint tint;      // paint of a toy
 };
 
+// A box or ball that darkens the ambient light around it, gathered each
+// frame from the alive cells of the parts and from the bodies.
+struct Occluder {
+    float4 centre;      // world centre, radius of a ball (0 for a box)
+    float4 extent;      // box half extent
+    float4 orientation; // local-to-world unit quaternion
+};
+
 struct GameState {
     float4 player;      // eye position, yaw
     float4 view;        // pitch, last action count, muzzle flash, last
@@ -114,6 +122,14 @@ struct GameState {
     float4 camera;      // camera position, 1 in third person
     float4 stride;      // character facing yaw, walk seconds, camera too close,
                         // vertical jump speed
+    // Light read once from the environment HDR by lightFromEnvironment.
+    float4 sunLight;    // direction toward its sun, exposure
+    float4 sunColor;    // the sun's irradiance at normal incidence, the
+                        // brightest sky radiance left
+    float4 skyFill[9];  // band-2 spherical harmonics of the irradiance of
+                        // everything but the sun, over pi
+    uint4 occluderCount;
+    Occluder occluders[partCapacity + bodyCapacity];
 };
 
 static_assert(sizeof(GameState) <= 131072,
@@ -1386,7 +1402,13 @@ vertex ScreenVertex fullscreenVertex(uint vertexID [[vertex_id]]) {
         float2(p.x, 1.0f - p.y)};
 }
 
-constant float3 sunDirection = float3(0.46f, 0.78f, 0.42f);
+// Scene brightness in stops against the exposure the environment sets, at
+// which a white surface facing up under its sun and sky shows as 1.
+constant float exposureStops = 0.5f;
+
+float luminance(float3 c) {
+    return dot(c, float3(0.2126f, 0.7152f, 0.0722f));
+}
 
 // Radiance equirectangular maps arrive as linear half-float textures with a
 // mip chain. Longitude wraps and latitude clamps at the poles.
@@ -1399,20 +1421,231 @@ float3 environmentRadiance(texture2d<float> environment, float3 d, float lod) {
     return environment.sample(environmentSampler, uv, level(lod)).rgb;
 }
 
-// Diffuse fill from a blurred level of the map, capped so the map's own sun
-// (peaks near 21000 in suburban_garden_1k) does not light surfaces a second
-// time beside the directional sun. Sharper levels read as glossy streaks.
-float3 environmentFill(texture2d<float> environment, float3 d, float lod) {
-    return min(environmentRadiance(environment, d, lod), float3(1.0f));
+// The direction of a point of the equirectangular map, the inverse of the
+// lookup in environmentRadiance.
+float3 environmentDirection(float2 uv) {
+    float phi = (uv.x - 0.5f) * 6.2831853f, theta = uv.y * 3.1415927f;
+    return float3(sin(theta) * cos(phi), cos(theta), sin(theta) * sin(phi));
+}
+
+struct SkyBasis {
+    float y[9];
+};
+
+// The real spherical harmonics of bands 0 to 2.
+SkyBasis skyBasis(float3 d) {
+    return {{0.282095f, 0.488603f * d.y, 0.488603f * d.z, 0.488603f * d.x,
+        1.092548f * d.x * d.y, 1.092548f * d.y * d.z,
+        0.315392f * (3.0f * d.z * d.z - 1.0f), 1.092548f * d.x * d.z,
+        0.546274f * (d.x * d.x - d.y * d.y)}};
+}
+
+// The radiance of a white surface facing n under the environment's sky and
+// ground, without its sun.
+float3 skyFill(device const GameState &game, float3 n) {
+    SkyBasis basis = skyBasis(n);
+    float3 fill = float3(0.0f);
+    for (uint i = 0u; i < 9u; ++i) fill += game.skyFill[i].rgb * basis.y[i];
+    return max(fill, float3(0.0f));
+}
+
+// The average colour of the yard's grass, which lights from below.
+constant float3 grassAlbedo = float3(0.26f, 0.32f, 0.185f);
+
+// Splits the environment once into a sun and a sky. Texels far brighter than
+// the map's mean are the sun: their direction and irradiance light the scene
+// through the GGX sun term and its traced shadow. The rest of the upper half
+// projects to spherical harmonics of irradiance. The lower half is the
+// yard's own sunlit grass rather than the map's ground, which in
+// suburban_garden_1k is shaded garden about four times darker. A 128 x 64
+// level is plenty for band 2 and still holds suburban_garden_1k's sun in two
+// texels, about 500 times brighter than its brightest sky. A map without
+// such texels, such as an overcast sky, lights the scene through the
+// harmonics alone.
+kernel void lightFromEnvironment(device GameState *states [[buffer(1)]],
+    texture2d<float> environment [[texture(2)]],
+    uint id [[thread_position_in_grid]]) {
+    if (id != 0u) return;
+    device GameState &game = states[0];
+    uint level = uint(max(int(environment.get_num_mip_levels()) - 8, 0));
+    uint2 size = uint2(environment.get_width(level),
+        environment.get_height(level));
+    float texelAngle = 6.2831853f / float(size.x) * 3.1415927f
+        / float(size.y);
+    float total = 0.0f;
+    for (uint y = 0u; y < size.y; ++y) {
+        float angle = texelAngle
+            * sin((float(y) + 0.5f) / float(size.y) * 3.1415927f);
+        for (uint x = 0u; x < size.x; ++x)
+            total += luminance(environment.read(uint2(x, y), level).rgb)
+                * angle;
+    }
+    float threshold = 32.0f * total / 12.566371f;
+    float3 sunSum = float3(0.0f), sunColor = float3(0.0f);
+    float3 fill[9];
+    float ground[9];
+    for (uint i = 0u; i < 9u; ++i) {
+        fill[i] = float3(0.0f);
+        ground[i] = 0.0f;
+    }
+    float skyPeak = 0.0f;
+    for (uint y = 0u; y < size.y; ++y) {
+        for (uint x = 0u; x < size.x; ++x) {
+            float2 uv = (float2(x, y) + 0.5f) / float2(size);
+            float3 d = environmentDirection(uv);
+            float3 radiance = environment.read(uint2(x, y), level).rgb;
+            float angle = texelAngle * sin(uv.y * 3.1415927f);
+            SkyBasis basis = skyBasis(d);
+            if (d.y < 0.0f) {
+                for (uint i = 0u; i < 9u; ++i) ground[i] += basis.y[i] * angle;
+                continue;
+            }
+            float brightness = luminance(radiance);
+            if (brightness > threshold) {
+                sunSum += d * brightness * angle;
+                sunColor += radiance * angle;
+                continue;
+            }
+            skyPeak = max(skyPeak, brightness);
+            for (uint i = 0u; i < 9u; ++i)
+                fill[i] += radiance * (basis.y[i] * angle);
+        }
+    }
+    // Convolution with the cosine lobe, over pi, per band.
+    const float band[9] = {1.0f, 0.666667f, 0.666667f, 0.666667f,
+        0.25f, 0.25f, 0.25f, 0.25f, 0.25f};
+    for (uint i = 0u; i < 9u; ++i)
+        game.skyFill[i] = float4(fill[i] * band[i], 0.0f);
+    float3 sun = length(sunSum) > 0.0f ? normalize(sunSum)
+        : float3(0.0f, 1.0f, 0.0f);
+    float3 lit = sunColor * max(sun.y, 0.0f) * 0.318309886f
+        + skyFill(game, float3(0.0f, 1.0f, 0.0f));
+    for (uint i = 0u; i < 9u; ++i)
+        game.skyFill[i].rgb += grassAlbedo * lit * (ground[i] * band[i]);
+    game.sunLight = float4(sun, 1.0f / max(luminance(lit), 1.0e-4f));
+    game.sunColor = float4(sunColor, max(skyPeak, 1.0e-4f));
 }
 
 // The visible sky stays procedural; the HDR map only lights surfaces.
-float3 skyColor(float3 d) {
+float3 skyColor(float3 d, float3 sunDirection) {
     float3 horizon = float3(0.42f, 0.6f, 0.86f);
     float3 zenith = float3(0.04f, 0.18f, 0.6f);
     float3 color = mix(horizon, zenith, pow(clamp(d.y, 0.0f, 1.0f), 0.35f));
-    float sun = max(dot(d, normalize(sunDirection)), 0.0f);
+    float sun = max(dot(d, sunDirection), 0.0f);
     return color + float3(1.0f, 0.85f, 0.6f) * pow(sun, 400.0f) * 8.0f;
+}
+
+// Khronos PBR Neutral: colours below the highlight shoulder pass unchanged,
+// so a material shows the base colour it was given.
+float3 neutralToneMap(float3 color) {
+    const float start = 0.76f, shoulder = 1.0f - start;
+    float x = min(color.r, min(color.g, color.b));
+    color -= x < 0.08f ? x - 6.25f * x * x : 0.04f;
+    float peak = max(color.r, max(color.g, color.b));
+    if (peak < start) return color;
+    float newPeak = 1.0f - shoulder * shoulder / (peak + shoulder - start);
+    color *= newPeak / peak;
+    float g = 1.0f - 1.0f / (0.15f * (peak - newPeak) + 1.0f);
+    return mix(color, float3(newPeak), g);
+}
+
+// Cosine-weighted share of the sky an axis-aligned box hides from a point
+// with normal n, both in the box's frame: Lambert's form factors of the
+// faces the point sees. A face across the point's horizon counts its lower
+// part against the upper, so the share comes out low there.
+float boxOcclusion(float3 p, float3 n, float3 extent) {
+    if (all(abs(p) < extent)) return 0.0f;
+    const float2 corners[4] = {float2(1.0f, 1.0f), float2(-1.0f, 1.0f),
+        float2(-1.0f, -1.0f), float2(1.0f, -1.0f)};
+    float hidden = 0.0f;
+    for (uint a = 0u; a < 3u; ++a) {
+        if (abs(p[a]) <= extent[a]) continue;
+        float side = sign(p[a]);
+        uint b = (a + 1u) % 3u, c = (a + 2u) % 3u;
+        // Counter-clockwise about the face's outward normal; the far face's
+        // mirror image keeps that order.
+        float3 v[4];
+        for (uint k = 0u; k < 4u; ++k) {
+            float3 q;
+            q[a] = side * extent[a];
+            q[b] = corners[k].x * extent[b];
+            q[c] = corners[k].y * extent[c] * side;
+            v[k] = normalize(q - p);
+        }
+        for (uint k = 0u; k < 4u; ++k) {
+            float3 e = cross(v[k], v[(k + 1u) & 3u]);
+            float length2 = dot(e, e);
+            if (length2 > 1.0e-12f)
+                hidden -= dot(n, e) * rsqrt(length2) * acos(clamp(
+                    dot(v[k], v[(k + 1u) & 3u]), -1.0f, 1.0f));
+        }
+    }
+    return clamp(hidden * 0.159154943f, 0.0f, 1.0f);
+}
+
+// The same share for a ball above the point's horizon.
+float ballOcclusion(float3 p, float3 n, float3 centre, float radius) {
+    float3 d = centre - p;
+    float distance2 = dot(d, d);
+    return clamp(dot(n, d) * rsqrt(distance2) * radius * radius / distance2,
+        0.0f, 1.0f);
+}
+
+// The boxes and balls ambientOcclusion darkens around: each part as the box
+// of its alive cells, and every body but the flying shards.
+kernel void gatherOccluders(device GameState *states [[buffer(1)]],
+    uint id [[thread_position_in_grid]]) {
+    if (id != 0u) return;
+    device GameState &game = states[0];
+    uint count = 0u;
+    uint parts = min(game.counts.x, partCapacity);
+    for (uint p = 0u; p < parts; ++p) {
+        ulong alive = partAlive(game, p);
+        if (alive == 0ul) continue;
+        float3 lower = float3(1.0e4f), upper = float3(-1.0e4f);
+        for (uint bit = 0u; bit < 64u; ++bit) {
+            if ((alive & (1ul << bit)) == 0ul) continue;
+            float3 cellLower, cellUpper;
+            cellBox(game.parts[p], bit, cellLower, cellUpper);
+            lower = min(lower, cellLower);
+            upper = max(upper, cellUpper);
+        }
+        game.occluders[count++] = {float4(0.5f * (lower + upper), 0.0f),
+            float4(0.5f * (upper - lower), 0.0f),
+            float4(0.0f, 0.0f, 0.0f, 1.0f)};
+    }
+    for (uint i = 0u; i < bodyCapacity; ++i) {
+        pixeltje_physics::RigidBody body = game.world.bodies[i];
+        Piece piece = game.pieces[i];
+        if (body.extentState.w == 0.0f || piece.kind == 2u) continue;
+        float radius = piece.kind == 4u
+            ? 0.5f * (piece.upper.x - piece.lower.x) : 0.0f;
+        game.occluders[count++] = {float4(body.centreMass.xyz, radius),
+            float4(body.extentState.xyz, 0.0f), body.orientation};
+    }
+    game.occluderCount.x = count;
+}
+
+// The ambient light left at p after the boxes and balls around it. Each
+// occluder fades out between 2 and 3 m, so the full form factor is worked
+// out only for the few close by.
+float ambientOcclusion(float3 p, float3 n, device const GameState &game) {
+    float open = 1.0f;
+    uint count = min(game.occluderCount.x, partCapacity + bodyCapacity);
+    for (uint i = 0u; i < count; ++i) {
+        Occluder o = game.occluders[i];
+        float3 local = pixeltje_physics::unrotate(o.orientation,
+            p - o.centre.xyz);
+        float distance = length(max(abs(local) - o.extent.xyz, 0.0f));
+        if (distance > 3.0f
+            || dot(n, o.centre.xyz - p) < -length(o.extent.xyz)) continue;
+        float hidden = o.centre.w > 0.0f
+            ? ballOcclusion(p, n, o.centre.xyz, o.centre.w)
+            : boxOcclusion(local, pixeltje_physics::unrotate(o.orientation,
+                n), o.extent.xyz);
+        open *= 1.0f - hidden * (1.0f - smoothstep(2.0f, 3.0f, distance));
+    }
+    return open;
 }
 
 struct PlaygroundMaterial {
@@ -1445,16 +1678,20 @@ PlaygroundMaterial materialForStyle(uint style, float3 albedo, bool broken) {
     return {albedo, roughness, metallic, 1.0f};
 }
 
-// GGX microfacet sun light with Schlick Fresnel and Smith masking. Diffuse
-// environment light averages five directions on the normal hemisphere;
-// specular light samples roughness-dependent mip levels of the HDR map.
-// Mip filtering is a compact approximation to GGX environment convolution.
+// GGX microfacet sun light with Schlick Fresnel and Smith masking, from the
+// sun lightFromEnvironment found. Diffuse ambient light comes from the
+// environment's spherical harmonics; specular light samples
+// roughness-dependent mip levels of the HDR map, held to its brightest sky
+// so the sun's highlight comes from the GGX term alone. Mip filtering is a
+// compact approximation to GGX environment convolution. Occlusion darkens
+// both, reflections less on smooth surfaces seen face on.
 float3 lightMaterial(PlaygroundMaterial material, float3 normal,
-    float3 view, float sunVisibility, texture2d<float> environment) {
+    float3 view, float sunVisibility, float occlusion,
+    device const GameState &game, texture2d<float> environment) {
     const float invPi = 0.318309886f;
     float3 n = normalize(normal);
     float3 v = normalize(view);
-    float3 l = normalize(sunDirection);
+    float3 l = game.sunLight.xyz;
     float3 h = normalize(v + l);
     float noV = max(dot(n, v), 0.001f);
     float noL = max(dot(n, l), 0.0f);
@@ -1475,31 +1712,24 @@ float3 lightMaterial(PlaygroundMaterial material, float3 normal,
     float3 specular = distribution * geometry * fresnel
         / max(4.0f * noV * noL, 0.001f) * material.specular;
     float3 sun = (diffuse + specular) * noL * sunVisibility
-        * float3(1.0f, 0.92f, 0.78f) * 3.5f;
+        * game.sunColor.rgb;
 
     float3 environmentFresnel = f0 + (max(float3(1.0f - roughness), f0)
         - f0) * pow(1.0f - noV, 5.0f);
-    float environmentLod = float(environment.get_num_mip_levels() - 1u);
-    float diffuseLod = max(environmentLod - 3.0f, 0.0f); // 8x4 for a 1k map
-    float3 tangent = normalize(cross(abs(n.y) < 0.9f
-        ? float3(0.0f, 1.0f, 0.0f) : float3(1.0f, 0.0f, 0.0f), n));
-    float3 bitangent = cross(n, tangent);
-    float3 irradiance = environmentFill(environment, n, diffuseLod) * 0.36f;
-    irradiance += environmentFill(environment,
-        normalize(n + tangent * 1.2f), diffuseLod) * 0.16f;
-    irradiance += environmentFill(environment,
-        normalize(n - tangent * 1.2f), diffuseLod) * 0.16f;
-    irradiance += environmentFill(environment,
-        normalize(n + bitangent * 1.2f), diffuseLod) * 0.16f;
-    irradiance += environmentFill(environment,
-        normalize(n - bitangent * 1.2f), diffuseLod) * 0.16f;
     float3 ambientDiffuse = (1.0f - environmentFresnel)
-        * (1.0f - material.metallic) * material.albedo * irradiance;
-    float3 reflected = reflect(-v, n);
+        * (1.0f - material.metallic) * material.albedo * skyFill(game, n)
+        * occlusion;
+    float environmentLod = float(environment.get_num_mip_levels() - 1u);
     float specularLod = roughness * roughness * environmentLod;
-    float3 ambientSpecular = environmentFresnel
-        * environmentRadiance(environment, reflected, specularLod)
-        * (1.0f - 0.45f * roughness) * material.specular;
+    float3 reflection = environmentRadiance(environment, reflect(-v, n),
+        specularLod);
+    reflection *= min(1.0f, game.sunColor.w
+        / max(luminance(reflection), 1.0e-4f));
+    // Lagarde and de Rousiers' specular occlusion.
+    float specularOcclusion = saturate(pow(noV + occlusion,
+        exp2(-16.0f * roughness - 1.0f)) - 1.0f + occlusion);
+    float3 ambientSpecular = environmentFresnel * reflection
+        * (1.0f - 0.45f * roughness) * material.specular * specularOcclusion;
     return sun + ambientDiffuse + ambientSpecular;
 }
 
@@ -1590,7 +1820,7 @@ fragment SceneFragment playgroundFragment(ScreenVertex in [[stage_in]],
     float3 color;
     float depth = 1.0f;
     if (hit.kind == 0u) {
-        color = skyColor(direction);
+        color = skyColor(direction, game.sunLight.xyz);
     } else {
         float3 point = origin + direction * hit.distance;
         float4 clip = cameraClip(point, game, u.resolutionTime.xy);
@@ -1605,7 +1835,7 @@ fragment SceneFragment playgroundFragment(ScreenVertex in [[stage_in]],
         } else {
             base = surfaceColor(hit);
         }
-        float3 sun = normalize(sunDirection);
+        float3 sun = game.sunLight.xyz;
         float sunVisibility = 1.0f;
         if (dot(hit.normal, sun) > 0.0f) {
             SceneHit blocker = traceScene(point + hit.normal * 0.01f, sun,
@@ -1615,8 +1845,11 @@ fragment SceneFragment playgroundFragment(ScreenVertex in [[stage_in]],
         PlaygroundMaterial material = hit.kind == 1u
             ? materialForStyle(0u, base, false)
             : materialForStyle(hit.style, base, hit.broken);
+        float occlusion = ambientOcclusion(point + hit.normal * 0.01f,
+            hit.normal, game);
         color = lightMaterial(material, hit.normal, -direction, sunVisibility,
-            environment);
+            occlusion, game, environment) * game.sunLight.w
+            * exp2(exposureStops);
         // A soft contact shadow under the third-person character.
         if (hit.kind == 1u && game.camera.w > 0.5f
             && game.stride.z < 0.5f)
@@ -1624,7 +1857,7 @@ fragment SceneFragment playgroundFragment(ScreenVertex in [[stage_in]],
                 length(point.xz - game.player.xz)), 1.0f,
                 clamp((game.player.y - playerEyeHeight) / 2.0f, 0.0f, 1.0f));
     }
-    color = pixeltje_3d::filmicToneMap(color);
+    color = neutralToneMap(color);
     float2 pixel = in.uv * u.resolutionTime.xy;
     float2 cross = abs(pixel - u.resolutionTime.xy * 0.5f);
     if ((cross.x < 1.2f && cross.y > 3.0f && cross.y < 10.0f)
@@ -1728,9 +1961,9 @@ fragment float4 characterFragment(CharacterVertex in [[stage_in]],
     float3 view = in.world - game.camera.xyz;
     // Skin and cloth: matte, with faint highlights so rims stay soft.
     PlaygroundMaterial material = {albedo, 0.8f, 0.0f, 0.2f};
-    float3 color = lightMaterial(material, in.normal, -view, 1.0f,
-        environment);
-    color = pixeltje_3d::filmicToneMap(color);
+    float3 color = neutralToneMap(lightMaterial(material, in.normal, -view,
+        1.0f, 1.0f, game, environment) * game.sunLight.w
+        * exp2(exposureStops));
     return float4(clamp(pixeltje_3d::linearToSRGB(
         clamp(color, float3(0.0f), float3(1.0f))),
         float3(0.0f), float3(1.0f)), 1.0f);
